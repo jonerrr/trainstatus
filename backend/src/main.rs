@@ -8,6 +8,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
 mod imports;
+mod routes;
 mod times;
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
@@ -58,6 +59,7 @@ async fn main() {
             "/",
             get(|| async { Redirect::temporary("https://trainstat.us") }),
         )
+        .route("/stops", get(routes::stops::get))
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()

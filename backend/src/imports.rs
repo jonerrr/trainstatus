@@ -65,7 +65,7 @@ where
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Clone)]
 pub struct Station {
     #[serde(deserialize_with = "de_remove_prefix", rename = "routeId")]
     pub route_id: String,
@@ -94,6 +94,7 @@ struct Route(String);
 struct Stop(String, String, bool, Option<String>, String);
 
 pub async fn stops_and_routes(pool: &PgPool) {
+    // because the public api is bad, I found this endpoint that gives me all the stations from mta.info
     let mut stations: Vec<Station> = reqwest::Client::new()
         .get("https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP")
         .send()
@@ -127,7 +128,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // remove duplicates from stations vec
     stations.sort_by_key(|s| (s.stop_id.clone()));
     stations.dedup_by(|a, b| a.stop_id == b.stop_id);
-    // dbg!(stations.len());
+
     let stops = stations
         .iter()
         .map(|s| {

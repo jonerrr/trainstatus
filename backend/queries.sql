@@ -28,6 +28,7 @@ select
     t.id,
     t.route_id,
     t.direction,
+    t.mta_trip_id,
     --	t.mta_trip_id,
     array_agg(st.arrival) AS arrivals,
     array_agg(st.stop_id) AS stop_ids --	st.arrival,
@@ -37,5 +38,7 @@ from
     left join stop_times st on t.id = st.trip_id
 where
     t.route_id = 'A'
+    and st.arrival >= now()
+    and t.mta_trip_id = '050250_A..S58R'
 group by
     t.id;
