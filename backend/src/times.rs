@@ -37,17 +37,17 @@ struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 #[derive(Error, Debug)]
 pub enum ImportTimesError {
+    // #[error("`{0}` is not present in entity")]
+    // MissingValue(String),
+
     // #[error("data store disconnected")]
     // Disconnect(#[from] io::Error),
-    #[error("`{0}` is not present in entity")]
-    MissingValue(String),
+
     // #[error("invalid header (expected {expected:?}, found {found:?})")]
     // InvalidHeader {
     //     expected: String,
     //     found: String,
     // },
-    // #[error("unknown data store error")]
-    // Unknown,
 }
 
 pub async fn import(pool: PgPool) {
@@ -128,7 +128,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             // }
 
             // use this to get the direction only once
-            let mut first_stop_id = match trip_update.stop_time_update.get(0) {
+            let mut first_stop_id = match trip_update.stop_time_update.first() {
                 Some(stop_time) => match stop_time.stop_id.as_ref() {
                     Some(id) => id.clone(),
                     None => continue,
@@ -158,7 +158,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                 route_id = "SI".to_string();
             };
             // check if express train
-            if route_id.chars().last().unwrap() == 'X' {
+            if route_id.ends_with('X') {
                 route_id.pop();
             }
 
@@ -208,6 +208,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                     .unwrap()
                     .and_local_timezone(tz)
                     .unwrap();
+            // convert to utc
+            let start_timestamp = start_timestamp.to_utc();
             let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
 
             let stop_updates = trip_update
@@ -223,18 +225,44 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                         return None;
                     }
 
-                    let arrival = match &stop_time.arrival {
+                    let mut arrival = match &stop_time.arrival {
                         Some(a) => convert_timestamp(a.time),
                         _ => None,
                     };
-                    let departure = match &stop_time.departure {
+                    let mut departure = match &stop_time.departure {
                         Some(d) => convert_timestamp(d.time),
                         _ => None,
                     };
+                    if arrival.is_none() {
+                        tracing::debug!(
+                            "Setting arrival time to start time for first stop in trip"
+                        );
+                        arrival = Some(start_timestamp);
+                    }
+                    if departure.is_none() {
+                        tracing::debug!(
+                            "Setting departure time to arrival time for last stop in trip"
+                        );
+                        departure = Some(arrival.unwrap());
+                    }
 
-                    if arrival != departure {
-                        tracing::debug!("arrival and departure are not equal for {}", &trip_id);
-                    };
+                    // if arrival != departure {
+                    //     match (arrival, departure) {
+                    //         (Some(arrival_time), Some(departure_time)) => {
+                    //             let dif = departure_time.signed_duration_since(arrival_time);
+                    //             println!(
+                    //                 "arrival: {} departure: {} dif: {}",
+                    //                 arrival_time, departure_time, dif
+                    //             );
+                    //         }
+                    //         _ => {
+                    //             tracing::warn!(
+                    //                 "Missing arrival or departure time for {}",
+                    //                 &trip_id
+                    //             );
+                    //         }
+                    //     };
+                    // };
 
                     Some(StopUpdate(id, stop_id.clone(), arrival, departure))
                 })

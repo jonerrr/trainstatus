@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS positions;
 
-DROP TABLE IF EXISTS stop_updates;
+DROP TABLE IF EXISTS stop_times;
 
 DROP TABLE IF EXISTS trips;

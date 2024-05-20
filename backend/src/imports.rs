@@ -11,7 +11,7 @@ pub async fn should_update(pool: &PgPool) -> bool {
         .unwrap();
 
     // the amount of stops that shoudl be in the database
-    return stop_count != 496;
+    stop_count != 496
 }
 
 // convert strings to numbers

@@ -24,21 +24,49 @@ order by
     rs.stop_sequence;
 
 -- get arrival and departure times for a route stop (TODO)
-select
-    t.id,
-    t.route_id,
-    t.direction,
-    t.mta_trip_id,
-    --	t.mta_trip_id,
-    array_agg(st.arrival) AS arrivals,
-    array_agg(st.stop_id) AS stop_ids --	st.arrival,
-    --	st.stop_id
-from
-    trips t
-    left join stop_times st on t.id = st.trip_id
+SELECT
+    s.*,
+    array_agg(
+        distinct jsonb_build_object('id', rs.route_id, 'stop_type', rs.stop_type)
+    ) AS routes,
+    array_agg(
+        distinct jsonb_build_object(
+            'id',
+            t.id,
+            'route_id',
+            t.route_id,
+            'direction',
+            t.direction,
+            'assigned',
+            t.assigned,
+            'created_at',
+            t.created_at,
+            'stop_times',
+            (
+                select
+                    jsonb_agg(st)
+                from
+                    (
+                        select
+                            st.stop_id,
+                            st.arrival,
+                            st.departure
+                        from
+                            stop_times st
+                        where
+                            st.trip_id = t.id
+                        order by
+                            st.arrival > now()
+                    ) as st
+            )
+        )
+    ) as trips
+FROM
+    stops s
+    LEFT JOIN route_stops rs ON s.id = rs.stop_id
+    LEFT JOIN stop_times st ON s.id = st.stop_id
+    LEFT JOIN trips t ON st.trip_id = t.id
 where
-    t.route_id = 'A'
-    and st.arrival >= now()
-    and t.mta_trip_id = '050250_A..S58R'
-group by
-    t.id;
+    s.id = '250'
+GROUP BY
+    s.id;
