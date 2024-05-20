@@ -1,9 +1,8 @@
 use axum::{response::Redirect, routing::get, Router};
-use http::Method;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::env::var;
 use std::sync::OnceLock;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
@@ -49,10 +48,10 @@ async fn main() {
 
     times::import(pool.clone()).await;
 
-    let origins = [
-        "http://localhost:5173".parse().unwrap(),
-        "https://trainstat.us".parse().unwrap(),
-    ];
+    // let origins = [
+    //     "http://localhost:5173".parse().unwrap(),
+    //     "https://trainstat.us".parse().unwrap(),
+    // ];
 
     let app = Router::new()
         .route(
@@ -61,11 +60,11 @@ async fn main() {
         )
         .route("/stops", get(routes::stops::get))
         .layer(TraceLayer::new_for_http())
-        .layer(
-            CorsLayer::new()
-                .allow_methods([Method::GET])
-                .allow_origin(origins),
-        )
+        // .layer(
+        //     CorsLayer::new()
+        //         .allow_methods([Method::GET])
+        //         .allow_origin(origins),
+        // )
         .with_state(pool);
     let listener =
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "0.0.0.0:3055".into()))
