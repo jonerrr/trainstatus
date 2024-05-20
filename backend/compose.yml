@@ -1,0 +1,12 @@
+services:
+  trainstatus-postgres:
+    image: postgres:alpine
+    container_name: postgres-ts
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=trains
+      - POSTGRES_PASSWORD=trains
+      - POSTGRES_DB=trains
+    volumes:
+      - ./container_postgres-data:/var/lib/postgresql/data:z
