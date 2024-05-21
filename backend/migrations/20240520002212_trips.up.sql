@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS trips (
     -- 0 = south, 1 = north
     direction SMALLINT NOT NULL,
     route_id VARCHAR NOT NULL REFERENCES routes(id),
+    -- headsign VARCHAR REFERENCES headsigns(id),
     UNIQUE (mta_trip_id, train_id, created_at, direction)
 );
 

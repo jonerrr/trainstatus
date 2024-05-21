@@ -1,0 +1,35 @@
+<script lang="ts">
+	import { createToggle, melt, createSync } from '@melt-ui/svelte';
+	import type { Writable } from 'svelte/store';
+	import { Pin } from 'lucide-svelte';
+	import { addToast } from '$lib/components/UndoToaster.svelte';
+
+	export let item_id: string;
+	export let store: Writable<string[]>;
+
+	const {
+		elements: { root },
+		states
+	} = createToggle();
+	const sync = createSync(states);
+	$: sync.pressed($store.includes(item_id), (v) => {
+		if (v) {
+			$store = [...$store, item_id];
+		} else {
+			$store = $store.filter((id) => id !== item_id);
+			// TODO: fix undo toaster
+			// addToast({ title: 'stop removed ', description: 'removed', item: 'Stop', item_id });
+		}
+	});
+</script>
+
+<button
+	use:melt={$root}
+	aria-label="Pin stop to home screen"
+	class="grid h-9 w-9 place-items-center items-center justify-center rounded-md
+bg-white text-base leading-4 text-indigo-800 shadow-lg hover:bg-indigo-100
+data-[disabled]:cursor-not-allowed data-[state=on]:bg-indigo-200
+data-[state=on]:text-indigo-900"
+>
+	<Pin />
+</button>

@@ -211,6 +211,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             // convert to utc
             let start_timestamp = start_timestamp.to_utc();
             let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
+            // let mut headsign: Option<String> = None;
 
             let stop_updates = trip_update
                 .stop_time_update
@@ -244,6 +245,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                             "Setting departure time to arrival time for last stop in trip"
                         );
                         departure = Some(arrival.unwrap());
+                        // headsign = Some(stop_id.clone());
                     }
 
                     // if arrival != departure {

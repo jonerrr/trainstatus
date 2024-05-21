@@ -55,8 +55,9 @@ SELECT
                             stop_times st
                         where
                             st.trip_id = t.id
+                            and st.arrival > now()
                         order by
-                            st.arrival > now()
+                            st.arrival
                     ) as st
             )
         )
