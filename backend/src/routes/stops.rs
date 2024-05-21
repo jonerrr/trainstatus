@@ -67,6 +67,7 @@ pub async fn get(
     params: Query<Parameters>,
 ) -> Result<impl IntoResponse, ServerError> {
     if params.ids.is_empty() {
+        // TODO: fix null stop_times when arrival is less than now()
         if params.times {
             // not sure if i should allow this big of a query
             let stops = sqlx::query_as!(
@@ -102,9 +103,9 @@ pub async fn get(
                                         from
                                             stop_times st
                                         where
-                                            st.trip_id = t.id
+                                            st.trip_id = t.id AND st.arrival > now()
                                         order by
-                                            st.arrival > now()
+                                            st.arrival
                                     ) as st
                             )
                         )
@@ -112,7 +113,7 @@ pub async fn get(
                 FROM
                     stops s
                     LEFT JOIN route_stops rs ON s.id = rs.stop_id
-                    LEFT JOIN stop_times st ON s.id = st.stop_id
+                    LEFT JOIN stop_times st ON s.id = st.stop_id AND st.arrival > NOW()
                     LEFT JOIN trips t ON st.trip_id = t.id
                 GROUP BY
                     s.id;
@@ -180,9 +181,9 @@ pub async fn get(
                                         from
                                             stop_times st
                                         where
-                                            st.trip_id = t.id
+                                            st.trip_id = t.id AND st.arrival > now()
                                         order by
-                                            st.arrival > now()
+                                            st.arrival
                                     ) as st
                             )
                         )
@@ -190,7 +191,7 @@ pub async fn get(
                 FROM
                     stops s
                     LEFT JOIN route_stops rs ON s.id = rs.stop_id
-                    LEFT JOIN stop_times st ON s.id = st.stop_id
+                    LEFT JOIN stop_times st ON s.id = st.stop_id AND st.arrival > NOW()
                     LEFT JOIN trips t ON st.trip_id = t.id
                 WHERE
                     s.id = ANY($1)
