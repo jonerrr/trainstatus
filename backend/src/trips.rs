@@ -3,7 +3,7 @@ use crate::{
     feed::{self},
 };
 use chrono::{DateTime, NaiveDateTime, NaiveTime, Utc};
-use prost::Message;
+use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
@@ -42,6 +42,12 @@ pub enum ImportTimesError {
     #[error("sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
 
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("protobuf decode error: {0}")]
+    Decode(#[from] DecodeError),
+
     #[error("no stop times")]
     NoStopTimes,
     // #[error("`{0}` is not present in entity")]
@@ -60,11 +66,17 @@ pub enum ImportTimesError {
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
-            let _ = futures::future::try_join_all(futures)
-                .await
-                .map_err(|e| tracing::error!("{:?}", e));
-            sleep(Duration::from_secs(10)).await;
+            // let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
+            // let _ = futures::future::join_all(futures).await;
+            for i in 0..ENDPOINTS.len() {
+                match decode_feed(&pool, ENDPOINTS[i]).await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        tracing::error!("Error importing data: {:?}", e);
+                    }
+                }
+            }
+            sleep(Duration::from_secs(20)).await;
         }
     });
 }
@@ -84,13 +96,11 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
         ))
         .header("x-api-key", api_key())
         .send()
-        .await
-        .unwrap()
+        .await?
         .bytes()
-        .await
-        .unwrap();
+        .await?;
 
-    let feed = feed::FeedMessage::decode(data).unwrap();
+    let feed = feed::FeedMessage::decode(data)?;
     // if endpoint == "" {
     //     let mut msgs = Vec::new();
     //     write!(msgs, "{:#?}", feed).unwrap();
@@ -301,6 +311,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                 tracing::error!("no stop times for endpoint {}", endpoint);
                 Err(ImportTimesError::NoStopTimes)?
             }
+
+            dbg!(stop_updates.len(), endpoint);
 
             // insert stop times
             let mut query_builder =

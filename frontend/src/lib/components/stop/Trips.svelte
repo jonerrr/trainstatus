@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Trip } from '$lib/api';
+	import { stops } from '$lib/stores';
 	import List from '$lib/components/List.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	export let trips: Trip[];
 </script>
@@ -14,10 +16,15 @@
 		<div
 			class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
 		>
-			<div class="flex gap-2">
-				<div class="flex-grow">asdads</div>
+			<div class="flex gap-2 items-center justify-between">
+				<div class="flex gap-2 items-center">
+					<div class=""><Icon name={trip.route_id} /></div>
+					<div>
+						{trip.eta?.toFixed(0)}m
+					</div>
+				</div>
 				<div>
-					{trip.eta}
+					{$stops.find((s) => s.id === trip.stop_times[trip.stop_times.length - 1].stop_id)?.name}
 				</div>
 			</div>
 		</div>
