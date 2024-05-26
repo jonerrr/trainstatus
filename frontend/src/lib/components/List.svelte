@@ -5,6 +5,8 @@
 
 	// export let items = writable([]);
 	export let loading = true;
+	// export let maxH = '';
+
 	// export let title;
 
 	const {
@@ -18,11 +20,11 @@
 
 <div
 	use:melt={$root}
-	class="relative w-full overflow-hidden rounded-md border border-neutral-700 bg-neutral-800/90 text-white shadow-lg"
+	class={`relative w-full ${$$restProps.class ?? ''} overflow-hidden rounded-md text-white shadow-lg`}
 >
 	<div use:melt={$viewport} class="h-full w-full rounded-[inherit]">
 		<div use:melt={$content}>
-			<div class="p-2">
+			<div>
 				<slot name="header" />
 				{#if loading}
 					<div class="flex w-full justify-center">

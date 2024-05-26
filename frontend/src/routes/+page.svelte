@@ -15,6 +15,11 @@
 	onMount(async () => {
 		trips = await fetch_trips(fetch, $pinned_stops);
 		loading_stops = false;
+		setInterval(async () => {
+			console.log('fetching trips');
+			trips = await fetch_trips(fetch, $pinned_stops);
+		}, 10000);
+		// trips = await fetch_trips(fetch, $pinned_stops);
 
 		pinned_stops.subscribe(async (pinned_stops) => {
 			trips = await fetch_trips(fetch, pinned_stops);
@@ -28,7 +33,7 @@
 	<section class="flex flex-col gap-2">
 		<!-- <h2 class="text-2xl font-semibold text-indigo-800">Pinned Stops</h2> -->
 		<!-- maybe use svelte context module or something else for list stuff -->
-		<List bind:loading={loading_stops}>
+		<List bind:loading={loading_stops} class="bg-neutral-800/90 border border-neutral-700 p-1">
 			<div slot="header" class="flex self-center mb-2 w-full justify-between">
 				<div class="font-semibold text-indigo-300">Pinned Stops</div>
 				<div>Northbound</div>
@@ -48,10 +53,7 @@
 					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
 					transition:slide={{ easing: quintOut, axis: 'y' }}
 				>
-					<TripPreview
-						trips={trips.filter((t) => t.stop_times.some((st) => st.stop_id === stop.id))}
-						{stop}
-					/>
+					<TripPreview bind:trips {stop} />
 					<!-- <div role="separator" class="my-2 h-px w-full bg-indigo-600" /> -->
 				</div>
 			{/each}
