@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                s.*,\n                ARRAY_AGG(JSONB_BUILD_OBJECT('id',\n                rs.route_id,\n                'stop_type',\n                rs.stop_type)) AS routes,\n                null as \"trips: _\"\n            FROM\n            stops s\n                LEFT JOIN route_stops rs ON\n            s.id = rs.stop_id\n            WHERE\n                s.id = ANY($1)\n            GROUP BY\n                s.id\n            ",
+  "query": "select\n\ts.*,\n\tARRAY_AGG(JSONB_BUILD_OBJECT('id',\n\trs.route_id,\n\t'stop_type',\n\trs.stop_type)) as routes\nfrom\n\tstops s\nleft join route_stops rs on\n\ts.id = rs.stop_id\ngroup by\n\ts.id",
   "describe": {
     "columns": [
       {
@@ -32,17 +32,10 @@
         "ordinal": 5,
         "name": "routes",
         "type_info": "JsonbArray"
-      },
-      {
-        "ordinal": 6,
-        "name": "trips: _",
-        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Left": [
-        "TextArray"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -50,9 +43,8 @@
       false,
       true,
       false,
-      null,
       null
     ]
   },
-  "hash": "3b7728bacf1de2d97198ea6e367ddef8ca018059adb88933974b9773272a029c"
+  "hash": "b095ef29bd7c35a2d7f97ada4cc97f99ab59b4b16fe7fe54fcb60175181a33e5"
 }

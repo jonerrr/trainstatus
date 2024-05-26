@@ -1,8 +1,13 @@
-<script>
+<script lang="ts">
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import '../app.css';
+	import { stops } from '$lib/stores';
+	import type { PageData } from './$types';
+
+	export let data: PageData;
+	stops.set(data.stops);
 </script>
 
 <Toaster />

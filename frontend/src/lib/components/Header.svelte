@@ -3,10 +3,10 @@
 </script>
 
 <header class="text-4xl p-2 font-bold text-indigo-400 flex">
-	<span class="text-gradient">Trainstat</span>
-	<span class="text-zinc-600">.</span><span class={$offline ? 'text-red-600' : 'text-blue-400'}
+	<span class="text-gradient">Trainstat.us</span>
+	<!-- <span class="text-zinc-600">.</span><span class={$offline ? 'text-red-600' : 'text-blue-400'}
 		>us</span
-	>
+	> -->
 </header>
 
 <style lang="postcss">
