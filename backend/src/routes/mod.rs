@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer};
 
+pub mod alerts;
 pub mod errors;
 pub mod stops;
 pub mod trips;

@@ -97,4 +97,35 @@ where
             and st.arrival > now()
     )
 group by
-    t.id
+    t.id;
+
+--- get alerts by route_id
+select
+    ae.route_id,
+    array_agg(
+        distinct jsonb_build_object(
+            'id',
+            a.id,
+            'header',
+            a.header_html,
+            'description',
+            a.description_html,
+            'alert_type',
+            a.alert_type,
+            'active_periods',
+            ap
+        )
+    ) as alerts
+from
+    alerts a
+    left join active_periods ap on a.id = ap.alert_id
+    left join affected_entities ae on a.id = ae.alert_id
+where
+    ae.route_id = '4'
+    and ap.start_time < now()
+    and (
+        ap.end_time > now()
+        or ap.end_time is null
+    )
+group by
+    ae.route_id;

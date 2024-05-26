@@ -61,12 +61,8 @@ async fn main() {
         )
         .route("/stops", get(routes::stops::get))
         .route("/trips", get(routes::trips::get))
+        .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
-        // .layer(
-        //     CorsLayer::new()
-        //         .allow_methods([Method::GET])
-        //         .allow_origin(origins),
-        // )
         .with_state(pool);
     let listener =
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "0.0.0.0:3055".into()))
