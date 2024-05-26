@@ -24,7 +24,7 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "backend=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "backend=warn,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -47,6 +47,7 @@ async fn main() {
     // let pool = pool.clone();
 
     trips::import(pool.clone()).await;
+    alerts::import(pool.clone()).await;
 
     // let origins = [
     //     "http://localhost:5173".parse().unwrap(),

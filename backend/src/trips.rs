@@ -38,7 +38,7 @@ struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 // use this error to create custom errors like "no trip id"
 
 #[derive(Error, Debug)]
-pub enum ImportTimesError {
+pub enum DecodeFeedError {
     #[error("sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
 
@@ -47,20 +47,8 @@ pub enum ImportTimesError {
 
     #[error("protobuf decode error: {0}")]
     Decode(#[from] DecodeError),
-
-    #[error("no stop times")]
-    NoStopTimes,
-    // #[error("`{0}` is not present in entity")]
-    // MissingValue(String),
-
-    // #[error("data store disconnected")]
-    // Disconnect(#[from] io::Error),
-
-    // #[error("invalid header (expected {expected:?}, found {found:?})")]
-    // InvalidHeader {
-    //     expected: String,
-    //     found: String,
-    // },
+    // #[error("no stop times for endpoint {endpoint:?}")]
+    // NoStopTimes { endpoint: String },
 }
 
 pub async fn import(pool: PgPool) {
@@ -68,15 +56,15 @@ pub async fn import(pool: PgPool) {
         loop {
             // let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
             // let _ = futures::future::join_all(futures).await;
-            for i in 0..ENDPOINTS.len() {
-                match decode_feed(&pool, ENDPOINTS[i]).await {
+            for endpoint in ENDPOINTS.iter() {
+                match decode_feed(&pool, endpoint).await {
                     Ok(_) => (),
                     Err(e) => {
                         tracing::error!("Error importing data: {:?}", e);
                     }
                 }
             }
-            sleep(Duration::from_secs(20)).await;
+            sleep(Duration::from_secs(15)).await;
         }
     });
 }
@@ -88,7 +76,7 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
     }
 }
 
-pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTimesError> {
+pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedError> {
     let data = reqwest::Client::new()
         .get(format!(
             "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs{}",
@@ -108,9 +96,14 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
     //     tokio::fs::write("./gtfs.txt", msgs).await.unwrap();
     // }
 
+    // TODO: figure out why sometimes the stuff is empty
+
     for entity in feed.entity {
         if entity.trip_update.is_none() && entity.vehicle.is_none() {
-            tracing::debug!("Skipping entity without trip_update or vehicle");
+            tracing::warn!(
+                "Skipping entity without trip_update or vehicle endpoint: {}",
+                endpoint
+            );
             continue;
         }
 
@@ -122,11 +115,17 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
 
             let trip_id = match trip_update.trip.trip_id.as_ref() {
                 Some(id) => id,
-                None => continue,
+                None => {
+                    tracing::warn!("Skipping trip without trip_id endpoint: {}", endpoint);
+                    continue;
+                }
             };
             let mut route_id = match trip_update.trip.route_id.as_ref() {
                 Some(id) => id.to_owned(),
-                None => continue,
+                None => {
+                    tracing::warn!("Skipping trip without route_id endpoint: {}", endpoint);
+                    continue;
+                }
             };
             // There is an express SI called SS in the feed but we are using SI for the route_id
             if route_id == "SS" {
@@ -155,31 +154,35 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                     _ => unreachable!(),
                 },
                 None => {
-                    // tracing::error!("No direction for trip {}", trip_id);
-
                     // we can get direction from stop times instead
                     let mut first_stop_id = match trip_update.stop_time_update.first() {
                         Some(stop_time) => match stop_time.stop_id.as_ref() {
                             Some(id) => id.clone(),
-                            None => continue,
+                            None => {
+                                tracing::warn!(
+                                    "Skipping trip without stop_id in stop_time_update {}",
+                                    endpoint
+                                );
+                                continue;
+                            }
                         },
-                        None => continue,
+                        None => {
+                            tracing::warn!(
+                                "Skipping trip without any stop times endpoint: {}",
+                                endpoint
+                            );
+                            continue;
+                        }
                     };
-                    let direction = match first_stop_id.pop() {
+                    match first_stop_id.pop() {
                         Some('N') => 1,
                         Some('S') => 0,
                         _ => unreachable!(),
-                    };
-                    // prob dont need to check twice
-                    // if FAKE_STOP_IDS.contains(&first_stop_id.as_str()) {
-                    //     continue;
-                    // }
-
-                    direction
+                    }
                 }
             };
 
-            // for some reason, 3, 4, 5, 6, 7 don't have a start time
+            // for some reason, routes in "" endpoint don't have a start time
             let start_time = match trip_update.trip.start_time.as_ref() {
                 Some(time) => time.to_owned(),
                 None => {
@@ -194,7 +197,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                     ) {
                         Some(time) => time.to_string(),
                         None => {
-                            tracing::debug!("Skipping trip without start time");
+                            tracing::warn!("Skipping trip without start time");
                             continue;
                         }
                     }
@@ -203,7 +206,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             let start_date = match trip_update.trip.start_date.as_ref() {
                 Some(date) => date,
                 None => {
-                    tracing::debug!("Skipping trip without start date");
+                    tracing::warn!("Skipping trip without start date");
                     continue;
                 }
             };
@@ -215,7 +218,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                 + &route_id
                 + " "
                 + &direction.to_string();
-            // dbg!(route_id);
 
             // timezone is America/New_York (UTC -4) according to the agency.txt file in the static gtfs data
             let tz = chrono_tz::America::New_York;
@@ -228,7 +230,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             // convert to utc
             let start_timestamp = start_timestamp.to_utc();
             let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
-            // let mut headsign: Option<String> = None;
 
             let stop_updates = trip_update
                 .stop_time_update
@@ -261,8 +262,18 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
                         tracing::debug!(
                             "Setting departure time to arrival time for last stop in trip"
                         );
-                        departure = Some(arrival.unwrap());
-                        // headsign = Some(stop_id.clone());
+                        match arrival {
+                            Some(a) => {
+                                departure = Some(a);
+                            }
+                            None => {
+                                tracing::warn!(
+                                    "Missing arrival time for {} in trip {}",
+                                    &stop_id,
+                                    &trip_id
+                                );
+                            }
+                        }
                     }
 
                     // if arrival != departure {
@@ -308,11 +319,14 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
 
             // TODO: figure out why its empty sometimes
             if stop_updates.is_empty() {
-                tracing::error!("no stop times for endpoint {}", endpoint);
-                Err(ImportTimesError::NoStopTimes)?
+                // Err(DecodeFeedError::NoStopTimes {
+                //     endpoint: endpoint.to_owned(),
+                // })?
+                tracing::warn!("no stop_updates for endpoint {}", endpoint);
+                continue;
             }
 
-            dbg!(stop_updates.len(), endpoint);
+            // dbg!(stop_updates.len(), endpoint);
 
             // insert stop times
             let mut query_builder =

@@ -104,6 +104,15 @@ pub async fn stops_and_routes(pool: &PgPool) {
         .await
         .unwrap();
 
+    // let stop_ids = stations
+    //     .iter()
+    //     .map(|s| s.stop_id.clone())
+    //     .collect::<Vec<String>>()
+    //     .join(",");
+    // // save stop_ids to file
+    // std::fs::write("stop_ids.txt", stop_ids)
+    //     .expect("Failed to write stop_ids to file");
+
     // get the routes and their stations
     let mut route_stops: HashMap<String, Vec<Station>> = HashMap::new();
     stations.iter().for_each(|s| {
