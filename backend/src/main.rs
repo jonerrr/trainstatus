@@ -8,7 +8,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod alerts;
 mod imports;
 mod routes;
-mod times;
+mod trips;
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
@@ -46,7 +46,7 @@ async fn main() {
 
     // let pool = pool.clone();
 
-    times::import(pool.clone()).await;
+    trips::import(pool.clone()).await;
 
     // let origins = [
     //     "http://localhost:5173".parse().unwrap(),
@@ -59,6 +59,7 @@ async fn main() {
             get(|| async { Redirect::temporary("https://trainstat.us") }),
         )
         .route("/stops", get(routes::stops::get))
+        .route("/times", get(routes::trips::get))
         .layer(TraceLayer::new_for_http())
         // .layer(
         //     CorsLayer::new()

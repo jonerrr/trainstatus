@@ -71,3 +71,30 @@ where
     s.id = '250'
 GROUP BY
     s.id;
+
+-- get arrivals for stop id
+select
+    t.id,
+    t.route_id,
+    t.direction,
+    array_agg(
+        st
+        order by
+            st.arrival
+    ) as stop_times
+from
+    trips t
+    left join stop_times st on t.id = st.trip_id
+where
+    t.id = any(
+        select
+            t.id
+        from
+            trips t
+            left join stop_times st on st.trip_id = t.id
+        where
+            st.stop_id = '250'
+            and st.arrival > now()
+    )
+group by
+    t.id
