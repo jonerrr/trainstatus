@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer};
 
 pub mod errors;
 pub mod stops;
+pub mod trips;
 
 pub fn parse_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where

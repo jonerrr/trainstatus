@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select\n        t.id,\n        t.route_id,\n        t.direction,\n        array_agg(jsonb_build_object('stop_id',\n        st.stop_id,\n        'arrival',\n        st.arrival,\n        'departure',\n        st.departure)\n    order by\n        st.arrival) as stop_times\n    from\n        trips t\n    left join stop_times st on\n        t.id = st.trip_id\n    where\n        t.id = any(\n        select\n            t.id\n        from\n            trips t\n        left join stop_times st on\n            st.trip_id = t.id\n        where\n            st.stop_id = ANY($1)\n            and st.arrival > now())\n    group by\n        t.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "stop_times",
+        "type_info": "JsonbArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "dc94614d746b45dfc3d8a05895299173da6add297e04de5f0f82bfc513aed0ee"
+}
