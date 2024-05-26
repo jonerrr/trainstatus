@@ -1,4 +1,5 @@
 import { offline } from '$lib/stores';
+import icons from '$lib/icons';
 
 export interface Stop {
 	id: string;
@@ -22,6 +23,18 @@ export enum StopType {
 	RushHourExtension = 4
 }
 
+type Fetch = typeof fetch;
+
+export async function fetch_stops(fetch: Fetch): Promise<Stop[]> {
+	const res = await fetch('/api/stops');
+	// check if response is from service worker
+	offline.set(res.headers.has('x-service-worker'));
+
+	const data: Stop[] = await res.json();
+
+	return data;
+}
+
 export interface Trip {
 	id: string;
 	route_id: string;
@@ -43,18 +56,6 @@ export interface StopTime {
 	departure: string;
 }
 
-type Fetch = typeof fetch;
-
-export async function fetch_stops(fetch: Fetch): Promise<Stop[]> {
-	const res = await fetch('/api/stops');
-	// check if response is from service worker
-	offline.set(res.headers.has('x-service-worker'));
-
-	const data: Stop[] = await res.json();
-
-	return data;
-}
-
 export async function fetch_trips(fetch: Fetch, stops: string[]): Promise<Trip[]> {
 	const res = await fetch(`/api/trips?stop_ids=${stops.join(',')}`);
 	// check if response is from service worker
@@ -65,29 +66,45 @@ export async function fetch_trips(fetch: Fetch, stops: string[]): Promise<Trip[]
 	return data;
 }
 
-// export async function get_stops(ids: string[], times: boolean): Promise<Stop[]> {
-// 	const res = await fetch(`/api/stops?ids=${ids.join(',')}&times=${times}`);
-// 	// check if response is from service worker
-// 	offline.set(res.headers.has('x-service-worker'));
+export interface RouteAlerts {
+	route_id: string;
+	alerts: Alert[];
+}
 
-// 	// TODO: error handling
-// 	const data: Stop[] = await res.json();
-// 	data.forEach((stop) => {
-// 		stop.trips?.filter((trip) => trip.stop_times != null);
-// 		// .map((trip) => {
-// 		// 	// convert dates from string to Date
-// 		// 	trip.created_at = new Date(trip.created_at);
-// 		// 	trip.stop_times = trip.stop_times.map((stop_time) => {
-// 		// 		stop_time.arrival = new Date(stop_time.arrival);
-// 		// 		stop_time.departure = new Date(stop_time.departure);
-// 		// 		retur
-// 		// 	returnn stop_time;
-// 		// 	}); trip;
-// 		// });
-// 	});
-// 	// data.forEach((stop) => {
-// 	// 	stop.
-// 	// });
+export interface Alert {
+	alert_type: string;
+	header: string;
+	description?: string;
+	active_periods: ActivePeriod[];
+}
 
-// 	return data;
-// }
+export interface ActivePeriod {
+	start_time: string;
+	end_time: string;
+}
+
+const train_regex = /(\[(.+?)\])/gm;
+function parse_html(html: string) {
+	return html.replaceAll(train_regex, (_match, _p1, p2) => {
+		const icon = icons.find((t) => t.name === p2) ?? icons[icons.length - 1];
+		// TODO: check if full svg and add missing shuttle bus icon
+		return `<svg xmlsn="http://www.w3.org/2000/svg" class="inline-block" width="1rem" height="1rem" viewBox="0 0 90 90" focusable="false"> ${icon.svg} </svg>`;
+	});
+}
+
+export async function fetch_alerts(fetch: Fetch, routes: string[]): Promise<RouteAlerts[]> {
+	const res = await fetch(`/api/alerts?route_ids=${routes.join(',')}`);
+	// check if response is from service worker
+	offline.set(res.headers.has('x-service-worker'));
+
+	const data: RouteAlerts[] = await res.json();
+
+	for (const route of data) {
+		for (const alert of route.alerts) {
+			alert.header = parse_html(alert.header);
+			if (alert.description) alert.description = parse_html(alert.description);
+		}
+	}
+
+	return data;
+}

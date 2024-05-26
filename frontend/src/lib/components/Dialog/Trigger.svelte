@@ -9,7 +9,7 @@
 	} = dialogRegistry.get(name);
 </script>
 
-<button class="w-full flex justify-between items-center" use:melt={$trigger}>
+<button class="w-full flex justify-between items-center py-1" use:melt={$trigger}>
 	<slot>
 		Open {name} Dialog
 	</slot>
