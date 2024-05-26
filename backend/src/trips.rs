@@ -4,6 +4,7 @@ use crate::{
 };
 use chrono::{DateTime, NaiveDateTime, NaiveTime, Utc};
 use prost::Message;
+use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use thiserror::Error;
@@ -37,6 +38,8 @@ struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 #[derive(Error, Debug)]
 pub enum ImportTimesError {
+    #[error("sqlx error: {0}")]
+    Sqlx(#[from] sqlx::Error),
     // #[error("`{0}` is not present in entity")]
     // MissingValue(String),
 
@@ -51,13 +54,8 @@ pub enum ImportTimesError {
 }
 
 pub async fn import(pool: PgPool) {
-    // TODO: figure out why its missing a bunch of ids
-    // let (tx, mut rx) = mpsc::channel::<feed::FeedEntity>(5000);
-
     tokio::spawn(async move {
         loop {
-            // let pool = pool.clone();
-
             let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
             let _ = futures::future::try_join_all(futures)
                 .await
@@ -65,15 +63,6 @@ pub async fn import(pool: PgPool) {
             sleep(Duration::from_secs(10)).await;
         }
     });
-
-    // let pool = pool.clone();
-    // tokio::spawn(async move {
-    // let pool = pool.clone();
-
-    // while let Some(entity) = rx.recv().await {
-
-    // }
-    // });
 }
 
 fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
@@ -82,16 +71,6 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
         _ => None,
     }
 }
-
-// async fn find_trip_id(pool: &PgPool, entity: feed::FeedEntity) -> Option<i32> {
-//     let trip_id = entity.trip_update.unwrap().trip.trip_id;
-//     let row = sqlx::query!("SELECT id FROM trips WHERE trip_id = $1", trip_id)
-//         .fetch_one(pool)
-//         .await
-//         .ok()?;
-
-//     Some(row.id)
-// }
 
 pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTimesError> {
     let data = reqwest::Client::new()
@@ -127,24 +106,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             //     continue;
             // }
 
-            // use this to get the direction only once
-            let mut first_stop_id = match trip_update.stop_time_update.first() {
-                Some(stop_time) => match stop_time.stop_id.as_ref() {
-                    Some(id) => id.clone(),
-                    None => continue,
-                },
-                None => continue,
-            };
-            let direction = match first_stop_id.pop() {
-                Some('N') => 1,
-                Some('S') => 0,
-                _ => unreachable!(),
-            };
-            // prob dont need to check twice
-            if FAKE_STOP_IDS.contains(&first_stop_id.as_str()) {
-                continue;
-            }
-
             let trip_id = match trip_update.trip.trip_id.as_ref() {
                 Some(id) => id,
                 None => continue,
@@ -161,6 +122,61 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             if route_id.ends_with('X') {
                 route_id.pop();
             }
+
+            let Some(nyct_trip_descriptor) = trip_update.trip.nyct_trip_descriptor else {
+                tracing::error!("No nyct_trip_descriptor for trip");
+                continue;
+            };
+
+            let train_id = nyct_trip_descriptor.train_id();
+            let assigned = nyct_trip_descriptor.is_assigned();
+
+            // let direction: i16 = match nyct_trip_descriptor.direction {
+            //     Some(d) => match d {
+            //         // north
+            //         1 => 1,
+            //         // south
+            //         3 => 0,
+            //         // east and west aren't used
+            //         _ => unreachable!(),
+            //     },
+            //     None => {
+            //         tracing::error!("No direction for trip {}", trip_id);
+
+            //         // we can get direction from stop times instead
+            //         let mut first_stop_id = match trip_update.stop_time_update.first() {
+            //             Some(stop_time) => match stop_time.stop_id.as_ref() {
+            //                 Some(id) => id.clone(),
+            //                 None => continue,
+            //             },
+            //             None => continue,
+            //         };
+            //         let direction = match first_stop_id.pop() {
+            //             Some('N') => 1,
+            //             Some('S') => 0,
+            //             _ => unreachable!(),
+            //         };
+            //         // prob dont need to check twice
+            //         // if FAKE_STOP_IDS.contains(&first_stop_id.as_str()) {
+            //         //     continue;
+            //         // }
+
+            //         direction
+            //     }
+            // };
+
+            let mut first_stop_id = match trip_update.stop_time_update.first() {
+                Some(stop_time) => match stop_time.stop_id.as_ref() {
+                    Some(id) => id.clone(),
+                    None => continue,
+                },
+                None => continue,
+            };
+            let direction = match first_stop_id.pop() {
+                Some('N') => 1,
+                Some('S') => 0,
+                _ => unreachable!(),
+            };
 
             // for some reason, 3, 4, 5, 6, 7 don't have a start time
             let start_time = match trip_update.trip.start_time.as_ref() {
@@ -215,7 +231,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
 
             let stop_updates = trip_update
                 .stop_time_update
-                .iter()
+                .par_iter()
                 .filter_map(|stop_time| {
                     let mut stop_id = stop_time.stop_id.as_ref().unwrap().to_owned();
 
@@ -275,20 +291,19 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             sqlx::query!(
                 r#"
                 INSERT INTO trips (id, mta_trip_id, train_id, route_id, created_at, assigned, direction)
-                VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT DO NOTHING                    
                 "#,
                 id,
                 trip_update.trip.trip_id,
-                "not implemented (train id)",
+                train_id,
                 &route_id,
                 start_timestamp,
-                true, // implement this
+                assigned,
                 direction,
             )
             .execute(pool)
-            .await
-            .unwrap();
+            .await?;
 
             // insert stop times
             let mut query_builder =
@@ -301,7 +316,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             });
             query_builder.push("ON CONFLICT DO NOTHING");
             let query = query_builder.build();
-            query.execute(pool).await.unwrap();
+            query.execute(pool).await?;
         }
     }
 
