@@ -4,6 +4,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::Utc;
 // use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::JsonValue, FromRow, PgPool};
@@ -14,6 +15,8 @@ pub struct Trip {
     id: Uuid,
     route_id: String,
     direction: i16,
+    assigned: bool,
+    created_at: chrono::DateTime<Utc>,
     stop_times: Option<Vec<JsonValue>>,
 }
 
@@ -44,6 +47,8 @@ pub async fn get(
         t.id,
         t.route_id,
         t.direction,
+        t.assigned,
+        t.created_at,
         array_agg(jsonb_build_object('stop_id',
         st.stop_id,
         'arrival',

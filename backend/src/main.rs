@@ -59,7 +59,7 @@ async fn main() {
             get(|| async { Redirect::temporary("https://trainstat.us") }),
         )
         .route("/stops", get(routes::stops::get))
-        .route("/times", get(routes::trips::get))
+        .route("/trips", get(routes::trips::get))
         .layer(TraceLayer::new_for_http())
         // .layer(
         //     CorsLayer::new()

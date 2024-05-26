@@ -1,32 +1,41 @@
 <script lang="ts">
 	import { createToggle, melt, createSync } from '@melt-ui/svelte';
 	import { Drawer } from 'vaul-svelte';
-	import { Direction, type Stop } from '$lib/api';
+	import { Direction, type Stop, type Trip } from '$lib/api';
 	import { pinned_stops } from '$lib/stores';
 	import Pin from '$lib/components/Pin.svelte';
 	import Eta from '$lib/components/stop/Eta.svelte';
 	import Trips from '$lib/components/stop/Trips.svelte';
 
 	export let stop: Stop;
-	const stop_with_eta = stop.trips.map((trip) => {
-		const stop_time = trip.stop_times.find((time) => time.stop_id === stop.id)!;
+	export let trips: Trip[];
+	// console.log(trips);
+	// console.log(stop);
 
-		const arrival = new Date(stop_time.arrival).getTime();
-		const now = new Date().getTime();
-		const eta = ((arrival - now) / 1000 / 60).toFixed(0);
+	const trips_with_eta = trips
+		.map((trip) => {
+			const stop_time = trip.stop_times.find((time) => time.stop_id === stop.id)!;
 
-		// console.log(eta);
+			const arrival = new Date(stop_time.arrival).getTime();
+			const now = new Date().getTime();
+			const eta = (arrival - now) / 1000 / 60;
 
-		return {
-			...trip,
-			eta
-		};
-	});
+			// console.log(trip.route_id, eta, stop_time.arrival);
 
-	console.log(stop.trips);
+			// TODO: fix this
+			if (eta < 0) {
+				console.log('trip is in the past', trip.route_id, eta, stop_time.arrival);
+			}
 
-	const northbound = stop_with_eta.filter((trip) => trip.direction === Direction.North);
-	const southbound = stop_with_eta.filter((trip) => trip.direction === Direction.South);
+			return {
+				...trip,
+				eta
+			};
+		})
+		.sort((a, b) => a.eta - b.eta);
+
+	const northbound = trips_with_eta.filter((trip) => trip.direction === Direction.North);
+	const southbound = trips_with_eta.filter((trip) => trip.direction === Direction.South);
 
 	// const stop_routes = stop.routes.flatMap((route) => route.route_id);
 </script>
@@ -39,12 +48,12 @@
 
 		<!-- northbound trips -->
 		<div class="flex grow-0 w-24">
-			<Eta routes={stop.routes} stop_id={stop.id} trips={northbound} />
+			<Eta routes={stop.routes} trips={northbound} />
 		</div>
 
 		<!-- southbound trips -->
 		<div class="flex grow-0 w-24">
-			<Eta routes={stop.routes} stop_id={stop.id} trips={southbound} />
+			<Eta routes={stop.routes} trips={southbound} />
 		</div>
 
 		<div>

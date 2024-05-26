@@ -5,7 +5,7 @@
 
 	// export let items = writable([]);
 	export let loading = true;
-	export let title;
+	// export let title;
 
 	const {
 		elements: { root, content, viewport, corner, scrollbarY, thumbY }
@@ -23,7 +23,7 @@
 	<div use:melt={$viewport} class="h-full w-full rounded-[inherit]">
 		<div use:melt={$content}>
 			<div class="p-2">
-				<h3 class="mb-2 font-semibold leading-none text-indigo-300">{title}</h3>
+				<slot name="header" />
 				{#if loading}
 					<div class="flex w-full justify-center">
 						<LoaderCircle class="animate-spin w-8 h-8 text-indigo-300" />
