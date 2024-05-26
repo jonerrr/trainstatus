@@ -31,6 +31,7 @@ const FAKE_STOP_IDS: [&str; 27] = [
     "S0M",
 ];
 
+#[derive(Debug)]
 struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 // TODO: remove unwraps and handle errors
@@ -40,6 +41,9 @@ struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 pub enum ImportTimesError {
     #[error("sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
+
+    #[error("no stop times")]
+    NoStopTimes,
     // #[error("`{0}` is not present in entity")]
     // MissingValue(String),
 
@@ -131,51 +135,38 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             let train_id = nyct_trip_descriptor.train_id();
             let assigned = nyct_trip_descriptor.is_assigned();
 
-            // let direction: i16 = match nyct_trip_descriptor.direction {
-            //     Some(d) => match d {
-            //         // north
-            //         1 => 1,
-            //         // south
-            //         3 => 0,
-            //         // east and west aren't used
-            //         _ => unreachable!(),
-            //     },
-            //     None => {
-            //         tracing::error!("No direction for trip {}", trip_id);
-
-            //         // we can get direction from stop times instead
-            //         let mut first_stop_id = match trip_update.stop_time_update.first() {
-            //             Some(stop_time) => match stop_time.stop_id.as_ref() {
-            //                 Some(id) => id.clone(),
-            //                 None => continue,
-            //             },
-            //             None => continue,
-            //         };
-            //         let direction = match first_stop_id.pop() {
-            //             Some('N') => 1,
-            //             Some('S') => 0,
-            //             _ => unreachable!(),
-            //         };
-            //         // prob dont need to check twice
-            //         // if FAKE_STOP_IDS.contains(&first_stop_id.as_str()) {
-            //         //     continue;
-            //         // }
-
-            //         direction
-            //     }
-            // };
-
-            let mut first_stop_id = match trip_update.stop_time_update.first() {
-                Some(stop_time) => match stop_time.stop_id.as_ref() {
-                    Some(id) => id.clone(),
-                    None => continue,
+            let direction: i16 = match nyct_trip_descriptor.direction {
+                Some(d) => match d {
+                    // north
+                    1 => 1,
+                    // south
+                    3 => 0,
+                    // east and west aren't used
+                    _ => unreachable!(),
                 },
-                None => continue,
-            };
-            let direction = match first_stop_id.pop() {
-                Some('N') => 1,
-                Some('S') => 0,
-                _ => unreachable!(),
+                None => {
+                    // tracing::error!("No direction for trip {}", trip_id);
+
+                    // we can get direction from stop times instead
+                    let mut first_stop_id = match trip_update.stop_time_update.first() {
+                        Some(stop_time) => match stop_time.stop_id.as_ref() {
+                            Some(id) => id.clone(),
+                            None => continue,
+                        },
+                        None => continue,
+                    };
+                    let direction = match first_stop_id.pop() {
+                        Some('N') => 1,
+                        Some('S') => 0,
+                        _ => unreachable!(),
+                    };
+                    // prob dont need to check twice
+                    // if FAKE_STOP_IDS.contains(&first_stop_id.as_str()) {
+                    //     continue;
+                    // }
+
+                    direction
+                }
             };
 
             // for some reason, 3, 4, 5, 6, 7 don't have a start time
@@ -305,16 +296,22 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), ImportTime
             .execute(pool)
             .await?;
 
+            // TODO: figure out why its empty sometimes
+            if stop_updates.is_empty() {
+                tracing::error!("no stop times for endpoint {}", endpoint);
+                Err(ImportTimesError::NoStopTimes)?
+            }
+
             // insert stop times
             let mut query_builder =
-                QueryBuilder::new("INSERT INTO stop_times (trip_id, stop_id, arrival, departure)");
+                QueryBuilder::new("INSERT INTO stop_times (trip_id, stop_id, arrival, departure) ");
             query_builder.push_values(stop_updates, |mut b, stop_update| {
                 b.push_bind(stop_update.0)
                     .push_bind(stop_update.1)
                     .push_bind(stop_update.2)
                     .push_bind(stop_update.3);
             });
-            query_builder.push("ON CONFLICT DO NOTHING");
+            query_builder.push(" ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure");
             let query = query_builder.build();
             query.execute(pool).await?;
         }
