@@ -27,9 +27,48 @@ pub async fn get(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
 ) -> Result<impl IntoResponse, ServerError> {
-    let alerts = sqlx::query_as!(
-        Alerts,
-        "
+    if params.route_ids.is_empty() {
+        let alerts = sqlx::query_as!(
+            Alerts,
+            "select
+                ae.route_id,
+                array_agg(
+                    distinct jsonb_build_object(
+                        'id',
+                        a.id,
+                        'header',
+                        a.header_html,
+                        'description',
+                        a.description_html,
+                        'alert_type',
+                        a.alert_type,
+                        'updated_at',
+                        a.updated_at,
+                        'active_periods',
+                        ap
+                    )
+                ) as alerts
+            from
+                alerts a
+                left join active_periods ap on a.id = ap.alert_id
+                left join affected_entities ae on a.id = ae.alert_id
+            where
+                a.in_feed = true
+                and ap.start_time < now()
+                and (
+                    ap.end_time > now()
+                    or ap.end_time is null
+                )
+            group by
+                ae.route_id;"
+        )
+        .fetch_all(&pool)
+        .await?;
+        Ok(Json(alerts))
+    } else {
+        let alerts = sqlx::query_as!(
+            Alerts,
+            "
     select
     ae.route_id,
     array_agg(
@@ -62,10 +101,10 @@ where
     )
 group by
     ae.route_id;",
-        &params.route_ids
-    )
-    .fetch_all(&pool)
-    .await?;
-
-    Ok(Json(alerts))
+            &params.route_ids
+        )
+        .fetch_all(&pool)
+        .await?;
+        Ok(Json(alerts))
+    }
 }

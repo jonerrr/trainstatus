@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@fontsource/inter':
+        specifier: ^5.0.18
+        version: 5.0.18
       cssnano:
         specifier: ^7.0.1
         version: 7.0.1(postcss@8.4.38)
@@ -265,6 +268,9 @@ packages:
 
   '@floating-ui/utils@0.2.2':
     resolution: {integrity: sha512-J4yDIIthosAsRZ5CPYP/jQvUAQtlZTTD/4suA08/FEnlxqW3sKS9iAhgsa9VYLZ6vDHn/ixJgIqRQPotoBjxIw==}
+
+  '@fontsource/inter@5.0.18':
+    resolution: {integrity: sha512-YCsoYPTcs713sI7tLtxaPrIhXAXvEetGg5Ry02ivA8qUOb3fQHojbK/X9HLD5OOKvFUNR2Ynkwb1kR1hVKQHpw==}
 
   '@humanwhocodes/config-array@0.11.14':
     resolution: {integrity: sha512-3T8LkOmg45BV5FICb15QQMsyUSWrQ8AygVfC7ZG32zOalnqrilm018ZVCw0eapXux8FtA33q8PSRSstjee3jSg==}
@@ -2017,6 +2023,8 @@ snapshots:
       '@floating-ui/utils': 0.2.2
 
   '@floating-ui/utils@0.2.2': {}
+
+  '@fontsource/inter@5.0.18': {}
 
   '@humanwhocodes/config-array@0.11.14':
     dependencies:

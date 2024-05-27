@@ -38,6 +38,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@fontsource/inter": "^5.0.18",
 		"cssnano": "^7.0.1",
 		"dayjs": "^1.11.11",
 		"lucide-svelte": "^0.378.0",

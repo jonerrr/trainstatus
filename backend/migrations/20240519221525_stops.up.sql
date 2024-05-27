@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS stops (
     name VARCHAR NOT NULL,
     ada BOOLEAN NOT NULL,
     notes VARCHAR,
-    borough VARCHAR NOT NULL
+    borough VARCHAR NOT NULL,
+    north_headsign VARCHAR NOT NULL,
+    south_headsign VARCHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS route_stops (
