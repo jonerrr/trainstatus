@@ -20,7 +20,7 @@
 
 <div
 	use:melt={$root}
-	class={`relative w-full ${$$restProps.class ?? ''} overflow-hidden rounded-md text-white shadow-lg`}
+	class={`relative overflow-hidden rounded-md text-white shadow-lg ${$$restProps.class ?? ''}`}
 >
 	<div use:melt={$viewport} class="h-full w-full rounded-[inherit]">
 		<div use:melt={$content}>
