@@ -80,6 +80,3 @@
 		<div class="text-indigo-200">No alerts</div>
 	{/if}
 </Dialog.Content>
-
-<style lang="postcss">
-</style>

@@ -57,8 +57,8 @@
 
 	// TODO: replace title with more specific destination (maybe last stop boroughs or headsign)
 	const triggers = [
-		{ id: 'northbound', title: 'Northbound' },
-		{ id: 'southbound', title: 'Southbound' }
+		{ id: 'northbound', title: stop.north_headsign },
+		{ id: 'southbound', title: stop.south_headsign }
 	];
 
 	const [send, receive] = crossfade({
@@ -68,26 +68,26 @@
 </script>
 
 <Dialog.Trigger name={stop.id}>
-	<div class="w-24 grow-0 font-semibold text-indigo-300">
+	<div class="w-24 grow-0 font-semibold text-indigo-200">
 		{stop.name}
 	</div>
 
 	<!-- northbound trips -->
 	<div class="flex flex-col items-center">
-		<div class="text-xs">
+		<div class="text-xs grow-0 w-24 text-indigo-200">
 			{stop.north_headsign}
 		</div>
-		<div class="flex grow-0 w-24">
+		<div class="flex grow-0 w-28">
 			<Eta routes={stop.routes} bind:trips={northbound} />
 		</div>
 	</div>
 
 	<!-- southbound trips -->
 	<div class="flex flex-col items-center">
-		<div class="text-xs">
+		<div class="text-xs grow-0 w-24 text-indigo-200">
 			{stop.south_headsign}
 		</div>
-		<div class="flex grow-0 w-24">
+		<div class="flex grow-0 w-28">
 			<Eta routes={stop.routes} bind:trips={southbound} />
 		</div>
 	</div>
