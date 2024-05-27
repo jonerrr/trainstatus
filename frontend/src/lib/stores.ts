@@ -6,5 +6,5 @@ export const loading = writable(false);
 export const offline = writable(false);
 export const stops = writable<Stop[]>([]);
 
-export const pinned_routes = persisted('pinned_routes', ['4', 'A']);
+export const pinned_routes = persisted('pinned_routes', ['4', 'A', 'F']);
 export const pinned_stops = persisted('pinned_stops', ['631', 'A27', 'D26', '901', 'R20']);

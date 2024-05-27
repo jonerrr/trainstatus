@@ -28,9 +28,9 @@
 	on:click|stopPropagation
 	aria-label="Pin stop to home screen"
 	class="z-50 grid h-9 w-9 place-items-center items-center justify-center rounded-md
-bg-white text-base leading-4 text-indigo-800 shadow-lg hover:bg-indigo-100
-data-[disabled]:cursor-not-allowed data-[state=on]:bg-indigo-200
-data-[state=on]:text-indigo-900"
+bg-white text-base leading-4 text-fuchsia-800 shadow-lg hover:bg-indigo-200
+data-[disabled]:cursor-not-allowed data-[state=on]:bg-indigo-400
+"
 >
 	<Pin />
 </button>

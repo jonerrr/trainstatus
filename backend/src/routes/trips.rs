@@ -41,9 +41,48 @@ pub async fn get(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
 ) -> Result<impl IntoResponse, ServerError> {
-    let trips = sqlx::query_as!(
-        Trip,
-        "select
+    if params.stop_ids.is_empty() {
+        let trips = sqlx::query_as!(
+            Trip,
+            "select
+            t.id,
+            t.route_id,
+            t.direction,
+            t.assigned,
+            t.created_at,
+            array_agg(jsonb_build_object('stop_id',
+            st.stop_id,
+            'arrival',
+            st.arrival,
+            'departure',
+            st.departure)
+        order by
+            st.arrival) as stop_times
+        from
+            trips t
+        left join stop_times st on
+            t.id = st.trip_id
+        where
+            t.id = any(
+            select
+                t.id
+            from
+                trips t
+            left join stop_times st on
+                st.trip_id = t.id
+            where
+                st.arrival > now())
+        group by
+            t.id"
+        )
+        .fetch_all(&pool)
+        .await?;
+
+        Ok(Json(trips))
+    } else {
+        let trips = sqlx::query_as!(
+            Trip,
+            "select
         t.id,
         t.route_id,
         t.direction,
@@ -74,12 +113,11 @@ pub async fn get(
             and st.arrival > now())
     group by
         t.id",
-        &params.stop_ids
-    )
-    .fetch_all(&pool)
-    .await?;
+            &params.stop_ids
+        )
+        .fetch_all(&pool)
+        .await?;
 
-    // dbg!(trips);
-
-    Ok(Json(trips))
+        Ok(Json(trips))
+    }
 }

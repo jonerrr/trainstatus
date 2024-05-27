@@ -58,8 +58,8 @@ export interface StopTime {
 	departure: string;
 }
 
-export async function fetch_trips(fetch: Fetch, stops: string[]): Promise<Trip[]> {
-	const res = await fetch(`/api/trips?stop_ids=${stops.join(',')}`);
+export async function fetch_trips(fetch: Fetch, stops?: string[]): Promise<Trip[]> {
+	const res = await fetch(`/api/trips${stops ? `?stop_ids=${stops.join(',')}` : ''}`);
 	// check if response is from service worker
 	offline.set(res.headers.has('x-service-worker'));
 
@@ -86,19 +86,19 @@ export interface ActivePeriod {
 	end_time: string;
 }
 
+// this is for parsing alert html and replacing text with svg icons
 const train_regex = /(\[(.+?)\])/gm;
 function parse_html(html: string) {
 	return html.replaceAll(train_regex, (_match, _p1, p2) => {
 		const icon = icons.find((t) => t.name === p2) ?? icons[icons.length - 1];
-		// TODO: check if full svg and add missing shuttle bus icon
 		if (icon.complete_svg) return icon.svg;
 		else
 			return `<svg xmlsn="http://www.w3.org/2000/svg" class="inline-block" width="1rem" height="1rem" viewBox="0 0 90 90" focusable="false"> ${icon.svg} </svg>`;
 	});
 }
 
-export async function fetch_alerts(fetch: Fetch, routes: string[]): Promise<RouteAlerts[]> {
-	const res = await fetch(`/api/alerts?route_ids=${routes.join(',')}`);
+export async function fetch_alerts(fetch: Fetch, routes?: string[]): Promise<RouteAlerts[]> {
+	const res = await fetch(`/api/alerts${routes ? `?route_ids=${routes.join(',')}` : ''}`);
 	// check if response is from service worker
 	offline.set(res.headers.has('x-service-worker'));
 
