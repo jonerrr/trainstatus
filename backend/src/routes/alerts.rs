@@ -42,6 +42,8 @@ pub async fn get(
             a.description_html,
             'alert_type',
             a.alert_type,
+            'updated_at',
+            a.updated_at,
             'active_periods',
             ap
         )
@@ -51,6 +53,7 @@ from
     left join active_periods ap on a.id = ap.alert_id
     left join affected_entities ae on a.id = ae.alert_id
 where
+    a.in_feed = true and
     ae.route_id = ANY($1)
     and ap.start_time < now()
     and (

@@ -8,6 +8,10 @@
 	let icon = icons.find((i) => i.name === name)!;
 </script>
 
+<!-- {#if icon.complete_svg}
+	{@html icon.svg}
+{:else} -->
 <svg class={$$props.class} {width} {height} viewBox="0 0 90 90">
 	{@html icon.svg}
 </svg>
+<!-- {/if} -->

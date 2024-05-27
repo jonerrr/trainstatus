@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    select\n    ae.route_id,\n    array_agg(\n        distinct jsonb_build_object(\n            'id',\n            a.id,\n            'header',\n            a.header_html,\n            'description',\n            a.description_html,\n            'alert_type',\n            a.alert_type,\n            'updated_at',\n            a.updated_at,\n            'active_periods',\n            ap\n        )\n    ) as alerts\nfrom\n    alerts a\n    left join active_periods ap on a.id = ap.alert_id\n    left join affected_entities ae on a.id = ae.alert_id\nwhere\n    a.in_feed = true and\n    ae.route_id = ANY($1)\n    and ap.start_time < now()\n    and (\n        ap.end_time > now()\n        or ap.end_time is null\n    )\ngroup by\n    ae.route_id;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "alerts",
+        "type_info": "JsonbArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "c90004e36f4137ee79410ba1a9dc6beb421380ed9065b3cd929d7fd5eb00998c"
+}

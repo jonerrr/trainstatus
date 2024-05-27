@@ -4,11 +4,12 @@
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
 	import { Direction, type Stop, type Trip } from '$lib/api';
-	import { pinned_stops } from '$lib/stores';
+	import { pinned_stops, stops } from '$lib/stores';
 	import Pin from '$lib/components/Pin.svelte';
 	import Eta from '$lib/components/stop/Eta.svelte';
 	import Trips from '$lib/components/stop/Trips.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Page from '../../../routes/+page.svelte';
 
 	export let stop: Stop;
 	// default to empty array to prevent undefined errors
@@ -29,7 +30,12 @@
 			console.log('mapping');
 			// TODO: fix this
 			if (eta < 0) {
-				console.log('trip is in the past', trip.route_id, eta, stop_time.arrival);
+				console.log(
+					'how the fuck is this trip in the past:',
+					trip.route_id,
+					eta,
+					stop_time.arrival
+				);
 			}
 
 			return {
@@ -41,6 +47,17 @@
 
 	$: northbound = trips_with_eta.filter((trip) => trip.direction === Direction.North);
 	$: southbound = trips_with_eta.filter((trip) => trip.direction === Direction.South);
+	// TODO: find source for headsigns
+	// let n_headsign = [];
+	// for (const route of stop.routes) {
+	// 	const route_trip = northbound.find((t) => t.route_id === route.id);
+	// 	if (route_trip) {
+	// 		const last_stop = $stops.find(
+	// 			(s) => s.id === route_trip.stop_times[route_trip.stop_times.length - 1].stop_id
+	// 		)!;
+	// 		n_headsign.push(last_stop.borough);
+	// 	}
+	// }
 
 	// const stop_routes = stop.routes.flatMap((route) => route.route_id);
 	const {
@@ -49,9 +66,6 @@
 	} = createTabs({
 		defaultValue: 'northbound'
 	});
-
-	let className = '';
-	export { className as class };
 
 	// TODO: replace title with more specific destination (maybe last stop boroughs or headsign)
 	const triggers = [
@@ -119,10 +133,10 @@
 					</button>
 				{/each}
 			</div>
-			<div use:melt={$content('northbound')} class="grow bg-neutral-600 p-5">
-				<Trips trips={northbound} />
+			<div use:melt={$content('northbound')} class="grow bg-neutral-600 p-2">
+				<Trips bind:trips={northbound} />
 			</div>
-			<div use:melt={$content('southbound')} class="grow bg-neutral-600 p-5">
+			<div use:melt={$content('southbound')} class="grow bg-neutral-600 p-2">
 				<Trips bind:trips={southbound} />
 			</div>
 		</div>
@@ -163,7 +177,7 @@
 		&[data-state='active'] {
 			@apply focus:relative;
 			/* background-color: white; */
-			/* color: theme('colors.zinc.900');? */
+			color: theme('colors.indigo.200');
 		}
 	}
 
