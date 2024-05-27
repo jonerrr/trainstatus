@@ -64,32 +64,19 @@
 		duration: 250,
 		easing: cubicInOut
 	});
+
+	// let offsetHeight: number;
+	// console.log(offsetHeight);
 </script>
 
 <Dialog.Trigger name={stop.id}>
-	<div class="w-24 grow-0 font-semibold text-indigo-200">
+	<div class="w-[25%] grow-0 font-semibold text-indigo-200">
 		{stop.name}
 	</div>
 
-	<!-- northbound trips -->
-	<div class="flex flex-col items-center">
-		<div class="text-xs grow-0 w-24 text-indigo-200">
-			{stop.north_headsign}
-		</div>
-		<div class="flex grow-0 w-28">
-			<Eta routes={stop.routes} bind:trips={northbound} />
-		</div>
-	</div>
+	<Eta headsign={stop.north_headsign} routes={stop.routes} trips={northbound} />
 
-	<!-- southbound trips -->
-	<div class="flex flex-col items-center">
-		<div class="text-xs grow-0 w-24 text-indigo-200">
-			{stop.south_headsign}
-		</div>
-		<div class="flex grow-0 w-28">
-			<Eta routes={stop.routes} bind:trips={southbound} />
-		</div>
-	</div>
+	<Eta headsign={stop.south_headsign} routes={stop.routes} trips={southbound} />
 
 	<div>
 		<Pin item_id={stop.id} store={pinned_stops} />

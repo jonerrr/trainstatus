@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { createSeparator, melt, type CreateSeparatorProps } from '@melt-ui/svelte';
 	import { Home, Clock, CircleAlert } from 'lucide-svelte';
 	import NavbarButton from '$lib/components/NavbarButton.svelte';
 </script>
 
-<nav class="fixed bottom-0 h-12 w-full bg-neutral-800">
+<nav class="fixed bottom-0 h-16 w-full bg-neutral-800">
 	<div class="grid grid-cols-3 h-full">
 		<NavbarButton>
 			<Home />

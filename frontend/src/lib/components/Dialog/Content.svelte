@@ -19,6 +19,7 @@
 	});
 </script>
 
+<!-- TODO: prevent clicking on other dialog when closing -->
 <div use:melt={$portalled}>
 	<div use:melt={$overlay} class="fixed inset-0 z-50 bg-black/40" />
 	<div

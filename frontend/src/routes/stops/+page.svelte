@@ -50,21 +50,37 @@
 	// if virtual list doesn't work, use observer api to detect when to show ETAs
 	let virtualList;
 	let list_height = 0;
-	console.log(list_height);
-	let row_heights: number[] = [];
-	// TODO: better height calculation
-	for (const stop of $stops) {
-		// each route adds 16px
-		// each headsign line adds 16px (if text is longer than 13 characters it adds 16px)
-		let height = 20;
-		let longest_headsign =
+	// let row_heights: number[] = [];
+	// // TODO: better height calculation
+	// for (const stop of $stops) {
+	// 	// each route adds 16px
+	// 	// each headsign line adds 16px (if text is longer than 13 characters it adds 16px)
+	// 	let height = 20;
+	// 	let longest_headsign =
+	// 		stop.north_headsign > stop.south_headsign
+	// 			? stop.north_headsign.length
+	// 			: stop.south_headsign.length;
+	// 	height += longest_headsign / 13 > 1 ? (height += 32) : (height += 16);
+	// 	height += stop.routes.length * 16;
+
+	// 	row_heights.push(height);
+	// }
+
+	function calculate_height(index: number): number {
+		const stop = $stops[index];
+		let height = 24;
+
+		// for each extra route, add 16px
+		height += stop.routes.length * 16;
+
+		// for headsign longer than 13 characters, add 16px
+		let headsign_chars =
 			stop.north_headsign > stop.south_headsign
 				? stop.north_headsign.length
 				: stop.south_headsign.length;
-		height += longest_headsign / 13 > 1 ? (height += 32) : (height += 16);
-		height += stop.routes.length * 16;
+		height += Math.ceil(headsign_chars / 12) * 16;
 
-		row_heights.push(height);
+		return height;
 	}
 </script>
 
@@ -82,7 +98,7 @@
 
 		<!-- TODO: create a function that determines item size -->
 		<VirtualList
-			bind:itemSize={row_heights}
+			itemSize={(i) => calculate_height(i)}
 			bind:height={list_height}
 			width="auto"
 			itemCount={$stops.length}

@@ -16,7 +16,7 @@
 
 <div class="p-2 text-indigo-200 text-sm">
 	{#await data.alerts}
-		{#each Array(10) as _}
+		{#each Array(20) as _}
 			<div class="flex flex-col gap-2">
 				<div
 					class="flex rounded w-full animate-pulse items-center justify-center my-1 h-10 bg-neutral-700"
