@@ -32,7 +32,6 @@
 			</div>
 			{#if route_alerts.alerts.length > 1}
 				<div class="font-normal rounded bg-indigo-200 p-1 text-neutral-800">
-					<!-- {alerts.alerts.length > 1 ? `+${alerts.alerts.length - 1}` : ''} -->
 					+{route_alerts.alerts.length - 1}
 				</div>
 			{/if}

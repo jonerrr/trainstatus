@@ -2,7 +2,7 @@
 	import { createSync, melt } from '@melt-ui/svelte';
 	import { dialogRegistry, type DialogName } from '.';
 	import { page } from '$app/stores';
-	import { flyAndScale } from '$lib/utils';
+	// import { flyAndScale } from '$lib/utils';
 
 	export let name: DialogName;
 

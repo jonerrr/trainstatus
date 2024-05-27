@@ -13,8 +13,6 @@
 	export let stop: Stop;
 	// default to empty array to prevent undefined errors
 	export let trips: Trip[] = [];
-	// console.log(trips);
-	// console.log(stop);
 
 	$: trips_with_eta = trips
 		.filter((trip) => trip.stop_times.some((st) => st.stop_id === stop.id))
@@ -25,23 +23,24 @@
 			const now = new Date().getTime();
 			const eta = (arrival - now) / 1000 / 60;
 
-			// console.log(trip.route_id, eta, stop_time.arrival);
-			console.log('mapping');
-			// TODO: fix this
-			if (eta < 0) {
-				console.log(
-					'how the fuck is this trip in the past:',
-					trip.route_id,
-					eta,
-					stop_time.arrival
-				);
-			}
+			// console.log('mapping');
+
+			// if (eta < 0) {
+			// 	console.log(
+			// 		'how the fuck is this trip in the past:',
+			// 		trip.route_id,
+			// 		eta,
+			// 		stop_time.arrival
+			// 	);
+			// }
 
 			return {
 				...trip,
 				eta
 			};
 		})
+		// I'm pretty sure some eta's are negative because stops can have the same trips but different etas
+		.filter((trip) => trip.eta >= 0)
 		.sort((a, b) => a.eta - b.eta);
 
 	$: northbound = trips_with_eta.filter((trip) => trip.direction === Direction.North);
@@ -174,7 +173,6 @@
 
 		&[data-state='active'] {
 			@apply focus:relative;
-			/* background-color: white; */
 			color: theme('colors.indigo.200');
 		}
 	}
