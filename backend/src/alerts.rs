@@ -35,6 +35,8 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
     // tokio::fs::remove_file("./alerts.txt").await.ok();
     // tokio::fs::write("./alerts.txt", msgs).await.unwrap();
 
+    let mut in_feed_ids = vec![];
+
     for entity in feed.entity {
         let Some(alert) = entity.alert else {
             tracing::warn!("no alert");
@@ -46,6 +48,13 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
             tracing::debug!("No mercury alert (likely elevator outage)");
             continue;
         };
+
+        if let Some(clone_id) = mercury_alert.clone_id {
+            tracing::debug!("deleting clone of alert");
+            sqlx::query!("DELETE FROM alerts WHERE mta_id = $1", clone_id)
+                .execute(pool)
+                .await?;
+        }
 
         let mta_id = entity.id;
         // first in vec is plain text, second is html
@@ -80,6 +89,7 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
             + " "
             + &display_before_active.to_string();
         let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
+        in_feed_ids.push(id);
 
         sqlx::query!("
             INSERT INTO alerts (id, mta_id, alert_type, header_plain, header_html, description_plain, description_html, created_at, updated_at, display_before_active)
@@ -153,6 +163,14 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
         let query = query_builder.build();
         query.execute(pool).await?;
     }
+
+    // set in_feed to false for alerts not in feed
+    sqlx::query!(
+        "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
+        &in_feed_ids
+    )
+    .execute(pool)
+    .await?;
 
     Ok(())
 }

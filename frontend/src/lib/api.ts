@@ -75,6 +75,7 @@ export interface Alert {
 	alert_type: string;
 	header: string;
 	description?: string;
+	updated_at: string;
 	active_periods: ActivePeriod[];
 }
 
@@ -88,7 +89,9 @@ function parse_html(html: string) {
 	return html.replaceAll(train_regex, (_match, _p1, p2) => {
 		const icon = icons.find((t) => t.name === p2) ?? icons[icons.length - 1];
 		// TODO: check if full svg and add missing shuttle bus icon
-		return `<svg xmlsn="http://www.w3.org/2000/svg" class="inline-block" width="1rem" height="1rem" viewBox="0 0 90 90" focusable="false"> ${icon.svg} </svg>`;
+		if (icon.complete_svg) return icon.svg;
+		else
+			return `<svg xmlsn="http://www.w3.org/2000/svg" class="inline-block" width="1rem" height="1rem" viewBox="0 0 90 90" focusable="false"> ${icon.svg} </svg>`;
 	});
 }
 

@@ -2,11 +2,14 @@
 	import { melt } from '@melt-ui/svelte';
 	import emblaCarouselSvelte from 'embla-carousel-svelte';
 	import AutoHeight from 'embla-carousel-auto-height';
+	import dayjs from 'dayjs';
+	import relativeTime from 'dayjs/plugin/relativeTime';
 	import type { Alert, RouteAlerts } from '$lib/api';
 	import { pinned_routes } from '$lib/stores';
 	import { Dialog } from '$lib/components/Dialog';
 	import Icon from '$lib/components/Icon.svelte';
 	import Pin from '$lib/components/Pin.svelte';
+	dayjs.extend(relativeTime);
 
 	export let route_id: string;
 	export let alerts: RouteAlerts | undefined;
@@ -19,9 +22,18 @@
 	<div class="flex gap-2 items-center">
 		<Icon width="2rem" height="2rem" name={route_id} />
 
-		<div>
-			{alerts?.alerts[0].alert_type}
-		</div>
+		{#if alerts}
+			<div class="font-semibold flex gap-2">
+				<div>
+					{alerts.alerts[0].alert_type}
+				</div>
+				<div class="font-normal">
+					{alerts.alerts.length > 1 ? `+${alerts.alerts.length - 1}` : ''}
+				</div>
+			</div>
+		{:else}
+			<div class="text-neutral-400">No alerts</div>
+		{/if}
 	</div>
 
 	<div>
@@ -40,11 +52,15 @@
 							{alert.alert_type}
 						</h2>
 
-						<div use:melt={description}>
+						<div use:melt={description} class="text-indigo-200">
 							{@html alert.header}
 							{#if alert.description}
 								{@html alert.description}
 							{/if}
+
+							<span class="text-sm text-neutral-400">
+								Updated {dayjs(alert.updated_at).fromNow()}
+							</span>
 						</div>
 					</div>
 				{/each}
@@ -53,6 +69,8 @@
 		<div class="flex text-indigo-200">
 			<button class="btn mt-2 ml-auto" use:melt={close}>Close</button>
 		</div>
+	{:else}
+		<div class="text-indigo-200">No alerts</div>
 	{/if}
 </Dialog.Content>
 

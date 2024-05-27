@@ -3,7 +3,14 @@
 </script>
 
 <header class="text-4xl p-2 font-bold text-indigo-400 flex">
-	<span class="text-gradient">Trainstat.us</span>
+	<div class="text-gradient">
+		<!-- TODO: test this -->
+		{#if $offline}
+			Trainstat<span class="animate-pulse text-red-500">.</span>us
+		{:else}
+			Trainstat.us
+		{/if}
+	</div>
 	<!-- <span class="text-zinc-600">.</span><span class={$offline ? 'text-red-600' : 'text-blue-400'}
 		>us</span
 	> -->

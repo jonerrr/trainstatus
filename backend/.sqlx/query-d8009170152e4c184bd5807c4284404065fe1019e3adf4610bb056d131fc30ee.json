@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d8009170152e4c184bd5807c4284404065fe1019e3adf4610bb056d131fc30ee"
+}
