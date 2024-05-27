@@ -3,7 +3,7 @@ import Trigger from './Trigger.svelte';
 import Content from './Content.svelte';
 import { pushState } from '$app/navigation';
 
-export const DIALOG_NAMES = ['settings', 'login', 'delete'] as const;
+// export const DIALOG_NAMES = ['settings', 'login', 'delete'] as const;
 
 export type DialogName = string[][number];
 

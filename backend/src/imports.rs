@@ -189,6 +189,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 "adding group because stop {} has less than 2 groups",
                 ns.stop.name
             );
+            // TODO: instead of clearing array, only replace the missing groups
             ns.groups.clear();
             ns.groups.push(NearbyGroup {
                 headsign: "Northbound".to_string(),

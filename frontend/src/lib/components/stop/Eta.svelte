@@ -17,10 +17,14 @@
 		route_trips[route.id] = [];
 	});
 	trips.forEach((trip) => {
+		if (!route_trips[trip.route_id]) {
+			console.log(`missing route ${trip.route_id} for trip, route_id: ${trip.route_id}`);
+			route_trips[trip.route_id] = [];
+		}
 		route_trips[trip.route_id].push(trip);
 	});
 
-	console.log(route_trips);
+	// console.log(route_trips);
 </script>
 
 <div class="flex flex-col gap-1">
