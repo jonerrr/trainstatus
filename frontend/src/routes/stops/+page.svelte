@@ -51,9 +51,20 @@
 	let virtualList;
 	let list_height = 0;
 	console.log(list_height);
-	let row_heights = [];
-	for (let i = 0; i < 496; i++) {
-		row_heights.push(100);
+	let row_heights: number[] = [];
+	// TODO: better height calculation
+	for (const stop of $stops) {
+		// each route adds 16px
+		// each headsign line adds 16px (if text is longer than 13 characters it adds 16px)
+		let height = 20;
+		let longest_headsign =
+			stop.north_headsign > stop.south_headsign
+				? stop.north_headsign.length
+				: stop.south_headsign.length;
+		height += longest_headsign / 13 > 1 ? (height += 32) : (height += 16);
+		height += stop.routes.length * 16;
+
+		row_heights.push(height);
 	}
 </script>
 
@@ -69,9 +80,13 @@
 			<div class="font-semibold text-indigo-300">Stop Times</div>
 		</div>
 
-		<!-- {#each current_stops as stop (stop.id)} -->
 		<!-- TODO: create a function that determines item size -->
-		<VirtualList itemSize={100} bind:height={list_height} width="auto" itemCount={$stops.length}>
+		<VirtualList
+			bind:itemSize={row_heights}
+			bind:height={list_height}
+			width="auto"
+			itemCount={$stops.length}
+		>
 			<div
 				slot="item"
 				let:index
@@ -82,8 +97,13 @@
 				<Preview {trips} stop={$stops[index]} />
 			</div>
 		</VirtualList>
-		<!-- {/each} -->
 
-		<!-- <div bind:this={sentinel}></div> -->
+		<!-- {#each $stops as stop (stop.id)}
+			<div
+				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
+			>
+				<Preview {trips} {stop} />
+			</div>
+		{/each} -->
 	</List>
 </div>
