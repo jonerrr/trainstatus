@@ -91,11 +91,21 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
         let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
         in_feed_ids.push(id);
 
+        // delete duplicate alerts
+        sqlx::query!(
+            "DELETE FROM alerts WHERE description_plain = $1 AND header_plain = $2",
+            description_plain,
+            headers[0]
+        )
+        .execute(pool)
+        .await?;
+
         sqlx::query!("
             INSERT INTO alerts (id, mta_id, alert_type, header_plain, header_html, description_plain, description_html, created_at, updated_at, display_before_active)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO UPDATE
-            SET description_plain = $6, description_html = $7, created_at = $8, updated_at = $9, display_before_active = $10",
+            SET alert_type = $3, header_plain = $4, header_html = $5, description_plain = $6, description_html = $7, created_at = $8, updated_at = $9, display_before_active = $10
+            ",
             id, mta_id, alert_type, headers[0], headers[1], description_plain, description_html, created_at, updated_at, display_before_active
         )
             .execute(pool)

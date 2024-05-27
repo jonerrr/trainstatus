@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { register } from 'swiper/element/bundle';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
@@ -8,14 +9,18 @@
 
 	export let data: PageData;
 	stops.set(data.stops);
+
+	// register swiper.js for alert carousel
+	register();
 </script>
 
 <Toaster />
 
-<Header />
+<div class="md:w-[60%] m-auto">
+	<Header />
 
-<slot />
-
+	<slot />
+</div>
 <Navbar />
 
 <style lang="postcss">

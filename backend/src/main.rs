@@ -2,7 +2,7 @@ use axum::{response::Redirect, routing::get, Router};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::env::var;
 use std::sync::OnceLock;
-use tower_http::trace::TraceLayer;
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
@@ -29,8 +29,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let pg_connect_option: PgConnectOptions =
-        std::env::var("DATABASE_URL").unwrap().parse().unwrap();
+    let pg_connect_option: PgConnectOptions = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL env not set")
+        .parse()
+        .unwrap();
     // pg_connect_option = pg_connect_option.disable_statement_logging();
     let pool = PgPoolOptions::new()
         .max_connections(32)
@@ -63,6 +65,7 @@ async fn main() {
         .route("/trips", get(routes::trips::get))
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
+        .layer(CompressionLayer::new())
         .with_state(pool);
     let listener =
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "0.0.0.0:3055".into()))
