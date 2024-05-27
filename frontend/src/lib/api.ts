@@ -7,6 +7,8 @@ export interface Stop {
 	ada: boolean;
 	notes?: string;
 	borough: string;
+	north_headsign: string;
+	south_headsign: string;
 	routes: Route[];
 }
 

@@ -30,6 +30,16 @@
       },
       {
         "ordinal": 5,
+        "name": "north_headsign",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "south_headsign",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
         "name": "routes",
         "type_info": "JsonbArray"
       }
@@ -42,6 +52,8 @@
       false,
       false,
       true,
+      false,
+      false,
       false,
       null
     ]

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '@fontsource/inter';
 	import { register } from 'swiper/element/bundle';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';

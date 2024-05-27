@@ -35,7 +35,7 @@ async fn main() {
         .unwrap();
     // pg_connect_option = pg_connect_option.disable_statement_logging();
     let pool = PgPoolOptions::new()
-        .max_connections(32)
+        .max_connections(100)
         .connect_with(pg_connect_option)
         .await
         .unwrap();
@@ -45,9 +45,7 @@ async fn main() {
         tracing::info!("Updating stops and routes");
         imports::stops_and_routes(&pool).await;
     }
-
-    // let pool = pool.clone();
-
+    // TODO: prevent importing until the previous import is done
     trips::import(pool.clone()).await;
     alerts::import(pool.clone()).await;
 

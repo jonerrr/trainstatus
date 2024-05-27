@@ -9,7 +9,6 @@
 	import Eta from '$lib/components/stop/Eta.svelte';
 	import Trips from '$lib/components/stop/Trips.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import Page from '../../../routes/+page.svelte';
 
 	export let stop: Stop;
 	// default to empty array to prevent undefined errors
@@ -47,17 +46,6 @@
 
 	$: northbound = trips_with_eta.filter((trip) => trip.direction === Direction.North);
 	$: southbound = trips_with_eta.filter((trip) => trip.direction === Direction.South);
-	// TODO: find source for headsigns
-	// let n_headsign = [];
-	// for (const route of stop.routes) {
-	// 	const route_trip = northbound.find((t) => t.route_id === route.id);
-	// 	if (route_trip) {
-	// 		const last_stop = $stops.find(
-	// 			(s) => s.id === route_trip.stop_times[route_trip.stop_times.length - 1].stop_id
-	// 		)!;
-	// 		n_headsign.push(last_stop.borough);
-	// 	}
-	// }
 
 	// const stop_routes = stop.routes.flatMap((route) => route.route_id);
 	const {
@@ -80,18 +68,28 @@
 </script>
 
 <Dialog.Trigger name={stop.id}>
-	<div class="w-24 grow-0">
+	<div class="w-24 grow-0 font-semibold text-indigo-300">
 		{stop.name}
 	</div>
 
 	<!-- northbound trips -->
-	<div class="flex grow-0 w-24">
-		<Eta routes={stop.routes} trips={northbound} />
+	<div class="flex flex-col items-center">
+		<div class="text-xs">
+			{stop.north_headsign}
+		</div>
+		<div class="flex grow-0 w-24">
+			<Eta routes={stop.routes} bind:trips={northbound} />
+		</div>
 	</div>
 
 	<!-- southbound trips -->
-	<div class="flex grow-0 w-24">
-		<Eta routes={stop.routes} trips={southbound} />
+	<div class="flex flex-col items-center">
+		<div class="text-xs">
+			{stop.south_headsign}
+		</div>
+		<div class="flex grow-0 w-24">
+			<Eta routes={stop.routes} bind:trips={southbound} />
+		</div>
 	</div>
 
 	<div>

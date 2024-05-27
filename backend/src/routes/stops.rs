@@ -14,8 +14,9 @@ pub struct Stop {
     pub ada: bool,
     pub notes: Option<String>,
     pub borough: String,
-    // vector of route structs
     pub routes: Option<Vec<JsonValue>>,
+    pub north_headsign: String,
+    pub south_headsign: String,
     // vector of trip structs
     // pub trips: Option<Vec<JsonValue>>,
 }

@@ -1,6 +1,6 @@
+use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
-use std::collections::HashMap;
 
 pub async fn should_update(pool: &PgPool) -> bool {
     let stop_count = sqlx::query!("SELECT COUNT(*) FROM stops as count")
@@ -89,14 +89,92 @@ pub struct Station {
     pub borough: String,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct NearbyStation {
+    pub groups: Vec<NearbyGroup>,
+    pub stop: NearbyStop,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct NearbyGroup {
+    pub headsign: String,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct NearbyStop {
+    #[serde(deserialize_with = "de_remove_prefix")]
+    pub id: String,
+    pub name: String,
+    // not used currently
+    // pub lat: f32,
+    // pub lon: f32,
+}
+
+// all the routes in the NYC subway system, will sadly need to be updated manually
+const ROUTES: [&str; 26] = [
+    "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
+    "Q", "R", "W", "H", "FS", "GS", "SI",
+];
+
+#[derive(Debug)]
 struct Route(String);
 
-struct Stop(String, String, bool, Option<String>, String);
+// route_id, stop_id, stop_sequence, stop_type
+struct RouteStop(String, String, i16, i16);
+
+// stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign
+// TODO: maybe also include lat and long of station from /nearby endpoint
+struct Stop(String, String, bool, Option<String>, String, String, String);
 
 pub async fn stops_and_routes(pool: &PgPool) {
-    // because the public api is bad, I found this endpoint that gives me all the stations from mta.info
-    let mut stations: Vec<Station> = reqwest::Client::new()
-        .get("https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP")
+    // store the routes and their stops
+    // need to add them after adding routes and stops to the database
+    // let mut route_stop_map: HashMap<String, Vec<RouteStop>> = HashMap::new();
+    let mut route_stops: Vec<RouteStop> = Vec::new();
+    let mut stations: Vec<Station> = Vec::new();
+    // go through each of the routes and get their stop sequences and the stop data
+    for route in ROUTES.iter() {
+        tracing::info!("getting stops for route {}", route);
+        // because the public api is bad, I found this endpoint that gives me all the stations from mta.info
+        let route_stations: Vec<Station> = reqwest::Client::new()
+            .get(format!("https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP&routeId=MTASBWY:{}", route))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+
+        // add the route stops into the vec
+        route_stops.extend(route_stations.iter().map(|s| {
+            RouteStop(
+                route.to_string(),
+                s.stop_id.clone(),
+                s.stop_sequence,
+                s.stop_type,
+            )
+        }));
+
+        // add the route_stops to main stations vector
+        stations.extend(route_stations.into_iter());
+    }
+
+    // remove duplicate stations, should be 496 stations without duplicates
+    stations.sort_by_key(|s| (s.stop_id.clone()));
+    stations.dedup_by(|a, b| a.stop_id == b.stop_id);
+
+    // get the list of stop ids so we can fetch the headsigns from the /nearby endpoint
+    let stop_ids = stations
+        .par_iter()
+        .map(|s| "MTASBWY:".to_owned() + &s.stop_id)
+        .collect::<Vec<String>>()
+        .join(",");
+    // save stop_ids to file
+    // std::fs::write("stop_ids.txt", stop_ids).expect("Failed to write stop_ids to file");
+
+    // another internal endpoint I found on the mta website. I would love to not use this but the MTA's public api is bad
+    let mut nearby_stations: Vec<NearbyStation> = reqwest::Client::new()
+        .get(format!("https://otp-mta-prod.camsys-apps.com/otp/routers/default/nearby?apikey=Z276E3rCeTzOQEoBPPN4JCEc6GfvdnYE&stops={}", stop_ids))
         .send()
         .await
         .unwrap()
@@ -104,27 +182,25 @@ pub async fn stops_and_routes(pool: &PgPool) {
         .await
         .unwrap();
 
-    // let stop_ids = stations
-    //     .iter()
-    //     .map(|s| s.stop_id.clone())
-    //     .collect::<Vec<String>>()
-    //     .join(",");
-    // // save stop_ids to file
-    // std::fs::write("stop_ids.txt", stop_ids)
-    //     .expect("Failed to write stop_ids to file");
-
-    // get the routes and their stations
-    let mut route_stops: HashMap<String, Vec<Station>> = HashMap::new();
-    stations.iter().for_each(|s| {
-        if route_stops.contains_key(&s.route_id) {
-            route_stops.get_mut(&s.route_id).unwrap().push(s.clone());
-        } else {
-            route_stops.insert(s.route_id.clone(), vec![s.clone()]);
+    // fix the nearby stations that have less than 2 groups
+    nearby_stations.par_iter_mut().for_each(|ns| {
+        if ns.groups.len() < 2 {
+            tracing::info!(
+                "adding group because stop {} has less than 2 groups",
+                ns.stop.name
+            );
+            ns.groups.clear();
+            ns.groups.push(NearbyGroup {
+                headsign: "Northbound".to_string(),
+            });
+            ns.groups.push(NearbyGroup {
+                headsign: "Southbound".to_string(),
+            });
         }
     });
 
     // insert routes into the database
-    let routes: Vec<Route> = route_stops.keys().map(|key| Route(key.clone())).collect();
+    let routes: Vec<Route> = ROUTES.iter().map(|r| Route(r.to_string())).collect();
 
     let mut query_builder = QueryBuilder::new("INSERT INTO routes (id) ");
     query_builder.push_values(routes, |mut b, route| {
@@ -134,60 +210,57 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
-    // remove duplicates from stations vec
-    stations.sort_by_key(|s| (s.stop_id.clone()));
-    stations.dedup_by(|a, b| a.stop_id == b.stop_id);
-
+    // parse stops into Stop struct for the query builder
     let stops = stations
-        .iter()
+        .par_iter()
         .map(|s| {
+            let nearby_station = nearby_stations
+                .iter()
+                .find(|ns| ns.stop.id == s.stop_id)
+                .unwrap();
+            // this might speed it up a bit but idk
+            // nearby_stations.retain(|ns| ns.stop.id != s.stop_id);
+
             Stop(
                 s.stop_id.clone(),
                 s.stop_name.clone(),
                 s.ada,
                 s.notes.clone(),
                 s.borough.clone(),
+                // the first one should be northbound and the last one should be southbound
+                // there can be more than 2 groups so we can't just take index 0 and 1
+                nearby_station.groups.first().unwrap().headsign.clone(),
+                nearby_station.groups.last().unwrap().headsign.clone(),
             )
         })
         .collect::<Vec<Stop>>();
 
     // insert all stops into the database
-    let mut query_builder = QueryBuilder::new("INSERT INTO stops (id, name, ada, notes, borough) ");
+    let mut query_builder = QueryBuilder::new(
+        "INSERT INTO stops (id, name, ada, notes, borough, north_headsign, south_headsign) ",
+    );
     query_builder.push_values(stops, |mut b, stop| {
         b.push_bind(stop.0)
             .push_bind(stop.1)
             .push_bind(stop.2)
             .push_bind(stop.3)
-            .push_bind(stop.4);
+            .push_bind(stop.4)
+            .push_bind(stop.5)
+            .push_bind(stop.6);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
-    // insert all the route_stops into the database
-    let mut route_stop_tuples = Vec::new();
-    route_stops.iter().for_each(|(route_id, stops)| {
-        stops.iter().for_each(|s| {
-            route_stop_tuples.push((
-                route_id.clone(),
-                s.stop_id.clone(),
-                s.stop_sequence,
-                s.stop_type,
-            ));
-        });
-    });
-
+    // insert all the route stops into the database
     let mut query_builder =
         QueryBuilder::new("INSERT INTO route_stops (route_id, stop_id, stop_sequence, stop_type) ");
-    query_builder.push_values(
-        route_stop_tuples,
-        |mut b, (route_id, stop_id, stop_sequence, stop_type)| {
-            b.push_bind(route_id)
-                .push_bind(stop_id)
-                .push_bind(stop_sequence)
-                .push_bind(stop_type);
-        },
-    );
+    query_builder.push_values(route_stops, |mut b, route_stop| {
+        b.push_bind(route_stop.0)
+            .push_bind(route_stop.1)
+            .push_bind(route_stop.2)
+            .push_bind(route_stop.3);
+    });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await.unwrap();

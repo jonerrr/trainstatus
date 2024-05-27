@@ -12,7 +12,7 @@
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
-	export let alerts: RouteAlerts | undefined;
+	export let route_alerts: RouteAlerts | undefined;
 	// TODO: worry about sort_order
 
 	// let plugins = [AutoHeight()];
@@ -23,18 +23,19 @@
 	<div class="flex gap-2 items-center">
 		<Icon width="2rem" height="2rem" name={route_id} />
 
-		{#if alerts}
-			<div class="font-semibold flex gap-2">
+		{#if route_alerts}
+			<!-- TODO: stop +n from moving on page load -->
+			<div class="font-semibold flex gap-2 items-center">
 				<div>
-					{alerts.alerts[0].alert_type}
+					{route_alerts.alerts[0].alert_type}
 				</div>
-				{#if alerts.alerts.length > 1}
-					<div class="font-normal rounded bg-indigo-200 p-1 text-neutral-800">
-						<!-- {alerts.alerts.length > 1 ? `+${alerts.alerts.length - 1}` : ''} -->
-						+{alerts.alerts.length - 1}
-					</div>
-				{/if}
 			</div>
+			{#if route_alerts.alerts.length > 1}
+				<div class="font-normal rounded bg-indigo-200 p-1 text-neutral-800">
+					<!-- {alerts.alerts.length > 1 ? `+${alerts.alerts.length - 1}` : ''} -->
+					+{route_alerts.alerts.length - 1}
+				</div>
+			{/if}
 		{:else}
 			<div class="text-neutral-400">No alerts</div>
 		{/if}
@@ -46,13 +47,13 @@
 </Dialog.Trigger>
 
 <Dialog.Content name={route_id} let:title let:description let:close>
-	{#if alerts}
+	{#if route_alerts}
 		<swiper-container
 			pagination="true"
 			auto-height="true"
 			style="--swiper-pagination-bullet-inactive-color: #171717; --swiper-pagination-color: #6366f1;"
 		>
-			{#each alerts?.alerts as alert}
+			{#each route_alerts.alerts as alert}
 				<swiper-slide>
 					<h2 class="font-bold flex items-center gap-2 text-indigo-300" use:melt={title}>
 						<Icon width="2rem" height="2rem" name={route_id} />
