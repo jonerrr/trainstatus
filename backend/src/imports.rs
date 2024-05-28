@@ -98,6 +98,7 @@ pub struct NearbyStation {
 #[derive(Deserialize, Clone, Debug)]
 pub struct NearbyGroup {
     pub headsign: String,
+    pub times: Vec<StationTime>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -110,11 +111,23 @@ pub struct NearbyStop {
     // pub lon: f32,
 }
 
+#[derive(Deserialize, Clone, Debug)]
+pub struct StationTime {
+    #[serde(deserialize_with = "de_remove_prefix", rename = "stopId")]
+    pub stop_id: String,
+}
+
 // all the routes in the NYC subway system, will sadly need to be updated manually
 const ROUTES: [&str; 26] = [
     "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
     "Q", "R", "W", "H", "FS", "GS", "SI",
 ];
+
+struct StopHeadsign {
+    stop_id: String,
+    north: String,
+    south: String,
+}
 
 #[derive(Debug)]
 struct Route(String);
@@ -173,7 +186,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // std::fs::write("stop_ids.txt", stop_ids).expect("Failed to write stop_ids to file");
 
     // another internal endpoint I found on the mta website. I would love to not use this but the MTA's public api is bad
-    let mut nearby_stations: Vec<NearbyStation> = reqwest::Client::new()
+    let nearby_stations: Vec<NearbyStation> = reqwest::Client::new()
         .get(format!("https://otp-mta-prod.camsys-apps.com/otp/routers/default/nearby?apikey=Z276E3rCeTzOQEoBPPN4JCEc6GfvdnYE&stops={}", stop_ids))
         .send()
         .await
@@ -182,23 +195,42 @@ pub async fn stops_and_routes(pool: &PgPool) {
         .await
         .unwrap();
 
-    // fix the nearby stations that have less than 2 groups
-    nearby_stations.par_iter_mut().for_each(|ns| {
-        if ns.groups.len() < 2 {
-            tracing::info!(
-                "adding group because stop {} has less than 2 groups",
-                ns.stop.name
-            );
-            // TODO: instead of clearing array, only replace the missing groups
-            ns.groups.clear();
-            ns.groups.push(NearbyGroup {
-                headsign: "Northbound".to_string(),
-            });
-            ns.groups.push(NearbyGroup {
-                headsign: "Southbound".to_string(),
-            });
-        }
-    });
+    // get all of the station headsigns
+    let stop_headsigns = nearby_stations
+        .into_par_iter()
+        .map(|station| {
+            // because the order of groups is different for each stop (thanks mta), we need to find the first group that has a stop time with a N or S to find the headsigns
+            let north_headsign = station
+                .groups
+                .par_iter()
+                .find_first(|group| {
+                    group
+                        .times
+                        .iter()
+                        .find(|time| time.stop_id.chars().last().unwrap() == 'N')
+                        .is_some()
+                })
+                .map(|group| group.headsign.clone());
+
+            let south_headsign = station
+                .groups
+                .par_iter()
+                .find_first(|group| {
+                    group
+                        .times
+                        .iter()
+                        .find(|time| time.stop_id.chars().last().unwrap() == 'S')
+                        .is_some()
+                })
+                .map(|group| group.headsign.clone());
+
+            StopHeadsign {
+                stop_id: station.stop.id.clone(),
+                north: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
+                south: south_headsign.unwrap_or_else(|| "Southbound".to_string()),
+            }
+        })
+        .collect::<Vec<_>>();
 
     // insert routes into the database
     let routes: Vec<Route> = ROUTES.iter().map(|r| Route(r.to_string())).collect();
@@ -215,12 +247,12 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let stops = stations
         .par_iter()
         .map(|s| {
-            let nearby_station = nearby_stations
-                .iter()
-                .find(|ns| ns.stop.id == s.stop_id)
-                .unwrap();
             // this might speed it up a bit but idk
             // nearby_stations.retain(|ns| ns.stop.id != s.stop_id);
+            let headsign = stop_headsigns
+                .iter()
+                .find(|stop_headsign| stop_headsign.stop_id == s.stop_id)
+                .unwrap();
 
             Stop(
                 s.stop_id.clone(),
@@ -228,11 +260,8 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 s.ada,
                 s.notes.clone(),
                 s.borough.clone(),
-                // TODO: figure out a way to check which is northbound and southbound
-                // the first one should be northbound and the last one should be southbound
-                // there can be more than 2 groups so we can't just take index 0 and 1
-                nearby_station.groups.first().unwrap().headsign.clone(),
-                nearby_station.groups.last().unwrap().headsign.clone(),
+                headsign.north.clone(),
+                headsign.south.clone(),
             )
         })
         .collect::<Vec<Stop>>();
