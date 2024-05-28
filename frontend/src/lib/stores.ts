@@ -9,3 +9,5 @@ export const stops = writable<Stop[]>([]);
 // '4', 'A', 'J'
 export const pinned_routes = persisted('pinned_routes', ['J', 'Q', 'N', 'A', 'H']);
 export const pinned_stops = persisted('pinned_stops', ['631', 'A27']);
+
+// TODO: maybe make some multithreaded / sw thing to calculate etas so its not laggy

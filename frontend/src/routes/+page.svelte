@@ -57,6 +57,7 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
+<!-- TODO: use meltui stuff to create routes and stops components -->
 <div class="p-2 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
 	<List bind:loading={loading_alerts} class="bg-neutral-800/90 border border-neutral-700 p-1">
 		<div slot="header" class="flex self-center mb-2 w-full">
