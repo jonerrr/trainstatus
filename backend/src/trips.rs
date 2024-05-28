@@ -116,14 +116,14 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             let trip_id = match trip_update.trip.trip_id.as_ref() {
                 Some(id) => id,
                 None => {
-                    tracing::warn!("Skipping trip without trip_id endpoint: {}", endpoint);
+                    tracing::debug!("Skipping trip without trip_id endpoint: {}", endpoint);
                     continue;
                 }
             };
             let mut route_id = match trip_update.trip.route_id.as_ref() {
                 Some(id) => id.to_owned(),
                 None => {
-                    tracing::warn!("Skipping trip without route_id endpoint: {}", endpoint);
+                    tracing::debug!("Skipping trip without route_id endpoint: {}", endpoint);
                     continue;
                 }
             };
@@ -159,7 +159,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                         Some(stop_time) => match stop_time.stop_id.as_ref() {
                             Some(id) => id.clone(),
                             None => {
-                                tracing::warn!(
+                                tracing::debug!(
                                     "Skipping trip without stop_id in stop_time_update {}",
                                     endpoint
                                 );
@@ -167,7 +167,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                             }
                         },
                         None => {
-                            tracing::warn!(
+                            tracing::debug!(
                                 "Skipping trip without any stop times endpoint: {}",
                                 endpoint
                             );
@@ -206,7 +206,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             let start_date = match trip_update.trip.start_date.as_ref() {
                 Some(date) => date,
                 None => {
-                    tracing::warn!("Skipping trip without start date");
+                    tracing::debug!("Skipping trip without start date");
                     continue;
                 }
             };
@@ -267,7 +267,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                                 departure = Some(a);
                             }
                             None => {
-                                tracing::warn!(
+                                tracing::debug!(
                                     "Missing arrival time for {} in trip {}",
                                     &stop_id,
                                     &trip_id
@@ -322,7 +322,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 // Err(DecodeFeedError::NoStopTimes {
                 //     endpoint: endpoint.to_owned(),
                 // })?
-                tracing::warn!("no stop_updates for endpoint {}", endpoint);
+                tracing::debug!("no stop_updates for endpoint {}", endpoint);
                 continue;
             }
 

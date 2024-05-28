@@ -25,7 +25,7 @@
 	<div
 		class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw]
             max-w-[450px] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-700 text-indigo-300
-            p-6 shadow-lg"
+            p-6 shadow-lg overflow-auto"
 		use:melt={$content}
 	>
 		<slot title={$title} description={$description} close={$close} />

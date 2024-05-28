@@ -72,6 +72,7 @@
 				</swiper-slide>
 			{/each}
 		</swiper-container>
+		<!-- TODO: -->
 		<div class="flex text-indigo-200">
 			<button class="btn mt-2 ml-auto" use:melt={close}>Close</button>
 		</div>
