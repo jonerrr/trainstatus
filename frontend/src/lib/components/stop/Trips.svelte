@@ -5,6 +5,9 @@
 	import Icon from '$lib/components/Icon.svelte';
 
 	export let trips: Trip[];
+	// if (!trips.length) {
+	// 	console.log('no trips');
+	// }
 </script>
 
 <!-- TODO: fix max-h -->
@@ -12,7 +15,7 @@
 	{#if trips.length}
 		{#each trips as trip (trip.id)}
 			<div
-				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
+				class="border-neutral-700 bg-neutral-800 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1 text-neutral-300"
 			>
 				<div class="flex gap-2 items-center justify-between mx-1">
 					<div class="flex gap-2 items-center">
@@ -25,6 +28,8 @@
 						{$stops.find((s) => s.id === trip.stop_times[trip.stop_times.length - 1].stop_id)?.name}
 					</div>
 				</div>
+				<!-- TODO: show current stop / how many stops away -->
+				<!-- TODO: make this trip dialog button -->
 			</div>
 		{/each}
 	{:else}

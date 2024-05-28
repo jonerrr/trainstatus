@@ -6,7 +6,7 @@
 	import { Direction, type Stop, type Trip } from '$lib/api';
 	import { pinned_stops, stops } from '$lib/stores';
 	import Pin from '$lib/components/Pin.svelte';
-	import Eta from '$lib/components/stop/Eta.svelte';
+	import Arrivals from '$lib/components/stop/Arrivals.svelte';
 	import Trips from '$lib/components/stop/Trips.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
@@ -74,9 +74,9 @@
 		{stop.name}
 	</div>
 
-	<Eta headsign={stop.north_headsign} routes={stop.routes} trips={northbound} />
+	<Arrivals headsign={stop.north_headsign} routes={stop.routes} trips={northbound} />
 
-	<Eta headsign={stop.south_headsign} routes={stop.routes} trips={southbound} />
+	<Arrivals headsign={stop.south_headsign} routes={stop.routes} trips={southbound} />
 
 	<div>
 		<Pin item_id={stop.id} store={pinned_stops} />
@@ -85,20 +85,21 @@
 
 <Dialog.Content name={stop.id} let:title let:description let:close>
 	<div class="flex items-center gap-2 py-1" use:melt={title}>
-		<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
-
-		<!-- TODO only show normal stopping trains or somehow indicate that route doesn't stop there all times -->
+		<!-- TODO: only show normal stopping trains or somehow indicate that route doesn't stop there all times -->
+		<!-- TODO: make icons adjust in size and wrap if 4+ routes -->
 		<div class="flex gap-1">
 			{#each stop.routes as route (route.id)}
 				<Icon width="2rem" height="2rem" name={route.id} />
 			{/each}
 		</div>
+
+		<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
 	</div>
 
 	<div use:melt={description}>
 		<div
 			use:melt={$root}
-			class="flex max-w-[25rem] flex-col overflow-hidden rounded-xl shadow-lg data-[orientation=vertical]:flex-row bg-neutral-600 text-indigo-200"
+			class="flex max-w-[25rem] border border-neutral-800 flex-col overflow-hidden rounded-xl shadow-lg data-[orientation=vertical]:flex-row bg-neutral-900/50 text-indigo-400"
 		>
 			<div
 				use:melt={$list}
@@ -113,16 +114,16 @@
 							<div
 								in:send={{ key: 'trigger' }}
 								out:receive={{ key: 'trigger' }}
-								class="absolute bottom-1 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full bg-indigo-400"
+								class="absolute bottom-1 left-1/2 h-1 w-full -translate-x-1/2 rounded-full bg-indigo-400"
 							/>
 						{/if}
 					</button>
 				{/each}
 			</div>
-			<div use:melt={$content('northbound')} class="grow bg-neutral-600 p-2">
+			<div use:melt={$content('northbound')} class="grow bg-neutral-900/50 p-2">
 				<Trips bind:trips={northbound} />
 			</div>
-			<div use:melt={$content('southbound')} class="grow bg-neutral-600 p-2">
+			<div use:melt={$content('southbound')} class="grow bg-neutral-900/50 p-2">
 				<Trips bind:trips={southbound} />
 			</div>
 		</div>

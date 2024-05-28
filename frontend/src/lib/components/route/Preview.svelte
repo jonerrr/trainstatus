@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { melt } from '@melt-ui/svelte';
-	// import emblaCarouselSvelte from 'embla-carousel-svelte';
-	// import AutoHeight from 'embla-carousel-auto-height';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import type { Alert, RouteAlerts } from '$lib/api';
@@ -15,8 +13,10 @@
 	export let route_alerts: RouteAlerts | undefined;
 	// TODO: worry about sort_order
 
-	// let plugins = [AutoHeight()];
-	// const options = { loop: true };
+	function on_progress(e: any) {
+		const [swiper, progress] = e.detail;
+		console.log(progress);
+	}
 </script>
 
 <Dialog.Trigger name={route_id}>
@@ -45,38 +45,56 @@
 	</div>
 </Dialog.Trigger>
 
+<!-- TODO: force pagination buttons on top of alerts -->
 <Dialog.Content name={route_id} let:title let:description let:close>
 	{#if route_alerts}
 		<swiper-container
 			pagination="true"
 			auto-height="true"
-			style="--swiper-pagination-bullet-inactive-color: #171717; --swiper-pagination-color: #6366f1;"
+			class="max-h-[85vh]"
+			style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
+			on:swiperprogress={on_progress}
 		>
 			{#each route_alerts.alerts as alert}
-				<swiper-slide>
-					<h2 class="font-bold flex items-center gap-2 text-indigo-300" use:melt={title}>
+				<swiper-slide class="relative">
+					<h2
+						class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300 bg-neutral-800"
+						use:melt={title}
+					>
 						<Icon width="2rem" height="2rem" name={route_id} />
 						{alert.alert_type}
 					</h2>
 
-					<div use:melt={description} class="text-indigo-200">
+					<div
+						use:melt={description}
+						class="text-indigo-200 overflow-auto max-h-[calc(85vh-8rem)] border border-neutral-700 rounded mb-6 mt-2"
+					>
 						{@html alert.header}
 						{#if alert.description}
 							{@html alert.description}
 						{/if}
 
-						<span class="text-sm text-neutral-400">
-							Updated {dayjs(alert.updated_at).fromNow()}
-						</span>
+						<!-- TODO: show end if not undefined -->
 					</div>
+
+					<span class="text-sm text-neutral-400">
+						Updated {dayjs(alert.updated_at).fromNow()}
+					</span>
 				</swiper-slide>
 			{/each}
 		</swiper-container>
-		<!-- TODO: -->
-		<div class="flex text-indigo-200">
-			<button class="btn mt-2 ml-auto" use:melt={close}>Close</button>
-		</div>
+
+		<button
+			class="z-40 text-indigo-400 font-bold absolute bottom-0 right-0 rounded p-2 m-6 shadow-xl bg-neutral-900/75 active:bg-neutral-800 hover:bg-neutral-800"
+			use:melt={close}>Close</button
+		>
 	{:else}
 		<div class="text-indigo-200">No alerts</div>
 	{/if}
 </Dialog.Content>
+
+<style lang="postcss">
+	swiper-container::part(pagination) {
+		@apply sticky bottom-2;
+	}
+</style>

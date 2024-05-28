@@ -12,7 +12,9 @@
 	} = dialogRegistry.get(name);
 
 	const sync = createSync({ open });
+	// @ts-ignore I don't think this is an issue
 	$: sync.open($page.state.dialogOpen === name, ($open) => {
+		// @ts-ignore
 		if ($page.state.dialogOpen !== name) {
 			dialogRegistry.shallow(name, $open);
 		}
@@ -20,11 +22,12 @@
 </script>
 
 <!-- TODO: prevent clicking on other dialog when closing -->
+<!-- TODO: add fade transition -->
 <div use:melt={$portalled}>
-	<div use:melt={$overlay} class="fixed inset-0 z-50 bg-black/40" />
+	<div use:melt={$overlay} class="fixed inset-0 z-49 bg-black/40" />
 	<div
 		class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw]
-            max-w-[450px] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-700 text-indigo-300
+            max-w-[500px] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-800 text-indigo-300
             p-6 shadow-lg overflow-auto"
 		use:melt={$content}
 	>

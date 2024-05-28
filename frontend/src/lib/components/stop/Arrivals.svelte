@@ -14,22 +14,23 @@
 		[key: string]: Required<Trip>[];
 	}
 	const route_trips: RouteTrips = {};
+
 	routes.forEach((route) => {
 		route_trips[route.id] = [];
 	});
 	trips.forEach((trip) => {
 		if (!route_trips[trip.route_id]) {
-			console.log(`missing route ${trip.route_id} for trip, route_id: ${trip.route_id}`);
+			console.log(`missing route ${trip.route_id} for trip ${trip.id}`);
 			route_trips[trip.route_id] = [];
 		}
 		route_trips[trip.route_id].push(trip);
 	});
 
-	// console.log(route_trips);
+	// TODO:
 </script>
 
 <div class="flex flex-col w-[30%] mt-auto">
-	<div class="text-xs text-indigo-200 text-wrap">
+	<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
 		{headsign}
 	</div>
 
@@ -40,11 +41,16 @@
 					<Icon name={route.id} />
 				</div>
 				<div class="flex gap-2">
-					{#each route_trips[route.id].slice(0, 2) as trip (trip.id)}
-						<div class="text-xs">
-							{trip.eta.toFixed(0)}m
-						</div>
-					{/each}
+					{#if route_trips[route.id].length}
+						<!-- TODO: make it clearer that these are arrivals -->
+						{#each route_trips[route.id].slice(0, 2) as trip (trip.id)}
+							<div class="text-xs">
+								{trip.eta.toFixed(0)}m
+							</div>
+						{/each}
+					{:else}
+						<div class="text-xs text-neutral-400">No trips found</div>
+					{/if}
 				</div>
 			</div>
 		{/each}

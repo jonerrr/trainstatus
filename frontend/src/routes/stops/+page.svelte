@@ -82,6 +82,7 @@
 		</div>
 
 		<!-- TODO: create a function that determines item size -->
+		<!-- TODO: check if item is showing and only load eta when showing -->
 		<VirtualList
 			itemSize={(i) => calculate_height(i)}
 			bind:height={list_height}
