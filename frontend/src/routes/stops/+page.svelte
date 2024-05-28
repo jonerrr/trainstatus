@@ -48,23 +48,8 @@
 	});
 
 	// if virtual list doesn't work, use observer api to detect when to show ETAs
-	let virtualList;
-	let list_height = 0;
-	// let row_heights: number[] = [];
-	// // TODO: better height calculation
-	// for (const stop of $stops) {
-	// 	// each route adds 16px
-	// 	// each headsign line adds 16px (if text is longer than 13 characters it adds 16px)
-	// 	let height = 20;
-	// 	let longest_headsign =
-	// 		stop.north_headsign > stop.south_headsign
-	// 			? stop.north_headsign.length
-	// 			: stop.south_headsign.length;
-	// 	height += longest_headsign / 13 > 1 ? (height += 32) : (height += 16);
-	// 	height += stop.routes.length * 16;
 
-	// 	row_heights.push(height);
-	// }
+	let list_height = 0;
 
 	function calculate_height(index: number): number {
 		const stop = $stops[index];

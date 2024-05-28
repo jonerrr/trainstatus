@@ -228,6 +228,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 s.ada,
                 s.notes.clone(),
                 s.borough.clone(),
+                // TODO: figure out a way to check which is northbound and southbound
                 // the first one should be northbound and the last one should be southbound
                 // there can be more than 2 groups so we can't just take index 0 and 1
                 nearby_station.groups.first().unwrap().headsign.clone(),

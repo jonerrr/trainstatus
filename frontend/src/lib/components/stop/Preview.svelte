@@ -84,15 +84,17 @@
 </Dialog.Trigger>
 
 <Dialog.Content name={stop.id} let:title let:description let:close>
-	<h2 class="font-bold flex items-center gap-2 text-indigo-300" use:melt={title}>
-		{stop.name}
+	<div class="flex items-center gap-2 py-1" use:melt={title}>
+		<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
 
+		<!-- TODO only show normal stopping trains or somehow indicate that route doesn't stop there all times -->
 		<div class="flex gap-1">
 			{#each stop.routes as route (route.id)}
-				<Icon name={route.id} />
+				<Icon width="2rem" height="2rem" name={route.id} />
 			{/each}
 		</div>
-	</h2>
+	</div>
+
 	<div use:melt={description}>
 		<div
 			use:melt={$root}

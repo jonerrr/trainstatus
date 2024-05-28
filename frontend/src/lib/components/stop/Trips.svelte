@@ -8,7 +8,7 @@
 </script>
 
 <!-- TODO: fix max-h -->
-<List loading={false} class="h-64">
+<List loading={false} class="h-96">
 	{#if trips.length}
 		{#each trips as trip (trip.id)}
 			<div
