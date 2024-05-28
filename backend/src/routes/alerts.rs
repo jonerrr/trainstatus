@@ -27,6 +27,7 @@ pub async fn get(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
 ) -> Result<impl IntoResponse, ServerError> {
+    // TODO: make this query a lot faster
     if params.route_ids.is_empty() {
         let alerts = sqlx::query_as!(
             Alerts,

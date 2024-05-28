@@ -15,7 +15,9 @@
 
 	function on_progress(e: any) {
 		const [swiper, progress] = e.detail;
-		console.log(progress);
+		// console.log(progress, swiper);
+		const index = swiper.activeIndex;
+		console.log(index);
 	}
 </script>
 
@@ -24,12 +26,12 @@
 		<Icon width="2rem" height="2rem" name={route_id} />
 
 		{#if route_alerts}
-			<!-- TODO: stop +n from moving on page load -->
 			<div class="font-semibold flex gap-2 items-center">
 				<div>
 					{route_alerts.alerts[0].alert_type}
 				</div>
 			</div>
+			<!-- TODO: stop +n from moving on page load -->
 			{#if route_alerts.alerts.length > 1}
 				<div class="font-normal rounded bg-indigo-200 p-1 text-neutral-800">
 					+{route_alerts.alerts.length - 1}
@@ -45,7 +47,6 @@
 	</div>
 </Dialog.Trigger>
 
-<!-- TODO: force pagination buttons on top of alerts -->
 <Dialog.Content name={route_id} let:title let:description let:close>
 	{#if route_alerts}
 		<swiper-container
@@ -73,13 +74,14 @@
 						{#if alert.description}
 							{@html alert.description}
 						{/if}
-
-						<!-- TODO: show end if not undefined -->
 					</div>
 
-					<span class="text-sm text-neutral-400">
-						Updated {dayjs(alert.updated_at).fromNow()}
-					</span>
+					<div class="text-sm text-neutral-400">
+						<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
+						<!-- TODO: show end if not undefined -->
+						<!-- <div>Updated {dayjs(alert.updated_at).fromNow()}</div> -->
+					</div>
+					<span class="text-sm text-neutral-400"> </span>
 				</swiper-slide>
 			{/each}
 		</swiper-container>
