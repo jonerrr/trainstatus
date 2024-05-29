@@ -9,6 +9,8 @@ const ASSETS = [
 	...files // everything in `static`
 ];
 
+// TODO: fix service worker offline caching and timeout
+
 self.addEventListener('install', (event) => {
 	// Create a new cache and add all files to it
 	async function addFilesToCache() {

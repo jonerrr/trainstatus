@@ -24,7 +24,7 @@
 							{trip.eta?.toFixed(0)}m
 						</div>
 					</div>
-					<div>
+					<div class="text-right">
 						{$stops.find((s) => s.id === trip.stop_times[trip.stop_times.length - 1].stop_id)?.name}
 					</div>
 				</div>

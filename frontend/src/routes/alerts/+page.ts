@@ -1,8 +1,8 @@
-import { fetch_alerts } from '$lib/api';
-import type { PageLoad } from './$types';
+// import { fetch_alerts } from '$lib/api';
+// import type { PageLoad } from './$types';
 
-export const load: PageLoad = ({ fetch }) => {
-	return {
-		alerts: fetch_alerts(fetch)
-	};
-};
+// export const load: PageLoad = async ({ fetch }) => {
+// 	return {
+// 		alerts: await fetch_alerts(fetch)
+// 	};
+// };
