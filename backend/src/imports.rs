@@ -203,25 +203,13 @@ pub async fn stops_and_routes(pool: &PgPool) {
             let north_headsign = station
                 .groups
                 .par_iter()
-                .find_first(|group| {
-                    group
-                        .times
-                        .iter()
-                        .find(|time| time.stop_id.chars().last().unwrap() == 'N')
-                        .is_some()
-                })
+                .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('N')))
                 .map(|group| group.headsign.clone());
 
             let south_headsign = station
                 .groups
                 .par_iter()
-                .find_first(|group| {
-                    group
-                        .times
-                        .iter()
-                        .find(|time| time.stop_id.chars().last().unwrap() == 'S')
-                        .is_some()
-                })
+                .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('S')))
                 .map(|group| group.headsign.clone());
 
             StopHeadsign {
