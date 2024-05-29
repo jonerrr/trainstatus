@@ -1,5 +1,5 @@
 target
-container_*
+container_postgres-data
 .mise.toml
 .infisical.json
 queries.sql
