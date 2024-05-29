@@ -15,9 +15,8 @@
 
 	function on_progress(e: any) {
 		const [swiper, progress] = e.detail;
-		// console.log(progress, swiper);
 		const index = swiper.activeIndex;
-		console.log(index);
+		// console.log(index);
 	}
 </script>
 
@@ -25,7 +24,7 @@
 	<div class="flex gap-2 items-center">
 		<Icon width="2rem" height="2rem" name={route_id} />
 
-		{#if route_alerts}
+		{#if route_alerts && route_alerts.alerts.length}
 			<div class="font-semibold flex gap-2 items-center">
 				<div>
 					{route_alerts.alerts[0].alert_type}
@@ -85,14 +84,13 @@
 				</swiper-slide>
 			{/each}
 		</swiper-container>
-
-		<button
-			class="z-40 text-indigo-400 font-bold absolute bottom-0 right-0 rounded p-2 m-6 shadow-xl bg-neutral-900/75 active:bg-neutral-800 hover:bg-neutral-800"
-			use:melt={close}>Close</button
-		>
 	{:else}
 		<div class="text-indigo-200">No alerts</div>
 	{/if}
+	<button
+		class="z-40 text-indigo-400 font-bold absolute bottom-0 right-0 rounded p-2 m-6 shadow-xl bg-neutral-900/75 active:bg-neutral-800 hover:bg-neutral-800"
+		use:melt={close}>Close</button
+	>
 </Dialog.Content>
 
 <style lang="postcss">
