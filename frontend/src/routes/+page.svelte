@@ -8,8 +8,8 @@
 	import TripPreview from '$lib/components/stop/Preview.svelte';
 	import RoutePreview from '$lib/components/route/Preview.svelte';
 
-	let loading_stops = true;
-	let loading_alerts = true;
+	// let loading_stops = true;
+	// let loading_alerts = true;
 
 	let trips: Trip[] = [];
 	let route_alerts: RouteAlerts[] = [];
@@ -19,17 +19,19 @@
 
 	onMount(async () => {
 		// initial load
-		trips = await fetch_trips(fetch, $pinned_stops);
-		loading_stops = false;
-		route_alerts = await fetch_alerts(fetch, $pinned_routes);
-		loading_alerts = false;
+		// trips = await fetch_trips(fetch, $pinned_stops);
+		// loading_stops = false;
+		// route_alerts = await fetch_alerts(fetch, $pinned_routes);
+		// loading_alerts = false;
 
 		// auto reload when pins change
 		pinned_stops.subscribe(async (pinned_stops) => {
+			console.log('pinned stops changed');
 			trips = await fetch_trips(fetch, pinned_stops);
 		});
 
 		pinned_routes.subscribe(async (pinned_routes) => {
+			console.log('pinned routes changed');
 			route_alerts = await fetch_alerts(fetch, pinned_routes);
 		});
 
@@ -59,14 +61,18 @@
 
 <!-- TODO: use meltui stuff to create routes and stops components -->
 <div class="p-2 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
-	<List bind:loading={loading_alerts} class="bg-neutral-800/90 border border-neutral-700 p-1">
+	<!-- determine loading by checking res array and make sure that routes are pinned -->
+	<List
+		loading={!route_alerts.length && !!$pinned_routes.length}
+		class="bg-neutral-800/90 border border-neutral-700 p-1"
+	>
 		<div slot="header" class="flex self-center mb-2 w-full">
 			<div class="font-semibold text-indigo-300">Pinned Routes</div>
 		</div>
-		{#if trips.length === 0}
+		{#if !$pinned_routes.length}
 			<div
 				transition:slide={{ easing: quintOut, axis: 'y', delay: 100 }}
-				class="text-center text-indigo-600 font-medium"
+				class="text-center text-indigo-500 font-semibold text-lg"
 			>
 				No routes pinned
 			</div>
@@ -81,17 +87,17 @@
 		{/each}
 	</List>
 
-	<List bind:loading={loading_stops} class="bg-neutral-800/90 border border-neutral-700 p-1">
+	<List
+		loading={!trips.length && !!$pinned_stops.length}
+		class="bg-neutral-800/90 border border-neutral-700 p-1"
+	>
 		<div slot="header" class="flex self-center mb-2 w-full justify-between">
 			<div class="font-semibold text-indigo-300">Pinned Stops</div>
-			<!-- <div>Northbound</div>
-				<div>Southbound</div>
-				<div></div> -->
 		</div>
-		{#if trips.length === 0}
+		{#if !$pinned_stops.length}
 			<div
 				transition:slide={{ easing: quintOut, axis: 'y', delay: 100 }}
-				class="text-center text-indigo-600 font-medium"
+				class="text-center text-indigo-500 font-semibold text-lg"
 			>
 				No stops pinned
 			</div>
@@ -102,7 +108,6 @@
 				transition:slide={{ easing: quintOut, axis: 'y' }}
 			>
 				<TripPreview bind:trips {stop} />
-				<!-- <div role="separator" class="my-2 h-px w-full bg-indigo-600" /> -->
 			</div>
 		{/each}
 	</List>

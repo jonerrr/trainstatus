@@ -1,15 +1,21 @@
 <script lang="ts">
 	import '@fontsource/inter';
 	import { register } from 'swiper/element/bundle';
+	import { onMount } from 'svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import '../app.css';
 	import { stops } from '$lib/stores';
 	import type { PageData } from './$types';
+	import { init_stops } from '$lib/api_db';
 
 	export let data: PageData;
 	stops.set(data.stops);
+
+	onMount(() => {
+		init_stops();
+	});
 
 	// register swiper.js for alert carousel
 	register();

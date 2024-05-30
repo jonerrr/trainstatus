@@ -19,12 +19,20 @@ fn api_key() -> &'static str {
     API_KEY.get_or_init(|| var("API_KEY").unwrap())
 }
 
+// fn stop_list(pool: &PgPool) -> Vec<String> {
+//     let stops = sqlx::query!("select id from stops")
+//         .fetch_all(pool)
+//         .await
+//         .unwrap();
+//     stops.iter().map(|s| s.id.clone()).collect()
+// }
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "backend=warn,tower_http=debug".into()),
+                .unwrap_or_else(|_| "backend=info,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -60,6 +68,7 @@ async fn main() {
             get(|| async { Redirect::temporary("https://trainstat.us") }),
         )
         .route("/stops", get(routes::stops::get))
+        .route("/arrivals", get(routes::stops::arrivals))
         .route("/trips", get(routes::trips::get))
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
