@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN now() AND now() + INTERVAL '30 minutes'\n            ORDER BY\n                st.arrival\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stop_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "arrival",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "departure",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "assigned",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0649bc2f356e13bb0d15a01d3b79943c559f44e105e50bd66629a896e89d3fc8"
+}

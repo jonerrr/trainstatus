@@ -1,5 +1,8 @@
 use super::errors::ServerError;
+use super::trips::Parameters;
+use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse, Json};
+use chrono::{DateTime, Utc};
 use http::HeaderMap;
 // use chrono::Utc;
 use serde::Serialize;
@@ -69,4 +72,73 @@ group by
     headers.insert("cache-control", "public, max-age=604800".parse().unwrap());
 
     Ok((headers, Json(stops)))
+}
+
+#[derive(FromRow, Serialize)]
+struct Arrival {
+    stop_id: String,
+    arrival: Option<DateTime<Utc>>,
+    departure: Option<DateTime<Utc>>,
+    route_id: Option<String>,
+    direction: Option<i16>,
+    assigned: Option<bool>,
+    // created_at: Option<DateTime<Utc>>,
+}
+
+pub async fn arrivals(
+    State(pool): State<PgPool>,
+    params: Query<Parameters>,
+) -> Result<impl IntoResponse, ServerError> {
+    let arrivals = {
+        if params.stop_ids.is_empty() {
+            sqlx::query_as!(
+                Arrival,
+                "SELECT
+                st.stop_id,
+                st.arrival,
+                st.departure,
+                t.route_id,
+                t.direction,
+                t.assigned
+            FROM
+                stop_times st
+            LEFT JOIN trips t 
+                ON
+                t.id = st.trip_id
+            WHERE
+                st.arrival BETWEEN now() AND now() + INTERVAL '30 minutes'
+            ORDER BY
+                st.arrival
+        ",
+            )
+            .fetch_all(&pool)
+            .await?
+        } else {
+            sqlx::query_as!(
+                Arrival,
+                "SELECT
+                st.stop_id,
+                st.arrival,
+                st.departure,
+                t.route_id,
+                t.direction,
+                t.assigned
+            FROM
+                stop_times st
+            LEFT JOIN trips t 
+                ON
+                t.id = st.trip_id
+            WHERE
+                st.arrival BETWEEN now() AND now() + INTERVAL '30 minutes' AND st.stop_id = ANY($1)
+            ORDER BY
+                st.arrival
+        ",
+                &params.stop_ids
+            )
+            .fetch_all(&pool)
+            .await?
+        }
+    };
+
+    Ok(Json(arrivals))
 }

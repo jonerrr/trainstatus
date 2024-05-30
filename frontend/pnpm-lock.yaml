@@ -17,6 +17,9 @@ importers:
       dayjs:
         specifier: ^1.11.11
         version: 1.11.11
+      dexie:
+        specifier: ^4.0.7
+        version: 4.0.7
       lucide-svelte:
         specifier: ^0.379.0
         version: 0.379.0(svelte@4.2.17)
@@ -803,6 +806,9 @@ packages:
 
   devalue@5.0.0:
     resolution: {integrity: sha512-gO+/OMXF7488D+u3ue+G7Y4AA3ZmUnB3eHJXmBTgNHvr4ZNzl36A0ZtG+XCRNYCkYx/bFmw4qtkoFLa+wSrwAA==}
+
+  dexie@4.0.7:
+    resolution: {integrity: sha512-M+Lo6rk4pekIfrc2T0o2tvVJwL6EAAM/B78DNfb8aaxFVoI1f8/rz5KTxuAnApkwqTSuxx7T5t0RKH7qprapGg==}
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
@@ -2603,6 +2609,8 @@ snapshots:
   detect-indent@6.1.0: {}
 
   devalue@5.0.0: {}
+
+  dexie@4.0.7: {}
 
   didyoumean@1.2.2: {}
 

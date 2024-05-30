@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS positions (
 CREATE TABLE IF NOT EXISTS stop_times (
     trip_id UUID REFERENCES trips(id),
     stop_id VARCHAR NOT NULL REFERENCES stops(id),
-    arrival TIMESTAMP WITH TIME ZONE,
-    departure TIMESTAMP WITH TIME ZONE,
+    arrival TIMESTAMP WITH TIME ZONE NOT NULL,
+    departure TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (trip_id, stop_id)
 );

@@ -6,7 +6,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
+    # TODO: fix tags (think i need to remove ghcr.io/ from the tags)
     strategy:
       fail-fast: false
       matrix:
@@ -14,13 +14,13 @@ jobs:
           - context: ./backend
             image: ghcr.io/${{ github.repository_owner }}/trainstatus-backend
             tags: |
-              ghcr.io/${{ github.repository_owner }}/trainstatus-backend:latest
-              ghcr.io/${{ github.repository_owner }}/trainstatus-backend:${{ github.event.release.tag_name }}
+              latest
+              ${{ github.event.release.tag_name }}
           - context: ./frontend
             image: ghcr.io/${{ github.repository_owner }}/trainstatus-frontend
             tags: |
-              ghcr.io/${{ github.repository_owner }}/trainstatus-frontend:latest
-              ghcr.io/${{ github.repository_owner }}/trainstatus-frontend:${{ github.event.release.tag_name }}
+              latest
+              ${{ github.event.release.tag_name }}
 
     permissions:
       contents: read
