@@ -24,18 +24,18 @@ interface Stop {
 	id: string;
 	name: string;
 	ada: boolean;
-	notes?: string;
+	notes: string | null;
 	borough: string;
 	north_headsign: string;
 	south_headsign: string;
 	// reference to route id
-	route_ids: string[];
+	routes: RouteStop[];
 	// routes: Route[];
 	// reference to trips
-	trip_ids: string[];
+	// trip_ids: string[];
 }
 
-type TripStopTime = Omit<StopTime, 'assigned' | 'direction'>;
+// type TripStopTime = Omit<StopTime, 'assigned' | 'direction'>;
 
 interface Trip {
 	id: string;
@@ -74,9 +74,9 @@ const db = new Dexie('StopsDatabase') as Dexie & {
 };
 
 db.version(1).stores({
-	stop: '&id,&name,ada,notes,borough,north_headsign,south_headsign,route_ids,*trip_ids',
+	stop: '&id,name,ada,notes,borough,north_headsign,south_headsign,route_ids',
 	route_stop: '&id,stop_type',
-	trip: '&id,route_id,direction,assigned,created_at,*stop_times',
+	trip: '&id,routes,direction,assigned,created_at,*stop_times',
 	stop_time: '&stop_id,arrival,departure,direction,assigned'
 });
 

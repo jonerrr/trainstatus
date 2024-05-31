@@ -1,6 +1,7 @@
 // check if +layout.ts and invalidate work with dexie
 import Dexie from 'dexie';
-import { db, type StopTime, type Trip } from '$lib/db';
+import { writable } from 'svelte/store';
+import { db, type Stop, type StopTime, type Trip } from '$lib/db';
 
 // const dateTimeReviver = function (key, value) {
 // 	var a;
@@ -15,12 +16,16 @@ import { db, type StopTime, type Trip } from '$lib/db';
 
 export async function init_stops() {
 	try {
+		// TODO: promise all trips and stops
 		// TODO: add check for if stops are already in db
+		console.log('DB: fetching stops');
+		const stops: Stop[] = await (await fetch('/api/stops')).json();
+		await db.stop.bulkPut(stops);
+
 		const Start = new Date().getTime();
 		console.log('DB: fetching trips');
 		const trips_res = await fetch(`/api/trips`);
 
-		// TODO: promise all trips and stops
 		const trips: Trip[] = (await trips_res.json()).map((t: Trip) => {
 			return {
 				...t,
@@ -48,7 +53,8 @@ export async function init_stops() {
 
 		// Your function or code block here
 		const end = new Date().getTime();
-
+		// const st = (await db.stop.toArray()).slice(0, 25).map((s) => s.id);
+		// console.log(st);
 		// get trips for stop id
 		// example of what we need for showing first 2 etas of each route at a stop
 		// const stops_test = await db.trip.where('stop_id').equals('250').toArray();
