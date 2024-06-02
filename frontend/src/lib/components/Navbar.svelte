@@ -4,15 +4,15 @@
 </script>
 
 <nav class="fixed bottom-0 h-16 w-full bg-neutral-800">
-	<div class="grid grid-cols-3 h-full">
+	<div class="flex h-full justify-center">
 		<NavbarButton>
-			<Home />
+			<Home class="m-auto h-full" />
 		</NavbarButton>
 		<NavbarButton href="/alerts">
-			<CircleAlert />
+			<CircleAlert class="m-auto h-full" />
 		</NavbarButton>
 		<NavbarButton href="/stops">
-			<Clock />
+			<Clock class="m-auto h-full" />
 		</NavbarButton>
 	</div>
 </nav>
