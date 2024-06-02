@@ -6,9 +6,9 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import '../app.css';
+	import { init_data } from '$lib/api_new';
 	import { stops } from '$lib/stores';
 	import type { PageData } from './$types';
-	import { init_stops } from '$lib/api_new';
 
 	export let data: PageData;
 	stops.set(data.stops);
@@ -16,10 +16,10 @@
 	let interval: number;
 
 	onMount(() => {
-		init_stops();
+		init_data();
 
 		interval = setInterval(() => {
-			init_stops();
+			init_data();
 		}, 10000);
 	});
 

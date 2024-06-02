@@ -40,6 +40,16 @@
       },
       {
         "ordinal": 7,
+        "name": "lat",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 8,
+        "name": "lon",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 9,
         "name": "routes",
         "type_info": "JsonbArray"
       }
@@ -52,6 +62,8 @@
       false,
       false,
       true,
+      false,
+      false,
       false,
       false,
       false,
