@@ -40,6 +40,7 @@
 		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
 			{stop.north_headsign}
 		</div>
+		<!-- TODO: go through stop times and take missing routes from there to show  -->
 		<div class="flex flex-col gap-1">
 			{#each stop.routes as route (route.id)}
 				<Arrivals {route} stop_id={stop.id} direction={Direction.North} />

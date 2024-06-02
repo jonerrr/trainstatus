@@ -107,8 +107,8 @@ pub struct NearbyStop {
     pub id: String,
     pub name: String,
     // not used currently
-    // pub lat: f32,
-    // pub lon: f32,
+    pub lat: f32,
+    pub lon: f32,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -123,10 +123,12 @@ const ROUTES: [&str; 26] = [
     "Q", "R", "W", "H", "FS", "GS", "SI",
 ];
 
-struct StopHeadsign {
+struct StopData {
     stop_id: String,
     north: String,
     south: String,
+    lat: f32,
+    lon: f32,
 }
 
 #[derive(Debug)]
@@ -135,9 +137,19 @@ struct Route(String);
 // route_id, stop_id, stop_sequence, stop_type
 struct RouteStop(String, String, i16, i16);
 
-// stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign
+// stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign, lat, lon
 // TODO: maybe also include lat and long of station from /nearby endpoint
-struct Stop(String, String, bool, Option<String>, String, String, String);
+struct Stop(
+    String,
+    String,
+    bool,
+    Option<String>,
+    String,
+    String,
+    String,
+    f32,
+    f32,
+);
 
 pub async fn stops_and_routes(pool: &PgPool) {
     // store the routes and their stops
@@ -196,7 +208,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
         .unwrap();
 
     // get all of the station headsigns
-    let stop_headsigns = nearby_stations
+    let stop_data = nearby_stations
         .into_par_iter()
         .map(|station| {
             // because the order of groups is different for each stop (thanks mta), we need to find the first group that has a stop time with a N or S to find the headsigns
@@ -212,10 +224,12 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('S')))
                 .map(|group| group.headsign.clone());
 
-            StopHeadsign {
+            StopData {
                 stop_id: station.stop.id.clone(),
                 north: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
                 south: south_headsign.unwrap_or_else(|| "Southbound".to_string()),
+                lat: station.stop.lat,
+                lon: station.stop.lon,
             }
         })
         .collect::<Vec<_>>();
@@ -237,10 +251,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
         .map(|s| {
             // this might speed it up a bit but idk
             // nearby_stations.retain(|ns| ns.stop.id != s.stop_id);
-            let headsign = stop_headsigns
-                .iter()
-                .find(|stop_headsign| stop_headsign.stop_id == s.stop_id)
-                .unwrap();
+            let stop_data = stop_data.iter().find(|sd| sd.stop_id == s.stop_id).unwrap();
 
             Stop(
                 s.stop_id.clone(),
@@ -248,15 +259,17 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 s.ada,
                 s.notes.clone(),
                 s.borough.clone(),
-                headsign.north.clone(),
-                headsign.south.clone(),
+                stop_data.north.clone(),
+                stop_data.south.clone(),
+                stop_data.lat,
+                stop_data.lon,
             )
         })
         .collect::<Vec<Stop>>();
 
     // insert all stops into the database
     let mut query_builder = QueryBuilder::new(
-        "INSERT INTO stops (id, name, ada, notes, borough, north_headsign, south_headsign) ",
+        "INSERT INTO stops (id, name, ada, notes, borough, north_headsign, south_headsign, lat, lon) ",
     );
     query_builder.push_values(stops, |mut b, stop| {
         b.push_bind(stop.0)
@@ -265,7 +278,9 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .push_bind(stop.3)
             .push_bind(stop.4)
             .push_bind(stop.5)
-            .push_bind(stop.6);
+            .push_bind(stop.6)
+            .push_bind(stop.7)
+            .push_bind(stop.8);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();

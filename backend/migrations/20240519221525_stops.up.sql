@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS stops (
     notes VARCHAR,
     borough VARCHAR NOT NULL,
     north_headsign VARCHAR NOT NULL,
-    south_headsign VARCHAR NOT NULL
+    south_headsign VARCHAR NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS route_stops (
