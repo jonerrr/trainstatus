@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { melt } from '@melt-ui/svelte';
 	import { derived } from 'svelte/store';
-	import { type Direction, type Trip, stop_time_store, trip_store } from '$lib/api_new';
+	import { type Direction, stop_time_store, type Stop } from '$lib/api_new';
+	import { stops } from '$lib/stores';
 	import { Dialog } from '$lib/components/Dialog';
 	import List from '$lib/components/List.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import TripPreview from '$lib/components/trip/Preview.svelte';
+	import TripPreview from '$lib/components/Trip/Dialog.svelte';
 
 	export let stop_id: string;
 	export let direction: Direction;
@@ -26,6 +27,12 @@
 			})
 			.sort((a, b) => a.eta! - b.eta!);
 	});
+
+	function last_stop(trip_id: string): Stop {
+		const stop_times = $stop_time_store.filter((st) => st.trip_id === trip_id);
+		const last_stop_time = stop_times[stop_times.length - 1];
+		return $stops.find((s) => s.id === last_stop_time.stop_id)!;
+	}
 </script>
 
 <!-- TODO: fix max-h -->
@@ -44,10 +51,9 @@
 								{stop_time.eta?.toFixed(0)}m
 							</div>
 						</div>
-						<!-- <div class="text-right">
-							{$stop_store.find((s) => s.id === trip.stop_times[trip.stop_times.length - 1].stop_id)
-								?.name}
-						</div> -->
+						<div class="text-right">
+							{last_stop(stop_time.trip_id).name}
+						</div>
 					</div>
 				</div>
 			</Dialog.Trigger>

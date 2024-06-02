@@ -49,7 +49,9 @@
 	});
 </script>
 
-<div class={`overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1`}>
+<div
+	class={`overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%]`}
+>
 	<div class="flex gap-2">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
 

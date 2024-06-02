@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.id AS trip_id\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN now() AND now() + INTERVAL '1 hour'\n            ORDER BY\n                st.arrival\n        ",
+  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.id AS trip_id\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival > now()\n            ORDER BY\n                st.arrival\n        ",
   "describe": {
     "columns": [
       {
@@ -52,5 +52,5 @@
       false
     ]
   },
-  "hash": "861b0b2fc1e8faf019d2582c6bdd3aef3c0b34a90e460022a5ff2e2688b138a4"
+  "hash": "d8b2a525c00824f582f846e8056c101989c171a4619102b018c032b8153af5f0"
 }

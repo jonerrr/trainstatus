@@ -119,7 +119,7 @@
 </script>
 
 <div
-	class={`relative overflow-auto text-white  bg-neutral-800/90 border border-neutral-700 p-1 max-h-[40%]`}
+	class={`relative overflow-auto text-white  bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%]`}
 >
 	<div class="flex text-lg self-center mb-2 w-full">
 		<div class="font-semibold text-indigo-300">{title}</div>
