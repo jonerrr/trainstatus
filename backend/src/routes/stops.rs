@@ -110,7 +110,7 @@ pub async fn arrivals(
                 ON
                 t.id = st.trip_id
             WHERE
-                st.arrival BETWEEN now() AND now() + INTERVAL '1 hour'
+                st.arrival > now()
             ORDER BY
                 st.arrival
         ",
@@ -134,7 +134,8 @@ pub async fn arrivals(
                 ON
                 t.id = st.trip_id
             WHERE
-                st.arrival BETWEEN now() AND now() + INTERVAL '1 hour' AND st.stop_id = ANY($1)
+                st.arrival > now()
+                AND st.stop_id = ANY($1)
             ORDER BY
                 st.arrival
         ",
