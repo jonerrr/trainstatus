@@ -1,7 +1,37 @@
-import Dexie, { type EntityTable } from 'dexie';
-// import type { Route } from '$lib/api';
+import { writable } from 'svelte/store';
 
-// TODO: some timestamp thing to delete old stuff
+export const stop_store = writable<Stop[]>([]);
+export const trip_store = writable<Trip[]>([]);
+export const stop_time_store = writable<StopTime[]>([]);
+
+export async function init_stops() {
+	try {
+		const stops: Stop[] = await (await fetch('/api/stops')).json();
+		stop_store.set(stops);
+
+		const trips: Trip[] = (await (await fetch('/api/trips?times=false')).json()).map((t: Trip) => {
+			return {
+				...t,
+				created_at: new Date(t.created_at)
+			};
+		});
+		trip_store.set(trips);
+
+		const stop_times: StopTime[] = (await (await fetch('/api/arrivals')).json()).map(
+			(st: StopTime) => {
+				return {
+					...st,
+					arrival: new Date(st.arrival),
+					departure: new Date(st.departure)
+				};
+			}
+		);
+		stop_time_store.set(stop_times);
+	} catch (e) {
+		console.error(e);
+	}
+}
+
 interface RouteStop {
 	id: string;
 	// maybe store name idk yet or just join
@@ -20,7 +50,7 @@ enum StopType {
 	RushHourExtension = 4
 }
 
-interface Stop {
+export interface Stop {
 	id: string;
 	name: string;
 	ada: boolean;
@@ -28,25 +58,18 @@ interface Stop {
 	borough: string;
 	north_headsign: string;
 	south_headsign: string;
-	// reference to route id
 	routes: RouteStop[];
-	// routes: Route[];
-	// reference to trips
-	// trip_ids: string[];
 }
 
 // type TripStopTime = Omit<StopTime, 'assigned' | 'direction'>;
 
-interface Trip {
+export interface Trip {
 	id: string;
 	route_id: string;
 	direction: Direction;
 	assigned: boolean;
 	created_at: Date;
 	stop_times: string[];
-	// stop_times: TripStopTime[];
-
-	// eta?: number;
 }
 
 export enum Direction {
@@ -54,7 +77,7 @@ export enum Direction {
 	South = 0
 }
 
-interface StopTime {
+export interface StopTime {
 	stop_id: string;
 	arrival: Date;
 	departure: Date;
@@ -62,27 +85,6 @@ interface StopTime {
 	assigned: boolean;
 	route_id: string;
 	eta?: number;
+	trip_id: string;
 	// created_at: Date;
 }
-
-const db = new Dexie('StopsDatabase') as Dexie & {
-	stop: EntityTable<
-		Stop,
-		'id' // primary key "id" (for the typings only)
-	>;
-	route_stop: EntityTable<RouteStop, 'id'>;
-	trip: EntityTable<Trip, 'id'>;
-	stop_time: EntityTable<StopTime, 'stop_id'>;
-};
-
-db.version(1).stores({
-	stop: '&id,name,ada,notes,borough,north_headsign,south_headsign,route_ids',
-	route_stop: '&id,stop_type',
-	trip: '&id,routes,direction,assigned,created_at,*stop_times',
-	stop_time: '&stop_id,arrival,departure,direction,assigned'
-});
-
-export type { RouteStop, Stop, Trip, StopTime, StopType };
-export { db };
-
-// https://github.com/dexie/Dexie.js/issues/281 for stop name search

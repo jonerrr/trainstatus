@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { melt, createTabs, name } from '@melt-ui/svelte';
-	import { liveQuery } from 'dexie';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
-	import { pinned_stops, stops } from '$lib/stores';
-	import { Direction, db, type Stop } from '$lib/db';
+	import { pinned_stops } from '$lib/stores';
+	import { Direction, type Stop } from '$lib/api_new';
 	import Pin from '$lib/components/Pin.svelte';
-	import Arrivals from '$lib/components/StopArrivals.svelte';
+	import Arrivals from '$lib/components/Stop/Arrivals.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Trips from '$lib/components/Stop/Trips.svelte';
 
 	export let stop: Stop;
 
@@ -101,10 +101,10 @@
 				{/each}
 			</div>
 			<div use:melt={$content('northbound')} class="grow bg-neutral-900/50 p-2">
-				<!-- <Trips bind:trips={northbound} /> -->
+				<Trips stop_id={stop.id} direction={Direction.North} />
 			</div>
 			<div use:melt={$content('southbound')} class="grow bg-neutral-900/50 p-2">
-				<!-- <Trips bind:trips={southbound} /> -->
+				<Trips stop_id={stop.id} direction={Direction.South} />
 			</div>
 		</div>
 
