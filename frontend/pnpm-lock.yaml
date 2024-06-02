@@ -20,6 +20,9 @@ importers:
       dexie:
         specifier: ^4.0.7
         version: 4.0.7
+      flexsearch:
+        specifier: ^0.7.43
+        version: 0.7.43
       lucide-svelte:
         specifier: ^0.379.0
         version: 0.379.0(svelte@4.2.17)
@@ -975,6 +978,9 @@ packages:
 
   flatted@3.3.1:
     resolution: {integrity: sha512-X8cqMLLie7KsNUDSdzeN8FYK9rEt4Dt67OsG/DNGnYTSDBG4uFAJFBnUeiV+zCVAvwFy56IjM9sH51jVaEhNxw==}
+
+  flexsearch@0.7.43:
+    resolution: {integrity: sha512-c5o/+Um8aqCSOXGcZoqZOm+NqtVwNsvVpWv6lfmSclU954O3wvQKxxK8zj74fPaSJbXpSLTs4PRhh+wnoCXnKg==}
 
   focus-trap@7.5.4:
     resolution: {integrity: sha512-N7kHdlgsO/v+iD/dMoJKtsSqs5Dz/dXZVebRgJw23LDk+jMi/974zyiOYDziY2JPp8xivq9BmUGwIJMiuSBi7w==}
@@ -2832,6 +2838,8 @@ snapshots:
       keyv: 4.5.4
 
   flatted@3.3.1: {}
+
+  flexsearch@0.7.43: {}
 
   focus-trap@7.5.4:
     dependencies:

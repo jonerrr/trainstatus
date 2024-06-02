@@ -54,6 +54,7 @@
 </svelte:head>
 
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-10rem)]">
+	<!-- TODO: no pinned routes if statement -->
 	<RouteAlertList title="Pinned Routes" route_ids={$pinned_routes} />
 
 	<!-- pinned stop list -->
