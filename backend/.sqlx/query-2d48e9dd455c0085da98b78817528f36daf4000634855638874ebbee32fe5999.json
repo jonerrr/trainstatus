@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN now() AND now() + INTERVAL '1 hour'\n            ORDER BY\n                st.arrival\n        ",
+  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.id AS trip_id\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN now() AND now() + INTERVAL '1 hour' AND st.stop_id = ANY($1)\n            ORDER BY\n                st.arrival\n        ",
   "describe": {
     "columns": [
       {
@@ -32,12 +32,20 @@
         "ordinal": 5,
         "name": "assigned",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "trip_id",
+        "type_info": "Uuid"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "TextArray"
+      ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -46,5 +54,5 @@
       false
     ]
   },
-  "hash": "859b61cdc9986442064ca5046f695d72eafcfeec39e5ac7271f92eac52e4bd19"
+  "hash": "2d48e9dd455c0085da98b78817528f36daf4000634855638874ebbee32fe5999"
 }

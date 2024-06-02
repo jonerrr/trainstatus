@@ -8,12 +8,12 @@
 	import '../app.css';
 	import { stops } from '$lib/stores';
 	import type { PageData } from './$types';
-	import { init_stops } from '$lib/api_db';
+	import { init_stops } from '$lib/api_new';
 
 	export let data: PageData;
 	stops.set(data.stops);
 
-	let interval;
+	let interval: number;
 
 	onMount(() => {
 		init_stops();

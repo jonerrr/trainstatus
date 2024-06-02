@@ -82,6 +82,7 @@ struct Arrival {
     route_id: Option<String>,
     direction: Option<i16>,
     assigned: Option<bool>,
+    trip_id: String,
     // created_at: Option<DateTime<Utc>>,
 }
 
@@ -99,7 +100,8 @@ pub async fn arrivals(
                 st.departure,
                 t.route_id,
                 t.direction,
-                t.assigned
+                t.assigned,
+                t.id AS trip_id
             FROM
                 stop_times st
             LEFT JOIN trips t 
@@ -122,7 +124,8 @@ pub async fn arrivals(
                 st.departure,
                 t.route_id,
                 t.direction,
-                t.assigned
+                t.assigned,
+                t.id AS trip_id
             FROM
                 stop_times st
             LEFT JOIN trips t 
