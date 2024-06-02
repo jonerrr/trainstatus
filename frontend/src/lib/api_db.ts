@@ -14,17 +14,22 @@ import { db, type Stop, type StopTime, type Trip } from '$lib/db';
 // 	return value;
 // };
 
+export const stop_store = writable<Stop[]>([]);
+export const trip_store = writable<Trip[]>([]);
+export const stop_time_store = writable<StopTime[]>([]);
+
 export async function init_stops() {
 	try {
 		// TODO: promise all trips and stops
 		// TODO: add check for if stops are already in db
+		const Start = new Date().getTime();
 		console.log('DB: fetching stops');
 		const stops: Stop[] = await (await fetch('/api/stops')).json();
-		await db.stop.bulkPut(stops);
+		// await db.stop.bulkPut(stops);
+		stop_store.set(stops);
 
-		const Start = new Date().getTime();
 		console.log('DB: fetching trips');
-		const trips_res = await fetch(`/api/trips`);
+		const trips_res = await fetch(`/api/trips?times=false`);
 
 		const trips: Trip[] = (await trips_res.json()).map((t: Trip) => {
 			return {
@@ -32,10 +37,11 @@ export async function init_stops() {
 				created_at: new Date(t.created_at)
 			};
 		});
+		trip_store.set(trips);
 
 		// insert to db, put will overwrite existing data
-		await db.trip.bulkPut(trips);
-		console.log('DB: inserted trips');
+		// await db.trip.bulkPut(trips);
+		// console.log('DB: inserted trips');
 
 		const stop_times_res = await fetch('/api/arrivals');
 		const stop_times: StopTime[] = (await stop_times_res.json()).map((st: StopTime) => {
@@ -45,31 +51,11 @@ export async function init_stops() {
 				departure: new Date(st.departure)
 			};
 		});
-		// console.log(stop_times);
-
-		await db.stop_time.bulkPut(stop_times);
-
-		console.log('DB: inserted times');
-
-		// Your function or code block here
-		const end = new Date().getTime();
-		// const st = (await db.stop.toArray()).slice(0, 25).map((s) => s.id);
-		// console.log(st);
-		// get trips for stop id
-		// example of what we need for showing first 2 etas of each route at a stop
-		// const stops_test = await db.trip.where('stop_id').equals('250').toArray();
-		// console.log(await db.stop_time.toArray());
-		// const arrivals = await db.stop_time.where('stop_id').equals('250').toArray();
-
-		// console.log(arrivals);
-		console.log(end - Start);
-
-		// await Promise.all(
-		// stops_test.map(async (s) => {
-		// 	await db.stop_time
-		// })
-		// );
-		// console.log(stops_test);
+		stop_time_store.set(stop_times);
+		// await db.stop_time.bulkPut(stop_times);
+		// console.log('DB: inserted stop_times');
+		const End = new Date().getTime();
+		console.log('DB: time to fetch and insert data:', End - Start);
 	} catch (e) {
 		console.error(e);
 	}

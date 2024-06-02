@@ -48,25 +48,6 @@ pub async fn get(
         if let Some(times) = params.times {
             // return stop_times
             if times {
-                // return trips without stop_times
-                let trips = sqlx::query_as!(
-                    Trip,
-                    r#"SELECT
-                    t.id,
-                    t.route_id,
-                    t.direction,
-                    t.assigned,
-                    t.created_at,
-                    NULL AS "stop_times!: Option<Vec<JsonValue>>"
-                FROM
-                    trips t
-                "#
-                )
-                .fetch_all(&pool)
-                .await?;
-
-                return Ok(Json(trips));
-            } else {
                 let trips = sqlx::query_as!(
                     Trip,
                     "select
@@ -104,10 +85,64 @@ pub async fn get(
                 .await?;
 
                 return Ok(Json(trips));
+            } else {
+                // return trips without stop_times
+                let trips = sqlx::query_as!(
+                    Trip,
+                    r#"SELECT
+                t.id,
+                t.route_id,
+                t.direction,
+                t.assigned,
+                t.created_at,
+                NULL AS "stop_times!: Option<Vec<JsonValue>>"
+            FROM
+                trips t
+            "#
+                )
+                .fetch_all(&pool)
+                .await?;
+
+                return Ok(Json(trips));
             }
         } else {
-            // Add an else block that returns an empty response
-            return Ok(Json(Vec::<Trip>::new()));
+            let trips = sqlx::query_as!(
+                Trip,
+                "select
+                t.id,
+                t.route_id,
+                t.direction,
+                t.assigned,
+                t.created_at,
+                array_agg(jsonb_build_object('stop_id',
+                st.stop_id,
+                'arrival',
+                st.arrival,
+                'departure',
+                st.departure)
+            order by
+                st.arrival) as stop_times
+            from
+                trips t
+            left join stop_times st on
+                t.id = st.trip_id
+            where
+                t.id = any(
+                select
+                    t.id
+                from
+                    trips t
+                left join stop_times st on
+                    st.trip_id = t.id
+                where
+                    st.arrival > now())
+            group by
+                t.id"
+            )
+            .fetch_all(&pool)
+            .await?;
+
+            return Ok(Json(trips));
         }
     } else {
         let trips = sqlx::query_as!(

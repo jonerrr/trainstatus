@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '@fontsource/inter';
 	import { register } from 'swiper/element/bundle';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
@@ -13,8 +13,19 @@
 	export let data: PageData;
 	stops.set(data.stops);
 
+	let interval;
+
 	onMount(() => {
 		init_stops();
+
+		interval = setInterval(() => {
+			init_stops();
+		}, 10000);
+	});
+
+	onDestroy(() => {
+		console.log('clearing db intervals');
+		clearInterval(interval);
 	});
 
 	// register swiper.js for alert carousel

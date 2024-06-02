@@ -49,7 +49,7 @@ interface Trip {
 	// eta?: number;
 }
 
-enum Direction {
+export enum Direction {
 	North = 1,
 	South = 0
 }
@@ -60,6 +60,8 @@ interface StopTime {
 	departure: Date;
 	direction: Direction;
 	assigned: boolean;
+	route_id: string;
+	eta?: number;
 	// created_at: Date;
 }
 
@@ -80,7 +82,7 @@ db.version(1).stores({
 	stop_time: '&stop_id,arrival,departure,direction,assigned'
 });
 
-export type { RouteStop, Stop, Trip, StopTime, StopType, Direction };
+export type { RouteStop, Stop, Trip, StopTime, StopType };
 export { db };
 
 // https://github.com/dexie/Dexie.js/issues/281 for stop name search
