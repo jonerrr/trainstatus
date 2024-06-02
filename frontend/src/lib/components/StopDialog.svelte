@@ -1,54 +1,17 @@
 <script lang="ts">
-	import { melt, createTabs } from '@melt-ui/svelte';
+	import { melt, createTabs, name } from '@melt-ui/svelte';
 	import { liveQuery } from 'dexie';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
-	// import { Direction, type Stop, type Trip } from '$lib/api';
 	import { pinned_stops, stops } from '$lib/stores';
-	import { db, type Stop } from '$lib/db';
+	import { Direction, db, type Stop } from '$lib/db';
 	import Pin from '$lib/components/Pin.svelte';
-	import Arrivals from '$lib/components/stop/Arrivals.svelte';
-	import Trips from '$lib/components/stop/Trips.svelte';
+	import Arrivals from '$lib/components/StopArrivals.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
 	export let stop: Stop;
-	// default to empty array to prevent undefined errors
-	// export let trips: Trip[] = [];
 
-	// $: trips_with_eta = trips
-	// 	.filter((trip) => trip.stop_times.some((st) => st.stop_id === stop.id))
-	// 	.map((trip) => {
-	// 		const stop_time = trip.stop_times.find((time) => time.stop_id === stop.id)!;
-
-	// 		const arrival = new Date(stop_time.arrival).getTime();
-	// 		const now = new Date().getTime();
-	// 		const eta = (arrival - now) / 1000 / 60;
-
-	// 		// console.log('mapping');
-
-	// 		// if (eta < 0) {
-	// 		// 	console.log(
-	// 		// 		'how the fuck is this trip in the past:',
-	// 		// 		trip.route_id,
-	// 		// 		eta,
-	// 		// 		stop_time.arrival
-	// 		// 	);
-	// 		// }
-
-	// 		return {
-	// 			...trip,
-	// 			eta
-	// 		};
-	// 	})
-	// 	// I'm pretty sure some eta's are negative because stops can have the same trips but different etas
-	// 	.filter((trip) => trip.eta >= 0)
-	// 	.sort((a, b) => a.eta - b.eta);
-
-	// $: northbound = trips_with_eta.filter((trip) => trip.direction === Direction.North);
-	// $: southbound = trips_with_eta.filter((trip) => trip.direction === Direction.South);
-
-	// const stop_routes = stop.routes.flatMap((route) => route.route_id);
 	const {
 		elements: { root, list, content, trigger },
 		states: { value }
@@ -66,34 +29,41 @@
 		duration: 250,
 		easing: cubicInOut
 	});
-
-	$: stop_times = liveQuery(async () =>
-		db.stop_time
-			.where('stop_id')
-			.equals(stop.id)
-			.and((st) => st.arrival > new Date())
-			.toArray()
-	);
-
-	// let offsetHeight: number;
-	// console.log(offsetHeight);
 </script>
 
-<Dialog.Trigger name={stop.id}>
+<Dialog.Trigger name={'stop/' + stop.id}>
 	<div class="w-[25%] grow-0 font-semibold text-indigo-200">
 		{stop.name}
 	</div>
-	arrivals
-	<!-- <Arrivals headsign={stop.north_headsign} routes={stop.routes} trips={northbound} />
 
-	<Arrivals headsign={stop.south_headsign} routes={stop.routes} trips={southbound} /> -->
+	<div class="flex flex-col w-[30%] mt-auto">
+		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
+			{stop.north_headsign}
+		</div>
+		<div class="flex flex-col gap-1">
+			{#each stop.routes as route (route.id)}
+				<Arrivals {route} stop_id={stop.id} direction={Direction.North} />
+			{/each}
+		</div>
+	</div>
+
+	<div class="flex flex-col w-[30%] mt-auto">
+		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
+			{stop.south_headsign}
+		</div>
+		<div class="flex flex-col gap-1">
+			{#each stop.routes as route (route.id)}
+				<Arrivals {route} stop_id={stop.id} direction={Direction.South} />
+			{/each}
+		</div>
+	</div>
 
 	<div>
 		<Pin item_id={stop.id} store={pinned_stops} />
 	</div>
 </Dialog.Trigger>
 
-<Dialog.Content name={stop.id} let:title let:description let:close>
+<Dialog.Content name={'stop/' + stop.id} let:title let:description let:close>
 	<div class="flex items-center gap-2 py-1" use:melt={title}>
 		<!-- TODO: only show normal stopping trains or somehow indicate that route doesn't stop there all times -->
 		<!-- TODO: make icons adjust in size and wrap if 4+ routes -->

@@ -1,20 +1,19 @@
 <script lang="ts">
 	import { liveQuery } from 'dexie';
+	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
-	import { db } from '$lib/db';
+	import { stop_store } from '$lib/api_db';
 	import List from '$lib/components/List.svelte';
 	import StopDialog from '$lib/components/StopDialog.svelte';
 
 	export let stop_ids: string[] = [];
 	// export let show_search: boolean = false;
 
-	// let stops = stop_ids.length
-	// 	? liveQuery(() => db.stop.where('id').anyOf(stop_ids).toArray())
-	// 	: liveQuery(() => db.stop.toArray());
-	// $: stop_times = liveQuery(async () => db.stop_time.where('stop_id').equals('250').toArray());
-
-	let stops = liveQuery(() => db.stop.where('id').anyOf(stop_ids).toArray());
+	const stops = derived(stop_store, ($stop_store) => {
+		const st = $stop_store.filter((st) => stop_ids.includes(st.id));
+		return st;
+	});
 </script>
 
 <div class="text-white">
@@ -28,7 +27,7 @@
 					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
 					transition:slide={{ easing: quintOut, axis: 'y' }}
 				>
-					<StopDialog bind:stop />
+					<StopDialog {stop} />
 				</div>
 			{/each}
 		</List>
