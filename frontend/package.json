@@ -45,7 +45,7 @@
 		"flexsearch": "^0.7.43",
 		"lucide-svelte": "^0.379.0",
 		"svelte-persisted-store": "^0.9.4",
-		"svelte-tiny-virtual-list": "^2.1.0",
+		"svelte-tiny-virtual-list": "^2.1.2",
 		"swiper": "^11.1.3"
 	}
 }
