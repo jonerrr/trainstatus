@@ -37,7 +37,7 @@
 
 <!-- TODO: fix max-h -->
 <!-- TODO: convert to list -->
-<div class="">
+<div class="flex flex-col overflow-auto max-h-96">
 	{#if $stop_times}
 		{#each $stop_times as stop_time}
 			<Dialog.Trigger name={stop_time.stop_id}>
@@ -71,6 +71,6 @@
 			</Dialog.Content>
 		{/each}
 	{:else}
-		<div class="text-indigo-300 text-center">No trips found</div>
+		<div class="text-indigo-300 text-center w-24">No trips found</div>
 	{/if}
 </div>
