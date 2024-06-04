@@ -40,7 +40,7 @@
 <div class="flex flex-col overflow-auto max-h-96">
 	{#if $stop_times}
 		{#each $stop_times as stop_time}
-			<Dialog.Trigger name={stop_time.stop_id}>
+			<Dialog.Trigger name={stop_time.trip_id}>
 				<div
 					class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
 				>
@@ -58,7 +58,7 @@
 				</div>
 			</Dialog.Trigger>
 
-			<Dialog.Content name={stop_time.stop_id} let:title let:description let:close>
+			<Dialog.Content name={stop_time.trip_id} let:title let:description let:close>
 				<div class="flex items-center gap-2 py-1" use:melt={title}>
 					<Icon name={stop_time.route_id} /> title
 				</div>

@@ -14,6 +14,7 @@
 	const sync = createSync({ open });
 	// @ts-ignore I don't think this is an issue
 	$: sync.open($page.state.dialogOpen === name, ($open) => {
+		console.log('sync', $open, $page.state, name);
 		// @ts-ignore
 		if ($page.state.dialogOpen !== name) {
 			dialogRegistry.shallow(name, $open);
