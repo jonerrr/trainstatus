@@ -4,13 +4,24 @@
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
 	import { pinned_stops } from '$lib/stores';
-	import { Direction, type Stop, type StopType } from '$lib/api';
+	import { Direction, StopType, stop_time_store, type Stop } from '$lib/api';
 	import Pin from '$lib/components/Pin.svelte';
 	import Arrivals from '$lib/components/Stop/Arrivals.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Trips from '$lib/components/Stop/Trips.svelte';
 
 	export let stop: Stop;
+
+	// Get all possible routes that stop at this stop
+	// Base routes are included so we can show them even if they don't have any upcoming trips
+	const base_routes = stop.routes
+		.filter((r) => r.stop_type === StopType.FullTime || r.stop_type === StopType.PartTime)
+		.map((r) => r.id);
+	const other_routes = $stop_time_store
+		.filter((st) => st.arrival > new Date() && st.stop_id === stop.id)
+		.map((st) => st.route_id);
+	// Dont know if this needs to be reactive
+	$: route_ids = Array.from(new Set([...base_routes, ...other_routes]));
 
 	const {
 		elements: { root, list, content, trigger },
@@ -19,7 +30,6 @@
 		defaultValue: 'northbound'
 	});
 
-	// TODO: replace title with more specific destination (maybe last stop boroughs or headsign)
 	const triggers = [
 		{ id: 'northbound', title: stop.north_headsign },
 		{ id: 'southbound', title: stop.south_headsign }
@@ -40,10 +50,9 @@
 		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
 			{stop.north_headsign}
 		</div>
-		<!-- TODO: go through stop times and take missing routes from there to show  -->
 		<div class="flex flex-col gap-1">
-			{#each stop.routes as route (route.id)}
-				<Arrivals {route} stop_id={stop.id} direction={Direction.North} />
+			{#each route_ids as route_id}
+				<Arrivals {route_id} stop_id={stop.id} direction={Direction.North} />
 			{/each}
 		</div>
 	</div>
@@ -53,8 +62,8 @@
 			{stop.south_headsign}
 		</div>
 		<div class="flex flex-col gap-1">
-			{#each stop.routes as route (route.id)}
-				<Arrivals {route} stop_id={stop.id} direction={Direction.South} />
+			{#each route_ids as route_id}
+				<Arrivals {route_id} stop_id={stop.id} direction={Direction.South} />
 			{/each}
 		</div>
 	</div>

@@ -3,13 +3,13 @@
 	import relativeTime from 'dayjs/plugin/relativeTime.js';
 	import { derived } from 'svelte/store';
 	import Icon from '$lib/components/Icon.svelte';
-	import { type Direction, type StopTime, stop_time_store, type RouteStop } from '$lib/api';
+	import { type Direction, stop_time_store } from '$lib/api';
 
 	dayjs.extend(relativeTime);
 
 	export let stop_id: string;
 	export let direction: Direction;
-	export let route: RouteStop;
+	export let route_id: string;
 
 	const stop_times = derived(stop_time_store, ($stop_time_store) => {
 		const st = $stop_time_store.filter(
@@ -17,7 +17,7 @@
 				st.arrival > new Date() &&
 				st.stop_id === stop_id &&
 				st.direction === direction &&
-				st.route_id === route.id
+				st.route_id === route_id
 		);
 
 		return st
@@ -35,7 +35,7 @@
 
 <div class="flex gap-1">
 	<div class="flex gap-1">
-		<Icon name={route.id} />
+		<Icon name={route_id} />
 	</div>
 	<div class="flex gap-2">
 		{#if $stop_times}
@@ -44,6 +44,8 @@
 					{stop_time.eta?.toFixed(0)}m
 				</div>
 			{/each}
+		{:else}
+			<div class="text-xs">No upcoming trips</div>
 		{/if}
 	</div>
 </div>
