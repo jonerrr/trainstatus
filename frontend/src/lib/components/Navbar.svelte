@@ -8,10 +8,10 @@
 		<NavbarButton>
 			<Home class="m-auto h-full" />
 		</NavbarButton>
-		<NavbarButton href="/alerts">
+		<NavbarButton label="Alerts" href="/alerts">
 			<CircleAlert class="m-auto h-full" />
 		</NavbarButton>
-		<NavbarButton href="/stops">
+		<NavbarButton label="Stop Times" href="/stops">
 			<Clock class="m-auto h-full" />
 		</NavbarButton>
 	</div>

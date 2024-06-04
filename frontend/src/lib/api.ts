@@ -79,7 +79,7 @@ export async function init_data() {
 	}
 }
 
-interface RouteStop {
+export interface RouteStop {
 	id: string;
 	// maybe store name idk yet or just join
 	// name: string;
@@ -89,7 +89,7 @@ interface RouteStop {
 	// arrivals: number[];
 }
 
-enum StopType {
+export enum StopType {
 	FullTime = 0,
 	PartTime = 1,
 	LateNights = 2,

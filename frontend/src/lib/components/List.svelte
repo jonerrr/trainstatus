@@ -1,46 +1,19 @@
 <script lang="ts">
-	import { createScrollArea, melt } from '@melt-ui/svelte';
-	import { LoaderCircle } from 'lucide-svelte';
-	import { writable } from 'svelte/store';
+	// Not used currently
+	// import { createEventDispatcher } from 'svelte';
 
-	// export let items = writable([]);
-	export let loading = true;
-	// export let maxH = '';
+	// const ndispatch = createEventDispatcher();
 
-	// export let title;
-
-	const {
-		elements: { root, content, viewport, corner, scrollbarY, thumbY }
-	} = createScrollArea({
-		// TODO: test auto
-		type: 'auto',
-		dir: 'ltr'
-	});
+	let list_el: HTMLDivElement;
+	export function scrollIntoView() {
+		list_el.scrollIntoView({ behavior: 'smooth' });
+	}
+	export let show_search = false;
 </script>
 
 <div
-	use:melt={$root}
-	class={`relative overflow-hidden rounded-md text-white shadow-lg ${$$restProps.class ?? ''}`}
+	bind:this={list_el}
+	class={`relative overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%] ${show_search ? 'max-h-[calc(100vh-11rem)]' : 'max-h-[calc(100vh-8rem)]'} `}
 >
-	<div use:melt={$viewport} class="h-full w-full rounded-[inherit]">
-		<div use:melt={$content}>
-			<div>
-				<slot name="header" />
-				{#if loading}
-					<div class="flex w-full justify-center">
-						<LoaderCircle class="animate-spin w-8 h-8 text-indigo-300" />
-					</div>
-				{:else}
-					<slot />
-				{/if}
-			</div>
-		</div>
-	</div>
-	<div
-		use:melt={$scrollbarY}
-		class="flex h-full w-2.5 touch-none select-none border-l border-l-transparent bg-neutral-300/10 p-px transition-colors"
-	>
-		<div use:melt={$thumbY} class="relative flex-1 rounded-full bg-neutral-300/50" />
-	</div>
-	<div use:melt={$corner} />
+	<slot />
 </div>

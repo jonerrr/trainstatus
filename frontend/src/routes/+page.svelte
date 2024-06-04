@@ -53,7 +53,7 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
-<div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-10rem)]">
+<div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
 	<!-- TODO: no pinned routes if statement -->
 	<RouteAlertList title="Pinned Routes" route_ids={$pinned_routes} />
 
@@ -69,8 +69,8 @@
 		</div>
 	{/if}
 
-	<!-- 15 closest stops -->
-	<StopList bind:stop_ids title="Nearby Stops" class="h-[30%]" show_location={true}>
+	<!-- closest stops -->
+	<StopList bind:stop_ids title="Nearby Stops" show_location={true}>
 		<div slot="location" class="flex gap-2">
 			{#if $location_status === LocationStatus.Loading}
 				<div class="flex gap-1 items-center text-white rounded px-2 py-1 bg-indigo-600">
@@ -78,6 +78,7 @@
 				</div>
 			{:else}
 				<button
+					aria-label="Nearby stops"
 					class="items-center bg-indigo-500 text-white rounded px-2 py-1 active:bg-indigo-600 hover:bg-indigo-600"
 					on:click={get_nearby_stops}
 				>

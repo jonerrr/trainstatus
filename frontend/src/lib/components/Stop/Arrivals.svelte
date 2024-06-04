@@ -1,18 +1,15 @@
 <script lang="ts">
-	import { liveQuery } from 'dexie';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime.js';
 	import { derived } from 'svelte/store';
 	import Icon from '$lib/components/Icon.svelte';
-	import { type Direction, type StopTime } from '$lib/api';
-	import { stop_time_store } from '$lib/api';
-	import type { Route } from '$lib/api';
+	import { type Direction, type StopTime, stop_time_store, type RouteStop } from '$lib/api';
 
 	dayjs.extend(relativeTime);
 
 	export let stop_id: string;
 	export let direction: Direction;
-	export let route: Route;
+	export let route: RouteStop;
 
 	const stop_times = derived(stop_time_store, ($stop_time_store) => {
 		const st = $stop_time_store.filter(

@@ -7,6 +7,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
+	import List from '$lib/components/List.svelte';
 	import StopDialog from '$lib/components/Stop/Dialog.svelte';
 
 	export let title: string = 'Stops';
@@ -19,7 +20,7 @@
 	// export let loading: boolean = false;
 
 	$: stops = derived(stop_store, ($stop_store) => {
-		if (!stop_ids) return $stop_store.slice(0, 11);
+		if (!stop_ids) return $stop_store.slice(0, 15);
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
 			? (stop_ids.map((id) => $stop_store.find((stop) => stop.id === id)).filter(Boolean) as Stop[])
@@ -30,7 +31,7 @@
 	let stops_index: FlexSearch.Index;
 
 	// from https://www.okupter.com/blog/svelte-debounce
-	const debounce = (callback: Function, wait = 300) => {
+	const debounce = (callback: Function, wait = 100) => {
 		let timeout: ReturnType<typeof setTimeout>;
 
 		return (...args: any[]) => {
@@ -41,10 +42,17 @@
 
 	let list_el: HTMLDivElement;
 	function searchStops(e: any) {
+		// If search is empty, clear search and show all stops
+		if (e.target.value === '') {
+			stop_ids = null;
+			return;
+		}
+
 		const results = stops_index.search(e.target.value);
 		// console.log(results);
-		if (results.length && results.length < 15) {
-			stop_ids = results.map((id) => id.toString());
+		if (results.length) {
+			// Get first 12 results
+			stop_ids = results.map((id) => id.toString()).slice(0, 12);
 		}
 
 		list_el.scrollIntoView({ behavior: 'smooth' });
@@ -66,12 +74,15 @@
 			});
 		}
 	});
+
+	// Prevent list from getting squished
+	$: min_h = $stops.length ? 'min-h-[140px]' : 'min-h-[30px]';
 </script>
 
 <!-- Switch from vh because on mobile searchbar blocks bottom -->
 <div
 	bind:this={list_el}
-	class={`relative overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%] ${show_search ? 'max-h-[calc(100vh-11rem)]' : 'max-h-[calc(100vh-8rem)]'} `}
+	class={`relative overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 ${min_h} ${show_search ? 'max-h-[calc(100vh-11rem)]' : 'max-h-[calc(100vh-4rem)]'}`}
 >
 	<div class="flex gap-2">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
@@ -92,7 +103,6 @@
 	{/if}
 </div>
 
-<!-- TODO: prevent searches from not being seen when results are smaller -->
 {#if show_search}
 	<div class="relative">
 		<input
@@ -100,12 +110,11 @@
 			on:input={debounce(searchStops)}
 			type="search"
 			placeholder="Search stops"
-			class="search-stops pl-10 border border-neutral-700 z-40 w-full h-12 rounded bg-neutral-600 shadow-xl"
+			class="search-stops text-indigo-200 fixed bottom-16 pl-10 max-w-[calc(100vw-10px)] z-40 w-full h-12 rounded bg-neutral-800 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 		/>
-		<!-- TODO: fix clear button going off screen when screen is md+ -->
 		<button
 			aria-label="Clear search"
-			class="z-50 w-6 h-6 text-indigo-500 hover:text-indigo-600 active:text-indigo-600 absolute inset-y-0 right-2 pt-3"
+			class="z-50 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute inset-y-0 right-2 pt-4"
 			on:click={clearSearch}
 		>
 			<CircleX />
