@@ -1,12 +1,13 @@
 <script lang="ts">
 	import FlexSearch from 'flexsearch';
+	import { CircleX } from 'lucide-svelte';
+	import { onMount } from 'svelte';
 	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { type Stop } from '$lib/api_new';
 	import { stops as stop_store } from '$lib/stores';
 	import StopDialog from '$lib/components/Stop/Dialog.svelte';
-	import { onMount } from 'svelte';
 
 	export let title: string = 'Stops';
 	export let stop_ids: string[] | null = [];
@@ -18,24 +19,42 @@
 	// export let loading: boolean = false;
 
 	$: stops = derived(stop_store, ($stop_store) => {
-		if (!stop_ids) return $stop_store.slice(0, 20);
-		// const st = $stop_store.filter((st) => stop_ids.includes(st.id));
-		// return st;
+		if (!stop_ids) return $stop_store.slice(0, 11);
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
 			? (stop_ids.map((id) => $stop_store.find((stop) => stop.id === id)).filter(Boolean) as Stop[])
-			: $stop_store.filter((st) => stop_ids.includes(st.id));
+			: $stop_store.filter((st) => stop_ids!.includes(st.id));
 		return st;
 	});
 
 	let stops_index: FlexSearch.Index;
 
-	function searchStops(e) {
+	// from https://www.okupter.com/blog/svelte-debounce
+	const debounce = (callback: Function, wait = 300) => {
+		let timeout: ReturnType<typeof setTimeout>;
+
+		return (...args: any[]) => {
+			clearTimeout(timeout);
+			timeout = setTimeout(() => callback(...args), wait);
+		};
+	};
+
+	let list_el: HTMLDivElement;
+	function searchStops(e: any) {
 		const results = stops_index.search(e.target.value);
-		console.log(results);
+		// console.log(results);
 		if (results.length && results.length < 15) {
 			stop_ids = results.map((id) => id.toString());
 		}
+
+		list_el.scrollIntoView({ behavior: 'smooth' });
+	}
+
+	let search_el: HTMLInputElement;
+
+	function clearSearch() {
+		stop_ids = null;
+		search_el.value = '';
 	}
 
 	onMount(() => {
@@ -49,8 +68,10 @@
 	});
 </script>
 
+<!-- Switch from vh because on mobile searchbar blocks bottom -->
 <div
-	class={`overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%]`}
+	bind:this={list_el}
+	class={`relative overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%] ${show_search ? 'max-h-[calc(100vh-11rem)]' : 'max-h-[calc(100vh-8rem)]'} `}
 >
 	<div class="flex gap-2">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
@@ -71,13 +92,25 @@
 	{/if}
 </div>
 
+<!-- TODO: prevent searches from not being seen when results are smaller -->
 {#if show_search}
-	<input
-		on:input={searchStops}
-		type="search"
-		placeholder="Search stops"
-		class="search-stops fixed pl-10 p-3 border border-neutral-700 z-40 bottom-16 w-full h-12 rounded bg-neutral-600"
-	/>
+	<div class="relative">
+		<input
+			bind:this={search_el}
+			on:input={debounce(searchStops)}
+			type="search"
+			placeholder="Search stops"
+			class="search-stops pl-10 border border-neutral-700 z-40 w-full h-12 rounded bg-neutral-600 shadow-xl"
+		/>
+		<!-- TODO: fix clear button going off screen when screen is md+ -->
+		<button
+			aria-label="Clear search"
+			class="z-50 w-6 h-6 text-indigo-500 hover:text-indigo-600 active:text-indigo-600 absolute inset-y-0 right-2 pt-3"
+			on:click={clearSearch}
+		>
+			<CircleX />
+		</button>
+	</div>
 {/if}
 
 <style lang="postcss">
@@ -86,5 +119,13 @@
 
 		background-position: 10px 10px;
 		background-repeat: no-repeat;
+	}
+
+	/* Remove default styles from search */
+	input[type='search']::-webkit-search-decoration,
+	input[type='search']::-webkit-search-cancel-button,
+	input[type='search']::-webkit-search-results-button,
+	input[type='search']::-webkit-search-results-decoration {
+		-webkit-appearance: none;
 	}
 </style>

@@ -11,6 +11,6 @@
 <!-- TODO: combine alert and stop list into one component and reuse across pages -->
 <!-- TODO: show routes even when there is no alert for them -->
 
-<div class="h-full max-h-[60vh] p-1">
+<div class="p-1">
 	<List />
 </div>

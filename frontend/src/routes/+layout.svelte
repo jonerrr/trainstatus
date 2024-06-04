@@ -34,7 +34,7 @@
 
 <Toaster />
 
-<div class="md:w-[60%] m-auto max-h-[calc(100vh - 10rem)]">
+<div class="md:w-[60%] m-auto">
 	<Header />
 
 	<slot />
