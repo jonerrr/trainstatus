@@ -26,7 +26,7 @@
 
 {#if $open}
 	<div use:melt={$portalled}>
-		<div use:melt={$overlay} class="fixed inset-0 z-49 bg-black/40" />
+		<div use:melt={$overlay} class="fixed inset-0 z-40 bg-black/40" />
 		<div
 			class="fixed left-[50%] top-[50%] z-50 max-h-[75vh]
             max-w-[calc(100vw - 20px)] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-800 text-indigo-300
