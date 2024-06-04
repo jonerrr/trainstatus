@@ -11,6 +11,6 @@
 <!-- TODO: combine alert and stop list into one component and reuse across pages -->
 <!-- TODO: show routes even when there is no alert for them -->
 
-<div class="max-h-[60vh]">
+<div class="">
 	<List stop_ids={null} title="Stops" show_search={true} />
 </div>

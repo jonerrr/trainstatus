@@ -6,7 +6,6 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    # TODO: fix tags (think i need to remove ghcr.io/ from the tags)
     strategy:
       fail-fast: false
       matrix:
