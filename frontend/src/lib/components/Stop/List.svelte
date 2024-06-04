@@ -31,7 +31,7 @@
 	let stops_index: FlexSearch.Index;
 
 	// from https://www.okupter.com/blog/svelte-debounce
-	const debounce = (callback: Function, wait = 100) => {
+	const debounce = (callback: Function, wait = 50) => {
 		let timeout: ReturnType<typeof setTimeout>;
 
 		return (...args: any[]) => {

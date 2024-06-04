@@ -52,7 +52,8 @@
 		<swiper-container
 			pagination="true"
 			auto-height="true"
-			class="min-w-72 max-w-96 min-h-72 overflow-hidden"
+			css-mode="true"
+			class="max-w-96"
 			style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
 			on:swiperprogress={on_progress}
 		>
@@ -68,7 +69,7 @@
 
 					<div
 						use:melt={description}
-						class="text-indigo-200 overflow-auto max-h-96 border border-neutral-700 rounded mb-6 mt-2"
+						class="text-indigo-200 overflow-auto min-w-72 max-h-96 border border-neutral-700 rounded mb-6 mt-2"
 					>
 						{@html alert.header}
 						{#if alert.description}
@@ -76,12 +77,12 @@
 						{/if}
 					</div>
 
-					<div class="text-sm text-neutral-400">
+					<div class="text-sm text-neutral-400 pr-12">
 						<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
 						<!-- TODO: show end if not undefined -->
 						<!-- <div>Updated {dayjs(alert.updated_at).fromNow()}</div> -->
 					</div>
-					<span class="text-sm text-neutral-400"> </span>
+					<!-- <span class="text-sm text-neutral-400"> </span> -->
 				</swiper-slide>
 			{/each}
 		</swiper-container>

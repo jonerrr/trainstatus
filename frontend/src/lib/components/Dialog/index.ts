@@ -12,7 +12,8 @@ function createDialogRegistry() {
 
 	function get(name: DialogName, props?: CreateDialogProps) {
 		if (!registry.has(name)) {
-			const dialog = createDialog({ ...props, closeOnOutsideClick: false });
+			// closeOnOutsideClick: false
+			const dialog = createDialog({ ...props });
 			registry.set(name, dialog);
 		}
 
