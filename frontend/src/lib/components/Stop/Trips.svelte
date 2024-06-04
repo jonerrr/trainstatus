@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { melt } from '@melt-ui/svelte';
 	import { derived } from 'svelte/store';
-	import { type Direction, stop_time_store, type Stop } from '$lib/api_new';
+	import { type Direction, stop_time_store, type Stop } from '$lib/api';
 	import { stops } from '$lib/stores';
 	import { Dialog } from '$lib/components/Dialog';
 	import List from '$lib/components/List.svelte';

@@ -61,7 +61,20 @@ self.addEventListener('fetch', (event) => {
 			}
 
 			if (response.status === 200) {
-				cache.put(event.request, response.clone());
+				const copy = response.clone();
+
+				// need to make new header object because headers are immutable
+				const headers = new Headers(copy.headers);
+				headers.append('X-Service-Worker', 'true');
+
+				cache.put(
+					event.request,
+					new Response(await copy.blob(), {
+						headers,
+						status: copy.status,
+						statusText: copy.statusText
+					})
+				);
 			}
 
 			return response;
@@ -69,8 +82,6 @@ self.addEventListener('fetch', (event) => {
 			const response = await cache.match(event.request);
 
 			if (response) {
-				// TODO: test this
-				response.headers.set('X-Service-Worker', 'true');
 				return response;
 			}
 

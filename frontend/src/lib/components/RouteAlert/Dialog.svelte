@@ -2,7 +2,7 @@
 	import { melt } from '@melt-ui/svelte';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
-	import { type Alert, type RouteAlerts, route_alerts_store } from '$lib/api_new';
+	import { type Alert, type RouteAlerts, route_alerts_store } from '$lib/api';
 	import { pinned_routes } from '$lib/stores';
 	import { Dialog } from '$lib/components/Dialog';
 	import Icon from '$lib/components/Icon.svelte';

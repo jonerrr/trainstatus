@@ -3,7 +3,7 @@
 	import { quintOut } from 'svelte/easing';
 	import List from '$lib/components/List.svelte';
 	import RouteAlertDialog from '$lib/components/RouteAlert/Dialog.svelte';
-	import { type RouteAlerts, route_alerts_store } from '$lib/api_new';
+	import { type RouteAlerts, route_alerts_store } from '$lib/api';
 
 	export let route_ids: string[] = [];
 	export let title: string = 'Alerts';

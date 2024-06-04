@@ -4,7 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
 	import { pinned_stops } from '$lib/stores';
-	import { Direction, type Stop } from '$lib/api_new';
+	import { Direction, type Stop } from '$lib/api';
 	import Pin from '$lib/components/Pin.svelte';
 	import Arrivals from '$lib/components/Stop/Arrivals.svelte';
 	import Icon from '$lib/components/Icon.svelte';
