@@ -41,7 +41,7 @@
 	});
 </script>
 
-<Dialog.Trigger name={'stop/' + stop.id}>
+<Dialog.Trigger name={stop.id}>
 	<div class="w-[25%] grow-0 font-semibold text-indigo-200">
 		{stop.name}
 	</div>
@@ -73,13 +73,19 @@
 	</div>
 </Dialog.Trigger>
 
-<Dialog.Content name={'stop/' + stop.id} let:title let:description let:close>
+<Dialog.Content name={stop.id} let:title let:description let:close>
 	<div class="flex items-center gap-2 py-1" use:melt={title}>
-		<!-- TODO: only show normal stopping trains or somehow indicate that route doesn't stop there all times -->
-		<!-- TODO: make icons adjust in size and wrap if 4+ routes -->
+		<!-- TODO: differentiate between fulltime and part time routes and temporary routes for icon -->
 		<div class="flex gap-1">
 			{#each stop.routes as route (route.id)}
-				<Icon width="2rem" height="2rem" name={route.id} />
+				<Icon
+					class={route.stop_type === StopType.FullTime || route.stop_type === StopType.PartTime
+						? ''
+						: 'opacity-30'}
+					width="2rem"
+					height="2rem"
+					name={route.id}
+				/>
 			{/each}
 		</div>
 

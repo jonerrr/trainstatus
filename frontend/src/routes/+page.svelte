@@ -3,9 +3,21 @@
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { pinned_stops, pinned_routes, location_status, LocationStatus, stops } from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
+	import StopDialog from '$lib/components/Stop/Dialog.svelte';
+
+	if ($page.url.searchParams.has('s')) {
+		// const stop_id = $page.url.searchParams.get('stop');
+		// pinned_stops.update((stops) => {
+		// 	if (!stops.includes(stop_id)) {
+		// 		return [...stops, stop_id];
+		// 	}
+		// 	return stops;
+		// });
+	}
 
 	let stop_ids: string[] = [];
 
@@ -53,9 +65,22 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
+<!-- TODO: URL based routing -->
+<!-- {#if $page.url.searchParams.has('s')} -->
+<!-- <StopDialog stop={$stops.find((s) => s.id === $page.url.searchParams.get('s'))} /> -->
+<!-- {/if} -->
+
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
-	<!-- TODO: no pinned routes if statement -->
-	<RouteAlertList title="Pinned Routes" route_ids={$pinned_routes} />
+	{#if $pinned_routes.length}
+		<RouteAlertList title="Pinned Routes" bind:route_ids={$pinned_routes} />
+	{:else}
+		<div
+			transition:slide={{ easing: quintOut, axis: 'y', delay: 100 }}
+			class="text-center text-indigo-500 font-semibold text-lg"
+		>
+			No routes pinned
+		</div>
+	{/if}
 
 	<!-- pinned stop list -->
 	{#if $pinned_stops.length}

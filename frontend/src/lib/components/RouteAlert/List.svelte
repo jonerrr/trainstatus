@@ -8,7 +8,7 @@
 	export let route_ids: string[] = [];
 	export let title: string = 'Alerts';
 
-	let routes: RouteAlerts[] = [
+	$: routes = [
 		{
 			route_id: '1',
 			alerts: []
@@ -115,7 +115,7 @@
 		}
 	];
 	// get only wanted route_ids
-	if (route_ids.length) routes = routes.filter((route) => route_ids.includes(route.route_id));
+	$: if (route_ids.length) routes = routes.filter((route) => route_ids.includes(route.route_id));
 
 	// TODO: fix dynamic height
 	// $: min_route_h = routes.length * 44 + 30;
@@ -128,7 +128,6 @@
 	<div class="flex text-lg self-center mb-2 w-full">
 		<div class="font-semibold text-indigo-300">{title}</div>
 	</div>
-	<!-- TODO: Determine routes by stoptype of regular or being in trips  -->
 	{#each routes as route_alerts (route_alerts.route_id)}
 		<div
 			class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"

@@ -110,11 +110,11 @@
 			on:input={debounce(searchStops)}
 			type="search"
 			placeholder="Search stops"
-			class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] md:max-w-[60%] fixed bottom-16 pl-10 z-40 w-full h-12 rounded bg-neutral-800 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+			class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] md:max-w-[60%] fixed bottom-16 pl-10 z-20 w-full h-12 rounded bg-neutral-800 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 		/>
 		<button
 			aria-label="Clear search"
-			class="z-50 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute inset-y-0 right-2 pt-4"
+			class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute inset-y-0 right-2 pt-4"
 			on:click={clearSearch}
 		>
 			<CircleX />
