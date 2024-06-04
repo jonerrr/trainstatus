@@ -87,7 +87,8 @@
 			{/each}
 		</swiper-container>
 	{:else}
-		<div class="text-indigo-200">No alerts</div>
+		<!-- TODO: show routre_id on top and links to stuff -->
+		<div class="text-indigo-200 h-20">No alerts</div>
 	{/if}
 	<button
 		class="z-40 text-indigo-400 font-bold absolute bottom-0 right-0 rounded p-2 m-6 shadow-xl bg-neutral-900/75 active:bg-neutral-800 hover:bg-neutral-800"

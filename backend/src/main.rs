@@ -1,7 +1,7 @@
-use axum::{response::Redirect, routing::get, Router};
+use axum::{body::Body, response::Response, routing::get, Router};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::env::var;
 use std::sync::OnceLock;
+use std::{convert::Infallible, env::var};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -18,6 +18,8 @@ fn api_key() -> &'static str {
     static API_KEY: OnceLock<String> = OnceLock::new();
     API_KEY.get_or_init(|| var("API_KEY").unwrap())
 }
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // fn stop_list(pool: &PgPool) -> Vec<String> {
 //     let stops = sqlx::query!("select id from stops")
@@ -65,7 +67,11 @@ async fn main() {
     let app = Router::new()
         .route(
             "/",
-            get(|| async { Redirect::temporary("https://trainstat.us") }),
+            get(|| async {
+                let res =
+                    Response::new(Body::from(format!("Trainstat.us API\nVersion: {VERSION}")));
+                Ok::<_, Infallible>(res)
+            }),
         )
         .route("/stops", get(routes::stops::get))
         .route("/arrivals", get(routes::stops::arrivals))

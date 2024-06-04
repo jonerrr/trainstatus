@@ -116,15 +116,19 @@
 	];
 	// get only wanted route_ids
 	if (route_ids.length) routes = routes.filter((route) => route_ids.includes(route.route_id));
+
+	// TODO: fix dynamic height
+	// $: min_route_h = routes.length * 44 + 30;
+	$: min_h = 'min-h-[200px]';
 </script>
 
 <div
-	class={`overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 min-h-[30%] max-h-[calc(100vh-8rem)]`}
+	class={`overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 ${min_h} max-h-[calc(100vh-8rem)]`}
 >
 	<div class="flex text-lg self-center mb-2 w-full">
 		<div class="font-semibold text-indigo-300">{title}</div>
 	</div>
-
+	<!-- TODO: Determine routes by stoptype of regular or being in trips  -->
 	{#each routes as route_alerts (route_alerts.route_id)}
 		<div
 			class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"

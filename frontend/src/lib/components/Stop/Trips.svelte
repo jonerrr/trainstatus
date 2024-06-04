@@ -36,22 +36,22 @@
 </script>
 
 <!-- TODO: fix max-h -->
-<List loading={false} class="h-96">
+<!-- TODO: convert to list -->
+<div class="">
 	{#if $stop_times}
 		{#each $stop_times as stop_time}
 			<Dialog.Trigger name={stop_time.stop_id}>
 				<div
 					class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
 				>
-					<!-- TODO: show current stop / how many stops away -->
-					<div class="flex gap-2 items-center justify-between mx-1">
+					<div class="flex gap-12 items-center justify-between mx-1">
 						<div class="flex gap-2 items-center">
 							<Icon name={stop_time.route_id} />
 							<div>
 								{stop_time.eta?.toFixed(0)}m
 							</div>
 						</div>
-						<div class="text-right">
+						<div class="text-right text-nowrap">
 							{last_stop(stop_time.trip_id).name}
 						</div>
 					</div>
@@ -73,4 +73,4 @@
 	{:else}
 		<div class="text-indigo-300 text-center">No trips found</div>
 	{/if}
-</List>
+</div>

@@ -23,14 +23,17 @@
 
 <!-- TODO: prevent clicking on other dialog when closing -->
 <!-- TODO: add fade transition -->
-<div use:melt={$portalled}>
-	<div use:melt={$overlay} class="fixed inset-0 z-49 bg-black/40" />
-	<div
-		class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw]
-            max-w-[500px] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-800 text-indigo-300
+
+{#if $open}
+	<div use:melt={$portalled}>
+		<div use:melt={$overlay} class="fixed inset-0 z-49 bg-black/40" />
+		<div
+			class="fixed left-[50%] top-[50%] z-50 max-h-[75vh]
+            max-w-[calc(100vw - 20px)] translate-x-[-50%] translate-y-[-50%] rounded bg-neutral-800 text-indigo-300
             p-6 shadow-lg overflow-auto"
-		use:melt={$content}
-	>
-		<slot title={$title} description={$description} close={$close} />
+			use:melt={$content}
+		>
+			<slot title={$title} description={$description} close={$close} />
+		</div>
 	</div>
-</div>
+{/if}
