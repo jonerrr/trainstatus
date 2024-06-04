@@ -6,7 +6,7 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import '../app.css';
-	import { init_data } from '$lib/api_new';
+	import { init_data } from '$lib/api';
 	import { stops } from '$lib/stores';
 	import type { PageData } from './$types';
 

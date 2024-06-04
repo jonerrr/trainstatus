@@ -5,7 +5,7 @@
 	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
-	import { type Stop } from '$lib/api_new';
+	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
 	import StopDialog from '$lib/components/Stop/Dialog.svelte';
 

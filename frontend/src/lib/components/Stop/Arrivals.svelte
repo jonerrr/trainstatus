@@ -4,8 +4,8 @@
 	import relativeTime from 'dayjs/plugin/relativeTime.js';
 	import { derived } from 'svelte/store';
 	import Icon from '$lib/components/Icon.svelte';
-	import { type Direction, type StopTime } from '$lib/api_new';
-	import { stop_time_store } from '$lib/api_new';
+	import { type Direction, type StopTime } from '$lib/api';
+	import { stop_time_store } from '$lib/api';
 	import type { Route } from '$lib/api';
 
 	dayjs.extend(relativeTime);
