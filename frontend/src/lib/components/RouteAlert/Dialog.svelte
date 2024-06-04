@@ -32,7 +32,6 @@
 					{route_alerts.alerts[0].alert_type}
 				</div>
 			</div>
-			<!-- TODO: stop +n from moving on page load -->
 			{#if route_alerts.alerts.length > 1}
 				<div class="font-normal rounded bg-indigo-200 p-1 text-neutral-800">
 					+{route_alerts.alerts.length - 1}
@@ -53,12 +52,12 @@
 		<swiper-container
 			pagination="true"
 			auto-height="true"
-			class="max-h-[85vh]"
+			class="min-w-72 max-w-96 min-h-72 overflow-hidden"
 			style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
 			on:swiperprogress={on_progress}
 		>
 			{#each route_alerts.alerts as alert}
-				<swiper-slide class="relative">
+				<swiper-slide>
 					<h2
 						class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300 bg-neutral-800"
 						use:melt={title}
@@ -69,7 +68,7 @@
 
 					<div
 						use:melt={description}
-						class="text-indigo-200 overflow-auto max-h-[calc(85vh-8rem)] border border-neutral-700 rounded mb-6 mt-2"
+						class="text-indigo-200 overflow-auto max-h-96 border border-neutral-700 rounded mb-6 mt-2"
 					>
 						{@html alert.header}
 						{#if alert.description}
