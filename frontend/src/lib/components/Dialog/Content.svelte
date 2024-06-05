@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createSync, melt } from '@melt-ui/svelte';
-	import { dialogRegistry, type DialogName } from '.';
 	import { page } from '$app/stores';
+	import { dialogRegistry, type DialogName } from '.';
 	// import { flyAndScale } from '$lib/utils';
 
 	export let name: DialogName;
@@ -14,9 +14,10 @@
 	const sync = createSync({ open });
 	// @ts-ignore I don't think this is an issue
 	$: sync.open($page.state.dialogOpen === name, ($open) => {
-		console.log('sync', $open, $page.state, name);
+		console.log('dialog opened', $open, $page.state, name);
 		// @ts-ignore
 		if ($page.state.dialogOpen !== name) {
+			console.log('dialog not in history', name, $open);
 			dialogRegistry.shallow(name, $open);
 		}
 	});

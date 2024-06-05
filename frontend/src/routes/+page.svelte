@@ -22,11 +22,9 @@
 	let stop_ids: string[] = [];
 
 	async function get_nearby_stops() {
-		console.log('Loading location');
 		location_status.set(LocationStatus.Loading);
 		navigator.geolocation.watchPosition(
 			async (position) => {
-				console.log('got position');
 				const { coords } = position;
 
 				const closest_stops = $stops
@@ -38,24 +36,25 @@
 					})
 					.sort((a, b) => a.distance - b.distance)
 					.slice(0, 15);
-				console.log('Sorted stops');
 				stop_ids = closest_stops.map((stop) => stop.id);
 				location_status.set(LocationStatus.Granted);
-				console.log('Finished loading location');
 			},
-			() => {
-				console.log('Error getting location');
+			(e) => {
+				console.error('Error getting location', e);
 
 				location_status.set(LocationStatus.Denied);
 			}
 		);
 	}
 
-	if ($location_status === LocationStatus.Granted) {
-		onMount(() => {
+	onMount(() => {
+		if ($location_status === LocationStatus.Granted) {
 			get_nearby_stops();
-		});
-	}
+		} else if ($location_status === LocationStatus.Loading) {
+			// reset location status if stuck loading
+			location_status.set(LocationStatus.NeverAsked);
+		}
+	});
 
 	// maybe in the future use https://melt-ui.com/docs/builders/tooltip for interactive tutorial
 </script>

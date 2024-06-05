@@ -33,9 +33,15 @@
 		const last_stop_time = stop_times[stop_times.length - 1];
 		return $stops.find((s) => s.id === last_stop_time.stop_id)!;
 	}
+
+	// const current_trip_ids = derived(stop_times, ($stop_times) =>
+	// 	$stop_times.map((st) => st.trip_id)
+	// );
+	// console.log($current_trip_ids);
+
+	console.log($stop_times);
 </script>
 
-<!-- TODO: fix max-h -->
 <!-- TODO: convert to list -->
 <div class="flex flex-col overflow-auto max-h-96">
 	{#if $stop_times}
@@ -60,7 +66,7 @@
 
 			<Dialog.Content name={stop_time.trip_id} let:title let:description let:close>
 				<div class="flex items-center gap-2 py-1" use:melt={title}>
-					<Icon name={stop_time.route_id} /> title
+					<Icon name={stop_time.route_id} />
 				</div>
 
 				<div use:melt={description}>description</div>
