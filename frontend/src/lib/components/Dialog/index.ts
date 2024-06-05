@@ -26,7 +26,6 @@ function createDialogRegistry() {
 
 	// Shallow routing
 	function shallow(name: DialogName, open: boolean) {
-		console.log('shallow ', name, open);
 		if (open) {
 			pushState('', {
 				dialogOpen: open ? name : 'none'

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { melt, createTabs, name } from '@melt-ui/svelte';
+	import { melt, createTabs } from '@melt-ui/svelte';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import { Dialog } from '$lib/components/Dialog';
