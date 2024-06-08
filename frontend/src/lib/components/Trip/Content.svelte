@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Share2, ClipboardCheck } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
 	import type { Trip } from '$lib/api';
 	import { stops, trips, stop_times } from '$lib/stores';
@@ -16,23 +17,58 @@
 		return $stops.find((s) => s.id === last_stop_id)!.name;
 	});
 
+	let copied = false;
+
+	function share() {
+		let url = window.location.origin + `/?t=${trip_id}`;
+		if (!navigator.share) {
+			navigator.clipboard.writeText(url);
+			// set copied to true and change back in 500 ms
+			copied = true;
+			setTimeout(() => {
+				copied = false;
+			}, 800);
+		} else {
+			navigator.share({
+				title: `${trip.route_id} to ${last_stop_name}`,
+				text: `View trip times`,
+				url
+			});
+		}
+	}
+
 	// TODO: add button to load previous stop times and fetch from api
 </script>
 
 <!-- list of stops and their arrival times -->
 <div
-	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80vh]"
+	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80vh]
+	max-w-[450px]"
 >
-	<div class="fixed flex items-center gap-2 bg-neutral-800 pr-12">
-		<Icon width="2rem" height="2rem" name={trip.route_id} />
+	<div class="flex items-center justify-between bg-neutral-800 w-full">
+		<div class="flex gap-2">
+			<Icon width="2rem" height="2rem" name={trip.route_id} />
 
-		<h2 class="font-bold text-xl text-indigo-300">
-			{$last_stop_name}
-		</h2>
+			<h2 class="font-bold text-xl text-indigo-300">
+				{$last_stop_name}
+			</h2>
+		</div>
+
+		<div class="pr-2">
+			{#if !copied}
+				<button aria-label="Share trip" on:click={share}>
+					<Share2 class="h-6 w-6" />
+				</button>
+			{:else}
+				<button class="text-green-600" aria-label="Trip link copied to clipboard">
+					<ClipboardCheck class="h-6 w-6" />
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	{#if $trip_stop_times}
-		<div class="pt-10 max-h-full">
+		<div class="max-h-full">
 			{#each $trip_stop_times as stop_time}
 				<Times {stop_time} />
 			{/each}

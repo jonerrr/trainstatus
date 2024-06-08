@@ -12,17 +12,6 @@
 
 	const stop = $stops.find((s) => s.id === stop_id)!;
 
-	// Get all possible routes that stop at this stop
-	// Base routes are included so we can show them even if they don't have any upcoming trips
-	const base_routes = stop.routes
-		.filter((r) => r.stop_type === StopType.FullTime || r.stop_type === StopType.PartTime)
-		.map((r) => r.id);
-	const other_routes = $stop_times
-		.filter((st) => st.arrival > new Date() && st.stop_id === stop.id)
-		.map((st) => st.route_id);
-	// Dont know if this needs to be reactive
-	$: route_ids = Array.from(new Set([...base_routes, ...other_routes]));
-
 	const {
 		elements: { root, list, content, trigger },
 		states: { value }
@@ -103,7 +92,6 @@
 
 		border-radius: 0;
 
-		/* color: theme(colors.neutral.900); */
 		font-weight: 500;
 		line-height: 1;
 
