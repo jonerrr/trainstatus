@@ -55,7 +55,7 @@ async fn main() {
         tracing::info!("Updating stops and routes");
         imports::stops_and_routes(&pool).await;
     }
-    // TODO: prevent importing until the previous import is done
+
     trips::import(pool.clone()).await;
     alerts::import(pool.clone()).await;
 

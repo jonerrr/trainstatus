@@ -3,7 +3,8 @@
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import { stops } from '$lib/stores';
-	import { Direction, StopType, stop_time_store } from '$lib/api';
+	import { Direction, StopType } from '$lib/api';
+	import { stop_times } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Trigger from '$lib/components/Trip/Trigger.svelte';
 
@@ -16,7 +17,7 @@
 	const base_routes = stop.routes
 		.filter((r) => r.stop_type === StopType.FullTime || r.stop_type === StopType.PartTime)
 		.map((r) => r.id);
-	const other_routes = $stop_time_store
+	const other_routes = $stop_times
 		.filter((st) => st.arrival > new Date() && st.stop_id === stop.id)
 		.map((st) => st.route_id);
 	// Dont know if this needs to be reactive

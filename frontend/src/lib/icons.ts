@@ -1,6 +1,5 @@
-// icons from https://github.com/louh/mta-subway-bullets/tree/main/svg
+// subway icons from https://github.com/louh/mta-subway-bullets/tree/main/svg
 
-// TODO: accessability icon and other required icons
 const icons = [
 	{
 		name: '1',
@@ -243,15 +242,14 @@ const icons = [
 		name: 'accessibility icon',
 		complete_svg: true,
 		svg: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-		stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block">
-		<circle cx="16" cy="4" r="1" />
-		<path d="m18 19 1-7-6 1" />
-		<path d="m5 8 3-3 5.5 3-2.36 3.5" />
-		<path d="M4.24 14.5a5 5 0 0 0 6.88 6" />
-		<path d="M13.76 17.5a5 5 0 0 0-6.88-6" />
-	</svg>`
+			stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block">
+			<circle cx="16" cy="4" r="1" />
+			<path d="m18 19 1-7-6 1" />
+			<path d="m5 8 3-3 5.5 3-2.36 3.5" />
+			<path d="M4.24 14.5a5 5 0 0 0 6.88 6" />
+			<path d="M13.76 17.5a5 5 0 0 0-6.88-6" />
+		</svg>`
 	},
-	// TODO: update icons
 	{
 		// from lucide icons
 		name: 'shuttle bus icon',

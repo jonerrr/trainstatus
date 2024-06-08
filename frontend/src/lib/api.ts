@@ -1,16 +1,16 @@
 import FlexSearch from 'flexsearch';
-import { writable } from 'svelte/store';
+import { writable, type Writable } from 'svelte/store';
 import { offline } from '$lib/stores';
 import icons from '$lib/icons';
 
-export const trip_store = writable<Trip[]>([]);
-export const stop_time_store = writable<StopTime[]>([]);
-export const route_alerts_store = writable<RouteAlerts[]>([]);
+// export const trip_store = writable<Trip[]>([]);
+// export const stop_time_store = writable<StopTime[]>([]);
+// export const alert_store = writable<Alert[]>([]);
 
 export let stopsIndex: FlexSearch.Index;
 
 const train_regex = /(\[(.+?)\])/gm;
-function parse_html(html: string) {
+export function parse_html(html: string) {
 	return html.replaceAll(train_regex, (_match, _p1, p2) => {
 		const icon = icons.find((t) => t.name === p2) ?? icons[icons.length - 1];
 		if (icon.complete_svg) return icon.svg;
@@ -19,7 +19,14 @@ function parse_html(html: string) {
 	});
 }
 
-export async function init_data() {
+type Fetch = typeof fetch;
+
+export async function init_data(
+	fetch: Fetch,
+	trip_store: Writable<Trip[]>,
+	stop_time_store: Writable<StopTime[]>,
+	alert_store: Writable<Alert[]>
+) {
 	try {
 		const [tripsResponse, stopTimesResponse, alertsResponse] = await Promise.all([
 			fetch('/api/trips?times=false'),
@@ -53,18 +60,16 @@ export async function init_data() {
 					};
 				});
 			}),
-			alertsResponse.json().then((data: RouteAlerts[]) => {
-				return data.map((ra: RouteAlerts) => {
+			alertsResponse.json().then((data: Alert[]) => {
+				return data.map((a: Alert) => {
 					return {
-						...ra,
-						alerts: ra.alerts.map((a: Alert) => {
-							return {
-								...a,
-								header: parse_html(a.header),
-								description: a.description ? parse_html(a.description) : null,
-								updated_at: new Date(a.updated_at)
-							};
-						})
+						...a,
+						header_html: parse_html(a.header_html),
+						description_html: a.description_html ? parse_html(a.description_html) : null,
+						created_at: new Date(a.created_at),
+						updated_at: new Date(a.updated_at),
+						start_time: new Date(a.start_time),
+						end_time: a.end_time ? new Date(a.end_time) : null
 					};
 				});
 			})
@@ -72,11 +77,13 @@ export async function init_data() {
 
 		trip_store.set(trips);
 		stop_time_store.set(stopTimes);
-		route_alerts_store.set(routeAlerts);
+		alert_store.set(routeAlerts);
 	} catch (e) {
 		console.error(e);
 	}
 }
+
+////////////// stop stuff
 
 export interface RouteStop {
 	id: string;
@@ -109,7 +116,7 @@ export interface Stop {
 	routes: RouteStop[];
 }
 
-// type TripStopTime = Omit<StopTime, 'assigned' | 'direction'>;
+////////////////// trip stuff
 
 export interface Trip {
 	id: string;
@@ -138,20 +145,32 @@ export interface StopTime {
 }
 
 // Alert types
-export interface RouteAlerts {
-	route_id: string;
-	alerts: Alert[];
-}
+// export interface RouteAlerts {
+// 	route_id: string;
+// 	alerts: Alert[];
+// }
+////////////////////// alert stuff
 
 export interface Alert {
+	id: string;
 	alert_type: string;
-	header: string;
-	description: string | null;
+	header_html: string;
+	description_html: string | null;
+	created_at: Date;
 	updated_at: Date;
-	active_periods: ActivePeriod[];
+	start_time: Date;
+	end_time: Date | null;
+	entities: Entity[];
 }
 
-export interface ActivePeriod {
-	start_time: Date;
-	end_time: Date;
+export interface Entity {
+	alert_id: string;
+	route_id: string | null;
+	stop_id: string | null;
+	sort_order: number;
 }
+
+// export interface ActivePeriod {
+// 	start_time: Date;
+// 	end_time: Date;
+// }

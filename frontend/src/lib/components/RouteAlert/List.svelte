@@ -6,6 +6,7 @@
 	export let route_ids: string[] = [];
 	export let title: string = 'Alerts';
 
+	// TODO: redo this cuz we dont need this object anymore
 	$: routes = [
 		{
 			route_id: '1',
