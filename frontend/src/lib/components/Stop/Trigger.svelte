@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { melt, createTabs } from '@melt-ui/svelte';
 	import { pushState } from '$app/navigation';
-	import { pinned_stops } from '$lib/stores';
-	import { Direction, StopType, stop_time_store, type Stop } from '$lib/api';
+	import { pinned_stops, stop_times } from '$lib/stores';
+	import { Direction, StopType, type Stop } from '$lib/api';
 	import Pin from '$lib/components/Pin.svelte';
 	import Arrivals from '$lib/components/Stop/Arrivals.svelte';
 
@@ -13,7 +13,7 @@
 	const base_routes = stop.routes
 		.filter((r) => r.stop_type === StopType.FullTime || r.stop_type === StopType.PartTime)
 		.map((r) => r.id);
-	const other_routes = $stop_time_store
+	const other_routes = $stop_times
 		.filter((st) => st.arrival > new Date() && st.stop_id === stop.id)
 		.map((st) => st.route_id);
 	// Dont know if this needs to be reactive

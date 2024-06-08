@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { derived } from 'svelte/store';
 	import { pushState } from '$app/navigation';
-	import { type Direction, stop_time_store, type Stop } from '$lib/api';
-	import { stops } from '$lib/stores';
+	import { type Direction, type Stop } from '$lib/api';
+	import { stops, stop_times as stop_time_store } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 
 	export let stop_id: string;

@@ -2,8 +2,9 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime.js';
 	import { derived } from 'svelte/store';
+	import { type Direction } from '$lib/api';
+	import { stop_times as stop_time_store } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
-	import { type Direction, stop_time_store } from '$lib/api';
 
 	dayjs.extend(relativeTime);
 

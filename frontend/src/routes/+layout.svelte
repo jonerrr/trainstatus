@@ -4,23 +4,26 @@
 	import { register } from 'swiper/element/bundle';
 	import { onDestroy, onMount } from 'svelte';
 	import { init_data } from '$lib/api';
-	import { stops } from '$lib/stores';
+	import { stops, trips, stop_times, alerts } from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import Dialog from '$lib/components/Dialog.svelte';
-	import type { PageData } from './$types';
+	// import type { PageData } from './$types';
 
-	export let data: PageData;
-	stops.set(data.stops);
+	// export let data: PageData;
+	// stops.set(data.stops);
+	// alert_store.set(data.stops);
+	// trip_store.set(data.trips);
+	// stop_time_store.set(data.stopTimes);
 
 	let interval: number;
 
 	onMount(() => {
-		init_data();
+		// init_data();
 
 		interval = setInterval(() => {
-			init_data();
+			init_data(fetch, trips, stop_times, alerts);
 		}, 10000);
 	});
 
