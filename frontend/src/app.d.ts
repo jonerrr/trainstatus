@@ -5,7 +5,11 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			dialog_open: boolean;
+			dialog_id: string;
+			dialog_type: 'stop' | 'trip' | 'route_alert' | 'route';
+		}
 		// interface Platform {}
 	}
 }

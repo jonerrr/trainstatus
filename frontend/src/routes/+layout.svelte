@@ -1,13 +1,14 @@
 <script lang="ts">
 	import '@fontsource/inter';
+	import '../app.css';
 	import { register } from 'swiper/element/bundle';
 	import { onDestroy, onMount } from 'svelte';
+	import { init_data } from '$lib/api';
+	import { stops } from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
-	import '../app.css';
-	import { init_data } from '$lib/api';
-	import { stops } from '$lib/stores';
+	import Dialog from '$lib/components/Dialog.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -23,8 +24,8 @@
 		}, 10000);
 	});
 
+	// Don't think we need this bc its a layout and won't be unmounted
 	onDestroy(() => {
-		console.log('clearing db intervals');
 		clearInterval(interval);
 	});
 
@@ -36,6 +37,8 @@
 
 <div class="md:w-[60%] m-auto">
 	<Header />
+
+	<Dialog />
 
 	<slot />
 </div>

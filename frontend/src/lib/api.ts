@@ -21,7 +21,6 @@ function parse_html(html: string) {
 
 export async function init_data() {
 	try {
-		console.log('Fetching stop data');
 		const [tripsResponse, stopTimesResponse, alertsResponse] = await Promise.all([
 			fetch('/api/trips?times=false'),
 			fetch('/api/arrivals'),

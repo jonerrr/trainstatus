@@ -4,20 +4,10 @@
 	import { quintOut } from 'svelte/easing';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { pushState } from '$app/navigation';
 	import { pinned_stops, pinned_routes, location_status, LocationStatus, stops } from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
-	import StopDialog from '$lib/components/Stop/Dialog.svelte';
-
-	if ($page.url.searchParams.has('s')) {
-		// const stop_id = $page.url.searchParams.get('stop');
-		// pinned_stops.update((stops) => {
-		// 	if (!stops.includes(stop_id)) {
-		// 		return [...stops, stop_id];
-		// 	}
-		// 	return stops;
-		// });
-	}
 
 	let stop_ids: string[] = [];
 
@@ -48,6 +38,12 @@
 	}
 
 	onMount(() => {
+		// TODO: open dialog based on URL params
+		// const open_stop_id = $page.url.searchParams.get('s');
+		// if (open_stop_id) {
+		// 	pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
+		// }
+
 		if ($location_status === LocationStatus.Granted) {
 			get_nearby_stops();
 		} else if ($location_status === LocationStatus.Loading) {

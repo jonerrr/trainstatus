@@ -7,8 +7,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
-	import List from '$lib/components/List.svelte';
-	import StopDialog from '$lib/components/Stop/Dialog.svelte';
+	import Trigger from '$lib/components/Stop/Trigger.svelte';
 
 	export let title: string = 'Stops';
 	export let stop_ids: string[] | null = [];
@@ -97,7 +96,7 @@
 				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
 				transition:slide={{ easing: quintOut, axis: 'y' }}
 			>
-				<StopDialog {stop} />
+				<Trigger {stop} />
 			</div>
 		{/each}
 	{/if}

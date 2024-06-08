@@ -1,12 +1,9 @@
 <script lang="ts">
-	import { melt } from '@melt-ui/svelte';
 	import { derived } from 'svelte/store';
+	import { pushState } from '$app/navigation';
 	import { type Direction, stop_time_store, type Stop } from '$lib/api';
 	import { stops } from '$lib/stores';
-	import { Dialog } from '$lib/components/Dialog';
-	import List from '$lib/components/List.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import TripPreview from '$lib/components/Trip/Dialog.svelte';
 
 	export let stop_id: string;
 	export let direction: Direction;
@@ -42,11 +39,15 @@
 	console.log($stop_times);
 </script>
 
-<!-- TODO: convert to list -->
 <div class="flex flex-col overflow-auto max-h-96">
-	{#if $stop_times}
+	{#if $stop_times.length}
 		{#each $stop_times as stop_time}
-			<Dialog.Trigger name={stop_time.trip_id}>
+			<button
+				class="w-full flex justify-between items-center py-1"
+				on:click={() => {
+					pushState('', { dialog_open: true, dialog_id: stop_time.trip_id, dialog_type: 'trip' });
+				}}
+			>
 				<div
 					class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
 				>
@@ -62,21 +63,9 @@
 						</div>
 					</div>
 				</div>
-			</Dialog.Trigger>
-
-			<Dialog.Content name={stop_time.trip_id} let:title let:description let:close>
-				<div class="flex items-center gap-2 py-1" use:melt={title}>
-					<Icon name={stop_time.route_id} />
-				</div>
-
-				<div use:melt={description}>description</div>
-				<button
-					class="z-40 text-indigo-400 font-bold absolute bottom-0 right-0 rounded p-2 m-6 shadow-xl bg-neutral-900/75 active:bg-neutral-800 hover:bg-neutral-800"
-					use:melt={close}>Close</button
-				>
-			</Dialog.Content>
+			</button>
 		{/each}
 	{:else}
-		<div class="text-indigo-300 text-center w-24">No trips found</div>
+		<div class="text-neutral-300 text-center">No trips found</div>
 	{/if}
 </div>
