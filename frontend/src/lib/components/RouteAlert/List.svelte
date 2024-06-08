@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
-	import List from '$lib/components/List.svelte';
-	import RouteAlertDialog from '$lib/components/RouteAlert/Dialog.svelte';
-	import { type RouteAlerts, route_alerts_store } from '$lib/api';
+	import Trigger from '$lib/components/RouteAlert/Trigger.svelte';
 
 	export let route_ids: string[] = [];
 	export let title: string = 'Alerts';
@@ -133,7 +131,7 @@
 			class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
 			transition:slide={{ easing: quintOut, axis: 'y' }}
 		>
-			<RouteAlertDialog route_id={route_alerts.route_id} />
+			<Trigger route_id={route_alerts.route_id} />
 		</div>
 	{/each}
 </div>
