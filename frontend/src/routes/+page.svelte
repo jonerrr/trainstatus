@@ -3,8 +3,6 @@
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { pushState } from '$app/navigation';
 	import { pinned_stops, pinned_routes, location_status, LocationStatus, stops } from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
@@ -38,12 +36,6 @@
 	}
 
 	onMount(() => {
-		// TODO: open dialog based on URL params
-		// const open_stop_id = $page.url.searchParams.get('s');
-		// if (open_stop_id) {
-		// 	pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
-		// }
-
 		if ($location_status === LocationStatus.Granted) {
 			get_nearby_stops();
 		} else if ($location_status === LocationStatus.Loading) {

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { melt, createTabs } from '@melt-ui/svelte';
 	import { pushState } from '$app/navigation';
 	import { pinned_stops, stop_times } from '$lib/stores';
 	import { Direction, StopType, type Stop } from '$lib/api';

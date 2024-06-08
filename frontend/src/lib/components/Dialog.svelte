@@ -11,7 +11,8 @@
 		elements: { trigger, overlay, content, title, description, close, portalled },
 		states: { open }
 	} = createDialog({
-		forceVisible: true
+		forceVisible: true,
+		closeOnOutsideClick: false
 	});
 
 	const sync = createSync({ open });
@@ -21,8 +22,9 @@
 	});
 </script>
 
+<!-- TODO: fix back on mobile not working -->
 {#if $open}
-	<div class="" use:melt={$portalled}>
+	<div use:melt={$portalled}>
 		<div use:melt={$overlay} class="fixed inset-0 z-50 bg-black/50" />
 		<div
 			class="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[90vw]

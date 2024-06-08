@@ -11,6 +11,7 @@
 <!-- {#if icon.complete_svg}
 	{@html icon.svg}
 {:else} -->
+<!-- TODO: when clicking on icon, go to stop list -->
 <svg class={$$props.class} {width} {height} viewBox="0 0 90 90">
 	{@html icon.svg}
 </svg>
