@@ -9,17 +9,10 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import Dialog from '$lib/components/Dialog.svelte';
-	import { page } from '$app/stores';
-	import { pushState } from '$app/navigation';
 
 	let interval: number;
 
 	onMount(() => {
-		const open_stop_id = $page.url.searchParams.get('s');
-		if (open_stop_id) {
-			pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
-		}
-
 		interval = setInterval(() => {
 			init_data(fetch, trips, stop_times, alerts);
 		}, 10000);

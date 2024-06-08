@@ -15,8 +15,6 @@
 	export let show_search: boolean = false;
 	// show ask for location button
 	export let show_location: boolean = false;
-	// TODO: better loading internally
-	// export let loading: boolean = false;
 
 	$: stops = derived(stop_store, ($stop_store) => {
 		if (!stop_ids) return $stop_store.slice(0, 15);

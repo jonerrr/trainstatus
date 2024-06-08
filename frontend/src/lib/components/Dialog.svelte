@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { CircleX } from 'lucide-svelte';
 	import { createDialog, melt, createSync } from '@melt-ui/svelte';
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { pushState, preloadData } from '$app/navigation';
 	import { flyAndScale } from '$lib/utils';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
@@ -20,9 +22,29 @@
 		console.log('dialog opened', $open, $page.state);
 		open.set($open);
 	});
+
+	// Check if user is trying to open a dialog from the URL
+	// Maybe we should pushstate the query params so its easy to copy
+	onMount(async () => {
+		const open_stop_id = $page.url.searchParams.get('s');
+		const open_route_id = $page.url.searchParams.get('r');
+		const open_trip_id = $page.url.searchParams.get('t');
+
+		if (open_stop_id) {
+			// Make sure data is loaded in before opening dialog otherwise we get an error
+			await preloadData('/');
+			pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
+		} else if (open_route_id) {
+			await preloadData('/');
+			pushState('', { dialog_open: true, dialog_id: open_route_id, dialog_type: 'route_alert' });
+		} else if (open_trip_id) {
+			await preloadData('/');
+			pushState('', { dialog_open: true, dialog_id: open_trip_id, dialog_type: 'trip' });
+		}
+	});
 </script>
 
-<!-- TODO: fix back on mobile not working -->
+<!-- TODO: figure out a way to prevent swiping from closing dialog on mobile -->
 {#if $open}
 	<div use:melt={$portalled}>
 		<div use:melt={$overlay} class="fixed inset-0 z-50 bg-black/50" />
