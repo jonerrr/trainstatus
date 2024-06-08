@@ -16,8 +16,8 @@
 			.filter((a) => a.entities && a.entities.some((e) => e.route_id === route_id))
 			.sort((a, b) => {
 				return (
-					a.entities.find((e) => e.route_id === route_id)!.sort_order -
-					b.entities.find((e) => e.route_id === route_id)!.sort_order
+					b.entities.find((e) => e.route_id === route_id)!.sort_order -
+					a.entities.find((e) => e.route_id === route_id)!.sort_order
 				);
 			});
 	});
@@ -26,7 +26,11 @@
 <button
 	class="w-full flex justify-between items-center py-1"
 	on:click={() => {
-		pushState('', { dialog_open: true, dialog_id: route_id, dialog_type: 'route_alert' });
+		pushState('', {
+			dialog_open: true,
+			dialog_id: route_id,
+			dialog_type: 'route_alert'
+		});
 	}}
 >
 	<div class="flex gap-2 items-center">

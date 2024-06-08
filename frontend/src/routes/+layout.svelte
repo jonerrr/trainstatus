@@ -1,26 +1,24 @@
 <script lang="ts">
-	import '@fontsource/inter';
 	import '../app.css';
+	import '@fontsource/inter';
 	import { register } from 'swiper/element/bundle';
 	import { onDestroy, onMount } from 'svelte';
 	import { init_data } from '$lib/api';
-	import { stops, trips, stop_times, alerts } from '$lib/stores';
+	import { trips, stop_times, alerts } from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
 	import Dialog from '$lib/components/Dialog.svelte';
-	// import type { PageData } from './$types';
-
-	// export let data: PageData;
-	// stops.set(data.stops);
-	// alert_store.set(data.stops);
-	// trip_store.set(data.trips);
-	// stop_time_store.set(data.stopTimes);
+	import { page } from '$app/stores';
+	import { pushState } from '$app/navigation';
 
 	let interval: number;
 
 	onMount(() => {
-		// init_data();
+		const open_stop_id = $page.url.searchParams.get('s');
+		if (open_stop_id) {
+			pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
+		}
 
 		interval = setInterval(() => {
 			init_data(fetch, trips, stop_times, alerts);
