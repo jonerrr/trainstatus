@@ -5,6 +5,7 @@ use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
+mod bus;
 mod imports;
 mod routes;
 mod trips;
@@ -43,6 +44,9 @@ async fn main() {
         .await
         .unwrap();
     sqlx::migrate!().run(&pool).await.unwrap();
+
+    // bus::import::stops_and_routes(&pool).await;
+    // bus::trips::import(pool.clone()).await;
 
     if imports::should_update(&pool).await {
         tracing::info!("Updating stops and routes");
