@@ -90,15 +90,14 @@ pub async fn get(
                 let trips = sqlx::query_as!(
                     Trip,
                     r#"SELECT
-                t.id,
-                t.route_id,
-                t.direction,
-                t.assigned,
-                t.created_at,
-                NULL AS "stop_times!: Option<Vec<JsonValue>>"
-            FROM
-                trips t
-            "#
+                    t.id,
+                    t.route_id,
+                    t.direction,
+                    t.assigned,
+                    t.created_at,
+                    NULL AS "stop_times!: Option<Vec<JsonValue>>"
+                FROM
+                    trips t"#
                 )
                 .fetch_all(&pool)
                 .await?;
@@ -108,7 +107,7 @@ pub async fn get(
         } else {
             let trips = sqlx::query_as!(
                 Trip,
-                "select
+                "SELECT
                 t.id,
                 t.route_id,
                 t.direction,
@@ -120,23 +119,23 @@ pub async fn get(
                 st.arrival,
                 'departure',
                 st.departure)
-            order by
-                st.arrival) as stop_times
-            from
+            ORDER BY
+                st.arrival) AS stop_times
+            FROM
                 trips t
-            left join stop_times st on
+            LEFT JOIN stop_times st ON
                 t.id = st.trip_id
-            where
-                t.id = any(
-                select
+            WHERE
+                t.id = ANY(
+                SELECT
                     t.id
-                from
+                FROM
                     trips t
-                left join stop_times st on
+                LEFT JOIN stop_times st ON
                     st.trip_id = t.id
-                where
+                WHERE
                     st.arrival > now())
-            group by
+            GROUP BY
                 t.id"
             )
             .fetch_all(&pool)
@@ -147,37 +146,37 @@ pub async fn get(
     } else {
         let trips = sqlx::query_as!(
             Trip,
-            "select
-        t.id,
-        t.route_id,
-        t.direction,
-        t.assigned,
-        t.created_at,
-        array_agg(jsonb_build_object('stop_id',
-        st.stop_id,
-        'arrival',
-        st.arrival,
-        'departure',
-        st.departure)
-    order by
-        st.arrival) as stop_times
-    from
-        trips t
-    left join stop_times st on
-        t.id = st.trip_id
-    where
-        t.id = any(
-        select
-            t.id
-        from
+            "SELECT
+            t.id,
+            t.route_id,
+            t.direction,
+            t.assigned,
+            t.created_at,
+            array_agg(jsonb_build_object('stop_id',
+            st.stop_id,
+            'arrival',
+            st.arrival,
+            'departure',
+            st.departure)
+        ORDER BY
+            st.arrival) AS stop_times
+        FROM
             trips t
-        left join stop_times st on
-            st.trip_id = t.id
-        where
-            st.stop_id = ANY($1)
-            and st.arrival > now())
-    group by
-        t.id",
+        LEFT JOIN stop_times st ON
+            t.id = st.trip_id
+        WHERE
+            t.id = ANY(
+            SELECT
+                t.id
+            FROM
+                trips t
+            LEFT JOIN stop_times st ON
+                st.trip_id = t.id
+            WHERE
+                st.stop_id = ANY($1)
+                    AND st.arrival > now())
+        GROUP BY
+            t.id",
             &params.stop_ids
         )
         .fetch_all(&pool)

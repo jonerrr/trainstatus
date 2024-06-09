@@ -9,13 +9,12 @@
 	export let trip_id: string;
 
 	const trip: Trip = $trips.find((t) => t.id === trip_id)!;
-	const trip_stop_times = derived(stop_times, ($stop_times) =>
-		$stop_times.filter((st) => st.trip_id === trip_id)
-	)!;
-	const last_stop_name = derived(trip_stop_times, ($trip_stop_times) => {
-		const last_stop_id = $trip_stop_times[$trip_stop_times.length - 1].stop_id;
-		return $stops.find((s) => s.id === last_stop_id)!.name;
-	});
+
+	$: trip_stop_times = $stop_times.filter((st) => st.trip_id === trip_id);
+
+	$: last_stop_name = $stops.find(
+		(s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id
+	)!.name;
 
 	let copied = false;
 
@@ -51,7 +50,7 @@
 			<Icon width="2rem" height="2rem" name={trip.route_id} />
 
 			<h2 class="font-bold text-xl text-indigo-300">
-				{$last_stop_name}
+				{last_stop_name}
 			</h2>
 		</div>
 
@@ -68,10 +67,11 @@
 		</div>
 	</div>
 
-	{#if $trip_stop_times}
+	<!-- TODO: figure out why the train times are not changing the stop name on update -->
+	{#if trip_stop_times.length}
 		<div class="max-h-full">
-			{#each $trip_stop_times as stop_time}
-				<Times {stop_time} />
+			{#each trip_stop_times as stop_time}
+				<Times bind:stop_time />
 			{/each}
 		</div>
 	{/if}
