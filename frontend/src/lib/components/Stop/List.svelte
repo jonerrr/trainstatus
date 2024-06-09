@@ -77,10 +77,9 @@
 	$: min_h = $stops.length ? 'min-h-[140px]' : 'min-h-[30px]';
 </script>
 
-<!-- Switch from vh because on mobile searchbar blocks bottom -->
 <div
 	bind:this={list_el}
-	class={`relative text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 ${min_h}`}
+	class={`relative text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 ${min_h} overflow-auto`}
 >
 	<div class="flex gap-2">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
@@ -91,7 +90,7 @@
 	</div>
 	{#if $stops}
 		<div
-			class={`flex flex-col gap-1 overflow-auto ${show_search ? 'max-h-[calc(100dvh-13rem)]' : 'max-h-[calc(100dvh-4rem)]'}`}
+			class={`flex flex-col gap-1 mt-1 overflow-auto ${show_search ? 'max-h-[calc(100dvh-13rem)]' : 'max-h-[calc(100dvh-4rem)]'}`}
 		>
 			{#each $stops as stop (stop?.id)}
 				<div
