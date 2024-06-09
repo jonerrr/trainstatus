@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Share2, ClipboardCheck } from 'lucide-svelte';
+	import { Share, ClipboardCheck } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
 	import type { Trip } from '$lib/api';
 	import { stops, trips, stop_times } from '$lib/stores';
@@ -58,7 +58,7 @@
 		<div class="pr-2">
 			{#if !copied}
 				<button aria-label="Share trip" on:click={share}>
-					<Share2 class="h-6 w-6" />
+					<Share class="h-6 w-6" />
 				</button>
 			{:else}
 				<button class="text-green-600" aria-label="Trip link copied to clipboard">

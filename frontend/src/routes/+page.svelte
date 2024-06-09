@@ -96,8 +96,10 @@
 				>
 					{#if $location_status === LocationStatus.Denied}
 						<LocateOff class="w-4 h-4" />
-					{:else}
+					{:else if $location_status === LocationStatus.Granted}
 						<LocateFixed class="w-4 h-4" />
+					{:else}
+						<Locate class="w-4 h-4" />
 					{/if}
 				</button>
 			{/if}
