@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                t.id,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.created_at,\n                NULL AS \"stop_times!: Option<Vec<JsonValue>>\"\n            FROM\n                trips t\n            ",
+  "query": "SELECT\n                    t.id,\n                    t.route_id,\n                    t.direction,\n                    t.assigned,\n                    t.created_at,\n                    NULL AS \"stop_times!: Option<Vec<JsonValue>>\"\n                FROM\n                    trips t",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       null
     ]
   },
-  "hash": "6d0a8551283c1506a5dbde0862c6c8e1bfa40f9c4f7e6d6d3edeb713dd068e9c"
+  "hash": "4ebda7f55fcafe107796df308402d16ec29a98ed0afdd4a3cba32cc6b95658b4"
 }

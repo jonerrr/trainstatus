@@ -3,11 +3,11 @@
 	import { quintOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
 	import type { StopTime } from '$lib/api';
-	import { stops, stop_times } from '$lib/stores';
+	import { stops } from '$lib/stores';
 
 	export let stop_time: StopTime;
 
-	const stop = $stops.find((s) => s.id === stop_time.stop_id)!;
+	$: stop = $stops.find((s) => s.id === stop_time.stop_id)!;
 </script>
 
 <button
@@ -21,10 +21,10 @@
 		});
 	}}
 >
-	<div>
+	<div class="text-left">
 		{stop.name}
 	</div>
-	<div>
+	<div class="text-right">
 		{stop_time.arrival.toLocaleTimeString()}
 	</div>
 </button>

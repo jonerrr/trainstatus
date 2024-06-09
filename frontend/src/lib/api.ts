@@ -124,7 +124,6 @@ export interface Trip {
 	direction: Direction;
 	assigned: boolean;
 	created_at: Date;
-	stop_times: string[];
 }
 
 export enum Direction {
