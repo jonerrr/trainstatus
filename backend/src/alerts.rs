@@ -1,4 +1,4 @@
-use crate::{api_key, feed, trips::DecodeFeedError};
+use crate::{feed, trips::DecodeFeedError};
 use chrono::DateTime;
 use prost::Message;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -23,7 +23,6 @@ pub async fn import(pool: PgPool) {
 async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
     let data = reqwest::Client::new()
         .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts")
-        .header("x-api-key", api_key())
         .send()
         .await?
         .bytes()

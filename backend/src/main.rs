@@ -1,6 +1,5 @@
 use axum::{body::Body, response::Response, routing::get, Router};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::sync::OnceLock;
 use std::{convert::Infallible, env::var};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -11,12 +10,6 @@ mod routes;
 mod trips;
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
-}
-
-// https://stackoverflow.com/a/77249700
-fn api_key() -> &'static str {
-    static API_KEY: OnceLock<String> = OnceLock::new();
-    API_KEY.get_or_init(|| var("API_KEY").unwrap())
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");

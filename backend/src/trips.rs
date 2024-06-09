@@ -1,7 +1,4 @@
-use crate::{
-    api_key,
-    feed::{self},
-};
+use crate::feed::{self};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
@@ -82,7 +79,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs{}",
             endpoint
         ))
-        .header("x-api-key", api_key())
         .send()
         .await?
         .bytes()
