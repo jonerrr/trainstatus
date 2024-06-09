@@ -39,14 +39,14 @@
 		<Icon name={route_id} />
 	</div>
 	<div class="flex gap-2">
-		{#if $stop_times}
+		{#if $stop_times.length}
 			{#each $stop_times.slice(0, 2) as stop_time}
 				<div class="text-xs">
 					{stop_time.eta?.toFixed(0)}m
 				</div>
 			{/each}
 		{:else}
-			<div class="text-xs">No upcoming trips</div>
+			<div class="text-xs text-neutral-400">No trips</div>
 		{/if}
 	</div>
 </div>

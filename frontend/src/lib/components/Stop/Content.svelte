@@ -28,6 +28,8 @@
 		duration: 250,
 		easing: cubicInOut
 	});
+
+	// TODO: show transfers
 </script>
 
 <div class="flex items-center gap-2 py-1">

@@ -1,18 +1,13 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
+	import type { Swiper } from 'swiper/types';
 	import { alerts } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import { derived } from 'svelte/store';
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
-
-	function on_progress(e: any) {
-		const [swiper, progress] = e.detail;
-		const index = swiper.activeIndex;
-		// console.log(index);
-	}
 
 	const route_alerts = derived(alerts, ($alerts) => {
 		const route_alerts = $alerts
@@ -25,17 +20,27 @@
 			});
 		return route_alerts;
 	});
+
+	function fix_swiper({ detail }: { detail: [Swiper] }) {
+		const swiper = detail[0];
+		setTimeout(() => {
+			console.log('fixing swiper');
+			// swiper.update();
+			// swiper.slideReset();
+		}, 500);
+	}
 </script>
 
-<!-- TODO: fix swiper slides breaking for certain alerts -->
+<!-- TODO: fix swiper slides breaking for certain alerts (i think i need to somehow update the component) -->
+<!-- it seems to fix itself when clicking outside of the dialog (but that closes it) -->
 <div class="max-h-[80vh]">
 	{#if $route_alerts.length}
 		<swiper-container
+			style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
 			pagination="true"
 			auto-height="true"
 			loop={$route_alerts.length > 1}
-			style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
-			on:swiperprogress={on_progress}
+			on:swiperinit={fix_swiper}
 		>
 			{#each $route_alerts as alert}
 				<swiper-slide class="">
@@ -57,6 +62,7 @@
 						<div class="text-sm text-neutral-400 flex justify-between">
 							<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
 							{#if alert.end_time}
+								<!-- TODO: get the earliest end_time from API -->
 								<div>End {dayjs(alert.end_time).fromNow()}</div>
 							{/if}
 						</div>
@@ -65,7 +71,6 @@
 			{/each}
 		</swiper-container>
 	{:else}
-		<!-- TODO: show route_id on top and links to stuff even when no alert -->
 		<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
 			<Icon width="2rem" height="2rem" name={route_id} />
 		</h2>
