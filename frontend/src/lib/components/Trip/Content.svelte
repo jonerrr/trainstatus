@@ -30,8 +30,9 @@
 			}, 800);
 		} else {
 			navigator.share({
-				title: `${trip.route_id} to ${last_stop_name}`,
-				text: `View trip times`,
+				// TODO: maybe include next stop and route name
+				// TODO: custom embeds
+				title: `View my subway trip`,
 				url
 			});
 		}

@@ -9,6 +9,8 @@
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
 
+	// detect if user is swiping back and disable close on outside click
+
 	const {
 		elements: { trigger, overlay, content, title, description, close, portalled },
 		states: { open }
