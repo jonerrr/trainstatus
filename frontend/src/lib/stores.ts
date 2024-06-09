@@ -20,5 +20,5 @@ export const trips = writable<Trip[]>([]);
 export const stop_times = writable<StopTime[]>([]);
 export const alerts = writable<Alert[]>([]);
 
-export const pinned_routes = persisted('pinned_routes', ['J', 'N', 'R']);
-export const pinned_stops = persisted('pinned_stops', ['631', 'A27']);
+export const pinned_routes = persisted('pinned_routes', ['J']);
+export const pinned_stops = persisted('pinned_stops', ['631']);

@@ -15,6 +15,4 @@ services:
   #     - DATABASE_URL=postgres://trains:trains@localhost:5432/trains
   #     - API_KEY=mta api key
   #   build: .
-  #   # ports:
-  #   #   - "3055:3055"
   #   network_mode: host

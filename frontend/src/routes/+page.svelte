@@ -60,25 +60,25 @@
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
 	{#if $pinned_routes.length}
 		<RouteAlertList title="Pinned Routes" bind:route_ids={$pinned_routes} />
-	{:else}
+		<!-- {:else}
 		<div
 			transition:slide={{ easing: quintOut, axis: 'y', delay: 100 }}
 			class="text-center text-indigo-500 font-semibold text-lg"
 		>
 			No routes pinned
-		</div>
+		</div> -->
 	{/if}
 
 	<!-- pinned stop list -->
 	{#if $pinned_stops.length}
 		<StopList bind:stop_ids={$pinned_stops} title="Pinned Stops" />
-	{:else}
+		<!-- {:else}
 		<div
 			transition:slide={{ easing: quintOut, axis: 'y', delay: 100 }}
 			class="text-center text-indigo-500 font-semibold text-lg"
 		>
 			No stops pinned
-		</div>
+		</div> -->
 	{/if}
 
 	<!-- closest stops -->

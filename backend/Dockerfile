@@ -14,4 +14,4 @@ FROM scratch
 WORKDIR /app
 COPY --from=build /app/target/x86_64-unknown-linux-musl/release/backend /backend
 EXPOSE 3055
-CMD [ "/backend" ]
+ENTRYPOINT [ "/backend" ]
