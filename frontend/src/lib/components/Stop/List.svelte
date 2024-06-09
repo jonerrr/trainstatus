@@ -52,6 +52,7 @@
 			stop_ids = results.map((id) => id.toString()).slice(0, 12);
 		}
 
+		// this is to make sure that the results are in view on mobile even when keyboard is open
 		list_el.scrollIntoView({ behavior: 'smooth' });
 	}
 
@@ -79,7 +80,7 @@
 <!-- Switch from vh because on mobile searchbar blocks bottom -->
 <div
 	bind:this={list_el}
-	class={`relative overflow-auto text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 ${min_h} ${show_search ? 'max-h-[calc(100vh-11rem)]' : 'max-h-[calc(100vh-4rem)]'}`}
+	class={`relative text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 ${min_h}`}
 >
 	<div class="flex gap-2">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
@@ -89,35 +90,39 @@
 		{/if}
 	</div>
 	{#if $stops}
-		{#each $stops as stop (stop?.id)}
-			<div
-				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl my-1 hover:bg-neutral-900 px-1"
-				transition:slide={{ easing: quintOut, axis: 'y' }}
+		<div
+			class={`flex flex-col gap-1 overflow-auto ${show_search ? 'max-h-[calc(100dvh-13rem)]' : 'max-h-[calc(100dvh-4rem)]'}`}
+		>
+			{#each $stops as stop (stop?.id)}
+				<div
+					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
+					transition:slide={{ easing: quintOut, axis: 'y' }}
+				>
+					<Trigger {stop} />
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if show_search}
+		<div class="relative">
+			<input
+				bind:this={search_el}
+				on:input={debounce(searchStops)}
+				type="search"
+				placeholder="Search stops"
+				class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] md:max-w-[60%] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+			/>
+			<button
+				aria-label="Clear search"
+				class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
+				on:click={clearSearch}
 			>
-				<Trigger {stop} />
-			</div>
-		{/each}
+				<CircleX />
+			</button>
+		</div>
 	{/if}
 </div>
-
-{#if show_search}
-	<div class="relative">
-		<input
-			bind:this={search_el}
-			on:input={debounce(searchStops)}
-			type="search"
-			placeholder="Search stops"
-			class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] md:max-w-[60%] fixed bottom-16 pl-10 z-20 w-full h-12 rounded bg-neutral-800 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-		/>
-		<button
-			aria-label="Clear search"
-			class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute inset-y-0 right-2 pt-4"
-			on:click={clearSearch}
-		>
-			<CircleX />
-		</button>
-	</div>
-{/if}
 
 <style lang="postcss">
 	.search-stops {
