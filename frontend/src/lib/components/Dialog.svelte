@@ -3,6 +3,7 @@
 	import { createDialog, melt, createSync } from '@melt-ui/svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	// import { browser } from '$app/environment';
 	import { pushState, preloadData } from '$app/navigation';
 	import { flyAndScale } from '$lib/utils';
 	import StopContent from '$lib/components/Stop/Content.svelte';
@@ -10,13 +11,37 @@
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
 
 	// detect if user is swiping back and disable close on outside click
+	// let touchstartX = 0;
+	// let touchendX = 0;
+
+	// function checkDirection() {
+	// 	if (touchendX < touchstartX) {
+	// 		console.log('swiped left');
+	// 		// alert('swiped left!')
+	// 	}
+	// 	if (touchendX > touchstartX) {
+	// 		console.log('swiped right');
+	// 		// alert('swiped right!');
+	// 	}
+	// }
+
+	// if (browser) {
+	// 	document.addEventListener('touchstart', (e) => {
+	// 		touchstartX = e.changedTouches[0].screenX;
+	// 	});
+
+	// 	document.addEventListener('touchend', (e) => {
+	// 		touchendX = e.changedTouches[0].screenX;
+	// 		checkDirection();
+	// 	});
+	// }
 
 	const {
 		elements: { trigger, overlay, content, title, description, close, portalled },
 		states: { open }
 	} = createDialog({
 		forceVisible: true,
-		closeOnOutsideClick: false
+		closeOnOutsideClick: true
 	});
 
 	const sync = createSync({ open });
@@ -27,6 +52,7 @@
 
 	// Check if user is trying to open a dialog from the URL
 	// Maybe we should pushstate the query params so its easy to copy
+	// TODO: prevent invalid ids from breaking everything
 	onMount(async () => {
 		const open_stop_id = $page.url.searchParams.get('s');
 		const open_route_id = $page.url.searchParams.get('r');
