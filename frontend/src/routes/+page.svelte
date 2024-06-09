@@ -82,6 +82,7 @@
 	{/if}
 
 	<!-- closest stops -->
+	<!-- TODO: fix scrolling issues on mobile -->
 	<StopList bind:stop_ids title="Nearby Stops" show_location={true}>
 		<div slot="location" class="flex gap-2">
 			{#if $location_status === LocationStatus.Loading}
