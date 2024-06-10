@@ -1,2 +1,2 @@
-pub mod import;
+pub mod imports;
 pub mod trips;
