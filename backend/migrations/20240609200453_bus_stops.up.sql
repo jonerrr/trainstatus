@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS bus_route_stops (
     stop_sequence INTEGER NOT NULL,
     -- can be 1 or 0
     -- each route has two directions with separate stops
-    direction_id INTEGER NOT NULL,
+    -- maybe remove because bus_stops has it but it might be different for each route
+    direction INTEGER NOT NULL,
     PRIMARY KEY (route_id, stop_id, stop_sequence)
 );

@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM bus_stops",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "direction",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "lat",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 4,
+        "name": "lon",
+        "type_info": "Float4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2a80e92bd8eedd97d2a6a1cc3f16eac8b030da09a5f582b9f767b6604299d69a"
+}

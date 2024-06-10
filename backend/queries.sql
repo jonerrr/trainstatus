@@ -129,3 +129,21 @@ where
     )
 group by
     ae.route_id;
+
+-- Get all bus routes and their stops in order (remove where clause)
+SELECT
+    brs.route_id,
+    brs.direction,
+    array_agg(
+        bs."name"
+        ORDER BY
+            brs.stop_sequence
+    )
+FROM
+    bus_route_stops brs
+    LEFT JOIN bus_stops bs ON bs.id = brs.stop_id
+WHERE
+    route_id = 'MTA NYCT_B45'
+GROUP BY
+    brs.route_id,
+    brs.direction;

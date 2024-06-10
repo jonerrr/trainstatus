@@ -1,7 +1,6 @@
-// use crate::imports::de_str_to_i32;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
-use sqlx::{query_builder, PgPool, QueryBuilder};
+use sqlx::{PgPool, QueryBuilder};
 use std::{env::var, sync::OnceLock};
 
 // https://stackoverflow.com/a/77249700
@@ -12,12 +11,14 @@ fn api_key() -> &'static str {
 }
 
 pub async fn should_update(pool: &PgPool) -> bool {
-    true
-
-    // TODO: implement this (check for lengths below in db)
-    // [src/bus/import.rs:80:5] routes.len() = 353
-    // [src/bus/import.rs:81:5] stops.len() = 15024
-    // [src/bus/import.rs:82:5] route_stops.len() = 24690
+    let count = sqlx::query!("SELECT COUNT(*) FROM bus_route_stops as count")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .count
+        .unwrap();
+    // this is the correct route stop count
+    count != 24690
 }
 
 // id, long_name, short_name, color, route_type
@@ -126,7 +127,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     for chunk in route_stops.chunks(chunk_size) {
         let mut query_builder = QueryBuilder::new(
-            "INSERT INTO bus_route_stops (route_id, stop_id, sequence, direction)",
+            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, direction)",
         );
         query_builder.push_values(chunk, |mut b, route| {
             b.push_bind(route.0.clone())

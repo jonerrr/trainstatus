@@ -51,7 +51,10 @@ async fn main() {
             tracing::info!("Bus stuff disabled");
         }
         Err(_) => {
-            bus::import::stops_and_routes(&pool).await;
+            if bus::imports::should_update(&pool).await {
+                tracing::info!("Updating bus stops and routes");
+                bus::imports::stops_and_routes(&pool).await;
+            }
             bus::trips::import(pool.clone()).await;
         }
     }
@@ -82,6 +85,7 @@ async fn main() {
         .route("/arrivals", get(routes::stops::arrivals))
         .route("/trips", get(routes::trips::get))
         .route("/alerts", get(routes::alerts::get))
+        .route("/bus/stops", get(routes::bus::stops::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .with_state(pool);
