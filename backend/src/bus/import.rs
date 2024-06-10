@@ -107,31 +107,37 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
-    let mut query_builder =
-        QueryBuilder::new("INSERT INTO bus_stops (id, name, direction, lat, lon)");
-    query_builder.push_values(stops, |mut b, route| {
-        b.push_bind(route.0)
-            .push_bind(route.1)
-            .push_bind(route.2)
-            .push_bind(route.3)
-            .push_bind(route.4);
-    });
-    query_builder.push("ON CONFLICT DO NOTHING");
-    let query = query_builder.build();
-    query.execute(pool).await.unwrap();
+    // prevent issues with query being too big
+    let chunk_size = 1000;
+    for chunk in stops.chunks(chunk_size) {
+        let mut query_builder =
+            QueryBuilder::new("INSERT INTO bus_stops (id, name, direction, lat, lon)");
+        query_builder.push_values(chunk, |mut b, route| {
+            b.push_bind(route.0)
+                .push_bind(route.1.clone())
+                .push_bind(route.2.clone())
+                .push_bind(route.3)
+                .push_bind(route.4);
+        });
+        query_builder.push("ON CONFLICT DO NOTHING");
+        let query = query_builder.build();
+        query.execute(pool).await.unwrap();
+    }
 
-    let mut query_builder =
-        QueryBuilder::new("INSERT INTO bus_route_stops (route_id, stop_id, sequence, direction)");
-    query_builder.push_values(route_stops, |mut b, route| {
-        b.push_bind(route.0)
-            .push_bind(route.1)
-            .push_bind(route.2)
-            .push_bind(route.3);
-    });
-    query_builder.push("ON CONFLICT DO NOTHING");
-    let query = query_builder.build();
-    query.execute(pool).await.unwrap();
-
+    for chunk in route_stops.chunks(chunk_size) {
+        let mut query_builder = QueryBuilder::new(
+            "INSERT INTO bus_route_stops (route_id, stop_id, sequence, direction)",
+        );
+        query_builder.push_values(chunk, |mut b, route| {
+            b.push_bind(route.0.clone())
+                .push_bind(route.1)
+                .push_bind(route.2)
+                .push_bind(route.3);
+        });
+        query_builder.push("ON CONFLICT DO NOTHING");
+        let query = query_builder.build();
+        query.execute(pool).await.unwrap();
+    }
     tracing::info!("finished inserting bus data into db");
 }
 
