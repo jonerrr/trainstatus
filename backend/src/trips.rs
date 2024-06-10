@@ -1,4 +1,4 @@
-use crate::feed::{self};
+use crate::feed;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;

@@ -10,12 +10,12 @@ pub async fn should_update(pool: &PgPool) -> bool {
         .count
         .unwrap();
 
-    // the amount of stops that shoudl be in the database
+    // the amount of stops that should be in the database
     stop_count != 496
 }
 
 // convert strings to numbers
-fn de_str_to_int<'de, D>(deserializer: D) -> Result<i16, D::Error>
+pub fn de_str_to_i16<'de, D>(deserializer: D) -> Result<i16, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -69,7 +69,7 @@ where
 pub struct Station {
     #[serde(deserialize_with = "de_remove_prefix", rename = "routeId")]
     pub route_id: String,
-    #[serde(deserialize_with = "de_str_to_int", rename = "stopSequence")]
+    #[serde(deserialize_with = "de_str_to_i16", rename = "stopSequence")]
     pub stop_sequence: i16,
     #[serde(deserialize_with = "de_remove_prefix", rename = "stopId")]
     pub stop_id: String,
@@ -80,7 +80,7 @@ pub struct Station {
     // 2 = train stops only at late nights
     // 3 = rush hour only and runs in 1 direction
     // 4 = part time extension that runs only during rush hours
-    #[serde(deserialize_with = "de_str_to_int", rename = "stopType")]
+    #[serde(deserialize_with = "de_str_to_i16", rename = "stopType")]
     pub stop_type: i16,
     #[serde(deserialize_with = "de_ada")]
     pub ada: bool,
@@ -138,7 +138,6 @@ struct Route(String);
 struct RouteStop(String, String, i16, i16);
 
 // stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign, lat, lon
-// TODO: maybe also include lat and long of station from /nearby endpoint
 struct Stop(
     String,
     String,

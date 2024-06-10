@@ -9,3 +9,10 @@ export default {
 	},
 	plugins: [require('@tailwindcss/forms')]
 };
+
+// primary background
+// secondary background
+// primary text
+// secondary text
+// tertiary text
+// primary border

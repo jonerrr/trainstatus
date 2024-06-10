@@ -12,3 +12,13 @@ Best website to check the status of your train.
 - Shareable links for your trip
 - Works on mobile and desktop
 - No ads or tracking
+
+## Requirements
+
+- Postgres
+- Node.js
+- Pnpm
+
+## Config
+
+Set `DISABLE_BUS` env to disable all bus data collection

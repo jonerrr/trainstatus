@@ -32,8 +32,9 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+    tracing::info!("Starting trainstat.us API v{}", VERSION);
 
-    let pg_connect_option: PgConnectOptions = std::env::var("DATABASE_URL")
+    let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
         .expect("DATABASE_URL env not set")
         .parse()
         .unwrap();
@@ -45,8 +46,15 @@ async fn main() {
         .unwrap();
     sqlx::migrate!().run(&pool).await.unwrap();
 
-    // bus::import::stops_and_routes(&pool).await;
-    // bus::trips::import(pool.clone()).await;
+    match var("DISABLE_BUS") {
+        Ok(_) => {
+            tracing::info!("Bus stuff disabled");
+        }
+        Err(_) => {
+            bus::import::stops_and_routes(&pool).await;
+            bus::trips::import(pool.clone()).await;
+        }
+    }
 
     if imports::should_update(&pool).await {
         tracing::info!("Updating stops and routes");
@@ -82,5 +90,6 @@ async fn main() {
             .await
             .unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
+
     axum::serve(listener, app).await.unwrap();
 }

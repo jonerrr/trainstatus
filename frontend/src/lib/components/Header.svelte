@@ -1,19 +1,42 @@
 <script lang="ts">
+	import { Map, Bus } from 'lucide-svelte';
+	import { createSwitch, melt } from '@melt-ui/svelte';
 	import { offline } from '$lib/stores';
+
+	const {
+		elements: { root, input }
+	} = createSwitch();
 </script>
 
-<header class="text-4xl p-2 font-bold text-indigo-400 flex">
-	<div class="text-gradient">
-		<!-- TODO: test this -->
+<header class="text-4xl p-2 font-bold text-indigo-400 flex justify-between">
+	<div
+		class="font-bold"
+		style="background: linear-gradient(45deg, #e66465, #9198e5); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+	>
 		{#if $offline}
 			Trainstat<span class="animate-pulse text-red-500">.</span>us
 		{:else}
 			Trainstat.us
 		{/if}
 	</div>
-	<!-- <span class="text-zinc-600">.</span><span class={$offline ? 'text-red-600' : 'text-blue-400'}
-		>us</span
-	> -->
+	<div class="flex items-center">
+		<label
+			class="pr-2 leading-none text-indigo-600 font-semibold text-sm"
+			for="airplane-mode"
+			id="airplane-mode-label"
+		>
+			Bus mode
+		</label>
+		<button
+			use:melt={$root}
+			class="relative h-6 cursor-default rounded-full bg-neutral-800 transition-colors data-[state=checked]:bg-indigo-700"
+			id="airplane-mode"
+			aria-labelledby="airplane-mode-label"
+		>
+			<span class="thumb block rounded-full bg-white transition" />
+		</button>
+		<input use:melt={$input} />
+	</div>
 </header>
 
 <style lang="postcss">
@@ -41,5 +64,23 @@
 				background-position: var(--bg-size) 0;
 			}
 		}
+	}
+
+	/* switch css */
+	button {
+		--w: 2.75rem;
+		--padding: 0.125rem;
+		width: var(--w);
+	}
+
+	.thumb {
+		--size: 1.25rem;
+		width: var(--size);
+		height: var(--size);
+		transform: translateX(var(--padding));
+	}
+
+	:global([data-state='checked']) .thumb {
+		transform: translateX(calc(var(--w) - var(--size) - var(--padding)));
 	}
 </style>
