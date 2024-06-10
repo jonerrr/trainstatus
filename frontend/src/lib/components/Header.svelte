@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Map, Bus } from 'lucide-svelte';
 	import { createSwitch, melt } from '@melt-ui/svelte';
-	import { offline } from '$lib/stores';
+	import { persisted } from 'svelte-persisted-store';
+	import { offline, bus_mode } from '$lib/stores';
 
 	const {
 		elements: { root, input }
-	} = createSwitch();
+	} = createSwitch({ checked: bus_mode });
 </script>
 
 <header class="text-4xl p-2 font-bold text-indigo-400 flex justify-between">
