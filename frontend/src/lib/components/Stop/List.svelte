@@ -1,5 +1,4 @@
 <script lang="ts">
-	import FlexSearch from 'flexsearch';
 	import { CircleX } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { derived } from 'svelte/store';
@@ -20,15 +19,12 @@
 
 	$: stops = derived(stop_store, ($stop_store) => {
 		if (!stop_ids) return $stop_store.slice(0, 15);
-		console.log(stop_ids);
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
 			? (stop_ids.map((id) => $stop_store.find((stop) => stop.id === id)).filter(Boolean) as Stop[])
 			: $stop_store.filter((st) => stop_ids!.includes(st.id));
 		return st;
 	});
-
-	// let stops_index: FlexSearch.Index;
 
 	// from https://www.okupter.com/blog/svelte-debounce
 	const debounce = (callback: Function, wait = 50) => {
@@ -48,7 +44,6 @@
 			return;
 		}
 
-		console.log('searching');
 		search_term = e.target.value;
 		searchWorker.postMessage({ type: 'search', payload: { search_term } });
 
@@ -72,7 +67,6 @@
 		searchWorker = new SearchWorker();
 		// listen for messages
 		searchWorker.addEventListener('message', (e) => {
-			console.log(e.data);
 			const { type, payload } = e.data;
 			type === 'ready' && (search = 'ready');
 			type === 'results' && (stop_ids = payload.results);
