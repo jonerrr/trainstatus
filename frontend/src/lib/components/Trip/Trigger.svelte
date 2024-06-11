@@ -55,7 +55,7 @@
 								{stop_time.eta?.toFixed(0)}m
 							</div>
 						</div>
-						<div class="text-right text-nowrap">
+						<div class="text-right">
 							{last_stop(stop_time.trip_id).name}
 						</div>
 					</div>

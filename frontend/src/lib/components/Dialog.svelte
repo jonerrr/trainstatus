@@ -1,54 +1,61 @@
 <script lang="ts">
 	import { CircleX } from 'lucide-svelte';
-	import { createDialog, melt, createSync } from '@melt-ui/svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	// import { browser } from '$app/environment';
 	import { pushState, preloadData } from '$app/navigation';
-	import { flyAndScale } from '$lib/utils';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
 
 	// detect if user is swiping back and disable close on outside click
-	// let touchstartX = 0;
-	// let touchendX = 0;
 
-	// function checkDirection() {
-	// 	if (touchendX < touchstartX) {
-	// 		console.log('swiped left');
-	// 		// alert('swiped left!')
-	// 	}
-	// 	if (touchendX > touchstartX) {
-	// 		console.log('swiped right');
-	// 		// alert('swiped right!');
-	// 	}
-	// }
+	let dialog_el: HTMLDialogElement;
 
-	// if (browser) {
-	// 	document.addEventListener('touchstart', (e) => {
-	// 		touchstartX = e.changedTouches[0].screenX;
-	// 	});
+	function manage_dialog(node: HTMLDialogElement) {
+		console.log('managing dialog');
+		page.subscribe((p) => {
+			console.log('dialog state changed', $page.state);
+			if (p.state.dialog_open) {
+				// prevent close state issues
+				// node.close();
+				node.inert = true;
+				node.showModal();
+				node.inert = false;
+			} else {
+				node.close();
+			}
+		});
 
-	// 	document.addEventListener('touchend', (e) => {
-	// 		touchendX = e.changedTouches[0].screenX;
-	// 		checkDirection();
-	// 	});
-	// }
+		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog
+		// from here https://stackoverflow.com/a/59741870
+		const delta = 6;
+		let startX: number;
+		let startY: number;
 
-	const {
-		elements: { trigger, overlay, content, title, description, close, portalled },
-		states: { open }
-	} = createDialog({
-		forceVisible: true,
-		closeOnOutsideClick: true
-	});
+		node.addEventListener('mousedown', function (event) {
+			startX = event.pageX;
+			startY = event.pageY;
+		});
 
-	const sync = createSync({ open });
-	$: sync.open($page.state.dialog_open, ($open) => {
-		console.log('dialog opened', $open, $page.state);
-		open.set($open);
-	});
+		node.addEventListener('mouseup', function (event) {
+			const diffX = Math.abs(event.pageX - startX);
+			const diffY = Math.abs(event.pageY - startY);
+
+			if (diffX < delta && diffY < delta) {
+				// Click!
+				console.log('real click');
+				if (event.target === node) {
+					// Close the dialog
+					// node.close();
+					pushState('', {
+						dialog_open: false,
+						dialog_id: '',
+						dialog_type: ''
+					});
+				}
+			}
+		});
+	}
 
 	// Check if user is trying to open a dialog from the URL
 	// Maybe we should pushstate the query params so its easy to copy
@@ -72,37 +79,35 @@
 	});
 </script>
 
-<!-- TODO: figure out a way to prevent swiping from closing dialog on mobile -->
-{#if $open}
-	<div use:melt={$portalled}>
-		<div use:melt={$overlay} class="fixed inset-0 z-50 bg-black/50" />
-		<div
-			class="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[90vw]
-            max-w-[450px] -translate-x-1/2 -translate-y-1/2 rounded-md
-            p-6 shadow-lg bg-neutral-800 text-indigo-300"
-			transition:flyAndScale={{
-				duration: 150,
-				y: 8,
-				start: 0.96
-			}}
-			use:melt={$content}
-		>
-			{#if $page.state.dialog_type === 'stop'}
-				<StopContent stop_id={$page.state.dialog_id} />
-			{:else if $page.state.dialog_type === 'trip'}
-				<TripContent trip_id={$page.state.dialog_id} />
-			{:else if $page.state.dialog_type === 'route_alert'}
-				<RouteAlertContent route_id={$page.state.dialog_id} />
-			{/if}
+<!-- TODO: figure out transitions -->
+<dialog
+	use:manage_dialog
+	class="backdrop:bg-black/50 rounded max-h-[85vh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
+	bind:this={dialog_el}
+>
+	<div class="p-6">
+		{#if $page.state.dialog_type === 'stop'}
+			<StopContent bind:stop_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'trip'}
+			<TripContent bind:trip_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'route_alert'}
+			<RouteAlertContent bind:route_id={$page.state.dialog_id} />
+		{/if}
 
-			<button
-				use:melt={$close}
-				aria-label="Close"
-				class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
+		<button
+			on:click={() => {
+				pushState('', {
+					dialog_open: false,
+					dialog_id: '',
+					dialog_type: ''
+				});
+			}}
+			aria-label="Close dialog"
+			class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
                 appearance-none items-center justify-center rounded-full"
-			>
-				<CircleX />
-			</button>
-		</div>
+		>
+			<CircleX />
+		</button>
 	</div>
-{/if}
+	<!-- </div> -->
+</dialog>
