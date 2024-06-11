@@ -8,7 +8,8 @@ declare global {
 		interface PageState {
 			dialog_open: boolean;
 			dialog_id: string;
-			dialog_type: 'stop' | 'trip' | 'route_alert' | 'route';
+			// blank is not open
+			dialog_type: 'stop' | 'trip' | 'route_alert' | 'route' | '';
 		}
 		// interface Platform {}
 	}
