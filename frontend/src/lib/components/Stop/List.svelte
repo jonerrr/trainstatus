@@ -97,7 +97,7 @@
 			{#each $stops as stop (stop?.id)}
 				<div
 					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
-					transition:slide={{ easing: quintOut, axis: 'y' }}
+					transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 				>
 					<Trigger {stop} />
 				</div>

@@ -22,16 +22,16 @@
 	<!-- <div class="flex items-center">
 		<label
 			class="pr-2 leading-none text-indigo-600 font-semibold text-sm"
-			for="airplane-mode"
-			id="airplane-mode-label"
+			for="bus-mode"
+			id="bus-mode-label"
 		>
 			Bus mode
 		</label>
 		<button
 			use:melt={$root}
 			class="relative h-6 cursor-default rounded-full bg-neutral-800 transition-colors data-[state=checked]:bg-indigo-700"
-			id="airplane-mode"
-			aria-labelledby="airplane-mode-label"
+			id="bus-mode"
+			aria-labelledby="bus-mode-label"
 		>
 			<span class="thumb block rounded-full bg-white transition" />
 		</button>
