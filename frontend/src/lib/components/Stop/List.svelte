@@ -5,8 +5,10 @@
 	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
+	import SearchWorker from '$lib/search-worker?worker';
 	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
+
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
 
 	export let title: string = 'Stops';
@@ -18,6 +20,7 @@
 
 	$: stops = derived(stop_store, ($stop_store) => {
 		if (!stop_ids) return $stop_store.slice(0, 15);
+		console.log(stop_ids);
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
 			? (stop_ids.map((id) => $stop_store.find((stop) => stop.id === id)).filter(Boolean) as Stop[])
@@ -25,7 +28,7 @@
 		return st;
 	});
 
-	let stops_index: FlexSearch.Index;
+	// let stops_index: FlexSearch.Index;
 
 	// from https://www.okupter.com/blog/svelte-debounce
 	const debounce = (callback: Function, wait = 50) => {
@@ -45,12 +48,9 @@
 			return;
 		}
 
-		const results = stops_index.search(e.target.value);
-		// console.log(results);
-		if (results.length) {
-			// Get first 12 results
-			stop_ids = results.map((id) => id.toString()).slice(0, 12);
-		}
+		console.log('searching');
+		search_term = e.target.value;
+		searchWorker.postMessage({ type: 'search', payload: { search_term } });
 
 		// this is to make sure that the results are in view on mobile even when keyboard is open
 		list_el.scrollIntoView({ behavior: 'smooth' });
@@ -63,14 +63,22 @@
 		search_el.value = '';
 	}
 
-	onMount(() => {
-		if (show_search) {
-			stops_index = new FlexSearch.Index({ tokenize: 'forward' });
+	let search = 'loading';
+	let search_term = '';
+	let searchWorker: Worker;
 
-			$stop_store.forEach((stop) => {
-				stops_index.add(stop.id, stop.name);
-			});
-		}
+	onMount(() => {
+		// create worker
+		searchWorker = new SearchWorker();
+		// listen for messages
+		searchWorker.addEventListener('message', (e) => {
+			console.log(e.data);
+			const { type, payload } = e.data;
+			type === 'ready' && (search = 'ready');
+			type === 'results' && (stop_ids = payload.results);
+		});
+		// initialize when the component mounts
+		searchWorker.postMessage({ type: 'load', payload: { stops: $stops } });
 	});
 
 	// Prevent list from getting squished
@@ -90,7 +98,7 @@
 	</div>
 	{#if $stops}
 		<div
-			class={`flex flex-col gap-1 mt-1 ${show_search ? 'max-h-[calc(100dvh-13rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`}
+			class={`flex flex-col gap-1 ${show_search ? 'max-h-[calc(100dvh-13rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`}
 		>
 			{#each $stops as stop (stop?.id)}
 				<div

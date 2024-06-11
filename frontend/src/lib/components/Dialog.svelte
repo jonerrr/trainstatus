@@ -12,7 +12,6 @@
 	let dialog_el: HTMLDialogElement;
 
 	function manage_dialog(node: HTMLDialogElement) {
-		console.log('managing dialog');
 		page.subscribe((p) => {
 			console.log('dialog state changed', $page.state);
 			if (p.state.dialog_open) {
