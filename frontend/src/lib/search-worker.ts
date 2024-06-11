@@ -7,14 +7,10 @@ addEventListener('message', async (e) => {
 
 	if (type === 'load') {
 		// create search index
-
+		// TODO: don't fetch stops twice
 		const stops_res: Stop[] = await (await fetch('/api/stops')).json();
 
 		create_stops_index(stops_res);
-		// stops.subscribe((data) => {
-		// 	console.log('creating index', data);
-		// 	create_stops_index(data);
-		// });
 
 		postMessage({ type: 'ready' });
 	}
@@ -24,7 +20,6 @@ addEventListener('message', async (e) => {
 		const search_term = payload.search_term;
 		// search posts index
 		const results = searchPostsIndex(search_term);
-		console.log(results);
 		// send message with results
 		postMessage({ type: 'results', payload: { results } });
 	}

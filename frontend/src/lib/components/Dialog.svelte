@@ -13,10 +13,10 @@
 
 	function manage_dialog(node: HTMLDialogElement) {
 		page.subscribe((p) => {
-			console.log('dialog state changed', $page.state);
 			if (p.state.dialog_open) {
 				// prevent close state issues
 				// node.close();
+				// this prevents auto focusing on close button when opening dialog
 				node.inert = true;
 				node.showModal();
 				node.inert = false;
@@ -41,8 +41,6 @@
 			const diffY = Math.abs(event.pageY - startY);
 
 			if (diffX < delta && diffY < delta) {
-				// Click!
-				console.log('real click');
 				if (event.target === node) {
 					// Close the dialog
 					// node.close();

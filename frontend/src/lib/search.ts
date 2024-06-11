@@ -17,7 +17,6 @@ export function searchPostsIndex(search_term: string) {
 	}
 
 	const results = stops_index.search(search_term);
-	// console.log(results);
 	if (results.length) {
 		// Get first 12 results
 		// TODO: calculate how many results can be on the screen

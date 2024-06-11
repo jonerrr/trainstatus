@@ -19,7 +19,7 @@
 			Trainstat.us
 		{/if}
 	</div>
-	<div class="flex items-center">
+	<!-- <div class="flex items-center">
 		<label
 			class="pr-2 leading-none text-indigo-600 font-semibold text-sm"
 			for="airplane-mode"
@@ -36,7 +36,7 @@
 			<span class="thumb block rounded-full bg-white transition" />
 		</button>
 		<input use:melt={$input} />
-	</div>
+	</div> -->
 </header>
 
 <style lang="postcss">
