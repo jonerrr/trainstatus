@@ -114,6 +114,7 @@ export interface Stop {
 	lat: number;
 	lon: number;
 	routes: RouteStop[];
+	transfers: string[];
 }
 
 ////////////////// trip stuff

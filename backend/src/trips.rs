@@ -32,7 +32,6 @@ const FAKE_STOP_IDS: [&str; 29] = [
 struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 // TODO: remove unwraps and handle errors
-// use this error to create custom errors like "no trip id"
 
 #[derive(Error, Debug)]
 pub enum DecodeFeedError {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Share, ClipboardCheck } from 'lucide-svelte';
+	import { Share, ClipboardCheck, ArrowBigRight } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
 	import type { Trip } from '$lib/api';
 	import { stops, trips, stop_times } from '$lib/stores';
@@ -46,8 +46,10 @@
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
-		<div class="flex gap-2">
+		<div class="flex gap-2 items-center text-indigo-400">
 			<Icon width="2rem" height="2rem" name={trip.route_id} />
+
+			<ArrowBigRight />
 
 			<h2 class="font-bold text-xl text-indigo-300">
 				{last_stop_name}

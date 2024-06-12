@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
@@ -137,7 +139,7 @@ struct Route(String);
 // route_id, stop_id, stop_sequence, stop_type
 struct RouteStop(String, String, i16, i16);
 
-// stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign, lat, lon
+// stop_id, stop_name, ada, ada notes, borough, north_headsign, south_headsign, lat, lon, transfers
 struct Stop(
     String,
     String,
@@ -148,7 +150,10 @@ struct Stop(
     String,
     f32,
     f32,
+    Vec<String>,
 );
+
+// TODO: should probably split this up into smaller functions
 
 pub async fn stops_and_routes(pool: &PgPool) {
     // store the routes and their stops
@@ -244,6 +249,8 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
+    let transfers = get_transfers(pool).await;
+
     // parse stops into Stop struct for the query builder
     let stops = stations
         .par_iter()
@@ -262,13 +269,23 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 stop_data.south.clone(),
                 stop_data.lat,
                 stop_data.lon,
+                transfers
+                    .iter()
+                    .filter_map(|t| {
+                        if t.to_stop_id == s.stop_id {
+                            Some(t.from_stop_id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>(),
             )
         })
         .collect::<Vec<Stop>>();
 
     // insert all stops into the database
     let mut query_builder = QueryBuilder::new(
-        "INSERT INTO stops (id, name, ada, notes, borough, north_headsign, south_headsign, lat, lon) ",
+        "INSERT INTO stops (id, name, ada, notes, borough, north_headsign, south_headsign, lat, lon, transfers) ",
     );
     query_builder.push_values(stops, |mut b, stop| {
         b.push_bind(stop.0)
@@ -279,7 +296,8 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .push_bind(stop.5)
             .push_bind(stop.6)
             .push_bind(stop.7)
-            .push_bind(stop.8);
+            .push_bind(stop.8)
+            .push_bind(stop.9);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
@@ -297,4 +315,51 @@ pub async fn stops_and_routes(pool: &PgPool) {
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
+}
+
+#[derive(Debug, Deserialize)]
+struct Transfer {
+    from_stop_id: String,
+    to_stop_id: String,
+    // transfer_type: i16,
+    // min_transfer_time: i16,
+}
+
+// import stop transfers from static gtfs data
+pub async fn get_transfers(pool: &PgPool) -> Vec<Transfer> {
+    let gtfs = reqwest::Client::new()
+        .get("http://web.mta.info/developers/data/nyct/subway/google_transit.zip")
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+
+    let reader = Cursor::new(gtfs);
+    let mut archive = zip::ZipArchive::new(reader).unwrap();
+
+    let file = archive.by_name("transfers.txt").unwrap();
+
+    let mut rdr = csv::Reader::from_reader(file);
+    let mut transfers = rdr
+        .deserialize()
+        .collect::<Result<Vec<Transfer>, csv::Error>>()
+        .unwrap();
+    // TODO: figure out why identical station transfers are still getting added
+    dbg!(transfers.len());
+    transfers.retain(|t| t.to_stop_id != t.from_stop_id);
+    dbg!(transfers.len());
+    // keep the records that aren't the fake south ferry loop stop
+    transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
+
+    transfers
+    // let mut query_builder: QueryBuilder<sqlx::Postgres> = QueryBuilder::new("INSERT INTO transfers (from_stop_id, to_stop_id)");
+    // query_builder.push_values(transfers, |mut b, transfer| {
+    //     b.push_bind(transfer.from_stop_id)
+    //         .push_bind(transfer.to_stop_id);
+    // });
+    // query_builder.push("ON CONFLICT DO NOTHING");
+    // let query = query_builder.build();
+    // query.execute(pool).await.unwrap();
 }

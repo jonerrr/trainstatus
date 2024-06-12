@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS stops (
     north_headsign VARCHAR NOT NULL,
     south_headsign VARCHAR NOT NULL,
     lat REAL NOT NULL,
-    lon REAL NOT NULL
+    lon REAL NOT NULL,
+    transfers VARCHAR []
 );
 
 CREATE TABLE IF NOT EXISTS route_stops (

@@ -3,14 +3,17 @@
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
 	import { stops } from '$lib/stores';
-	import { Direction, StopType } from '$lib/api';
-	import { stop_times } from '$lib/stores';
-	import Icon from '$lib/components/Icon.svelte';
+	import { Direction } from '$lib/api';
 	import Trigger from '$lib/components/Trip/Trigger.svelte';
+	import Routes from '$lib/components/Stop/Routes.svelte';
+	import Transfer from '$lib/components/Stop/Transfer.svelte';
+	import { derived } from 'svelte/store';
 
 	export let stop_id: string;
 
-	const stop = $stops.find((s) => s.id === stop_id)!;
+	const stop = derived(stops, ($stops) => {
+		return $stops.find((s) => s.id === stop_id)!;
+	});
 
 	const {
 		elements: { root, list, content, trigger },
@@ -20,35 +23,31 @@
 	});
 
 	const triggers = [
-		{ id: 'northbound', title: stop.north_headsign },
-		{ id: 'southbound', title: stop.south_headsign }
+		{ id: 'northbound', title: $stop.north_headsign },
+		{ id: 'southbound', title: $stop.south_headsign }
 	];
 
 	const [send, receive] = crossfade({
 		duration: 250,
 		easing: cubicInOut
 	});
-
-	// TODO: show transfers
 </script>
 
 <div class="flex items-center gap-2 py-1">
-	<!-- TODO: differentiate between fulltime and part time routes and temporary routes for icon -->
-	<div class="flex gap-1">
-		{#each stop.routes as route (route.id)}
-			<Icon
-				class={route.stop_type === StopType.FullTime || route.stop_type === StopType.PartTime
-					? ''
-					: 'opacity-30'}
-				width="2rem"
-				height="2rem"
-				name={route.id}
-			/>
+	<Routes routes={$stop.routes} />
+
+	<h2 class="font-bold text-xl text-indigo-300">{$stop.name}</h2>
+</div>
+
+{#if $stop.transfers.length}
+	<div class="flex gap-2 pb-1 items-center">
+		<h2 class="text-lg">Transfers:</h2>
+
+		{#each $stop.transfers as stop_id}
+			<Transfer {stop_id} />
 		{/each}
 	</div>
-
-	<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
-</div>
+{/if}
 
 <div>
 	<div
@@ -75,10 +74,10 @@
 			{/each}
 		</div>
 		<div use:melt={$content('northbound')} class="bg-neutral-900/50 p-2">
-			<Trigger stop_id={stop.id} direction={Direction.North} />
+			<Trigger stop_id={$stop.id} direction={Direction.North} />
 		</div>
 		<div use:melt={$content('southbound')} class=" bg-neutral-900/50 p-2">
-			<Trigger stop_id={stop.id} direction={Direction.South} />
+			<Trigger stop_id={$stop.id} direction={Direction.South} />
 		</div>
 	</div>
 </div>

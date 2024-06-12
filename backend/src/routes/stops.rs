@@ -22,6 +22,7 @@ pub struct Stop {
     pub south_headsign: String,
     pub lat: f32,
     pub lon: f32,
+    pub transfers: Option<Vec<String>>,
     // vector of trip structs
     // pub trips: Option<Vec<JsonValue>>,
 }

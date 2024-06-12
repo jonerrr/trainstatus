@@ -59,9 +59,12 @@ async fn main() {
         }
     }
 
+    // imports::transfers(&pool).await;
     if imports::should_update(&pool).await {
         tracing::info!("Updating stops and routes");
         imports::stops_and_routes(&pool).await;
+        tracing::info!("Updating transfers");
+        // imports::transfers(&pool).await;
     }
 
     trips::import(pool.clone()).await;
