@@ -11,7 +11,7 @@ Best website to check the status of your train.
 - Shallow routing between dialogs so you never lose your place
 - Shareable links for your trip
 - Works on mobile and desktop
-- No ads or tracking
+- No ads or tracking (your geolocation data never leaves your device)
 
 ## Requirements
 
