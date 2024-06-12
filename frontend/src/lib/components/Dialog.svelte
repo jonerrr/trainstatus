@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
+	import { all_route_ids } from '$lib/api';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
@@ -56,22 +57,37 @@
 
 	// Check if user is trying to open a dialog from the URL
 	// Maybe we should pushstate the query params so its easy to copy
-	// TODO: prevent invalid ids from breaking everything
 	onMount(async () => {
-		const open_stop_id = $page.url.searchParams.get('s');
-		const open_route_id = $page.url.searchParams.get('r');
-		const open_trip_id = $page.url.searchParams.get('t');
+		const open_stop_id = $page.url.searchParams.get('s')?.toUpperCase();
+		const open_route_id = $page.url.searchParams.get('r')?.toUpperCase();
+		const open_trip_id = $page.url.searchParams.get('t')?.toUpperCase();
 
 		if (open_stop_id) {
 			// Make sure data is loaded in before opening dialog otherwise we get an error
 			await preloadData('/');
-			pushState('', { dialog_open: true, dialog_id: open_stop_id, dialog_type: 'stop' });
+			pushState('', {
+				dialog_open: true,
+				dialog_id: open_stop_id,
+				dialog_type: 'stop'
+			});
 		} else if (open_route_id) {
-			await preloadData('/');
-			pushState('', { dialog_open: true, dialog_id: open_route_id, dialog_type: 'route_alert' });
+			if (all_route_ids.includes(open_route_id)) {
+				await preloadData('/');
+				pushState('', {
+					dialog_open: true,
+					dialog_id: open_route_id,
+					dialog_type: 'route_alert'
+				});
+			} else {
+				console.error('invalid route id');
+			}
 		} else if (open_trip_id) {
 			await preloadData('/');
-			pushState('', { dialog_open: true, dialog_id: open_trip_id, dialog_type: 'trip' });
+			pushState('', {
+				dialog_open: true,
+				dialog_id: open_trip_id,
+				dialog_type: 'trip'
+			});
 		}
 	});
 </script>

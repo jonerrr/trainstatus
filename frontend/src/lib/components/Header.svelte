@@ -11,7 +11,7 @@
 <header class="text-4xl p-2 font-bold text-indigo-400 flex justify-between">
 	<div
 		class="font-bold"
-		style="background: linear-gradient(45deg, #e66465, #9198e5); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
+		style="background: linear-gradient(45deg, #c026d3, #4338ca); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
 	>
 		{#if $offline}
 			Trainstat<span class="animate-pulse text-red-500">.</span>us
@@ -19,13 +19,13 @@
 			Trainstat.us
 		{/if}
 	</div>
-	<!-- <div class="flex items-center">
+	<div class="flex items-center">
 		<label
 			class="pr-2 leading-none text-indigo-600 font-semibold text-sm"
 			for="bus-mode"
 			id="bus-mode-label"
 		>
-			Bus mode
+			Bus mode <span class="text-xs text-neutral-500">(soon)</span>
 		</label>
 		<button
 			use:melt={$root}
@@ -36,7 +36,7 @@
 			<span class="thumb block rounded-full bg-white transition" />
 		</button>
 		<input use:melt={$input} />
-	</div> -->
+	</div>
 </header>
 
 <style lang="postcss">

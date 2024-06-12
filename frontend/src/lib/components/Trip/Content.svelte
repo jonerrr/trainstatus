@@ -8,13 +8,14 @@
 
 	export let trip_id: string;
 
-	const trip: Trip = $trips.find((t) => t.id === trip_id)!;
+	const trip = $trips.find((t) => t.id === trip_id);
 
 	$: trip_stop_times = $stop_times.filter((st) => st.trip_id === trip_id);
 
-	$: last_stop_name = $stops.find(
-		(s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id
-	)!.name;
+	const last_stop = derived(stops, ($stops) => {
+		if (!trip_stop_times) return undefined;
+		return $stops.find((s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id);
+	});
 
 	let copied = false;
 
@@ -31,7 +32,7 @@
 			navigator.share({
 				// TODO: maybe include next stop and route name
 				// TODO: custom embeds
-				title: `View my subway trip`,
+				title: `View my trip to ${$last_stop?.name}`,
 				url
 			});
 		}
@@ -47,13 +48,17 @@
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
 		<div class="flex gap-2 items-center text-indigo-400">
-			<Icon width="2rem" height="2rem" name={trip.route_id} />
+			{#if trip && $last_stop}
+				<Icon width="2rem" height="2rem" name={trip.route_id} />
 
-			<ArrowBigRight />
+				<ArrowBigRight />
 
-			<h2 class="font-bold text-xl text-indigo-300">
-				{last_stop_name}
-			</h2>
+				<h2 class="font-bold text-xl text-indigo-300">
+					{$last_stop.name}
+				</h2>
+			{:else}
+				<h1>Trip not found</h1>
+			{/if}
 		</div>
 
 		<div class="pr-2">
@@ -69,7 +74,6 @@
 		</div>
 	</div>
 
-	<!-- TODO: figure out why the train times are not changing the stop name on update -->
 	{#if trip_stop_times.length}
 		<div class="max-h-full">
 			{#each trip_stop_times as stop_time}

@@ -1,13 +1,6 @@
-import FlexSearch from 'flexsearch';
-import { writable, type Writable } from 'svelte/store';
+import { type Writable } from 'svelte/store';
 import { offline } from '$lib/stores';
 import icons from '$lib/icons';
-
-// export const trip_store = writable<Trip[]>([]);
-// export const stop_time_store = writable<StopTime[]>([]);
-// export const alert_store = writable<Alert[]>([]);
-
-export let stopsIndex: FlexSearch.Index;
 
 const train_regex = /(\[(.+?)\])/gm;
 export function parse_html(html: string) {
@@ -82,6 +75,35 @@ export async function init_data(
 		console.error(e);
 	}
 }
+
+export const all_route_ids = [
+	'1',
+	'2',
+	'3',
+	'4',
+	'5',
+	'6',
+	'7',
+	'A',
+	'C',
+	'E',
+	'B',
+	'D',
+	'F',
+	'M',
+	'G',
+	'J',
+	'Z',
+	'L',
+	'N',
+	'Q',
+	'R',
+	'W',
+	'H',
+	'FS',
+	'GS',
+	'SI'
+];
 
 ////////////// stop stuff
 
