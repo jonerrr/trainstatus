@@ -12,15 +12,19 @@
 
 	$: trip_stop_times = $stop_times.filter((st) => st.trip_id === trip_id);
 
-	const last_stop = derived(stops, ($stops) => {
-		if (!trip_stop_times) return undefined;
-		return $stops.find((s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id);
-	});
+	// const last_stop = derived(stops, ($stops) => {
+	// 	if (!trip_stop_times) return undefined;
+	// 	return $stops.find((s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id);
+	// });
+	$: last_stop = trip_stop_times
+		? $stops.find((s) => s.id === trip_stop_times[trip_stop_times.length - 1].stop_id)
+		: undefined;
 
 	let copied = false;
 
 	function share() {
 		let url = window.location.origin + `/?t=${trip_id}`;
+
 		if (!navigator.share) {
 			navigator.clipboard.writeText(url);
 			// set copied to true and change back in 500 ms
@@ -32,7 +36,7 @@
 			navigator.share({
 				// TODO: maybe include next stop and route name
 				// TODO: custom embeds
-				title: `View my trip to ${$last_stop?.name}`,
+				title: `View my trip to ${last_stop?.name}`,
 				url
 			});
 		}
@@ -48,13 +52,13 @@
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
 		<div class="flex gap-2 items-center text-indigo-400">
-			{#if trip && $last_stop}
+			{#if trip && last_stop}
 				<Icon width="2rem" height="2rem" name={trip.route_id} />
 
 				<ArrowBigRight />
 
 				<h2 class="font-bold text-xl text-indigo-300">
-					{$last_stop.name}
+					{last_stop.name}
 				</h2>
 			{:else}
 				<h1>Trip not found</h1>
