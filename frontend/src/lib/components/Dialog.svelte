@@ -13,6 +13,7 @@
 
 	function manage_dialog(node: HTMLDialogElement) {
 		page.subscribe((p) => {
+			console.log(p);
 			if (p.state.dialog_open) {
 				// prevent close state issues
 				// node.close();
@@ -43,7 +44,6 @@
 			if (diffX < delta && diffY < delta) {
 				if (event.target === node) {
 					// Close the dialog
-					// node.close();
 					pushState('', {
 						dialog_open: false,
 						dialog_id: '',
@@ -82,29 +82,31 @@
 	class="backdrop:bg-black/50 rounded max-h-[85vh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
 	bind:this={dialog_el}
 >
-	<div class="p-6">
-		{#if $page.state.dialog_type === 'stop'}
-			<StopContent bind:stop_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'trip'}
-			<TripContent bind:trip_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'route_alert'}
-			<RouteAlertContent bind:route_id={$page.state.dialog_id} />
-		{/if}
+	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
+	{#key $page.state.dialog_id}
+		<div class="p-6">
+			{#if $page.state.dialog_type === 'stop'}
+				<StopContent bind:stop_id={$page.state.dialog_id} />
+			{:else if $page.state.dialog_type === 'trip'}
+				<TripContent bind:trip_id={$page.state.dialog_id} />
+			{:else if $page.state.dialog_type === 'route_alert'}
+				<RouteAlertContent bind:route_id={$page.state.dialog_id} />
+			{/if}
 
-		<button
-			on:click={() => {
-				pushState('', {
-					dialog_open: false,
-					dialog_id: '',
-					dialog_type: ''
-				});
-			}}
-			aria-label="Close dialog"
-			class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
+			<button
+				on:click={() => {
+					pushState('', {
+						dialog_open: false,
+						dialog_id: '',
+						dialog_type: ''
+					});
+				}}
+				aria-label="Close dialog"
+				class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
                 appearance-none items-center justify-center rounded-full"
-		>
-			<CircleX />
-		</button>
-	</div>
-	<!-- </div> -->
+			>
+				<CircleX />
+			</button>
+		</div>
+	{/key}
 </dialog>

@@ -259,7 +259,7 @@ pub struct StopData {
     #[serde(deserialize_with = "de_str_to_i32")]
     code: i32,
     direction: String,
-    id: String,
+    // id: String,
     lat: f32,
     lon: f32,
     name: String,

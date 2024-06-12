@@ -20,6 +20,8 @@ export const pinned_routes = persisted('pinned_routes', ['J']);
 // which of the pin lists have accordion open
 // export const expanded_pinned = persisted('expanded_pinned', ['routes']);
 export const pinned_stops = persisted('pinned_stops', ['631']);
+// the amount of elements to show in pinned routes list before scroll is required
+// export const pinned_routes_shown = persisted('pinned_routes_shown', 1);
 export const location_status = persisted<LocationStatus>(
 	'location_status',
 	LocationStatus.NeverAsked
