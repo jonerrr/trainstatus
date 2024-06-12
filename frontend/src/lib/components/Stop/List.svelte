@@ -4,7 +4,7 @@
 	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
-	import SearchWorker from '$lib/search-worker?worker';
+	import SearchWorker from '$lib/search_worker?worker';
 	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
 	import Trigger from '$lib/components/Stop/Trigger.svelte';

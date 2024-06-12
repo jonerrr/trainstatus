@@ -1,45 +1,16 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
-	import Trigger from '$lib/components/RouteAlert/Trigger.svelte';
 	import { derived, writable } from 'svelte/store';
+	import { all_route_ids } from '$lib/api';
+	import Trigger from '$lib/components/RouteAlert/Trigger.svelte';
 
 	export let route_ids: string[] = [];
 	export let title: string = 'Alerts';
 	export let expand: boolean = true;
 	// export let accordion: boolean = false;
 
-	// for if no route ids are supplied
-	const all_routes_ids = [
-		'1',
-		'2',
-		'3',
-		'4',
-		'5',
-		'6',
-		'7',
-		'A',
-		'C',
-		'E',
-		'B',
-		'D',
-		'F',
-		'M',
-		'G',
-		'J',
-		'Z',
-		'L',
-		'N',
-		'Q',
-		'R',
-		'W',
-		'H',
-		'FS',
-		'GS',
-		'SI'
-	];
-
-	if (!route_ids.length) route_ids = all_routes_ids;
+	if (!route_ids.length) route_ids = all_route_ids;
 
 	// calculate height of list
 	// let item_heights: number[] = [];

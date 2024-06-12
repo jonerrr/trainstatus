@@ -5,12 +5,11 @@
 	export let stop_id: string;
 
 	const stop = $stops.find((s) => s.id === stop_id)!;
-	console.log(stop_id);
 </script>
 
 <button
 	on:click={() => pushState('', { dialog_id: stop_id, dialog_open: true, dialog_type: 'stop' })}
-	class="flex rounded gap-1 border border-indigo-700 bg-indigo-800"
+	class="flex rounded gap-1 border border-neutral-700 bg-neutral-900 shadow-2xl"
 >
 	<Routes routes={stop.routes} />
 </button>

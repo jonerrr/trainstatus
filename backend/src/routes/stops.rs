@@ -4,11 +4,9 @@ use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
 use http::HeaderMap;
-// use chrono::Utc;
 use serde::Serialize;
 use sqlx::types::JsonValue;
 use sqlx::{FromRow, PgPool};
-// use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
 pub struct Stop {
