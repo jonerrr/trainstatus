@@ -3,6 +3,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { derived, writable } from 'svelte/store';
 	import { all_route_ids } from '$lib/api';
+	import List from '$lib/components/List.svelte';
 	import Trigger from '$lib/components/RouteAlert/Trigger.svelte';
 
 	export let route_ids: string[] = [];
@@ -21,21 +22,22 @@
 	// 		item_heights = item_heights.slice(0, route_ids.length);
 	// 	}
 	// }
-	const min_h = derived(item_heights, ($item_heights) => {
-		const h = $item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
-		if (h < 30) return 30;
-		else return h;
-	});
-	$: console.log($min_h);
+	// const min_h = derived(item_heights, ($item_heights) => {
+	// 	const h = $item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
+	// 	if (h < 30) return 30;
+	// 	else return h;
+	// });
+	// $: console.log($min_h);
 
 	// $: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
 </script>
 
 <!-- TODO: allow user to customize list length or add buttom to add /subtract shown pinned routes -->
-<div
+<!-- <div
 	style={!expand ? `min-height: ${40 + $min_h}px; max-height: ${40 + $min_h}px;` : ''}
 	class={`overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[calc(100dvh-8rem)]`}
->
+> -->
+<List bind:expand class="max-h-[calc(100dvh-8rem)]">
 	<div class="flex text-lg justify-between self-center w-full">
 		<div class="font-semibold text-indigo-300">{title}</div>
 	</div>
@@ -50,4 +52,5 @@
 			</div>
 		{/each}
 	</div>
-</div>
+</List>
+<!-- </div> -->

@@ -20,6 +20,7 @@
 			});
 		return route_alerts;
 	});
+	console.log($route_alerts);
 
 	function fix_swiper({ detail }: { detail: [Swiper] }) {
 		console.log('fixing swiper');

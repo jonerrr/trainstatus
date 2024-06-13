@@ -41,7 +41,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     // TODO: test not converting to tuple and just using the struct
     for route in &all_routes {
-        tracing::info!("fetching route {}", route.id);
+        tracing::debug!("fetching route {}", route.id);
 
         routes.push(Route(
             route.id.clone(),
@@ -89,9 +89,9 @@ pub async fn stops_and_routes(pool: &PgPool) {
     stops.sort_by(|a, b| a.0.cmp(&b.0));
     stops.dedup_by(|a, b| a.0 == b.0);
 
-    dbg!(routes.len());
-    dbg!(stops.len());
-    dbg!(route_stops.len());
+    // dbg!(routes.len());
+    // dbg!(stops.len());
+    // dbg!(route_stops.len());
 
     // insert routes into db
 
