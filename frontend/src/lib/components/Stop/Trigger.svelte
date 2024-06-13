@@ -19,43 +19,45 @@
 	$: route_ids = Array.from(new Set([...base_routes, ...other_routes]));
 </script>
 
-<button
-	class="w-full flex justify-between items-center py-1"
-	on:click={() => {
-		pushState('', {
-			dialog_id: stop.id,
-			dialog_type: 'stop',
-			dialog_open: true
-		});
-	}}
->
-	<div class="w-[25%] grow-0 font-semibold text-indigo-200">
-		{stop.name}
-	</div>
+<div class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1">
+	<button
+		class="w-full flex justify-between items-center py-1"
+		on:click={() => {
+			pushState('', {
+				dialog_id: stop.id,
+				dialog_type: 'stop',
+				dialog_open: true
+			});
+		}}
+	>
+		<div class="w-[25%] grow-0 font-semibold text-indigo-200">
+			{stop.name}
+		</div>
 
-	<div class="flex flex-col w-[30%] mt-auto">
-		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
-			{stop.north_headsign}
+		<div class="flex flex-col w-[30%] mt-auto">
+			<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
+				{stop.north_headsign}
+			</div>
+			<div class="flex flex-col gap-1">
+				{#each route_ids as route_id}
+					<Arrivals {route_id} stop_id={stop.id} direction={Direction.North} />
+				{/each}
+			</div>
 		</div>
-		<div class="flex flex-col gap-1">
-			{#each route_ids as route_id}
-				<Arrivals {route_id} stop_id={stop.id} direction={Direction.North} />
-			{/each}
-		</div>
-	</div>
 
-	<div class="flex flex-col w-[30%] mt-auto">
-		<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
-			{stop.south_headsign}
+		<div class="flex flex-col w-[30%] mt-auto">
+			<div class="text-xs text-indigo-200 text-wrap text-left pb-1">
+				{stop.south_headsign}
+			</div>
+			<div class="flex flex-col gap-1">
+				{#each route_ids as route_id}
+					<Arrivals {route_id} stop_id={stop.id} direction={Direction.South} />
+				{/each}
+			</div>
 		</div>
-		<div class="flex flex-col gap-1">
-			{#each route_ids as route_id}
-				<Arrivals {route_id} stop_id={stop.id} direction={Direction.South} />
-			{/each}
-		</div>
-	</div>
 
-	<div>
-		<Pin item_id={stop.id} store={pinned_stops} />
-	</div>
-</button>
+		<div>
+			<Pin item_id={stop.id} store={pinned_stops} />
+		</div>
+	</button>
+</div>

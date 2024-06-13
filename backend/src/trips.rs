@@ -217,6 +217,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             // timezone is America/New_York (UTC -4) according to the agency.txt file in the static gtfs data
             let tz = chrono_tz::America::New_York;
 
+            // maybe don't unwrap
             let start_timestamp =
                 NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
                     .unwrap()

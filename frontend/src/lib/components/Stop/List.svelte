@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX } from 'lucide-svelte';
+	import { BusFront, CircleX, TrainFront, TramFront } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { derived } from 'svelte/store';
 	import { slide } from 'svelte/transition';
@@ -9,9 +9,28 @@
 	import { stops as stop_store } from '$lib/stores';
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
 	import List from '$lib/components/List.svelte';
+	// import ModeSwitch from '$lib/components/ModeSwitch.svelte';
+	import { createTabs, melt } from '@melt-ui/svelte';
+	// import { cubicInOut } from 'svelte/easing';
+	// import { crossfade } from 'svelte/transition';
+
+	const {
+		elements: { root, list, content, trigger },
+		states: { value }
+	} = createTabs({
+		defaultValue: 'Train'
+	});
+
+	// const triggers = ['Train', 'Bus'];
+
+	// const [send, receive] = crossfade({
+	// 	duration: 250,
+	// 	easing: cubicInOut
+	// });
 
 	export let title: string = 'Stops';
 	export let stop_ids: string[] | null = [];
+	export let bus_stop_ids: string[] | null = [];
 	// show search bar on bottom
 	export let show_search: boolean = false;
 	// show ask for location button
@@ -79,84 +98,89 @@
 					list_el.scrollIntoView();
 				}
 			}
-			// type === 'ready' && (search = 'ready');
-			// type === 'results' && (stop_ids = payload.results);
 		});
 		// initialize when the component mounts
 		searchWorker.postMessage({ type: 'load', payload: { stops: $stops } });
 	});
 
 	// calculate height of list
-	const item_heights: number[] = [];
-	$: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
+	// const item_heights: number[] = [];
+	// $: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
+	$: min_h = 50;
 </script>
 
-<!-- <div
-	bind:this={list_el}
-	style={!expand ? `min-height: ${40 + min_h}px; max-height: ${40 + min_h}px;` : ''}
-	class={`relative text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1  overflow-auto`}
-> -->
-<List bind:expand bind:min_h bind:this={list_el} class="">
-	<div class="flex gap-2 pointer-events-auto pb-1">
-		<div class="font-semibold text-lg text-indigo-300">{title}</div>
+<List bind:expand bind:min_h bind:this={list_el}>
+	<div
+		use:melt={$root}
+		class="flex border border-neutral-800 flex-col rounded-xl shadow-lg data-[orientation=vertical]:flex-row"
+	>
+		<div class="flex gap-2 pointer-events-auto pb-1">
+			<div class="font-semibold text-lg text-indigo-300">{title}</div>
 
-		{#if show_location}
-			<slot name="location" />
-		{/if}
-		<!-- <div class="flex gap-4 rounded">
-			<button
-				on:click={() => {
-					console.log($pinned_routes_shown);
-					if ($pinned_routes_shown > 1) $pinned_routes_shown--;
-				}}>-</button
+			{#if show_location}
+				<slot name="location" />
+			{/if}
+
+			<div
+				use:melt={$list}
+				class="grid grid-cols-2 bg-neutral-900 rounded shrink-0 overflow-x-auto text-indigo-100 border border-neutral-500"
+				aria-label="List"
 			>
-			<button
-				on:click={() => {
-					console.log($pinned_routes_shown);
-					$pinned_routes_shown++;
-				}}>+</button
-			>
-		</div> -->
-	</div>
-	{#if $stops}
+				<button
+					use:melt={$trigger('Train')}
+					class="trigger px-2 rounded-l relative border-neutral-400 border-r data-[state=active]:bg-indigo-800"
+				>
+					<TrainFront />
+				</button>
+				<button
+					use:melt={$trigger('Bus')}
+					class="px-2 trigger rounded-r relative border-neutral-400 border-l data-[state=active]:bg-indigo-800"
+				>
+					<BusFront />
+				</button>
+			</div>
+		</div>
 		<div
 			class={`flex flex-col gap-1 ${show_search ? 'max-h-[calc(100dvh-13rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`}
 		>
-			<!-- TODO: figure out a way to make list length only 3 of these divs long -->
-			{#each $stops as stop, i (stop?.id)}
+			{#if $value === 'Train'}
+				{#if $stops}
+					<!-- TODO: figure out a way to make list length only 3 rows long (maybe get innerheight from trigger component and put in writable) -->
+					{#each $stops as stop (stop?.id)}
+						<Trigger {stop} />
+					{/each}
+				{/if}
+			{:else if $value === 'Bus'}
 				<div
-					bind:offsetHeight={item_heights[i]}
 					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
 					transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 				>
-					<Trigger {stop} />
+					Coming Soon
 				</div>
-			{/each}
+			{/if}
 		</div>
-	{/if}
 
-	<!-- TODO: prevent virtual keyboard from blocking results (use window.visualViewport.height to calculate max height of stops list or virtual keyboard api whenever that comes out) -->
-	{#if show_search}
-		<div class="relative">
-			<input
-				bind:this={search_el}
-				on:input={debounce(searchStops)}
-				type="search"
-				placeholder="Search stops"
-				class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-			/>
-			<button
-				aria-label="Clear search"
-				class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
-				on:click={clearSearch}
-			>
-				<CircleX />
-			</button>
-		</div>
-	{/if}
+		<!-- TODO: prevent virtual keyboard from blocking results (use window.visualViewport.height to calculate max height of stops list or virtual keyboard api whenever that comes out) -->
+		{#if show_search}
+			<div class="relative">
+				<input
+					bind:this={search_el}
+					on:input={debounce(searchStops)}
+					type="search"
+					placeholder="Search stops"
+					class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				/>
+				<button
+					aria-label="Clear search"
+					class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
+					on:click={clearSearch}
+				>
+					<CircleX />
+				</button>
+			</div>
+		{/if}
+	</div>
 </List>
-
-<!-- </div> -->
 
 <style lang="postcss">
 	.search-stops {
