@@ -32,6 +32,8 @@
 			// swiper.slideReset();
 		}, 500);
 	}
+
+	// TODO: show route map after alerts
 </script>
 
 <!-- TODO: fix swiper slides breaking for certain alerts (i think i need to somehow update the component) -->

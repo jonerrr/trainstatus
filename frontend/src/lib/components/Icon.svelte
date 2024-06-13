@@ -4,6 +4,7 @@
 	export let name: string;
 	export let width = '1rem';
 	export let height = '1rem';
+	export let opacity: 'none' | 'half' | 'full' = 'none';
 
 	let icon = icons.find((i) => i.name === name)!;
 </script>

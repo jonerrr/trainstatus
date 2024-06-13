@@ -1,3 +1,4 @@
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
@@ -38,11 +39,31 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let mut route_stops: Vec<RouteStop> = Vec::new();
 
     let all_routes = AgencyRoute::get_all().await;
+    let pb = ProgressBar::new(all_routes.len() as u64);
 
-    // TODO: test not converting to tuple and just using the struct
-    for route in &all_routes {
-        tracing::debug!("fetching route {}", route.id);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} {bar:40.cyan/blue} {pos:>7}/{len:7} {elapsed_precise}")
+            .unwrap(),
+    );
 
+    // TODO: dont convert to tuple and just use struct
+    for mut route in all_routes.into_iter() {
+        // get the stops for the route
+        let r_stops = RouteStops::get(&route.id).await;
+
+        route.id = route
+            .id
+            .split_once('_')
+            .map(|(_, id)| id)
+            .unwrap()
+            .to_owned();
+
+        // tracing::debug!("fetched route {}", route.id);
+        pb.set_prefix(format!("Processing route {}", &route.id));
+        pb.inc(1);
+
+        // add routes to the routes vector that gets inserted to db
         routes.push(Route(
             route.id.clone(),
             route.long_name.clone(),
@@ -51,11 +72,11 @@ pub async fn stops_and_routes(pool: &PgPool) {
             route.route_type,
         ));
 
-        let r_stops = RouteStops::get(&route.id).await;
-        if !r_stops.entry.stop_groupings[0].ordered {
-            tracing::warn!("stops for Route {} are not ordered", route.id);
-            continue;
-        }
+        // they are always ordered
+        // if !r_stops.entry.stop_groupings[0].ordered {
+        //     tracing::warn!("stops for Route {} are not ordered", route.id);
+        //     continue;
+        // }
 
         // add stops to the stops vector
         let stops_n = r_stops
@@ -71,13 +92,13 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .stop_groups
             .par_iter()
             .map(|rs| {
-                let route_id = route.id.clone();
+                let route_id = &route.id;
 
                 rs.stop_ids
                     .par_iter()
                     .enumerate()
                     .map(move |(sequence, stop_id)| {
-                        RouteStop(route_id.clone(), *stop_id, sequence as i32, rs.id)
+                        RouteStop(route_id.to_owned(), *stop_id, sequence as i32, rs.id)
                     })
                     .collect::<Vec<_>>()
             })
@@ -89,6 +110,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     stops.sort_by(|a, b| a.0.cmp(&b.0));
     stops.dedup_by(|a, b| a.0 == b.0);
 
+    pb.finish_with_message("done");
     // dbg!(routes.len());
     // dbg!(stops.len());
     // dbg!(route_stops.len());
@@ -210,7 +232,8 @@ pub struct StopGrouping {
     stop_groups: Vec<StopGroup>,
 }
 
-fn de_stop_id<'de, D>(deserializer: D) -> Result<Vec<i32>, D::Error>
+// get stop/route id by splitting by _
+fn de_get_id<'de, D>(deserializer: D) -> Result<Vec<i32>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -232,7 +255,7 @@ pub struct StopGroup {
     #[serde(deserialize_with = "de_str_to_i32")]
     id: i32,
     name: StopName,
-    #[serde(rename = "stopIds", deserialize_with = "de_stop_id")]
+    #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
 }
 

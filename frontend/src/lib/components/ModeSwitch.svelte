@@ -7,10 +7,10 @@
 		elements: { root, list, content, trigger },
 		states: { value }
 	} = createTabs({
-		defaultValue: 'Trains'
+		defaultValue: 'Train'
 	});
 
-	const triggers = ['Trains', 'Buses'];
+	const triggers = ['Train', 'Bus'];
 
 	const [send, receive] = crossfade({
 		duration: 250,
@@ -26,7 +26,7 @@
 		use:melt={$list}
 		class="flex shrink-0 overflow-x-auto text-indigo-100
 data-[orientation=vertical]:flex-col data-[orientation=vertical]:border-r"
-		aria-label="Trip information"
+		aria-label="List"
 	>
 		{#each triggers as triggerItem}
 			<button use:melt={$trigger(triggerItem)} class="trigger relative">

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { createSwitch, melt } from '@melt-ui/svelte';
-	import { persisted } from 'svelte-persisted-store';
 	import { offline, bus_mode } from '$lib/stores';
 
 	const {
@@ -14,7 +13,7 @@
 		style="background: linear-gradient(45deg, #c026d3, #4338ca); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
 	>
 		{#if $offline}
-			Trainstat<span class="animate-pulse text-red-500">.</span>us
+			Trainstat<span class="animate-pulse text-red-500 bg-none">.</span>us
 		{:else}
 			Trainstat.us
 		{/if}

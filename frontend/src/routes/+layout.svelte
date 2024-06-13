@@ -13,13 +13,22 @@
 
 	let interval: number;
 
-	onMount(async () => {
-		if ($bus_mode) {
+	// TODO: maybe always load bus stops
+	bus_mode.subscribe(async (val) => {
+		if (val) {
 			console.log('bus mode enabled');
 			const bus_res: BusStop[] = await (await fetch('/api/bus/stops')).json();
 			bus_stops.set(bus_res);
-			console.log($bus_stops);
 		}
+	});
+
+	onMount(async () => {
+		// if ($bus_mode) {
+		// 	console.log('bus mode enabled');
+		// 	const bus_res: BusStop[] = await (await fetch('/api/bus/stops')).json();
+		// 	bus_stops.set(bus_res);
+		// 	console.log($bus_stops);
+		// }
 
 		interval = setInterval(async () => {
 			await init_data(fetch, trips, stop_times, alerts);
