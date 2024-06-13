@@ -8,6 +8,7 @@
 	import { type Stop } from '$lib/api';
 	import { stops as stop_store } from '$lib/stores';
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
+	import List from '$lib/components/List.svelte';
 
 	export let title: string = 'Stops';
 	export let stop_ids: string[] | null = [];
@@ -37,7 +38,7 @@
 		};
 	};
 
-	let list_el: HTMLDivElement;
+	let list_el: List;
 	function searchStops(e: any) {
 		// If search is empty, clear search and show all stops
 		if (e.target.value === '') {
@@ -75,7 +76,7 @@
 			if (type === 'results') {
 				stop_ids = payload.results;
 				if (payload.results.length < 6) {
-					list_el.scrollIntoView({ behavior: 'smooth' });
+					list_el.scrollIntoView();
 				}
 			}
 			// type === 'ready' && (search = 'ready');
@@ -90,11 +91,12 @@
 	$: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
 </script>
 
-<div
+<!-- <div
 	bind:this={list_el}
 	style={!expand ? `min-height: ${40 + min_h}px; max-height: ${40 + min_h}px;` : ''}
 	class={`relative text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1  overflow-auto`}
->
+> -->
+<List bind:expand bind:min_h bind:this={list_el} class="">
 	<div class="flex gap-2 pointer-events-auto pb-1">
 		<div class="font-semibold text-lg text-indigo-300">{title}</div>
 
@@ -152,7 +154,9 @@
 			</button>
 		</div>
 	{/if}
-</div>
+</List>
+
+<!-- </div> -->
 
 <style lang="postcss">
 	.search-stops {

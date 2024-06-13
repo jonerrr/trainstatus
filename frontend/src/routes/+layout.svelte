@@ -4,7 +4,8 @@
 	import { register } from 'swiper/element/bundle';
 	import { onDestroy, onMount } from 'svelte';
 	import { init_data } from '$lib/api';
-	import { trips, stop_times, alerts } from '$lib/stores';
+	import { trips, stop_times, alerts, bus_mode, bus_stops } from '$lib/stores';
+	import type { BusStop } from '$lib/bus_api';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
@@ -12,9 +13,16 @@
 
 	let interval: number;
 
-	onMount(() => {
-		interval = setInterval(() => {
-			init_data(fetch, trips, stop_times, alerts);
+	onMount(async () => {
+		if ($bus_mode) {
+			console.log('bus mode enabled');
+			const bus_res: BusStop[] = await (await fetch('/api/bus/stops')).json();
+			bus_stops.set(bus_res);
+			console.log($bus_stops);
+		}
+
+		interval = setInterval(async () => {
+			await init_data(fetch, trips, stop_times, alerts);
 		}, 10000);
 	});
 

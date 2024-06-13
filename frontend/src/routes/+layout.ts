@@ -1,4 +1,4 @@
-import { init_data, parse_html, type Alert, type Stop, type StopTime, type Trip } from '$lib/api';
+import { init_data, type Stop } from '$lib/api';
 import { stops, trips, stop_times, alerts } from '$lib/stores';
 import type { LayoutLoad } from './$types';
 
