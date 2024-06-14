@@ -221,12 +221,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
     //                 .and_local_timezone(tz)
     //                 .unwrap();
     //         // convert to utc
-    //         let start_timestamp = start_timestamp.to_utc();
-    //         let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
-
-    //         let stop_updates = trip_update
-    //             .stop_time_update
-    //             .par_iter()
+    //         let start_timestamp = stmta_trip_id
     //             .filter_map(|stop_time| {
     //                 let mut stop_id = stop_time.stop_id.as_ref().unwrap().to_owned();
 
@@ -296,7 +291,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
     //         // not sure if we should upsert on conflict yet
     //         sqlx::query!(
     //             r#"
-    //             INSERT INTO trips (id, mta_trip_id, train_id, route_id, created_at, assigned, direction)
+    //             INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction)
     //             VALUES ($1, $2, $3, $4, $5, $6, $7)
     //             ON CONFLICT DO NOTHING
     //             "#,

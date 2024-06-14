@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
@@ -161,9 +162,17 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // let mut route_stop_map: HashMap<String, Vec<RouteStop>> = HashMap::new();
     let mut route_stops: Vec<RouteStop> = Vec::new();
     let mut stations: Vec<Station> = Vec::new();
+
+    let pb = ProgressBar::new(ROUTES.len() as u64);
+
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} {bar:40.cyan/green} {pos:>7}/{len:7} {elapsed_precise}")
+            .unwrap(),
+    );
+
     // go through each of the routes and get their stop sequences and the stop data
     for route in ROUTES.iter() {
-        tracing::info!("getting stops for route {}", route);
         // because the public api is bad, I found this endpoint that gives me all the stations from mta.info
         let route_stations: Vec<Station> = reqwest::Client::new()
             .get(format!("https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP&routeId=MTASBWY:{}", route))
@@ -186,7 +195,12 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
         // add the route_stops to main stations vector
         stations.extend(route_stations.into_iter());
+
+        pb.set_prefix(format!("Processing route {}", route));
+        pb.inc(1);
     }
+
+    pb.finish_with_message("Finished parsing train data");
 
     // remove duplicate stations, should be 496 stations without duplicates
     stations.sort_by_key(|s| (s.stop_id.clone()));
@@ -346,10 +360,9 @@ pub async fn get_transfers(pool: &PgPool) -> Vec<Transfer> {
         .deserialize()
         .collect::<Result<Vec<Transfer>, csv::Error>>()
         .unwrap();
-    // TODO: figure out why identical station transfers are still getting added
     dbg!(transfers.len());
     transfers.retain(|t| t.to_stop_id != t.from_stop_id);
-    dbg!(transfers.len());
+    // dbg!(transfers.len());
     // keep the records that aren't the fake south ferry loop stop
     transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
 

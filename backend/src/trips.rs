@@ -8,6 +8,8 @@ use thiserror::Error;
 use tokio::time::sleep;
 use uuid::Uuid;
 
+// use std::io::Write;
+
 // A C E https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace
 // B D F M https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm
 // G https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g
@@ -299,7 +301,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             // not sure if we should upsert on conflict yet
             sqlx::query!(
                 r#"
-                INSERT INTO trips (id, mta_trip_id, train_id, route_id, created_at, assigned, direction)
+                INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT DO NOTHING                    
                 "#,

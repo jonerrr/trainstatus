@@ -60,8 +60,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .to_owned();
 
         // tracing::debug!("fetched route {}", route.id);
-        pb.set_prefix(format!("Processing route {}", &route.id));
-        pb.inc(1);
 
         // add routes to the routes vector that gets inserted to db
         routes.push(Route(
@@ -104,13 +102,16 @@ pub async fn stops_and_routes(pool: &PgPool) {
             })
             .collect::<Vec<_>>();
         route_stops.extend(route_stops_g.into_iter().flatten());
+
+        pb.set_prefix(format!("Processing bus route {}", &route.id));
+        pb.inc(1);
     }
 
     // remove duplicates
     stops.sort_by(|a, b| a.0.cmp(&b.0));
     stops.dedup_by(|a, b| a.0 == b.0);
 
-    pb.finish_with_message("done");
+    pb.finish_with_message("Finished parsing bus data");
     // dbg!(routes.len());
     // dbg!(stops.len());
     // dbg!(route_stops.len());
