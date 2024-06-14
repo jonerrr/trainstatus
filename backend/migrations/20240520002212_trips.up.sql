@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS trips (
     -- probably should be a different type, no need for UUID
     id UUID PRIMARY KEY,
-    mta_trip_id VARCHAR NOT NULL,
+    mta_id VARCHAR NOT NULL,
     train_id VARCHAR NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     assigned BOOLEAN NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS trips (
     direction SMALLINT NOT NULL,
     route_id VARCHAR NOT NULL REFERENCES routes(id),
     -- headsign VARCHAR REFERENCES headsigns(id),
-    UNIQUE (mta_trip_id, train_id, created_at, direction)
+    UNIQUE (mta_id, train_id, created_at, direction)
 );
 
 CREATE TABLE IF NOT EXISTS positions (

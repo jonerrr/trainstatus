@@ -25,8 +25,6 @@ CREATE TABLE IF NOT EXISTS affected_entities(
     sort_order INTEGER NOT NULL
 );
 
-CREATE INDEX idx_alerts_id ON alerts (id);
-
-CREATE INDEX idx_active_periods_alert_id_start_time_end_time ON active_periods (alert_id, start_time, end_time);
-
-CREATE INDEX idx_affected_entities_alert_id_route_id ON affected_entities (alert_id, route_id);
+-- CREATE INDEX idx_alerts_id ON alerts (id);
+-- CREATE INDEX idx_active_periods_alert_id_start_time_end_time ON active_periods (alert_id, start_time, end_time);
+-- CREATE INDEX idx_affected_entities_alert_id_route_id ON affected_entities (alert_id, route_id);
