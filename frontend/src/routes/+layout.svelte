@@ -32,7 +32,7 @@
 
 		interval = setInterval(async () => {
 			await init_data(fetch, trips, stop_times, alerts);
-		}, 10000);
+		}, 15000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted

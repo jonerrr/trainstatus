@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                    t.id,\n                    t.route_id,\n                    t.direction,\n                    t.assigned,\n                    t.created_at,\n                    array_agg(jsonb_build_object('stop_id',\n                    st.stop_id,\n                    'arrival',\n                    st.arrival,\n                    'departure',\n                    st.departure)\n                ORDER BY\n                    st.arrival) AS stop_times\n                FROM\n                    trips t\n                LEFT JOIN stop_times st ON\n                    t.id = st.trip_id\n                WHERE\n                    t.id = ANY(\n                    SELECT\n                        t.id\n                    FROM\n                        trips t\n                    LEFT JOIN stop_times st ON\n                        st.trip_id = t.id\n                    WHERE\n                        st.arrival > now())\n                GROUP BY\n                    t.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "assigned",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "stop_times",
+        "type_info": "JsonbArray"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "9145eac08458da048bad2efc8d612bd77699e6c9ba36ec1de0351c53007b7942"
+}

@@ -50,7 +50,7 @@ pub async fn get(
             if times {
                 let trips = sqlx::query_as!(
                     Trip,
-                    "select
+                    "SELECT
                     t.id,
                     t.route_id,
                     t.direction,
@@ -62,23 +62,23 @@ pub async fn get(
                     st.arrival,
                     'departure',
                     st.departure)
-                order by
-                    st.arrival) as stop_times
-                from
+                ORDER BY
+                    st.arrival) AS stop_times
+                FROM
                     trips t
-                left join stop_times st on
+                LEFT JOIN stop_times st ON
                     t.id = st.trip_id
-                where
-                    t.id = any(
-                    select
+                WHERE
+                    t.id = ANY(
+                    SELECT
                         t.id
-                    from
+                    FROM
                         trips t
-                    left join stop_times st on
+                    LEFT JOIN stop_times st ON
                         st.trip_id = t.id
-                    where
+                    WHERE
                         st.arrival > now())
-                group by
+                GROUP BY
                     t.id"
                 )
                 .fetch_all(&pool)

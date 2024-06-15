@@ -263,7 +263,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
-    let transfers = get_transfers(pool).await;
+    let transfers = get_transfers().await;
 
     // parse stops into Stop struct for the query builder
     let stops = stations
@@ -340,7 +340,7 @@ struct Transfer {
 }
 
 // import stop transfers from static gtfs data
-pub async fn get_transfers(pool: &PgPool) -> Vec<Transfer> {
+async fn get_transfers() -> Vec<Transfer> {
     let gtfs = reqwest::Client::new()
         .get("http://web.mta.info/developers/data/nyct/subway/google_transit.zip")
         .send()

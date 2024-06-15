@@ -1,5 +1,5 @@
 use crate::feed::{self};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
@@ -10,19 +10,10 @@ use uuid::Uuid;
 
 use std::io::Write;
 
-// There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
-// Thanks MTA for that
-// Shout out to N12 for being included in the static gtfs data even though its not a real stop (The lat/long point to Stillwell ave station)
-// const FAKE_STOP_IDS: [&str; 28] = [
-//     "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
-//     "R65", "M07", "X22", "R60", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24",
-//     "S0M", "S12",
-// ];
-
 #[derive(Debug)]
-struct StopTime {
+struct Position {
     trip_id: Uuid,
-    stop_id: i32,
+    stop_id: String,
     arrival: DateTime<Utc>,
     departure: DateTime<Utc>,
     stop_sequence: i16,
@@ -51,7 +42,7 @@ pub async fn import(pool: PgPool) {
             match decode_feed(&pool).await {
                 Ok(_) => (),
                 Err(e) => {
-                    tracing::error!("Error importing bus trip data: {:?}", e);
+                    tracing::error!("Error importing bus position data: {:?}", e);
                 }
             }
 
@@ -75,7 +66,7 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
 
 pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
     let data = reqwest::Client::new()
-        .get("https://gtfsrt.prod.obanyc.com/tripUpdates")
+        .get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
         .send()
         .await?
         .bytes()
@@ -83,23 +74,14 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
 
     let feed = feed::FeedMessage::decode(data)?;
 
-    let mut msgs = Vec::new();
-    write!(msgs, "{:#?}", feed).unwrap();
-    tokio::fs::remove_file("./trips.txt").await.ok();
-    tokio::fs::write("./trips.txt", msgs).await.unwrap();
-
-    // let data = reqwest::Client::new()
-    //     .get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
-    //     .send()
-    //     .await?
-    //     .bytes()
-    //     .await?;
-
-    // let feed = feed::FeedMessage::decode(data)?;
+    // let mut msgs = Vec::new();
+    // write!(msgs, "{:#?}", feed).unwrap();
+    // tokio::fs::remove_file("./positions.txt").await.ok();
+    // tokio::fs::write("./positions.txt", msgs).await.unwrap();
 
     for entity in feed.entity {
         if entity.trip_update.is_none() {
-            tracing::debug!(target: "bus_trips", "Skipping entity without trip_update: ");
+            tracing::debug!(target: "pos_positions", "Skipping entity without trip_update: ");
             continue;
         }
 
@@ -111,7 +93,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             let trip_id = match trip_update.trip.trip_id.as_ref() {
                 Some(id) => id,
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without trip_id",);
+                    tracing::debug!(target: "pos_positions", "Skipping trip without trip_id",);
                     continue;
                 }
             };
@@ -119,7 +101,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             let route_id = match trip_update.trip.route_id {
                 Some(id) => id,
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without route_id",);
+                    tracing::debug!(target: "pos_positions", "Skipping trip without route_id",);
                     continue;
                 }
             };
@@ -127,7 +109,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             let direction: i16 = match trip_update.trip.direction_id {
                 Some(id) => id as i16,
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without direction",);
+                    tracing::debug!(target: "pos_positions", "Skipping trip without direction",);
                     continue;
                 }
             };
@@ -135,21 +117,15 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             let start_date = match trip_update.trip.start_date.as_ref() {
                 Some(date) => date,
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without start date");
+                    tracing::debug!(target: "pos_positions", "Skipping trip without start date");
                     continue;
                 }
             };
 
-            let vehicle_id: i32 = match trip_update.vehicle.as_ref() {
-                Some(v) => match v.id.as_ref().unwrap().split_once('_') {
-                    Some((_, id)) => id.parse().unwrap(),
-                    None => {
-                        tracing::debug!(target: "bus_trips", "Skipping trip without vehicle id");
-                        continue;
-                    }
-                },
+            let vehicle_id = match trip_update.vehicle.as_ref() {
+                Some(v) => v.id.as_ref().unwrap(),
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without start date");
+                    tracing::debug!(target: "pos_positions", "Skipping trip without start date");
                     continue;
                 }
             };
@@ -157,7 +133,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             let delay = match trip_update.delay {
                 Some(d) => d,
                 None => {
-                    tracing::debug!(target: "bus_trips", "Skipping trip without start date");
+                    tracing::debug!(target: "pos_positions", "Skipping trip without start date");
                     continue;
                 }
             };
@@ -170,15 +146,16 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
 
             let stop_updates = trip_update
                 .stop_time_update
-                .into_par_iter()
+                .par_iter()
                 .filter_map(|stop_time| {
-                    let stop_id: i32 = match stop_time.stop_id.unwrap().parse() {
-                        Ok(id) => id,
-                        Err(e) => {
-                            tracing::error!(target: "bus_trips", "Failed to parse stop_id: {}", e);
-                            return None;
-                        }
-                    };
+                    let mut stop_id = stop_time.stop_id.as_ref().unwrap().to_owned();
+
+                    // remove direction from stop_id
+                    stop_id.pop();
+
+                    // if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+                    //     return None;
+                    // }
 
                     let arrival = match &stop_time.arrival {
                         Some(a) => convert_timestamp(a.time),
@@ -195,7 +172,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
                     let stop_sequence = match stop_time.stop_sequence {
                         Some(seq) => seq as i16,
                         None => {
-                            tracing::debug!(target: "bus_trips", "Skipping stop without sequence");
+                            tracing::debug!(target: "pos_positions", "Skipping stop without sequence");
                             return None;
                         }
                     };
@@ -214,7 +191,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             // not sure if we should upsert on conflict yet
             sqlx::query!(
                 r#"
-                INSERT INTO bus_trips (id, mta_id, vehicle_id, start_date, created_at, direction, deviation, route_id)
+                INSERT INTO pos_positions (id, mta_id, vehicle_id, start_date, created_at, direction, deviation, route_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT DO NOTHING
                 "#,
@@ -231,7 +208,7 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
             .await?;
 
             if stop_updates.is_empty() {
-                tracing::debug!(target: "bus_trips", "no stop_updates for endpoint");
+                tracing::debug!(target: "pos_positions", "no stop_updates for endpoint");
                 continue;
             }
 
