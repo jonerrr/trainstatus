@@ -1,3 +1,6 @@
 /target
 .mise.toml
 container_*
+trips.txt
+positions.txt
+siri-vehicles.json

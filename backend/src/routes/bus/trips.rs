@@ -1,11 +1,9 @@
+use crate::routes::errors::ServerError;
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::Utc;
-// use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
-
-use crate::routes::errors::ServerError;
 
 #[derive(FromRow, Serialize)]
 pub struct BusTrip {
@@ -13,7 +11,7 @@ pub struct BusTrip {
     route_id: String,
     direction: i16,
     vehicle_id: i32,
-    deviation: i32,
+    deviation: Option<i32>,
     created_at: chrono::DateTime<Utc>,
 }
 
@@ -54,5 +52,5 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
     .fetch_all(&pool)
     .await?;
 
-    return Ok(Json(trips));
+    Ok(Json(trips))
 }

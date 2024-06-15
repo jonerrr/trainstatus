@@ -84,7 +84,7 @@ pub async fn get(
                 .fetch_all(&pool)
                 .await?;
 
-                return Ok(Json(trips));
+                Ok(Json(trips))
             } else {
                 // return trips without stop_times
                 let trips = sqlx::query_as!(
@@ -102,7 +102,7 @@ pub async fn get(
                 .fetch_all(&pool)
                 .await?;
 
-                return Ok(Json(trips));
+                Ok(Json(trips))
             }
         } else {
             let trips = sqlx::query_as!(
@@ -140,8 +140,7 @@ pub async fn get(
             )
             .fetch_all(&pool)
             .await?;
-
-            return Ok(Json(trips));
+            Ok(Json(trips))
         }
     } else {
         let trips = sqlx::query_as!(

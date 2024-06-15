@@ -45,8 +45,10 @@ pub enum DecodeFeedError {
 
     #[error("protobuf decode error: {0}")]
     Decode(#[from] DecodeError),
-    // #[error("no stop times for endpoint {endpoint:?}")]
-    // NoStopTimes { endpoint: String },
+
+    #[error("SIRI error: {0}")]
+    Siri(String), // #[error("no stop times for endpoint {endpoint:?}")]
+                  // NoStopTimes { endpoint: String },
 }
 
 pub async fn import(pool: PgPool) {
