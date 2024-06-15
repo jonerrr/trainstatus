@@ -1,12 +1,8 @@
-use axum::{
-    extract::{Query, State},
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, response::IntoResponse, Json};
 use chrono::Utc;
 // use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::{types::JsonValue, FromRow, PgPool};
+use serde::Serialize;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::routes::errors::ServerError;
