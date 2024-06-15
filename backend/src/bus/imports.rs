@@ -1,15 +1,8 @@
+use super::api_key;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
-use std::{env::var, sync::OnceLock};
-
-// https://stackoverflow.com/a/77249700
-fn api_key() -> &'static str {
-    // you need bustime api key to run this
-    static API_KEY: OnceLock<String> = OnceLock::new();
-    API_KEY.get_or_init(|| var("API_KEY").unwrap())
-}
 
 pub async fn should_update(pool: &PgPool) -> bool {
     let count = sqlx::query!("SELECT COUNT(*) FROM bus_route_stops as count")
@@ -228,7 +221,7 @@ pub struct Entry {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct StopGrouping {
-    ordered: bool,
+    // ordered: bool,
     #[serde(rename = "stopGroups")]
     stop_groups: Vec<StopGroup>,
 }
@@ -255,15 +248,15 @@ pub struct StopGroup {
     // can be 0 or 1
     #[serde(deserialize_with = "de_str_to_i32")]
     id: i32,
-    name: StopName,
+    // name: StopName,
     #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct StopName {
-    name: String,
-}
+// #[derive(Deserialize, Clone, Debug)]
+// pub struct StopName {
+//     name: String,
+// }
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct References {

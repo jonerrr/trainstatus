@@ -9,15 +9,16 @@ CREATE TABLE IF NOT EXISTS bus_trips (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     -- 0 = south, 1 = north
     direction SMALLINT NOT NULL,
-    -- Delay (in seconds) can be positive (meaning that the vehicle is late) or negative (meaning that the vehicle is ahead of schedule). Delay of 0 means that the vehicle is exactly on time.
-    deviation INTEGER NOT NULL,
+    -- Delay (in seconds) can be positive (meaning that the vehicle is late) or negative (meaning that the vehicle is ahead of schedule)
+    deviation INTEGER,
     route_id VARCHAR NOT NULL REFERENCES bus_routes(id),
     UNIQUE (mta_id, vehicle_id, start_date, direction)
 );
 
 CREATE TABLE IF NOT EXISTS bus_positions (
-    vehicle_id INTEGER NOT NULL,
+    vehicle_id INTEGER,
     stop_id INTEGER NOT NULL REFERENCES bus_stops(id),
+    mta_id VARCHAR,
     lat REAL NOT NULL,
     lon REAL NOT NULL,
     bearing REAL NOT NULL,
@@ -26,11 +27,11 @@ CREATE TABLE IF NOT EXISTS bus_positions (
     progress_status VARCHAR,
     passengers INTEGER,
     capacity INTEGER,
-    PRIMARY KEY (vehicle_id)
+    UNIQUE (vehicle_id, mta_id)
 );
 
 CREATE TABLE IF NOT EXISTS bus_stop_times (
-    trip_id UUID REFERENCES bus_trips(id),
+    trip_id UUID REFERENCES bus_trips(id) ON DELETE CASCADE,
     stop_id INTEGER NOT NULL REFERENCES bus_stops(id),
     arrival TIMESTAMP WITH TIME ZONE NOT NULL,
     departure TIMESTAMP WITH TIME ZONE NOT NULL,
