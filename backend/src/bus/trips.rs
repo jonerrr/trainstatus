@@ -1,10 +1,9 @@
-use crate::feed::{self};
+use crate::{feed, trips::DecodeFeedError};
 use chrono::{DateTime, Utc};
-use prost::{DecodeError, Message};
+use prost::Message;
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
-use thiserror::Error;
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -30,20 +29,6 @@ struct StopTime {
 
 // TODO: remove unwraps and handle errors
 // use this error to create custom errors like "no trip id"
-
-#[derive(Error, Debug)]
-pub enum DecodeFeedError {
-    #[error("sqlx error: {0}")]
-    Sqlx(#[from] sqlx::Error),
-
-    #[error("reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("protobuf decode error: {0}")]
-    Decode(#[from] DecodeError),
-    // #[error("no stop times for endpoint {endpoint:?}")]
-    // NoStopTimes { endpoint: String },
-}
 
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
@@ -87,15 +72,6 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
     write!(msgs, "{:#?}", feed).unwrap();
     tokio::fs::remove_file("./trips.txt").await.ok();
     tokio::fs::write("./trips.txt", msgs).await.unwrap();
-
-    // let data = reqwest::Client::new()
-    //     .get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
-    //     .send()
-    //     .await?
-    //     .bytes()
-    //     .await?;
-
-    // let feed = feed::FeedMessage::decode(data)?;
 
     for entity in feed.entity {
         if entity.trip_update.is_none() {
@@ -162,8 +138,14 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
                 }
             };
 
-            let id_name =
-                trip_id.to_owned() + &route_id + " " + &direction.to_string() + start_date;
+            let id_name = trip_id.to_owned()
+                + &route_id
+                + " "
+                + &direction.to_string()
+                + " "
+                + start_date
+                + " "
+                + &vehicle_id.to_string();
             let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
 
             let start_date = chrono::NaiveDate::parse_from_str(start_date, "%Y%m%d").unwrap();

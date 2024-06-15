@@ -56,6 +56,7 @@ async fn main() {
                 bus::imports::stops_and_routes(&pool).await;
             }
             bus::trips::import(pool.clone()).await;
+            bus::positions::import(pool.clone()).await;
         }
     }
 
