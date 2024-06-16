@@ -15,7 +15,6 @@
 	} from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
-	import Toaster from '$lib/components/UndoToaster.svelte';
 	import Dialog from '$lib/components/Dialog.svelte';
 
 	let interval: number;
@@ -51,8 +50,6 @@
 	// register swiper.js for alert carousel
 	register();
 </script>
-
-<Toaster />
 
 <div class="md:w-[60%] m-auto">
 	<Header />

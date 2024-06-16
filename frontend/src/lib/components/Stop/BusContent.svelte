@@ -25,6 +25,7 @@
 		<h2 class="font-bold text-xl w-[80%] text-indigo-300">{stop.name}</h2>
 	</div>
 
+	<!-- TODO: get bus transfers and also subway transfers -->
 	<!-- {#if $stop.transfers.length}
 		<div class="flex gap-2 pb-1 items-center flex-wrap">
 			<h2 class="text-lg">Transfers:</h2>
