@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateFixed, LocateOff } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import { writable } from 'svelte/store';
 	import {
 		pinned_stops,
 		pinned_routes,
@@ -8,14 +9,13 @@
 		LocationStatus,
 		stops,
 		bus_stops,
-		pinned_bus_stops,
-		monitored_routes
+		pinned_bus_stops
 	} from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
 
-	let stop_ids: string[] = [];
-	let bus_stop_ids: number[] = [];
+	let stop_ids = writable<string[]>([]);
+	let bus_stop_ids = writable<number[]>([]);
 
 	// from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 	function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -50,7 +50,7 @@
 					})
 					.sort((a, b) => a.distance - b.distance)
 					.slice(0, 15);
-				stop_ids = closest_stops.map((stop) => stop.id);
+				$stop_ids = closest_stops.map((stop) => stop.id);
 
 				const closest_bus_stops = $bus_stops
 					.map((stop) => {
@@ -63,7 +63,7 @@
 				// const routes = closest_bus_stops.map((s) => s.routes.map((r) => r.id)).flat();
 				// console.log(routes);
 
-				bus_stop_ids = closest_bus_stops.map((stop) => stop.id);
+				$bus_stop_ids = closest_bus_stops.map((stop) => stop.id);
 
 				location_status.set(LocationStatus.Granted);
 			},
@@ -92,23 +92,22 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
-<!-- TODO: fix pinning only bus stops -->
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
 	{#if $pinned_routes.length}
 		<RouteAlertList expand={false} title="Pinned Routes" bind:route_ids={$pinned_routes} />
 	{/if}
 
-	{#if $pinned_stops.length}
+	{#if $pinned_stops.length || $pinned_bus_stops.length}
 		<StopList
-			bind:bus_stop_ids={$pinned_bus_stops}
+			bus_stop_ids={pinned_bus_stops}
 			expand={false}
-			bind:stop_ids={$pinned_stops}
+			stop_ids={pinned_stops}
 			title="Pinned Stops"
 		/>
 	{/if}
 
 	<!-- closest stops -->
-	<StopList bind:bus_stop_ids bind:stop_ids title="Nearby Stops" show_location={true}>
+	<StopList {bus_stop_ids} {stop_ids} title="Nearby Stops" show_location={true}>
 		<div slot="location" class="flex gap-2">
 			{#if $location_status === LocationStatus.Loading}
 				<div class="flex gap-1 items-center text-white rounded px-2 py-1 bg-indigo-600">

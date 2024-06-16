@@ -19,6 +19,7 @@
 	import Dialog from '$lib/components/Dialog.svelte';
 
 	let interval: number;
+	let bus_interval: number;
 
 	let last_monitored_routes: string[] = [];
 
@@ -27,23 +28,25 @@
 			await update_data(fetch, trips, stop_times, alerts);
 		}, 15000);
 
-		monitored_routes.subscribe((routes) => {
-			if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
-				last_monitored_routes = routes;
-				console.log(routes);
-				update_bus_data(fetch, bus_trips, bus_stop_times, routes);
-			}
+		monitored_routes.subscribe(async (routes) => {
+			console.log(routes);
+			// if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
+			// 	last_monitored_routes = routes;
+			// 	console.log(routes);
+			// 	// await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
+			// }
 		});
 
 		// Interval for update_bus_data
-		setInterval(async () => {
-			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
-		}, 40000);
+		// bus_interval = setInterval(async () => {
+		// 	await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
+		// }, 40000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted
 	onDestroy(() => {
 		clearInterval(interval);
+		clearInterval(bus_interval);
 	});
 
 	// register swiper.js for alert carousel
