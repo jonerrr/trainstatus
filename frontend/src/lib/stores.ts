@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { persisted } from 'svelte-persisted-store';
 import type { Alert, Stop, StopTime, Trip } from '$lib/api';
-import type { BusRoute, BusStop } from '$lib/bus_api';
+import type { BusRoute, BusStop, BusStopTime, BusTrip } from '$lib/bus_api';
 
 export enum LocationStatus {
 	NeverAsked,
@@ -33,6 +33,9 @@ export const monitored_routes = writable<string[]>([]);
 
 export const bus_routes = writable<BusRoute[]>([]);
 export const bus_stops = writable<BusStop[]>([]);
+export const bus_trips = writable<BusTrip[]>([]);
+export const bus_stop_times = writable<BusStopTime[]>([]);
+
 // export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
 export const pinned_bus_stops = persisted('pinned_bus_stops', [100014]);
 

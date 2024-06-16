@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n        t.id,\n        t.route_id,\n        t.direction,\n        t.vehicle_id,\n        t.created_at,\n        t.deviation,\n        bp.lat,\n        bp.lon,\n        bp.progress_status,\n        bp.passengers,\n        bp.capacity,\n        bp.stop_id\n    FROM\n        bus_trips t\n    LEFT JOIN bus_positions bp ON\n        bp.vehicle_id = t.vehicle_id\n        AND bp.mta_id = t.mta_id\n    WHERE\n        t.route_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "vehicle_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "deviation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "lat",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 7,
+        "name": "lon",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 8,
+        "name": "progress_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "passengers",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "capacity",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "stop_id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a40afe2856da7a52cf9b65acd3c7ae6ac7e54b5062473ff93ff647dee1eb665c"
+}

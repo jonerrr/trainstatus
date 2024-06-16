@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            bst.*\n        FROM\n            bus_stop_times bst\n        LEFT JOIN bus_trips bt ON\n            bt.id = bst.trip_id\n        WHERE\n            bt.route_id = ANY($1)\n            AND bst.arrival > now()\n        ORDER BY\n            bst.arrival",
+  "query": "\n        SELECT\n            bst.*, bt.route_id\n        FROM\n            bus_stop_times bst\n        LEFT JOIN bus_trips bt ON\n            bt.id = bst.trip_id\n        WHERE\n            bt.route_id = ANY($1)\n            AND bst.arrival > now()\n        ORDER BY\n            bst.arrival",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,11 @@
         "ordinal": 4,
         "name": "stop_sequence",
         "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "route_id",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
@@ -39,8 +44,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "be1665f7c677ef7cd1daf526526fd439aecf6f8587500a4d854663e77ed00fc4"
+  "hash": "17a5a24f3cc13575ee566ae4c16b1d4e9fc1b5a4e45d415da9bcce9e1350837d"
 }

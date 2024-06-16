@@ -4,7 +4,15 @@
 	import { register } from 'swiper/element/bundle';
 	import { onDestroy, onMount } from 'svelte';
 	import { update_data } from '$lib/api';
-	import { trips, stop_times, alerts, monitored_routes } from '$lib/stores';
+	import { update_bus_data } from '$lib/bus_api';
+	import {
+		trips,
+		stop_times,
+		alerts,
+		monitored_routes,
+		bus_trips,
+		bus_stop_times
+	} from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Toaster from '$lib/components/UndoToaster.svelte';
@@ -12,20 +20,25 @@
 
 	let interval: number;
 
-	let last_monitored_routes = [];
-
-	monitored_routes.subscribe((routes) => {
-		if (routes.length !== last_monitored_routes.length) {
-			last_monitored_routes = routes;
-			console.log(routes);
-			// update_data(fetch, trips, stop_times, alerts);
-		}
-	});
+	let last_monitored_routes: string[] = [];
 
 	onMount(async () => {
 		interval = setInterval(async () => {
 			await update_data(fetch, trips, stop_times, alerts);
 		}, 15000);
+
+		monitored_routes.subscribe((routes) => {
+			if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
+				last_monitored_routes = routes;
+				console.log(routes);
+				update_bus_data(fetch, bus_trips, bus_stop_times, routes);
+			}
+		});
+
+		// Interval for update_bus_data
+		setInterval(async () => {
+			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
+		}, 40000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted
