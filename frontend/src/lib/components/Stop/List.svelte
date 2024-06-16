@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { BusFront, CircleX, TrainFront } from 'lucide-svelte';
+	import { createTabs, melt } from '@melt-ui/svelte';
 	import { onMount } from 'svelte';
-	import { derived } from 'svelte/store';
+	import { derived, writable, type Writable } from 'svelte/store';
 	import SearchWorker from '$lib/search_worker?worker';
 	import { type Stop } from '$lib/api';
+	import type { BusStop } from '$lib/bus_api';
 	import { stops as stop_store, bus_stops as bus_stop_store, monitored_routes } from '$lib/stores';
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
 	import BusTrigger from '$lib/components/Stop/BusTrigger.svelte';
 	import List from '$lib/components/List.svelte';
-	import { createTabs, melt } from '@melt-ui/svelte';
-	import type { BusStop } from '$lib/bus_api';
 	// import { cubicInOut } from 'svelte/easing';
 	// import { crossfade } from 'svelte/transition';
 
@@ -23,8 +23,8 @@
 	// const triggers = ['Train', 'Bus'];
 
 	export let title: string = 'Stops';
-	export let stop_ids: string[] | null = [];
-	export let bus_stop_ids: number[] | null = [];
+	export let stop_ids: Writable<string[]> = writable([]);
+	export let bus_stop_ids: Writable<number[]> = writable([]);
 	// show search bar on bottom
 	export let show_search: boolean = false;
 	// show ask for location button
@@ -32,31 +32,32 @@
 	// set a max height for the list
 	export let expand: boolean = true;
 
-	$: stops = derived(stop_store, ($stop_store) => {
-		if (!stop_ids) return $stop_store.slice(0, 15);
+	const stops = derived([stop_ids, stop_store], ([$stop_ids, $stop_store]) => {
 		// this preserves the order of stop_ids but its slower
+		console.log($stop_ids);
 		const st = show_location
-			? (stop_ids.map((id) => $stop_store.find((stop) => stop.id === id)).filter(Boolean) as Stop[])
-			: $stop_store.filter((st) => stop_ids!.includes(st.id));
+			? ($stop_ids
+					.map((id) => $stop_store.find((stop) => stop.id === id))
+					.filter(Boolean) as Stop[])
+			: $stop_store.filter((st) => $stop_ids.includes(st.id));
 		return st;
 	});
 
 	// TODO: not sure if we want to ignore shuttles
-	$: bus_stops = derived(bus_stop_store, ($bus_stop_store) => {
-		if (!bus_stop_ids) return $bus_stop_store.slice(0, 15);
+	const bus_stops = derived([bus_stop_ids, bus_stop_store], ([$bus_stop_ids, $bus_stop_store]) => {
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
-			? (bus_stop_ids
+			? ($bus_stop_ids
 					.map((id) => $bus_stop_store.find((stop) => stop.id === id))
 					.filter(Boolean) as BusStop[])
-			: $bus_stop_store.filter((st) => bus_stop_ids!.includes(st.id));
+			: $bus_stop_store.filter((st) => $bus_stop_ids.includes(st.id));
+
+		$monitored_routes = [
+			...new Set([...st.map((s) => s.routes.map((r) => r.id)).flat(), ...$monitored_routes])
+		].slice(0, 15);
+
 		return st;
 	});
-
-	// TODO: make sure this wont go in some insane loop and crash the page
-	$: $monitored_routes = [
-		...new Set([...$bus_stops.map((s) => s.routes.map((r) => r.id)).flat(), ...$monitored_routes])
-	].slice(0, 15);
 
 	// from https://www.okupter.com/blog/svelte-debounce
 	const debounce = (callback: Function, wait = 50) => {
@@ -68,30 +69,28 @@
 		};
 	};
 
+	let search_el: HTMLInputElement;
+
+	function clearSearch() {
+		// reset stop ids
+		$stop_ids = $stop_store.slice(0, 15).map((s) => s.id);
+		$bus_stop_ids = $bus_stop_store.slice(0, 15).map((s) => s.id);
+		search_el.value = '';
+	}
+
 	let list_el: List;
 	function searchStops(e: any) {
 		// If search is empty, clear search and show all stops
 		if (e.target.value === '') {
-			stop_ids = null;
-			bus_stop_ids = null;
+			clearSearch();
 			return;
 		}
 
 		search_term = e.target.value;
 		searchWorker.postMessage({
 			type: 'search',
-			payload: { search_term, search_type: $value === 'Train' ? 't' : 'b' }
+			payload: { search_term, search_type: $value }
 		});
-
-		// this is to make sure that the results are in view on mobile even when keyboard is open
-		// list_el.scrollIntoView({ behavior: 'smooth' });
-	}
-
-	let search_el: HTMLInputElement;
-
-	function clearSearch() {
-		stop_ids = null;
-		search_el.value = '';
 	}
 
 	let search = 'loading';
@@ -107,10 +106,9 @@
 
 			if (type === 'ready') search = 'ready';
 
-			if (type === 'results') {
-				console.log(payload);
-				if (payload.search_type === 't') stop_ids = payload.results;
-				else if (payload.search_type === 'b') bus_stop_ids = payload.results;
+			if (type === 'results' && payload.results.length) {
+				if (payload.search_type === 'Train') $stop_ids = payload.results;
+				else if (payload.search_type === 'Bus') $bus_stop_ids = payload.results;
 
 				if (payload.results && payload.results.length < 6) {
 					list_el.scrollIntoView();

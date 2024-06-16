@@ -34,8 +34,9 @@ addEventListener('message', async (e) => {
 		const search_term = payload.search_term;
 		const search_type = payload.search_type;
 		// search posts index
-		const results = search_type === 't' ? search_stops(search_term) : search_bus_stops(search_term);
+		const results =
+			search_type === 'Train' ? search_stops(search_term) : search_bus_stops(search_term);
 		// send message with results
-		postMessage({ type: 'results', payload: { results, search_type } });
+		postMessage({ type: 'results', payload: { results: results ?? [], search_type } });
 	}
 });

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { item_heights } from '$lib/stores';
-	import { derived } from 'svelte/store';
+	// import { item_heights } from '$lib/stores';
+	// import { derived } from 'svelte/store';
 
 	let list_el: HTMLDivElement;
 	export function scrollIntoView() {
