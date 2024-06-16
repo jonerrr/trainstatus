@@ -2,12 +2,12 @@
 	import { melt, createTabs } from '@melt-ui/svelte';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade } from 'svelte/transition';
+	import { derived } from 'svelte/store';
 	import { stops } from '$lib/stores';
 	import { Direction } from '$lib/api';
 	import Trigger from '$lib/components/Trip/Trigger.svelte';
 	import Routes from '$lib/components/Stop/Routes.svelte';
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
-	import { derived } from 'svelte/store';
 
 	export let stop_id: string;
 

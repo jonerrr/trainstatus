@@ -7,6 +7,7 @@
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
+	import BusStopContent from '$lib/components/Stop/BusContent.svelte';
 
 	// detect if user is swiping back and disable close on outside click
 
@@ -107,6 +108,8 @@
 				<TripContent bind:trip_id={$page.state.dialog_id} />
 			{:else if $page.state.dialog_type === 'route_alert'}
 				<RouteAlertContent bind:route_id={$page.state.dialog_id} />
+			{:else if $page.state.dialog_type === 'bus_stop'}
+				<BusStopContent bind:stop_id={$page.state.dialog_id} />
 			{/if}
 
 			<button
