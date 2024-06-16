@@ -2,7 +2,6 @@ use crate::{feed, trips::DecodeFeedError};
 use chrono::{DateTime, Utc};
 use prost::Message;
 use rayon::prelude::*;
-use serde::Serialize;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -10,13 +9,12 @@ use uuid::Uuid;
 
 // use std::io::Write;
 
-#[derive(Debug, Serialize)]
-pub struct StopTime {
-    pub trip_id: Uuid,
-    pub stop_id: i32,
-    pub arrival: DateTime<Utc>,
-    pub departure: DateTime<Utc>,
-    pub stop_sequence: i16,
+struct StopTime {
+    trip_id: Uuid,
+    stop_id: i32,
+    arrival: DateTime<Utc>,
+    departure: DateTime<Utc>,
+    stop_sequence: i16,
 }
 
 // TODO: remove unwraps and handle errors

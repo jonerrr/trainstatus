@@ -55,8 +55,8 @@
 
 	// TODO: make sure this wont go in some insane loop and crash the page
 	$: $monitored_routes = [
-		...new Set([...$monitored_routes, ...$bus_stops.map((s) => s.routes.map((r) => r.id)).flat()])
-	];
+		...new Set([...$bus_stops.map((s) => s.routes.map((r) => r.id)).flat(), ...$monitored_routes])
+	].slice(0, 15);
 
 	// from https://www.okupter.com/blog/svelte-debounce
 	const debounce = (callback: Function, wait = 50) => {
@@ -112,7 +112,7 @@
 				if (payload.search_type === 't') stop_ids = payload.results;
 				else if (payload.search_type === 'b') bus_stop_ids = payload.results;
 
-				if (payload.results.length < 6) {
+				if (payload.results && payload.results.length < 6) {
 					list_el.scrollIntoView();
 				}
 			}
@@ -128,16 +128,15 @@
 </script>
 
 <List bind:expand bind:min_h bind:this={list_el}>
-	<div
-		use:melt={$root}
-		class="flex border border-neutral-800 flex-col rounded-xl shadow-lg data-[orientation=vertical]:flex-row"
-	>
-		<div class="flex gap-2 pointer-events-auto pb-1">
-			<div class="font-semibold text-lg text-indigo-300">{title}</div>
+	<div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
+		<div class="flex pb-1 justify-between">
+			<div class="flex gap-2">
+				<div class="font-semibold text-lg text-indigo-300">{title}</div>
 
-			{#if show_location}
-				<slot name="location" />
-			{/if}
+				{#if show_location}
+					<slot name="location" />
+				{/if}
+			</div>
 
 			<div
 				use:melt={$list}

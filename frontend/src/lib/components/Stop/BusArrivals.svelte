@@ -2,23 +2,16 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime.js';
 	import { derived } from 'svelte/store';
-	import { type Direction } from '$lib/api';
-	import { stop_times as stop_time_store } from '$lib/stores';
-	import Icon from '$lib/components/Icon.svelte';
+	import { bus_stop_times as bus_stop_time_store } from '$lib/stores';
 
 	dayjs.extend(relativeTime);
 
-	export let stop_id: string;
-	export let direction: Direction;
+	export let stop_id: number;
 	export let route_id: string;
 
-	const stop_times = derived(stop_time_store, ($stop_time_store) => {
-		const st = $stop_time_store.filter(
-			(st) =>
-				st.arrival > new Date() &&
-				st.stop_id === stop_id &&
-				st.direction === direction &&
-				st.route_id === route_id
+	const stop_times = derived(bus_stop_time_store, ($bus_stop_time_store) => {
+		const st = $bus_stop_time_store.filter(
+			(st) => st.arrival > new Date() && st.stop_id === stop_id && st.route_id === route_id
 		);
 
 		return st
@@ -34,19 +27,14 @@
 	});
 </script>
 
-<div class="flex gap-1">
-	<div class="flex gap-1">
-		<Icon name={route_id} />
-	</div>
-	<div class="flex gap-2">
-		{#if $stop_times.length}
-			{#each $stop_times.slice(0, 2) as stop_time}
-				<div class="text-xs">
-					{stop_time.eta?.toFixed(0)}m
-				</div>
-			{/each}
-		{:else}
-			<div class="text-xs text-neutral-400">No trips</div>
-		{/if}
-	</div>
+<div class="flex gap-2 pr-1">
+	{#if $stop_times.length}
+		{#each $stop_times.slice(0, 2) as stop_time}
+			<div class="text-xs">
+				{stop_time.eta?.toFixed(0)}m
+			</div>
+		{/each}
+	{:else}
+		<div class="text-xs text-neutral-400">No trips</div>
+	{/if}
 </div>
