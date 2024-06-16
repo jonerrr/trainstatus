@@ -248,11 +248,9 @@ pub async fn decode_siri(pool: PgPool) -> Result<(), DecodeFeedError> {
             ("VehicleMonitoringDetailLevel", "basic"),
         ])
         .send()
-        .await
-        .unwrap()
+        .await?
         .json::<serde_json::Value>()
-        .await
-        .unwrap();
+        .await?;
 
     // error is usually due to 30s timeout
     let service_delivery: ServiceDelivery =

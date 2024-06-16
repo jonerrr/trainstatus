@@ -360,7 +360,7 @@ async fn get_transfers() -> Vec<Transfer> {
         .deserialize()
         .collect::<Result<Vec<Transfer>, csv::Error>>()
         .unwrap();
-    dbg!(transfers.len());
+
     transfers.retain(|t| t.to_stop_id != t.from_stop_id);
     // dbg!(transfers.len());
     // keep the records that aren't the fake south ferry loop stop

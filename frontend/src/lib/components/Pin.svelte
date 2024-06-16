@@ -2,10 +2,9 @@
 	import { createToggle, melt, createSync } from '@melt-ui/svelte';
 	import type { Writable } from 'svelte/store';
 	import { Pin } from 'lucide-svelte';
-	import { addToast } from '$lib/components/UndoToaster.svelte';
 
-	export let item_id: string;
-	export let store: Writable<string[]>;
+	export let item_id: string | number;
+	export let store: Writable<string[] | number[]>;
 
 	const {
 		elements: { root },

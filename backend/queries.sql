@@ -147,3 +147,54 @@ WHERE
 GROUP BY
     brs.route_id,
     brs.direction;
+
+-- get bus trips
+SELECT
+    t.id,
+    t.route_id,
+    t.direction,
+    t.vehicle_id,
+    t.created_at,
+    t.deviation,
+    br.color,
+    jsonb_agg(
+        bst
+        ORDER BY
+            bst.arrival
+    ) AS stop_times
+FROM
+    bus_trips t
+    LEFT JOIN bus_routes br ON br.id = t.route_id
+    LEFT JOIN bus_stop_times bst ON bst.trip_id = t.id
+WHERE
+    t.id = ANY(
+        SELECT
+            bst.trip_id
+        FROM
+            bus_stop_times bst
+        WHERE
+            bst.arrival > now()
+    )
+    AND t.route_id = 'B45'
+GROUP BY
+    t.id,
+    br.color;
+
+-- get all bus stops and their routes
+SELECT
+    s.*,
+    jsonb_agg(
+        jsonb_build_object(
+            'id',
+            brs.route_id,
+            'direction',
+            brs.direction,
+            'headsign',
+            brs.headsign
+        )
+    ) AS routes
+FROM
+    bus_stops s
+    LEFT JOIN bus_route_stops brs ON brs.stop_id = s.id
+GROUP BY
+    s.id;

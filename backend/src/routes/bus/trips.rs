@@ -54,3 +54,5 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
 
     Ok(Json(trips))
 }
+
+//

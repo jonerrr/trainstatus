@@ -14,7 +14,7 @@
 
 	function manage_dialog(node: HTMLDialogElement) {
 		page.subscribe((p) => {
-			console.log(p);
+			// console.log(p);
 			if (p.state.dialog_open) {
 				// prevent close state issues
 				// node.close();
