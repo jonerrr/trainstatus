@@ -79,7 +79,7 @@ export interface BusTrip {
 	created_at: Date;
 	lat: number | null;
 	lon: number | null;
-	progress_status: string | null;
+	progress_status: 'layover' | 'spooking' | null;
 	passengers: number | null;
 	capacity: number | null;
 	stop_id: number | null;
