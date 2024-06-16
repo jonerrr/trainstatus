@@ -29,18 +29,16 @@
 		}, 15000);
 
 		monitored_routes.subscribe(async (routes) => {
-			console.log(routes);
-			// if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
-			// 	last_monitored_routes = routes;
-			// 	console.log(routes);
-			// 	// await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
-			// }
+			if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
+				last_monitored_routes = routes;
+				await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
+			}
 		});
 
 		// Interval for update_bus_data
-		// bus_interval = setInterval(async () => {
-		// 	await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
-		// }, 40000);
+		bus_interval = setInterval(async () => {
+			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
+		}, 40000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted

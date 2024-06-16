@@ -34,7 +34,6 @@
 
 	const stops = derived([stop_ids, stop_store], ([$stop_ids, $stop_store]) => {
 		// this preserves the order of stop_ids but its slower
-		console.log($stop_ids);
 		const st = show_location
 			? ($stop_ids
 					.map((id) => $stop_store.find((stop) => stop.id === id))
@@ -52,6 +51,7 @@
 					.filter(Boolean) as BusStop[])
 			: $bus_stop_store.filter((st) => $bus_stop_ids.includes(st.id));
 
+		// monitor routes so we get trip/times for them
 		$monitored_routes = [
 			...new Set([...st.map((s) => s.routes.map((r) => r.id)).flat(), ...$monitored_routes])
 		].slice(0, 15);
@@ -60,7 +60,7 @@
 	});
 
 	// from https://www.okupter.com/blog/svelte-debounce
-	const debounce = (callback: Function, wait = 50) => {
+	const debounce = (callback: Function, wait = 200) => {
 		let timeout: ReturnType<typeof setTimeout>;
 
 		return (...args: any[]) => {
@@ -176,7 +176,7 @@
 		</div>
 
 		<!-- TODO: prevent virtual keyboard from blocking results (use window.visualViewport.height to calculate max height of stops list or virtual keyboard api whenever that comes out) -->
-		{#if show_search}
+		{#if show_search && search === 'ready'}
 			<div class="relative">
 				<input
 					bind:this={search_el}
