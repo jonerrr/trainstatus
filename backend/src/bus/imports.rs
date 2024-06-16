@@ -1,7 +1,7 @@
 use super::api_key;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 
 pub async fn should_update(pool: &PgPool) -> bool {
@@ -16,13 +16,28 @@ pub async fn should_update(pool: &PgPool) -> bool {
 }
 
 // id, long_name, short_name, color, route_type
-struct Route(String, String, String, String, i32);
+#[derive(Serialize)]
+pub struct Route {
+    pub id: String,
+    pub long_name: String,
+    pub short_name: String,
+    pub color: String,
+    pub shuttle: bool,
+}
 
 // id, name, direction, lat, lon
 struct Stop(i32, String, String, f32, f32);
 
 //  route id, stop id, sequence
-struct RouteStop(String, i32, i32, i32);
+// struct RouteStop(String, i32, i32, i32);
+
+struct RouteStop {
+    route_id: String,
+    stop_id: i32,
+    stop_sequence: i32,
+    headsign: String,
+    direction: i32,
+}
 
 // could hypothetically use transactions to prevent conflicts
 pub async fn stops_and_routes(pool: &PgPool) {
@@ -30,6 +45,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let mut routes: Vec<Route> = Vec::new();
     let mut stops: Vec<Stop> = Vec::new();
     let mut route_stops: Vec<RouteStop> = Vec::new();
+    // let mut stop_groups: Vec<RouteStopGroup> = Vec::new();
 
     let all_routes = AgencyRoute::get_all().await;
     let pb = ProgressBar::new(all_routes.len() as u64);
@@ -53,15 +69,16 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .to_owned();
 
         // tracing::debug!("fetched route {}", route.id);
+        let shuttle = route.route_type == 711;
 
         // add routes to the routes vector that gets inserted to db
-        routes.push(Route(
-            route.id.clone(),
-            route.long_name.clone(),
-            route.short_name.clone(),
-            route.color.clone(),
-            route.route_type,
-        ));
+        routes.push(Route {
+            id: route.id.clone(),
+            long_name: route.long_name,
+            short_name: route.short_name,
+            color: route.color,
+            shuttle,
+        });
 
         // they are always ordered
         // if !r_stops.entry.stop_groupings[0].ordered {
@@ -78,6 +95,21 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .collect::<Vec<Stop>>();
         stops.extend(stops_n);
 
+        // let r_stop_groups = r_stops.entry.stop_groupings[0]
+        //     .stop_groups
+        //     .iter()
+        //     .map(|sg| {
+        //         let headsign = sg.name.name.clone();
+        //         let direction = sg.id;
+        //         RouteStopGroup {
+        //             route_id: route.id.clone(),
+        //             direction,
+        //             headsign,
+        //         }
+        //     })
+        //     .collect::<Vec<RouteStopGroup>>();
+        // stop_groups.extend(r_stop_groups);
+
         // parse and collect the route stops for each group/direction
         let route_stops_g = r_stops.entry.stop_groupings[0]
             .stop_groups
@@ -88,8 +120,12 @@ pub async fn stops_and_routes(pool: &PgPool) {
                 rs.stop_ids
                     .par_iter()
                     .enumerate()
-                    .map(move |(sequence, stop_id)| {
-                        RouteStop(route_id.to_owned(), *stop_id, sequence as i32, rs.id)
+                    .map(move |(sequence, stop_id)| RouteStop {
+                        route_id: route_id.clone(),
+                        stop_id: *stop_id,
+                        stop_sequence: sequence as i32,
+                        headsign: rs.name.name.clone(),
+                        direction: rs.id,
                     })
                     .collect::<Vec<_>>()
             })
@@ -112,13 +148,13 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // insert routes into db
 
     let mut query_builder =
-        QueryBuilder::new("INSERT INTO bus_routes (id, long_name, short_name, color, route_type)");
+        QueryBuilder::new("INSERT INTO bus_routes (id, long_name, short_name, color, shuttle)");
     query_builder.push_values(routes, |mut b, route| {
-        b.push_bind(route.0)
-            .push_bind(route.1)
-            .push_bind(route.2)
-            .push_bind(route.3)
-            .push_bind(route.4);
+        b.push_bind(route.id)
+            .push_bind(route.long_name)
+            .push_bind(route.short_name)
+            .push_bind(route.color)
+            .push_bind(route.shuttle);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
@@ -143,18 +179,20 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     for chunk in route_stops.chunks(chunk_size) {
         let mut query_builder = QueryBuilder::new(
-            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, direction)",
+            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction)",
         );
         query_builder.push_values(chunk, |mut b, route| {
-            b.push_bind(route.0.clone())
-                .push_bind(route.1)
-                .push_bind(route.2)
-                .push_bind(route.3);
+            b.push_bind(&route.route_id)
+                .push_bind(route.stop_id)
+                .push_bind(route.stop_sequence)
+                .push_bind(&route.headsign)
+                .push_bind(route.direction);
         });
         query_builder.push("ON CONFLICT DO NOTHING");
         let query = query_builder.build();
         query.execute(pool).await.unwrap();
     }
+
     tracing::info!("finished inserting bus data into db");
 }
 
@@ -248,15 +286,15 @@ pub struct StopGroup {
     // can be 0 or 1
     #[serde(deserialize_with = "de_str_to_i32")]
     id: i32,
-    // name: StopName,
+    name: StopName,
     #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
 }
 
-// #[derive(Deserialize, Clone, Debug)]
-// pub struct StopName {
-//     name: String,
-// }
+#[derive(Deserialize, Clone, Debug)]
+pub struct StopName {
+    name: String,
+}
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct References {

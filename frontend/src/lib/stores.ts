@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { persisted } from 'svelte-persisted-store';
 import type { Alert, Stop, StopTime, Trip } from '$lib/api';
-import type { BusStop } from '$lib/bus_api';
+import type { BusRoute, BusStop } from '$lib/bus_api';
 
 export enum LocationStatus {
 	NeverAsked,
@@ -28,8 +28,13 @@ export const location_status = persisted<LocationStatus>(
 	LocationStatus.NeverAsked
 );
 
-export const bus_mode = persisted('bus_mode', false);
+// list of bus routes to fetch from api bc we can't fetch all at once
+export const monitored_routes = writable<string[]>([]);
+
+export const bus_routes = writable<BusRoute[]>([]);
 export const bus_stops = writable<BusStop[]>([]);
+// export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
+export const pinned_bus_stops = persisted('pinned_bus_stops', [100014]);
 
 // store length of each list element
 export const item_heights = writable<{ [key: string | number]: number }>({});

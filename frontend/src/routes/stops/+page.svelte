@@ -7,5 +7,5 @@
 </svelte:head>
 
 <div class="p-1">
-	<List stop_ids={null} title="Stops" show_search={true} />
+	<List bus_stop_ids={null} stop_ids={null} title="Stops" show_search={true} />
 </div>

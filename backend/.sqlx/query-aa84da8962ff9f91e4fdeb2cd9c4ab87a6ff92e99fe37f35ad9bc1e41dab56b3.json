@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM bus_stops",
+  "query": "SELECT\n        s.*,\n        jsonb_agg(\n            jsonb_build_object(\n                'id',\n                brs.route_id,\n                'direction',\n                brs.direction,\n                'headsign',\n                brs.headsign\n            )\n        ) AS routes\n    FROM\n        bus_stops s\n        LEFT JOIN bus_route_stops brs ON brs.stop_id = s.id\n    GROUP BY\n        s.id;",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,11 @@
         "ordinal": 4,
         "name": "lon",
         "type_info": "Float4"
+      },
+      {
+        "ordinal": 5,
+        "name": "routes",
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {
@@ -37,8 +42,9 @@
       false,
       false,
       false,
-      false
+      false,
+      null
     ]
   },
-  "hash": "2a80e92bd8eedd97d2a6a1cc3f16eac8b030da09a5f582b9f767b6604299d69a"
+  "hash": "aa84da8962ff9f91e4fdeb2cd9c4ab87a6ff92e99fe37f35ad9bc1e41dab56b3"
 }

@@ -14,7 +14,7 @@ export function parse_html(html: string) {
 
 type Fetch = typeof fetch;
 
-export async function init_data(
+export async function update_data(
 	fetch: Fetch,
 	trip_store: Writable<Trip[]>,
 	stop_time_store: Writable<StopTime[]>,

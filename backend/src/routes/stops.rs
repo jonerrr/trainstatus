@@ -1,5 +1,4 @@
-use super::errors::ServerError;
-use super::trips::Parameters;
+use super::{errors::ServerError, trips::Parameters};
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
@@ -51,18 +50,18 @@ pub struct Route {
 pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
     let stops = sqlx::query_as!(
         Stop,
-        "select
-	s.*,
-	ARRAY_AGG(JSONB_BUILD_OBJECT('id',
-	rs.route_id,
-	'stop_type',
-	rs.stop_type)) as routes
-from
-	stops s
-left join route_stops rs on
-	s.id = rs.stop_id
-group by
-	s.id",
+        "SELECT
+        s.*,
+        ARRAY_AGG(JSONB_BUILD_OBJECT('id',
+        rs.route_id,
+        'stop_type',
+        rs.stop_type)) AS routes
+    FROM
+        stops s
+    LEFT JOIN route_stops rs ON
+        s.id = rs.stop_id
+    GROUP BY
+        s.id",
     )
     .fetch_all(&pool)
     .await?;

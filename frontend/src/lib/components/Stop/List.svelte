@@ -1,16 +1,15 @@
 <script lang="ts">
-	import { BusFront, CircleX, TrainFront, TramFront } from 'lucide-svelte';
+	import { BusFront, CircleX, TrainFront } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { derived } from 'svelte/store';
-	import { slide } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
 	import SearchWorker from '$lib/search_worker?worker';
 	import { type Stop } from '$lib/api';
-	import { stops as stop_store } from '$lib/stores';
+	import { stops as stop_store, bus_stops as bus_stop_store, monitored_routes } from '$lib/stores';
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
+	import BusTrigger from '$lib/components/Stop/BusTrigger.svelte';
 	import List from '$lib/components/List.svelte';
-	// import ModeSwitch from '$lib/components/ModeSwitch.svelte';
 	import { createTabs, melt } from '@melt-ui/svelte';
+	import type { BusStop } from '$lib/bus_api';
 	// import { cubicInOut } from 'svelte/easing';
 	// import { crossfade } from 'svelte/transition';
 
@@ -23,14 +22,9 @@
 
 	// const triggers = ['Train', 'Bus'];
 
-	// const [send, receive] = crossfade({
-	// 	duration: 250,
-	// 	easing: cubicInOut
-	// });
-
 	export let title: string = 'Stops';
 	export let stop_ids: string[] | null = [];
-	export let bus_stop_ids: string[] | null = [];
+	export let bus_stop_ids: number[] | null = [];
 	// show search bar on bottom
 	export let show_search: boolean = false;
 	// show ask for location button
@@ -47,6 +41,23 @@
 		return st;
 	});
 
+	// TODO: not sure if we want to ignore shuttles
+	$: bus_stops = derived(bus_stop_store, ($bus_stop_store) => {
+		if (!bus_stop_ids) return $bus_stop_store.slice(0, 15);
+		// this preserves the order of stop_ids but its slower
+		const st = show_location
+			? (bus_stop_ids
+					.map((id) => $bus_stop_store.find((stop) => stop.id === id))
+					.filter(Boolean) as BusStop[])
+			: $bus_stop_store.filter((st) => bus_stop_ids!.includes(st.id));
+		return st;
+	});
+
+	// TODO: make sure this wont go in some insane loop and crash the page
+	$: $monitored_routes = [
+		...new Set([...$monitored_routes, ...$bus_stops.map((s) => s.routes.map((r) => r.id)).flat()])
+	];
+
 	// from https://www.okupter.com/blog/svelte-debounce
 	const debounce = (callback: Function, wait = 50) => {
 		let timeout: ReturnType<typeof setTimeout>;
@@ -62,11 +73,15 @@
 		// If search is empty, clear search and show all stops
 		if (e.target.value === '') {
 			stop_ids = null;
+			bus_stop_ids = null;
 			return;
 		}
 
 		search_term = e.target.value;
-		searchWorker.postMessage({ type: 'search', payload: { search_term } });
+		searchWorker.postMessage({
+			type: 'search',
+			payload: { search_term, search_type: $value === 'Train' ? 't' : 'b' }
+		});
 
 		// this is to make sure that the results are in view on mobile even when keyboard is open
 		// list_el.scrollIntoView({ behavior: 'smooth' });
@@ -93,14 +108,17 @@
 			if (type === 'ready') search = 'ready';
 
 			if (type === 'results') {
-				stop_ids = payload.results;
+				console.log(payload);
+				if (payload.search_type === 't') stop_ids = payload.results;
+				else if (payload.search_type === 'b') bus_stop_ids = payload.results;
+
 				if (payload.results.length < 6) {
 					list_el.scrollIntoView();
 				}
 			}
 		});
 		// initialize when the component mounts
-		searchWorker.postMessage({ type: 'load', payload: { stops: $stops } });
+		searchWorker.postMessage({ type: 'load' });
 	});
 
 	// calculate height of list
@@ -140,6 +158,7 @@
 				</button>
 			</div>
 		</div>
+		<!-- TODO: use melt $content instead of if statement -->
 		<div
 			class={`flex flex-col gap-1 ${show_search ? 'max-h-[calc(100dvh-13rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`}
 		>
@@ -151,12 +170,11 @@
 					{/each}
 				{/if}
 			{:else if $value === 'Bus'}
-				<div
-					class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
-					transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
-				>
-					Coming Soon
-				</div>
+				{#if $bus_stops}
+					{#each $bus_stops as stop (stop?.id)}
+						<BusTrigger {stop} />
+					{/each}
+				{/if}
 			{/if}
 		</div>
 

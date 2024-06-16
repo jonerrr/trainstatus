@@ -5,7 +5,6 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-// use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{types::JsonValue, FromRow, PgPool};
 use uuid::Uuid;
@@ -19,13 +18,6 @@ pub struct Trip {
     created_at: chrono::DateTime<Utc>,
     stop_times: Option<Vec<JsonValue>>,
 }
-
-// #[derive(FromRow, Serialize, Deserialize)]
-// pub struct StopTime {
-//     arrival: DateTime<Utc>,
-//     departure: DateTime<Utc>,
-//     stop_id: String,
-// }
 
 fn all_stops() -> Vec<String> {
     Vec::new()

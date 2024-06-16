@@ -91,6 +91,8 @@ async fn main() {
         .route("/alerts", get(routes::alerts::get))
         .route("/bus/stops", get(routes::bus::stops::get))
         .route("/bus/trips", get(routes::bus::trips::get))
+        .route("/bus/routes", get(routes::bus::routes::get))
+        .route("/bus/routes/arrivals", get(routes::bus::routes::arrivals))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .with_state(pool);
