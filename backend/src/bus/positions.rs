@@ -158,7 +158,7 @@ pub async fn decode_feed(pool: PgPool) -> Result<(), DecodeFeedError> {
             .push_bind(p.bearing)
             .push_bind(p.updated_at);
     });
-    query_builder.push(" ON CONFLICT (vehicle_id, mta_id) DO UPDATE SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, updated_at = EXCLUDED.updated_at");
+    query_builder.push(" ON CONFLICT (vehicle_id) DO UPDATE SET mta_id = EXCLUDED.mta_id, lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, updated_at = EXCLUDED.updated_at");
     let query = query_builder.build();
     query.execute(&pool).await?;
 

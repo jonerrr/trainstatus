@@ -51,13 +51,14 @@ pub async fn get(
         bus_trips t
     LEFT JOIN bus_positions bp ON
         bp.vehicle_id = t.vehicle_id
-        AND bp.mta_id = t.mta_id
+       
     WHERE
         t.route_id = ANY($1)"#,
         &params.route_ids
     )
     .fetch_all(&pool)
     .await?;
+    //  AND bp.mta_id = t.mta_id
 
     Ok(Json(trips))
 }

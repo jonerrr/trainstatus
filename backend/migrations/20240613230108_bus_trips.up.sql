@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS bus_trips (
 );
 
 CREATE TABLE IF NOT EXISTS bus_positions (
-    vehicle_id INTEGER,
+    vehicle_id INTEGER PRIMARY KEY,
     stop_id INTEGER NOT NULL REFERENCES bus_stops(id),
     mta_id VARCHAR,
     lat REAL NOT NULL,
@@ -26,8 +26,7 @@ CREATE TABLE IF NOT EXISTS bus_positions (
     -- SIRI STUFF
     progress_status VARCHAR,
     passengers INTEGER,
-    capacity INTEGER,
-    UNIQUE (vehicle_id, mta_id)
+    capacity INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS bus_stop_times (

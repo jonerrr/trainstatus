@@ -38,7 +38,7 @@
 		// Interval for update_bus_data
 		bus_interval = setInterval(async () => {
 			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
-		}, 40000);
+		}, 30000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted

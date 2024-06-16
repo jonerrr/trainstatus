@@ -1,6 +1,7 @@
 use super::api_key;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 
@@ -93,22 +94,9 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .into_par_iter()
             .map(|s| Stop(s.code, s.name, s.direction, s.lat, s.lon))
             .collect::<Vec<Stop>>();
+        // let s_names = stops_n.iter().map(|s| s.1.clone()).collect::<Vec<String>>();
+        // println!("{:?}", s_names);
         stops.extend(stops_n);
-
-        // let r_stop_groups = r_stops.entry.stop_groupings[0]
-        //     .stop_groups
-        //     .iter()
-        //     .map(|sg| {
-        //         let headsign = sg.name.name.clone();
-        //         let direction = sg.id;
-        //         RouteStopGroup {
-        //             route_id: route.id.clone(),
-        //             direction,
-        //             headsign,
-        //         }
-        //     })
-        //     .collect::<Vec<RouteStopGroup>>();
-        // stop_groups.extend(r_stop_groups);
 
         // parse and collect the route stops for each group/direction
         let route_stops_g = r_stops.entry.stop_groupings[0]
@@ -281,6 +269,40 @@ where
         .collect::<Vec<i32>>())
 }
 
+// fix stop capitalization by capitalizing only the first letter of each word
+// could probably use regex for this
+fn de_stop_name<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // all non words regex
+    let re = Regex::new(r"\W{1}").unwrap();
+
+    let mut name = String::deserialize(deserializer)?;
+    name = name.to_lowercase();
+    let matches = re.find_iter(&name);
+
+    let mut name = name.clone();
+    // replace the character after each match with the uppercase version
+    for m in matches {
+        // let start = m.start();
+        let end = m.end();
+        // if the end is the last character in the string, skip it
+        let c = match name.chars().nth(end) {
+            None => {
+                // dbg!(&name);
+                continue;
+            }
+            Some(c) => c.to_uppercase().to_string(),
+        };
+        name.replace_range(end..end + 1, &c);
+    }
+    // capitalize the first letter
+    name = name.chars().nth(0).unwrap().to_uppercase().to_string() + &name[1..];
+
+    Ok(name)
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct StopGroup {
     // can be 0 or 1
@@ -293,6 +315,7 @@ pub struct StopGroup {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct StopName {
+    #[serde(deserialize_with = "de_stop_name")]
     name: String,
 }
 
@@ -317,6 +340,7 @@ pub struct StopData {
     // id: String,
     lat: f32,
     lon: f32,
+    #[serde(deserialize_with = "de_stop_name")]
     name: String,
 }
 
