@@ -14,6 +14,7 @@
 	import { pinned_bus_stops, bus_routes } from '$lib/stores';
 	import Pin from '$lib/components/Pin.svelte';
 	import BusArrivals from '$lib/components/Stop/BusArrivals.svelte';
+	import BusIcon from '$lib/components/BusIcon.svelte';
 
 	export let stop: BusStop;
 
@@ -27,15 +28,15 @@
 <button
 	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
 	on:click={() => {
-		// pushState('', {
-		// 	dialog_id: stop.id,
-		// 	dialog_type: 'stop',
-		// 	dialog_open: true
-		// });
+		pushState('', {
+			dialog_id: stop.id,
+			dialog_type: 'bus_stop',
+			dialog_open: true
+		});
 	}}
 >
-	<!-- TODO: convert to grid -->
-	<div class="flex flex-col text-left text-xs grow-0">
+	<!-- TODO: make spacing consistent (use grid maybe idk) -->
+	<div class="flex flex-col text-left text-xs">
 		<div class="flex gap-2">
 			<div>
 				{#if stop.direction === 'SW'}
@@ -67,12 +68,7 @@
 		<div class="flex flex-col">
 			{#each stop_routes as route}
 				<div class="flex gap-2 items-center text-xs text-wrap text-left rounded p-1">
-					<span
-						style={`background-color: #${route.color}`}
-						class="p-1 text-indigo-100 rounded font-bold"
-					>
-						{route.short_name}
-					</span>
+					<BusIcon {route} />
 					<div class="text-neutral-100 max-w-[60%]">
 						{stop.routes.find((r) => r.id === route.id)?.headsign}
 					</div>
