@@ -63,6 +63,8 @@
 		const open_route_id = $page.url.searchParams.get('r')?.toUpperCase();
 		const open_trip_id = $page.url.searchParams.get('t')?.toUpperCase();
 
+		const open_bus_stop_id = $page.url.searchParams.get('bs');
+
 		if (open_stop_id) {
 			// Make sure data is loaded in before opening dialog otherwise we get an error
 			await preloadData('/');
@@ -88,6 +90,14 @@
 				dialog_open: true,
 				dialog_id: open_trip_id,
 				dialog_type: 'trip'
+			});
+		} else if (open_bus_stop_id) {
+			await preloadData('/');
+
+			pushState('', {
+				dialog_open: true,
+				dialog_id: parseInt(open_bus_stop_id),
+				dialog_type: 'bus_stop'
 			});
 		}
 	});

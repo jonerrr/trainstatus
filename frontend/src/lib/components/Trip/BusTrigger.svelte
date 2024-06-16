@@ -33,6 +33,7 @@
 			<div class="flex gap-2 items-center">
 				<div class="flex flex-col gap-1">
 					{#if $trip.passengers}
+						<!-- TODO: change color of icon based on ratio of passengers and capacity -->
 						<div class="flex items-center gap-1">
 							<Users size="16" />
 							{$trip.passengers}

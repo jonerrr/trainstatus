@@ -6,6 +6,8 @@
 
 	export let stop_id: number;
 
+	// TODO: check if routes are being monitored and if not, add them to the store
+
 	// const stop = derived(bus_stops, ($stops) => {
 	// 	return $stops.find((s) => s.id === stop_id);
 	// });
