@@ -9,9 +9,8 @@
 	export let trip_id: string;
 
 	// TODO: Fix trip not found error when loading from URL
-
+	console.log(trip_id);
 	$: trip = derived(bus_trips, ($bus_trips) => {
-		console.log('searching for trip');
 		return $bus_trips.find((t) => t.id === trip_id);
 	});
 	// TODO: maybe check and make sure arrival is gt now
@@ -22,8 +21,9 @@
 		return $bus_routes.find((r) => r.id === $trip?.route_id);
 	});
 
-	$: last_stop = $bus_stops.find((s) => s.id === $stop_times[$stop_times.length - 1]?.stop_id);
-	$: console.log($trip?.stop_id);
+	$: last_stop = $stop_times
+		? $bus_stops.find((s) => s.id === $stop_times[$stop_times.length - 1]?.stop_id)
+		: null;
 
 	let copied = false;
 	function share() {
@@ -62,7 +62,7 @@
 					{#if $trip.passengers}
 						{#if $trip.passengers && $trip.capacity}
 							<!-- TODO: change color of icon based on ratio of passengers and capacity -->
-							<BusCapacity passengers={$trip.capacity} capacity={$trip.capacity} />
+							<BusCapacity passengers={$trip.passengers} capacity={$trip.capacity} />
 						{/if}
 					{/if}
 					<BusIcon route={$route} />
@@ -72,12 +72,12 @@
 
 				<h2 class="font-bold text-xl text-indigo-300">{last_stop?.name}</h2>
 			{:else}
-				<h1>Trip not found</h1>
+				<h1 class="p-2">Trip not found</h1>
 			{/if}
 		</div>
-		<!-- 
+
 		{#if $trip && $route}
-			<div class="pr-2">
+			<div class="pr-10 md:pr-2">
 				{#if !copied}
 					<button aria-label="Share trip" on:click={share}>
 						<Share class="h-6 w-6" />
@@ -88,7 +88,7 @@
 					</button>
 				{/if}
 			</div>
-		{/if} -->
+		{/if}
 	</div>
 
 	{#if $stop_times.length}
