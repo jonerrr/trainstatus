@@ -4,6 +4,7 @@
 	import { bus_stops, bus_trips, bus_stop_times, bus_routes } from '$lib/stores';
 	import BusIcon from '$lib/components/BusIcon.svelte';
 	import BusTimes from '$lib/components/Trip/BusTimes.svelte';
+	import BusCapacity from '$lib/components/Trip/BusCapacity.svelte';
 
 	export let trip_id: string;
 
@@ -59,11 +60,10 @@
 			{#if $trip && $route}
 				<div class="flex flex-col">
 					{#if $trip.passengers}
-						<!-- TODO: change color of icon based on ratio of passengers and capacity -->
-						<div class="flex items-center gap-1 text-neutral-200">
-							<Users size="16" />
-							{$trip.passengers}
-						</div>
+						{#if $trip.passengers && $trip.capacity}
+							<!-- TODO: change color of icon based on ratio of passengers and capacity -->
+							<BusCapacity passengers={$trip.capacity} capacity={$trip.capacity} />
+						{/if}
 					{/if}
 					<BusIcon route={$route} />
 				</div>

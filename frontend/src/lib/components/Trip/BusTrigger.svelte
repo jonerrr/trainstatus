@@ -3,8 +3,9 @@
 	import { derived } from 'svelte/store';
 	import { pushState } from '$app/navigation';
 	import { bus_trips } from '$lib/stores';
-	import BusIcon from '$lib/components/BusIcon.svelte';
 	import type { BusRoute, BusStop, BusStopTime } from '$lib/bus_api';
+	import BusIcon from '$lib/components/BusIcon.svelte';
+	import BusCapacity from '$lib/components/Trip/BusCapacity.svelte';
 
 	export let stop: BusStop;
 	export let route: BusRoute;
@@ -33,12 +34,8 @@
 		{#if $trip}
 			<div class="flex gap-2 items-center">
 				<div class="flex flex-col gap-1">
-					{#if $trip.passengers}
-						<!-- TODO: change color of icon based on ratio of passengers and capacity -->
-						<div class="flex items-center gap-1">
-							<Users size="16" />
-							{$trip.passengers}
-						</div>
+					{#if $trip.passengers && $trip.capacity}
+						<BusCapacity passengers={$trip.passengers} capacity={$trip.capacity} />
 					{/if}
 					<BusIcon {route} />
 				</div>
