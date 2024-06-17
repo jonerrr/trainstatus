@@ -51,13 +51,15 @@
 	>
 		{#each $route_alerts as alert}
 			<swiper-slide>
-				<div class="relative flex flex-col max-h-[80vh]">
+				<div class="relative flex flex-col max-h-[82vh] p-2">
 					<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
 						<Icon width="2rem" height="2rem" name={route_id} />
 						{alert.alert_type}
 					</h2>
 
-					<div class="text-indigo-200 overflow-auto border border-neutral-700 rounded my-2">
+					<div
+						class="text-indigo-200 max-h-[80vh] overflow-auto border border-neutral-700 rounded my-2"
+					>
 						<!-- hypothetically, the MTA could XSS this website (that would be silly) -->
 						{@html alert.header_html}
 						<!-- TODO: remove links or mark them as links -->

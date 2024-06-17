@@ -4,10 +4,12 @@
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
+	import { monitored_routes } from '$lib/stores';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
 	import BusStopContent from '$lib/components/Stop/BusContent.svelte';
+	import BusTripContent from '$lib/components/Trip/BusContent.svelte';
 
 	// detect if user is swiping back and disable close on outside click
 
@@ -63,7 +65,14 @@
 		const open_route_id = $page.url.searchParams.get('r')?.toUpperCase();
 		const open_trip_id = $page.url.searchParams.get('t')?.toUpperCase();
 
+		const preload_route_ids = $page.url.searchParams.get('pr')?.toUpperCase().split(',');
 		const open_bus_stop_id = $page.url.searchParams.get('bs');
+		const open_bus_trip_id = $page.url.searchParams.get('bt');
+
+		if (preload_route_ids) {
+			console.log('preloading routes');
+			$monitored_routes = [...preload_route_ids, ...$monitored_routes].slice(0, 15);
+		}
 
 		if (open_stop_id) {
 			// Make sure data is loaded in before opening dialog otherwise we get an error
@@ -99,6 +108,14 @@
 				dialog_id: parseInt(open_bus_stop_id),
 				dialog_type: 'bus_stop'
 			});
+		} else if (open_bus_trip_id) {
+			await preloadData('/');
+
+			pushState('', {
+				dialog_open: true,
+				dialog_id: parseInt(open_bus_trip_id),
+				dialog_type: 'bus_trip'
+			});
 		}
 	});
 </script>
@@ -111,31 +128,31 @@
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
 	{#key $page.state.dialog_id}
-		<div class="p-6">
-			{#if $page.state.dialog_type === 'stop'}
-				<StopContent bind:stop_id={$page.state.dialog_id} />
-			{:else if $page.state.dialog_type === 'trip'}
-				<TripContent bind:trip_id={$page.state.dialog_id} />
-			{:else if $page.state.dialog_type === 'route_alert'}
-				<RouteAlertContent bind:route_id={$page.state.dialog_id} />
-			{:else if $page.state.dialog_type === 'bus_stop'}
-				<BusStopContent bind:stop_id={$page.state.dialog_id} />
-			{/if}
+		{#if $page.state.dialog_type === 'stop'}
+			<StopContent bind:stop_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'trip'}
+			<TripContent bind:trip_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'route_alert'}
+			<RouteAlertContent bind:route_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'bus_stop'}
+			<BusStopContent bind:stop_id={$page.state.dialog_id} />
+		{:else if $page.state.dialog_type === 'bus_trip'}
+			<BusTripContent bind:trip_id={$page.state.dialog_id} />
+		{/if}
 
-			<button
-				on:click={() => {
-					pushState('', {
-						dialog_open: false,
-						dialog_id: '',
-						dialog_type: ''
-					});
-				}}
-				aria-label="Close dialog"
-				class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
+		<button
+			on:click={() => {
+				pushState('', {
+					dialog_open: false,
+					dialog_id: '',
+					dialog_type: ''
+				});
+			}}
+			aria-label="Close dialog"
+			class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
                 appearance-none items-center justify-center rounded-full"
-			>
-				<CircleX />
-			</button>
-		</div>
+		>
+			<CircleX />
+		</button>
 	{/key}
 </dialog>
