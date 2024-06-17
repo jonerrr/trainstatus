@@ -65,17 +65,19 @@
 			{/if}
 		</div>
 
-		<div class="pr-2">
-			{#if !copied}
-				<button aria-label="Share trip" on:click={share}>
-					<Share class="h-6 w-6" />
-				</button>
-			{:else}
-				<button class="text-green-600" aria-label="Trip link copied to clipboard">
-					<ClipboardCheck class="h-6 w-6" />
-				</button>
-			{/if}
-		</div>
+		{#if trip}
+			<div class="pr-2">
+				{#if !copied}
+					<button aria-label="Share trip" on:click={share}>
+						<Share class="h-6 w-6" />
+					</button>
+				{:else}
+					<button class="text-green-600" aria-label="Trip link copied to clipboard">
+						<ClipboardCheck class="h-6 w-6" />
+					</button>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	{#if trip_stop_times.length}
