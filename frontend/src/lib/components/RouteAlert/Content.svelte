@@ -20,11 +20,9 @@
 			});
 		return route_alerts;
 	});
-	console.log($route_alerts);
+	// console.log($route_alerts);
 
 	function fix_swiper({ detail }: { detail: [Swiper] }) {
-		console.log('fixing swiper');
-
 		const swiper = detail[0];
 		setTimeout(async () => {
 			console.log('fixing swiper');
@@ -80,10 +78,12 @@
 		{/each}
 	</swiper-container>
 {:else}
-	<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
-		<Icon width="2rem" height="2rem" name={route_id} />
-	</h2>
-	<div class="text-indigo-200">No alerts</div>
+	<div class="p-2">
+		<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
+			<Icon width="2rem" height="2rem" name={route_id} />
+		</h2>
+		<div class="text-indigo-200">No alerts</div>
+	</div>
 {/if}
 
 <!-- </div> -->

@@ -61,14 +61,15 @@
 	// Check if user is trying to open a dialog from the URL
 	// Maybe we should pushstate the query params so its easy to copy
 	onMount(async () => {
+		// stop and routes should be uppercase but trip ids should be lowercase because they are uuids
 		const open_stop_id = $page.url.searchParams.get('s')?.toUpperCase();
 		const open_route_id = $page.url.searchParams.get('r')?.toUpperCase();
-		const open_trip_id = $page.url.searchParams.get('t')?.toUpperCase();
+		const open_trip_id = $page.url.searchParams.get('t')?.toLowerCase();
+
+		const open_bus_stop_id = $page.url.searchParams.get('bs');
+		const open_bus_trip_id = $page.url.searchParams.get('bt')?.toLowerCase();
 
 		const preload_route_ids = $page.url.searchParams.get('pr')?.toUpperCase().split(',');
-		const open_bus_stop_id = $page.url.searchParams.get('bs');
-		const open_bus_trip_id = $page.url.searchParams.get('bt');
-
 		if (preload_route_ids) {
 			console.log('preloading routes');
 			$monitored_routes = [...preload_route_ids, ...$monitored_routes].slice(0, 15);
@@ -113,7 +114,7 @@
 
 			pushState('', {
 				dialog_open: true,
-				dialog_id: parseInt(open_bus_trip_id),
+				dialog_id: open_bus_trip_id,
 				dialog_type: 'bus_trip'
 			});
 		}
