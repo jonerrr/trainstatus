@@ -51,6 +51,13 @@
 	register();
 </script>
 
+<svelte:head>
+	<meta
+		property="og:description"
+		content="The best website to see view MTA subway (and bus) times and alerts."
+	/>
+</svelte:head>
+
 <div class="md:w-[60%] m-auto">
 	<Header />
 
