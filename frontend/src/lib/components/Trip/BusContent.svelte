@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Share, ClipboardCheck, ArrowBigRight, Users } from 'lucide-svelte';
+	import { ArrowBigRight } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
 	import { bus_stops, bus_trips, bus_stop_times, bus_routes } from '$lib/stores';
 	import BusIcon from '$lib/components/BusIcon.svelte';
@@ -24,28 +24,6 @@
 	$: last_stop = $stop_times
 		? $bus_stops.find((s) => s.id === $stop_times[$stop_times.length - 1]?.stop_id)
 		: null;
-
-	let copied = false;
-	function share() {
-		// pr param is a list of route ids that should be monitored
-		let url = window.location.origin + `/?bt=${trip_id}&pr=${$trip?.route_id}`;
-
-		if (!navigator.share) {
-			navigator.clipboard.writeText(url);
-			// set copied to true and change back in 500 ms
-			copied = true;
-			setTimeout(() => {
-				copied = false;
-			}, 800);
-		} else {
-			navigator.share({
-				// TODO: maybe include next stop and route name
-				// TODO: custom embeds
-				title: `${$trip?.route_id} to ${last_stop?.name}`,
-				url
-			});
-		}
-	}
 
 	// TODO: add button to load previous stop times and fetch from api
 </script>
@@ -75,20 +53,6 @@
 				<h1 class="p-2">Trip not found</h1>
 			{/if}
 		</div>
-
-		{#if $trip && $route}
-			<div class="pr-10 md:pr-2">
-				{#if !copied}
-					<button aria-label="Share trip" on:click={share}>
-						<Share class="h-6 w-6" />
-					</button>
-				{:else}
-					<button class="text-green-600" aria-label="Trip link copied to clipboard">
-						<ClipboardCheck class="h-6 w-6" />
-					</button>
-				{/if}
-			</div>
-		{/if}
 	</div>
 
 	{#if $stop_times.length}

@@ -3,6 +3,7 @@
 	import type { Writable } from 'svelte/store';
 	import { Pin } from 'lucide-svelte';
 
+	// should probably use generic types
 	export let item_id: string | number;
 	export let store: Writable<string[] | number[]>;
 
@@ -11,13 +12,12 @@
 		states
 	} = createToggle();
 	const sync = createSync(states);
+	const pressed = states.pressed;
 	$: sync.pressed($store.includes(item_id), (v) => {
 		if (v) {
 			$store = [...$store, item_id];
 		} else {
 			$store = $store.filter((id) => id !== item_id);
-			// TODO: fix undo toaster
-			// addToast({ title: 'stop removed ', description: 'removed', item: 'Stop', item_id });
 		}
 	});
 </script>
@@ -25,11 +25,15 @@
 <button
 	use:melt={$root}
 	on:click|stopPropagation
-	aria-label="Pin stop to home screen"
+	aria-label="Pin to home screen"
 	class="z-30 grid h-9 w-9 place-items-center items-center justify-center rounded-md
-text-base text-indigo-900 leading-4 bg-indigo-200 shadow-lg hover:bg-indigo-200
-data-[disabled]:cursor-not-allowed data-[state=on]:bg-indigo-400
+text-base text-indigo-300 leading-4 data-[state=on]:text-indigo-600
+data-[disabled]:cursor-not-allowed
 "
 >
-	<Pin />
+	{#if $pressed}
+		<Pin fill="#4f46e5" />
+	{:else}
+		<Pin />
+	{/if}
 </button>
