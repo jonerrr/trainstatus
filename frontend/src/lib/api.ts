@@ -22,7 +22,7 @@ export async function update_data(
 ) {
 	try {
 		const [tripsResponse, stopTimesResponse, alertsResponse] = await Promise.all([
-			fetch('/api/trips?times=false'),
+			fetch('/api/trips'),
 			fetch('/api/arrivals'),
 			fetch('/api/alerts')
 		]);
@@ -40,7 +40,8 @@ export async function update_data(
 				return data.map((t: Trip) => {
 					return {
 						...t,
-						created_at: new Date(t.created_at)
+						created_at: new Date(t.created_at),
+						updated_at: new Date(t.updated_at)
 					};
 				});
 			}),
@@ -145,9 +146,14 @@ export interface Stop {
 export interface Trip {
 	id: string;
 	route_id: string;
+	express: boolean;
 	direction: Direction;
 	assigned: boolean;
 	created_at: Date;
+	stop_id: string | null;
+	train_status: number | null;
+	current_stop_sequence: number | null;
+	updated_at: Date;
 }
 
 export enum Direction {

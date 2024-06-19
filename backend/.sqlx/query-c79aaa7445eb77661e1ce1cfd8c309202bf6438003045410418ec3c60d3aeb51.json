@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n\tt.id,\n\tt.route_id,\n    t.express,\n\tt.direction,\n\tt.assigned,\n\tt.created_at,\n\tp.stop_id,\n\tp.train_status,\n\tp.current_stop_sequence,\n\tp.updated_at\nFROM\n\ttrips t\nLEFT JOIN positions p ON\n\tp.trip_id = t.id\nWHERE\n\tt.id = ANY(\n\tSELECT\n\t\tt.id\n\tFROM\n\t\ttrips t\n\tLEFT JOIN stop_times st ON\n\t\tst.trip_id = t.id\n\tWHERE\n\t\tst.arrival > now())",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "express",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 4,
+        "name": "assigned",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "stop_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "train_status",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "current_stop_sequence",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c79aaa7445eb77661e1ce1cfd8c309202bf6438003045410418ec3c60d3aeb51"
+}

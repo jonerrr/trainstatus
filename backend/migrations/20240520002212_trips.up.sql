@@ -8,14 +8,15 @@ CREATE TABLE IF NOT EXISTS trips (
     -- 0 = south, 1 = north
     direction SMALLINT NOT NULL,
     route_id VARCHAR NOT NULL REFERENCES routes(id),
-    -- headsign VARCHAR REFERENCES headsigns(id),
+    express BOOLEAN NOT NULL,
     UNIQUE (mta_id, train_id, created_at, direction)
 );
 
 CREATE TABLE IF NOT EXISTS positions (
     trip_id UUID REFERENCES trips(id),
     stop_id VARCHAR NOT NULL REFERENCES stops(id),
-    train_status SMALLINT NOT NULL,
+    -- 0 = incoming, 1 = at stop, 2 = in transit to
+    train_status SMALLINT,
     current_stop_sequence SMALLINT,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (trip_id)
