@@ -73,6 +73,7 @@ export async function update_data(
 		alert_store.set(routeAlerts);
 	} catch (e) {
 		console.error(e);
+		offline.set(true);
 	}
 }
 

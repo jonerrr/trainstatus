@@ -167,7 +167,7 @@
 <!-- TODO: figure out transitions -->
 <dialog
 	use:manage_dialog
-	class="backdrop:bg-black/50 rounded max-h-[85vh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
+	class="backdrop:bg-black/50 rounded max-h-[85dvh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
 	bind:this={dialog_el}
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
@@ -184,7 +184,35 @@
 			<BusTripContent bind:trip_id={$page.state.dialog_id} />
 		{/if}
 
-		<button
+		<div class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center">
+			{#if !copied}
+				<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
+					<Share class="h-6 w-6" />
+				</button>
+			{:else}
+				<button
+					class="appearance-none inline-flex h-8 w-8 text-green-600"
+					aria-label="Link copied to clipboard"
+				>
+					<ClipboardCheck class="h-6 w-6" />
+				</button>
+			{/if}
+
+			<button
+				on:click={() => {
+					pushState('', {
+						dialog_open: false,
+						dialog_id: '',
+						dialog_type: ''
+					});
+				}}
+				aria-label="Close dialog"
+				class="appearance-none inline-flex h-8 w-8"
+			>
+				<CircleX />
+			</button>
+		</div>
+		<!-- <button
 			on:click={() => {
 				pushState('', {
 					dialog_open: false,
@@ -214,6 +242,6 @@
 			>
 				<ClipboardCheck class="h-6 w-6" />
 			</button>
-		{/if}
+		{/if} -->
 	{/key}
 </dialog>

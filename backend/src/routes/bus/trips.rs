@@ -34,26 +34,36 @@ pub async fn get(
     // return trips without stop_times
     let trips = sqlx::query_as!(
         BusTrip,
-        r#"SELECT 
-        t.id,
-        t.route_id,
-        t.direction,
-        t.vehicle_id,
-        t.created_at,
-        t.deviation,
-        bp.lat,
-        bp.lon,
-        bp.progress_status,
-        bp.passengers,
-        bp.capacity,
-        bp.stop_id
-    FROM
-        bus_trips t
-    LEFT JOIN bus_positions bp ON
-        bp.vehicle_id = t.vehicle_id
-       
-    WHERE
-        t.route_id = ANY($1)"#,
+        r#"
+        SELECT
+	t.id,
+	t.route_id,
+	t.direction,
+	t.vehicle_id,
+	t.created_at,
+	t.deviation,
+	bp.lat,
+	bp.lon,
+	bp.progress_status,
+	bp.passengers,
+	bp.capacity,
+	bp.stop_id
+FROM
+	bus_trips t
+LEFT JOIN bus_positions bp ON
+	bp.vehicle_id = t.vehicle_id
+	AND bp.mta_id = t.mta_id
+	AND t.id = ANY(
+	SELECT
+		t.id
+	FROM
+		bus_trips t
+	LEFT JOIN bus_stop_times st ON
+		st.trip_id = t.id
+	WHERE
+		st.arrival > now())
+WHERE
+	t.route_id = ANY($1)"#,
         &params.route_ids
     )
     .fetch_all(&pool)

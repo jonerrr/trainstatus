@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n        t.id,\n        t.route_id,\n        t.direction,\n        t.vehicle_id,\n        t.created_at,\n        t.deviation,\n        bp.lat,\n        bp.lon,\n        bp.progress_status,\n        bp.passengers,\n        bp.capacity,\n        bp.stop_id\n    FROM\n        bus_trips t\n    LEFT JOIN bus_positions bp ON\n        bp.vehicle_id = t.vehicle_id\n       \n    WHERE\n        t.route_id = ANY($1)",
+  "query": "\n        SELECT\n\tt.id,\n\tt.route_id,\n\tt.direction,\n\tt.vehicle_id,\n\tt.created_at,\n\tt.deviation,\n\tbp.lat,\n\tbp.lon,\n\tbp.progress_status,\n\tbp.passengers,\n\tbp.capacity,\n\tbp.stop_id\nFROM\n\tbus_trips t\nLEFT JOIN bus_positions bp ON\n\tbp.vehicle_id = t.vehicle_id\n\tAND bp.mta_id = t.mta_id\n\tAND t.id = ANY(\n\tSELECT\n\t\tt.id\n\tFROM\n\t\tbus_trips t\n\tLEFT JOIN bus_stop_times st ON\n\t\tst.trip_id = t.id\n\tWHERE\n\t\tst.arrival > now())\nWHERE\n\tt.route_id = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -84,5 +84,5 @@
       true
     ]
   },
-  "hash": "fdd53e5465368dfee70c2f9fbd5f67b7c584d90d05c2ca550062fec11e0ee82c"
+  "hash": "36a59f96cff3b8f185cda21c2188db752658fdd8c5d1c64744f45912d534328b"
 }

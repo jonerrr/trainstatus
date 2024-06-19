@@ -10,41 +10,46 @@ export async function update_bus_data(
 	stop_time_store: Writable<BusStopTime[]>,
 	routes: string[]
 ) {
-	const route_l = routes.join(',');
-	const [tripsResponse, stopTimesResponse] = await Promise.all([
-		fetch(`/api/bus/trips?route_ids=${route_l}`),
-		fetch(`/api/bus/routes/arrivals?route_ids=${route_l}`)
-	]);
+	try {
+		const route_l = routes.join(',');
+		const [tripsResponse, stopTimesResponse] = await Promise.all([
+			fetch(`/api/bus/trips?route_ids=${route_l}`),
+			fetch(`/api/bus/routes/arrivals?route_ids=${route_l}`)
+		]);
 
-	if (
-		tripsResponse.headers.has('x-service-worker') ||
-		stopTimesResponse.headers.has('x-service-worker')
-	)
+		if (
+			tripsResponse.headers.has('x-service-worker') ||
+			stopTimesResponse.headers.has('x-service-worker')
+		)
+			offline.set(true);
+		else offline.set(false);
+
+		const [trips, stopTimes] = await Promise.all([
+			tripsResponse.json().then((data: BusTrip[]) => {
+				return data.map((t: BusTrip) => {
+					return {
+						...t,
+						created_at: new Date(t.created_at)
+					};
+				});
+			}),
+			stopTimesResponse.json().then((data: BusStopTime[]) => {
+				return data.map((st: BusStopTime) => {
+					return {
+						...st,
+						arrival: new Date(st.arrival),
+						departure: new Date(st.departure)
+					};
+				});
+			})
+		]);
+
+		trip_store.set(trips);
+		stop_time_store.set(stopTimes);
+	} catch (e) {
+		console.error(e);
 		offline.set(true);
-	else offline.set(false);
-
-	const [trips, stopTimes] = await Promise.all([
-		tripsResponse.json().then((data: BusTrip[]) => {
-			return data.map((t: BusTrip) => {
-				return {
-					...t,
-					created_at: new Date(t.created_at)
-				};
-			});
-		}),
-		stopTimesResponse.json().then((data: BusStopTime[]) => {
-			return data.map((st: BusStopTime) => {
-				return {
-					...st,
-					arrival: new Date(st.arrival),
-					departure: new Date(st.departure)
-				};
-			});
-		})
-	]);
-
-	trip_store.set(trips);
-	stop_time_store.set(stopTimes);
+	}
 }
 
 export interface BusRoute {

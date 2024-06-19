@@ -298,7 +298,7 @@ where
         name.replace_range(end..end + 1, &c);
     }
     // capitalize the first letter
-    name = name.chars().nth(0).unwrap().to_uppercase().to_string() + &name[1..];
+    name = name.chars().next().unwrap().to_uppercase().to_string() + &name[1..];
 
     Ok(name)
 }

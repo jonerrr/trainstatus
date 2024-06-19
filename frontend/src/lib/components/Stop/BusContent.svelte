@@ -39,8 +39,9 @@
 
 {#if stop}
 	<div class="p-4">
-		<div class="flex items-center gap-2 py-1">
-			<div class="flex flex-wrap gap-1">
+		<div class="flex gap-1">
+			<!-- TODO: fix extra space when wrapping -->
+			<div class={`flex flex-wrap gap-1 my-auto`}>
 				{#each stop_routes as route}
 					<BusIcon {route} />
 				{/each}
@@ -64,7 +65,7 @@
 	{/if} -->
 
 		<div
-			class="flex border overflow-auto max-h-96 border-neutral-800 flex-col rounded shadow-lg bg-neutral-900/50 text-indigo-400"
+			class="flex flex-col gap-1 border overflow-auto max-h-96 border-neutral-800 rounded shadow-lg bg-neutral-900/50 text-indigo-400"
 		>
 			{#if $stop_times.length}
 				{#each $stop_times as stop_time}
