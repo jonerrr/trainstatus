@@ -1,5 +1,5 @@
 use crate::feed;
-use chrono::{DateTime, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
@@ -98,13 +98,13 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
     // TODO: figure out why sometimes the stuff is empty
 
     for entity in feed.entity {
-        if entity.trip_update.is_none() && entity.vehicle.is_none() {
-            tracing::debug!(
-                "Skipping entity without trip_update or vehicle endpoint: {}",
-                endpoint
-            );
-            continue;
-        }
+        // if entity.trip_update.is_none() && entity.vehicle.is_none() {
+        //     tracing::debug!(
+        //         "Skipping entity without trip_update or vehicle endpoint: {}",
+        //         endpoint
+        //     );
+        //     continue;
+        // }
 
         if let Some(trip_update) = entity.trip_update {
             // used to get the direction
@@ -126,13 +126,16 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                     continue;
                 }
             };
+            let mut express = false;
             // There is an express SI called SS in the feed but we are using SI for the route_id
             if route_id == "SS" {
                 route_id = "SI".to_string();
+                express = true;
             };
             // check if express train
             if route_id.ends_with('X') {
                 route_id.pop();
+                express = true;
             }
 
             let Some(nyct_trip_descriptor) = trip_update.trip.nyct_trip_descriptor else {
@@ -219,13 +222,11 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 + &direction.to_string();
 
             // timezone is America/New_York (UTC -4) according to the agency.txt file in the static gtfs data
-            let tz = chrono_tz::America::New_York;
-
             // maybe don't unwrap
             let start_timestamp =
                 NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
                     .unwrap()
-                    .and_local_timezone(tz)
+                    .and_local_timezone(chrono_tz::America::New_York)
                     .unwrap();
             // convert to utc
             let start_timestamp = start_timestamp.to_utc();
@@ -303,9 +304,9 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             // not sure if we should upsert on conflict yet
             sqlx::query!(
                 r#"
-                INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT DO NOTHING                    
+                INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction, express)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned
                 "#,
                 id,
                 trip_update.trip.trip_id,
@@ -314,6 +315,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 start_timestamp,
                 assigned,
                 direction,
+                express
             )
             .execute(pool)
             .await?;
@@ -341,6 +343,159 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             query_builder.push(" ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure");
             let query = query_builder.build();
             query.execute(pool).await?;
+        }
+
+        // TODO: combine similar functions (like getting start timestamp and getting trip / tripid) into one function that trip and vehicle can use
+        if let Some(vehicle) = entity.vehicle {
+            // TODO: save stop sequence, stop id, status, timestamp,
+            let Some(trip) = vehicle.trip else {
+                tracing::error!("No trip for vehicle");
+                continue;
+            };
+
+            let train_status = vehicle.current_status.map(|s| s as i16);
+
+            let current_stop_sequence = vehicle.current_stop_sequence.map(|s| s as i16);
+
+            let Some(updated_at) = vehicle
+                .timestamp
+                .map(|t| chrono::Utc.timestamp_opt(t as i64, 0).unwrap())
+            else {
+                tracing::error!("No timestamp for vehicle");
+                continue;
+            };
+
+            let Some(trip_id) = trip.trip_id else {
+                tracing::error!("No trip_id for vehicle");
+                continue;
+            };
+
+            let Some(mut route_id) = trip.route_id else {
+                tracing::error!("No route_id for vehicle");
+                continue;
+            };
+
+            // There is an express SI called SS in the feed but we are using SI for the route_id
+            if route_id == "SS" {
+                route_id = "SI".to_string();
+            };
+            // remove express train indicator
+            if route_id.ends_with('X') {
+                route_id.pop();
+            }
+
+            // should i check if stop id is fake here?
+            let Some(mut stop_id) = vehicle.stop_id else {
+                tracing::error!("No stop_id for vehicle");
+                continue;
+            };
+            // remove direction from stop_id, used for determining direction if needed
+            let stop_direction = stop_id.pop();
+
+            if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+                continue;
+            }
+
+            let Some(nyct_trip_descriptor) = trip.nyct_trip_descriptor else {
+                tracing::error!("No nyct_trip_descriptor for vehicle");
+                continue;
+            };
+
+            let train_id = nyct_trip_descriptor.train_id();
+
+            let direction: i16 = match nyct_trip_descriptor.direction {
+                Some(d) => match d {
+                    // north
+                    1 => 1,
+                    // south
+                    3 => 0,
+                    // east and west aren't used
+                    _ => unreachable!(),
+                },
+                None => {
+                    // we can get direction from stop id instead
+                    match stop_direction {
+                        Some('N') => 1,
+                        Some('S') => 0,
+                        _ => unreachable!(),
+                    }
+                }
+            };
+
+            let start_time = match trip.start_time.as_ref() {
+                Some(time) => time.to_owned(),
+                None => {
+                    // tracing::debug!("Skipping trip without start time");
+                    // This is how you parse the origin time according to MTA's gtfs docs
+                    let origin_time =
+                        trip_id.split_once('_').unwrap().0.parse::<u32>().unwrap() / 100;
+                    match NaiveTime::from_hms_opt(
+                        origin_time / 60,
+                        origin_time % 60,
+                        ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+                    ) {
+                        Some(time) => time.to_string(),
+                        None => {
+                            tracing::warn!("Skipping vehicle without start time");
+                            continue;
+                        }
+                    }
+                }
+            };
+            let start_date = match trip.start_date.as_ref() {
+                Some(date) => date,
+                None => {
+                    tracing::debug!("Skipping vehicle without start date");
+                    continue;
+                }
+            };
+            let start_timestamp = format!("{} {}", start_date, start_time);
+            let start_timestamp =
+                NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
+                    .unwrap()
+                    .and_local_timezone(chrono_tz::America::New_York)
+                    .unwrap();
+            // convert to utc
+            let start_timestamp = start_timestamp.to_utc();
+
+            let trip = sqlx::query!(
+                "
+                SELECT
+                    id
+                FROM
+                    trips
+                WHERE
+                    route_id = $1
+                    AND train_id = $2
+                    AND direction = $3
+                ORDER BY
+                    ABS(EXTRACT(EPOCH
+                FROM
+                    ($4 - created_at)))
+                LIMIT 1
+            ",
+                route_id,
+                train_id,
+                direction,
+                start_timestamp
+            )
+            .fetch_optional(pool)
+            .await?;
+
+            let trip_id = match trip {
+                Some(t) => t.id,
+                None => {
+                    tracing::error!("No trip found for vehicle");
+                    continue;
+                }
+            };
+
+            sqlx::query!("
+                INSERT INTO positions (trip_id, stop_id, train_status, current_stop_sequence, updated_at)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (trip_id)
+                DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at
+            ", trip_id, stop_id, train_status, current_stop_sequence, updated_at).execute(pool).await?;
         }
     }
 

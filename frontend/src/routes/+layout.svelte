@@ -30,7 +30,7 @@
 		// update bus routes data when monitored routes change
 		// TODO: maybe check if there are no new routes and then don't update
 		monitored_routes.subscribe(async (routes) => {
-			if (JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
+			if (routes.length && JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
 				last_monitored_routes = routes;
 				await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
 			}

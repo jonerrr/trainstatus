@@ -1,22 +1,23 @@
-use super::{errors::ServerError, parse_list};
-use axum::{
-    extract::{Query, State},
-    response::IntoResponse,
-    Json,
-};
+use crate::routes::{errors::ServerError, parse_list};
+use axum::{extract::State, response::IntoResponse, Json};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::{types::JsonValue, FromRow, PgPool};
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
 pub struct Trip {
     id: Uuid,
     route_id: String,
+    express: bool,
     direction: i16,
     assigned: bool,
     created_at: chrono::DateTime<Utc>,
-    stop_times: Option<Vec<JsonValue>>,
+    stop_id: Option<String>,
+    train_status: Option<i16>,
+    current_stop_sequence: Option<i16>,
+    updated_at: Option<chrono::DateTime<Utc>>,
+    // stop_times: Option<Vec<JsonValue>>,
 }
 
 fn all_stops() -> Vec<String> {
@@ -30,149 +31,37 @@ pub struct Parameters {
     pub times: Option<bool>,
 }
 
-pub async fn get(
-    State(pool): State<PgPool>,
-    params: Query<Parameters>,
-) -> Result<impl IntoResponse, ServerError> {
-    // return all trips if no stop_ids are provided
-    if params.stop_ids.is_empty() {
-        // check if they want stop_times included
-        if let Some(times) = params.times {
-            // return stop_times
-            if times {
-                let trips = sqlx::query_as!(
-                    Trip,
-                    "SELECT
-                    t.id,
-                    t.route_id,
-                    t.direction,
-                    t.assigned,
-                    t.created_at,
-                    array_agg(jsonb_build_object('stop_id',
-                    st.stop_id,
-                    'arrival',
-                    st.arrival,
-                    'departure',
-                    st.departure)
-                ORDER BY
-                    st.arrival) AS stop_times
-                FROM
-                    trips t
-                LEFT JOIN stop_times st ON
-                    t.id = st.trip_id
-                WHERE
-                    t.id = ANY(
-                    SELECT
-                        t.id
-                    FROM
-                        trips t
-                    LEFT JOIN stop_times st ON
-                        st.trip_id = t.id
-                    WHERE
-                        st.arrival > now())
-                GROUP BY
-                    t.id"
-                )
-                .fetch_all(&pool)
-                .await?;
+pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+    let trips = sqlx::query_as!(
+        Trip,
+        r#"SELECT
+	t.id,
+	t.route_id,
+    t.express,
+	t.direction,
+	t.assigned,
+	t.created_at,
+	p.stop_id,
+	p.train_status,
+	p.current_stop_sequence,
+	p.updated_at
+FROM
+	trips t
+LEFT JOIN positions p ON
+	p.trip_id = t.id
+WHERE
+	t.id = ANY(
+	SELECT
+		t.id
+	FROM
+		trips t
+	LEFT JOIN stop_times st ON
+		st.trip_id = t.id
+	WHERE
+		st.arrival > now())"#
+    )
+    .fetch_all(&pool)
+    .await?;
 
-                Ok(Json(trips))
-            } else {
-                // return trips without stop_times
-                let trips = sqlx::query_as!(
-                    Trip,
-                    r#"SELECT
-                    t.id,
-                    t.route_id,
-                    t.direction,
-                    t.assigned,
-                    t.created_at,
-                    NULL AS "stop_times!: Option<Vec<JsonValue>>"
-                FROM
-                    trips t"#
-                )
-                .fetch_all(&pool)
-                .await?;
-
-                Ok(Json(trips))
-            }
-        } else {
-            let trips = sqlx::query_as!(
-                Trip,
-                "SELECT
-                t.id,
-                t.route_id,
-                t.direction,
-                t.assigned,
-                t.created_at,
-                array_agg(jsonb_build_object('stop_id',
-                st.stop_id,
-                'arrival',
-                st.arrival,
-                'departure',
-                st.departure)
-            ORDER BY
-                st.arrival) AS stop_times
-            FROM
-                trips t
-            LEFT JOIN stop_times st ON
-                t.id = st.trip_id
-            WHERE
-                t.id = ANY(
-                SELECT
-                    t.id
-                FROM
-                    trips t
-                LEFT JOIN stop_times st ON
-                    st.trip_id = t.id
-                WHERE
-                    st.arrival > now())
-            GROUP BY
-                t.id"
-            )
-            .fetch_all(&pool)
-            .await?;
-            Ok(Json(trips))
-        }
-    } else {
-        let trips = sqlx::query_as!(
-            Trip,
-            "SELECT
-            t.id,
-            t.route_id,
-            t.direction,
-            t.assigned,
-            t.created_at,
-            array_agg(jsonb_build_object('stop_id',
-            st.stop_id,
-            'arrival',
-            st.arrival,
-            'departure',
-            st.departure)
-        ORDER BY
-            st.arrival) AS stop_times
-        FROM
-            trips t
-        LEFT JOIN stop_times st ON
-            t.id = st.trip_id
-        WHERE
-            t.id = ANY(
-            SELECT
-                t.id
-            FROM
-                trips t
-            LEFT JOIN stop_times st ON
-                st.trip_id = t.id
-            WHERE
-                st.stop_id = ANY($1)
-                    AND st.arrival > now())
-        GROUP BY
-            t.id",
-            &params.stop_ids
-        )
-        .fetch_all(&pool)
-        .await?;
-
-        Ok(Json(trips))
-    }
+    Ok(Json(trips))
 }
