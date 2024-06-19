@@ -14,6 +14,7 @@
 			width="2rem"
 			height="2rem"
 			name={route.id}
+			link={false}
 		/>
 	{/each}
 </div>

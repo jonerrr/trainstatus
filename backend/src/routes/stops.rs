@@ -25,11 +25,12 @@ pub struct Stop {
     // pub trips: Option<Vec<JsonValue>>,
 }
 
-#[derive(FromRow)]
-pub struct Route {
-    pub id: String,
-    pub stop_type: i16,
-}
+// #[derive(FromRow)]
+// pub struct Route {
+//     pub id: String,
+//     pub stop_type: i16,
+//     pub stop_sequence: i16,
+// }
 
 // pub struct Trip {
 //     pub id: Uuid,
@@ -52,17 +53,19 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
     let stops = sqlx::query_as!(
         Stop,
         "SELECT
-        s.*,
-        ARRAY_AGG(JSONB_BUILD_OBJECT('id',
-        rs.route_id,
-        'stop_type',
-        rs.stop_type)) AS routes
-    FROM
-        stops s
-    LEFT JOIN route_stops rs ON
-        s.id = rs.stop_id
-    GROUP BY
-        s.id",
+	s.*,
+	ARRAY_AGG(JSONB_BUILD_OBJECT('id',
+	rs.route_id,
+	'stop_type',
+	rs.stop_type,
+	'stop_sequence',
+	rs.stop_sequence)) AS routes
+FROM
+	stops s
+LEFT JOIN route_stops rs ON
+	s.id = rs.stop_id
+GROUP BY
+	s.id",
     )
     .fetch_all(&pool)
     .await?;

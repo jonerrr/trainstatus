@@ -14,10 +14,11 @@
 	// detect if user is swiping back and disable close on outside click
 
 	let dialog_el: HTMLDialogElement;
+	let dialog_width: number;
+	let dialog_height: number;
 
 	function manage_dialog(node: HTMLDialogElement) {
 		page.subscribe((p) => {
-			// console.log(p);
 			if (p.state.dialog_open) {
 				// prevent close state issues
 				// node.close();
@@ -30,30 +31,32 @@
 			}
 		});
 
-		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog
+		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog when swiping to go back
 		// from here https://stackoverflow.com/a/59741870
 		const delta = 6;
 		let startX: number;
 		let startY: number;
 
 		node.addEventListener('mousedown', function (event) {
-			startX = event.pageX;
-			startY = event.pageY;
+			// Make sure the user is clicking outside of the dialog
+			if (event.target === node) {
+				startX = event.pageX;
+				startY = event.pageY;
+			}
 		});
 
 		node.addEventListener('mouseup', function (event) {
 			const diffX = Math.abs(event.pageX - startX);
 			const diffY = Math.abs(event.pageY - startY);
+			// console.log(event.target.id);
 
 			if (diffX < delta && diffY < delta) {
-				if (event.target === node) {
-					// Close the dialog
-					pushState('', {
-						dialog_open: false,
-						dialog_id: '',
-						dialog_type: ''
-					});
-				}
+				// Close the dialog
+				pushState('', {
+					dialog_open: false,
+					dialog_id: '',
+					dialog_type: ''
+				});
 			}
 		});
 	}
@@ -166,9 +169,12 @@
 
 <!-- TODO: figure out transitions -->
 <dialog
+	id="content-dialog"
 	use:manage_dialog
 	class="backdrop:bg-black/50 rounded max-h-[85dvh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
 	bind:this={dialog_el}
+	bind:offsetWidth={dialog_width}
+	bind:offsetHeight={dialog_height}
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
 	{#key $page.state.dialog_id}

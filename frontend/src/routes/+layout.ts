@@ -2,7 +2,7 @@ import { update_data } from '$lib/api';
 import { stops, trips, stop_times, alerts, bus_stops, bus_routes } from '$lib/stores';
 import type { LayoutLoad } from './$types';
 
-// // load data here first for SSR benefits (i think)
+// load data here first for SSR benefits (i think)
 export const load: LayoutLoad = async ({ fetch }) => {
 	const stopsPromise = fetch('/api/stops').then((res) => res.json());
 	const busStopsPromise = fetch('/api/bus/stops').then((res) => res.json());

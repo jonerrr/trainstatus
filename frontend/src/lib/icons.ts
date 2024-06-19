@@ -226,6 +226,18 @@ const icons = [
         </g>
     </g>`
 	},
+	// TODO: fix clipping for diamond icons
+	{
+		name: 'FX',
+		svg: `<g id="F-Diamond" serif:id="F Diamond">
+        <g transform="matrix(0.539996,0.539996,-0.555556,0.555556,51.4781,-4.07742)">
+            <rect x="2.407" y="5" width="92.593" height="90" style="fill:rgb(255,98,25);"/>
+        </g>
+        <g transform="matrix(1.26802,0,0,1.26802,21.9029,39.5201)">
+            <path d="M10.105,-10.604L36.932,-10.604L36.932,-3.955L17.961,-3.955L17.961,4.748L34.57,4.748L34.57,11.32L17.961,11.32L17.961,27.185L10.105,27.185L10.105,-10.604Z" style="fill:white;fill-rule:nonzero;"/>
+        </g>
+    </g>`
+	},
 	{
 		name: '6X',
 		svg: `<g id="_6-Diamond" serif:id="6 Diamond">

@@ -20,6 +20,7 @@
 		: undefined;
 
 	// TODO: add button to load previous stop times and fetch from api
+	// TODO: fix state not updating properly
 </script>
 
 <!-- list of stops and their arrival times -->
@@ -28,9 +29,9 @@
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full pt-1">
-		<div class="flex gap-2 items-center text-indigo-400">
+		<div class="flex gap-2 items-center text-indigo-400 max-w-[calc(100%-60px)]">
 			{#if $trip}
-				<Icon width="2rem" height="2rem" name={$trip.route_id} />
+				<Icon express={$trip.express} width="2rem" height="2rem" name={$trip.route_id} />
 
 				<ArrowBigRight />
 
@@ -43,10 +44,10 @@
 		</div>
 	</div>
 
-	{#if $trip_stop_times.length}
+	{#if $trip && $trip_stop_times.length}
 		<div class="max-h-[75dvh] pt-2 overflow-auto">
-			{#each $trip_stop_times as stop_time}
-				<Times {stop_time} />
+			{#each $trip_stop_times as stop_time (stop_time.stop_id)}
+				<Times stop_id={$trip.stop_id} train_status={$trip.train_status} {stop_time} />
 			{/each}
 		</div>
 	{/if}
