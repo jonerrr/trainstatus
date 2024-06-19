@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n        s.*,\n        ARRAY_AGG(JSONB_BUILD_OBJECT('id',\n        rs.route_id,\n        'stop_type',\n        rs.stop_type)) AS routes\n    FROM\n        stops s\n    LEFT JOIN route_stops rs ON\n        s.id = rs.stop_id\n    GROUP BY\n        s.id",
+  "query": "SELECT\n\ts.*,\n\tARRAY_AGG(JSONB_BUILD_OBJECT('id',\n\trs.route_id,\n\t'stop_type',\n\trs.stop_type,\n\t'stop_sequence',\n\trs.stop_sequence)) AS routes\nFROM\n\tstops s\nLEFT JOIN route_stops rs ON\n\ts.id = rs.stop_id\nGROUP BY\n\ts.id",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       null
     ]
   },
-  "hash": "f22f039c511d4711b46cdd0316f6d20f07aa0ffabb9ebad10894f3a5d4c8e24e"
+  "hash": "b030df363f4caac2384be3f56c4045b59545eecebfdcd2bb870c5a53081bc7df"
 }

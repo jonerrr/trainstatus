@@ -50,7 +50,7 @@
 
 	{#if $stop_times.length}
 		<div class="max-h-[75dvh] pt-1 flex flex-col gap-1 overflow-auto">
-			{#each $stop_times as stop_time}
+			{#each $stop_times as stop_time (stop_time.trip_id)}
 				<BusTimes {stop_time} />
 			{/each}
 		</div>

@@ -111,12 +111,10 @@ export const all_route_ids = [
 
 export interface RouteStop {
 	id: string;
-	// maybe store name idk yet or just join
-	// name: string;
 	// I wonder if its possible to check the alerts and see if route is running on night service
 	// also take into account rush hours https://new.mta.info/sites/default/files/2019-10/service_guide_web_Oct19.pdf
 	stop_type: StopType;
-	// arrivals: number[];
+	stop_sequence: number;
 }
 
 export enum StopType {
@@ -151,9 +149,15 @@ export interface Trip {
 	assigned: boolean;
 	created_at: Date;
 	stop_id: string | null;
-	train_status: number | null;
+	train_status: TrainStatus | null;
 	current_stop_sequence: number | null;
 	updated_at: Date;
+}
+
+export enum TrainStatus {
+	Incoming = 0,
+	AtStop = 1,
+	InTransitTo = 2
 }
 
 export enum Direction {

@@ -128,9 +128,9 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             };
             let mut express = false;
             // There is an express SI called SS in the feed but we are using SI for the route_id
+            // I'm not marking this as express because I don't have an icon for ti
             if route_id == "SS" {
                 route_id = "SI".to_string();
-                express = true;
             };
             // check if express train
             if route_id.ends_with('X') {
@@ -212,17 +212,11 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                     continue;
                 }
             };
-            let start_timestamp = format!("{} {}", start_date, start_time);
-            let id_name = start_timestamp.clone()
-                + " "
-                + trip_id
-                + " "
-                + &route_id
-                + " "
-                + &direction.to_string();
+            let id_name = start_date.to_owned() + trip_id + &route_id + &direction.to_string();
 
             // timezone is America/New_York (UTC -4) according to the agency.txt file in the static gtfs data
             // maybe don't unwrap
+            let start_timestamp = format!("{} {}", start_date, start_time);
             let start_timestamp =
                 NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
                     .unwrap()
@@ -459,8 +453,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             let start_timestamp = start_timestamp.to_utc();
 
             let trip = sqlx::query!(
-                "
-                SELECT
+                "SELECT
                     id
                 FROM
                     trips
@@ -472,8 +465,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                     ABS(EXTRACT(EPOCH
                 FROM
                     ($4 - created_at)))
-                LIMIT 1
-            ",
+                LIMIT 1",
                 route_id,
                 train_id,
                 direction,
@@ -485,7 +477,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             let trip_id = match trip {
                 Some(t) => t.id,
                 None => {
-                    tracing::error!("No trip found for vehicle");
+                    tracing::debug!("No trip found for vehicle");
                     continue;
                 }
             };

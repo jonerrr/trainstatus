@@ -7,12 +7,12 @@ use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
 pub struct Trip {
-    id: Uuid,
-    route_id: String,
-    express: bool,
-    direction: i16,
-    assigned: bool,
-    created_at: chrono::DateTime<Utc>,
+    id: Option<Uuid>,
+    route_id: Option<String>,
+    express: Option<bool>,
+    direction: Option<i16>,
+    assigned: Option<bool>,
+    created_at: Option<chrono::DateTime<Utc>>,
     stop_id: Option<String>,
     train_status: Option<i16>,
     current_stop_sequence: Option<i16>,

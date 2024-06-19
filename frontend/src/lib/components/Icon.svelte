@@ -3,17 +3,18 @@
 	import icons from '$lib/icons';
 
 	export let name: string;
+	export let express: boolean = false;
 	export let width = '1rem';
 	export let height = '1rem';
 	// link to route alert, false for route alerts so you don't go to the same dialog
 	export let link: boolean = true;
 
-	let icon = icons.find((i) => i.name === name)!;
+	let icon_name = express ? name + 'X' : name;
+	let icon = icons.find((i) => i.name === icon_name)!;
 </script>
 
 <!-- Icon component only works with complete: false svgs -->
 
-<!-- TODO: when clicking on icon, go to stop list -->
 <button
 	on:click={() => {
 		if (link) pushState('', { dialog_open: true, dialog_id: name, dialog_type: 'route_alert' });

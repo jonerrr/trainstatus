@@ -27,6 +27,11 @@ export const location_status = persisted<LocationStatus>(
 	'location_status',
 	LocationStatus.NeverAsked
 );
+// store which tab user was last on in stop dialog
+export const stop_direction = persisted<'northbound' | 'southbound'>(
+	'stop_direction',
+	'northbound'
+);
 
 // list of bus routes to fetch from api bc we can't fetch all at once
 export const monitored_routes = writable<string[]>([]);
