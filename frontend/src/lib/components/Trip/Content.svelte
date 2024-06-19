@@ -44,7 +44,7 @@
 	</div>
 
 	{#if $trip_stop_times.length}
-		<div class="max-h-full pt-2">
+		<div class="max-h-[75vh] pt-2 overflow-auto">
 			{#each $trip_stop_times as stop_time}
 				<Times {stop_time} />
 			{/each}
