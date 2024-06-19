@@ -92,7 +92,7 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
-<div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 h-[calc(100vh-8rem)]">
+<div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
 	{#if $pinned_routes.length}
 		<RouteAlertList expand={false} title="Pinned Routes" bind:route_ids={$pinned_routes} />
 	{/if}

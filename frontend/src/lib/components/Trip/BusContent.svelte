@@ -8,8 +8,6 @@
 
 	export let trip_id: string;
 
-	// TODO: Fix trip not found error when loading from URL
-	console.log(trip_id);
 	$: trip = derived(bus_trips, ($bus_trips) => {
 		return $bus_trips.find((t) => t.id === trip_id);
 	});
@@ -30,11 +28,11 @@
 
 <!-- list of stops and their arrival times -->
 <div
-	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80vh]
+	class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
-		<div class="flex max-w-[calc(100%-45px)] gap-2 items-center text-indigo-400">
+		<div class="flex max-w-[calc(100%-60px)] gap-2 items-center text-indigo-400">
 			{#if $trip && $route}
 				<div class="flex flex-col">
 					{#if $trip.passengers}
@@ -48,6 +46,7 @@
 
 				<ArrowBigRight />
 
+				<!-- TODO: figure out why not all stops are in trip sometimes so last stop is incorrect -->
 				<h2 class="font-bold text-xl text-indigo-300">{last_stop?.name}</h2>
 			{:else}
 				<h1 class="p-2">Trip not found</h1>
@@ -56,7 +55,7 @@
 	</div>
 
 	{#if $stop_times.length}
-		<div class="max-h-[75vh] overflow-auto">
+		<div class="max-h-[75vh] pt-1 flex flex-col gap-1 overflow-auto">
 			{#each $stop_times as stop_time}
 				<BusTimes {stop_time} />
 			{/each}
