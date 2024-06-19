@@ -14,8 +14,6 @@
 	// detect if user is swiping back and disable close on outside click
 
 	let dialog_el: HTMLDialogElement;
-	let dialog_width: number;
-	let dialog_height: number;
 
 	function manage_dialog(node: HTMLDialogElement) {
 		page.subscribe((p) => {
@@ -173,8 +171,6 @@
 	use:manage_dialog
 	class="backdrop:bg-black/50 rounded max-h-[85dvh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
 	bind:this={dialog_el}
-	bind:offsetWidth={dialog_width}
-	bind:offsetHeight={dialog_height}
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
 	{#key $page.state.dialog_id}
