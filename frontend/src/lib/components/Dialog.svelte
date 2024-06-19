@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
@@ -56,6 +56,49 @@
 				}
 			}
 		});
+	}
+
+	let copied = false;
+
+	function share() {
+		let param = '';
+		let title = '';
+		switch ($page.state.dialog_type) {
+			case 'stop':
+				param = 's';
+				title = 'View Stop';
+				break;
+			case 'trip':
+				param = 't';
+				title = 'View Trip';
+				break;
+			case 'route_alert':
+				param = 'r';
+				title = 'View Route Alert';
+				break;
+			case 'bus_stop':
+				param = 'bs';
+				title = 'View Bus Stop';
+				break;
+			case 'bus_trip':
+				param = 'bt';
+				title = 'View Bus Trip';
+				break;
+		}
+
+		let url = window.location.origin + `/?${param}=${$page.state.dialog_id}`;
+		if (!navigator.share) {
+			navigator.clipboard.writeText(url);
+			copied = true;
+			setTimeout(() => {
+				copied = false;
+			}, 800);
+		} else {
+			navigator.share({
+				title,
+				url
+			});
+		}
 	}
 
 	// Check if user is trying to open a dialog from the URL
@@ -150,10 +193,27 @@
 				});
 			}}
 			aria-label="Close dialog"
-			class="absolute right-[10px] top-[10px] inline-flex h-8 w-8
-                appearance-none items-center justify-center rounded-full"
+			class="absolute right-[5px] top-[10px] inline-flex h-8 w-8
+                appearance-none items-center justify-center"
 		>
 			<CircleX />
 		</button>
+
+		{#if !copied}
+			<button
+				class="absolute appearance-none items-center justify-center right-[40px] top-[10px] inline-flex h-8 w-8"
+				aria-label="Share"
+				on:click={share}
+			>
+				<Share class="h-6 w-6" />
+			</button>
+		{:else}
+			<button
+				class="absolute appearance-none items-center justify-center right-[40px] top-[10px] inline-flex h-8 w-8 text-green-600"
+				aria-label="Link copied to clipboard"
+			>
+				<ClipboardCheck class="h-6 w-6" />
+			</button>
+		{/if}
 	{/key}
 </dialog>

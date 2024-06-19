@@ -37,7 +37,7 @@ export const bus_trips = writable<BusTrip[]>([]);
 export const bus_stop_times = writable<BusStopTime[]>([]);
 
 // export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
-export const pinned_bus_stops = persisted('pinned_bus_stops', [100014]);
+export const pinned_bus_stops = persisted('pinned_bus_stops', []);
 
 // store length of each list element
 export const item_heights = writable<{ [key: string | number]: number }>({});
