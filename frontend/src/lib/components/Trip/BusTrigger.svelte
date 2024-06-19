@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Users } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
 	import { pushState } from '$app/navigation';
 	import { bus_trips } from '$lib/stores';
@@ -16,6 +15,7 @@
 	});
 	// console.log($trip);
 	// TODO: make sure data auto updates properly
+	// TODO: show if its only scheduled and not real time (maybe check if bus has position or if it hasn't left first stop)
 </script>
 
 <button

@@ -45,9 +45,11 @@
 					<BusIcon {route} />
 				{/each}
 			</div>
+			<div class="flex flex-col gap-1">
+				<span class="text-xs text-neutral-300">#{stop.id}</span>
 
-			<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
-			<span class="text-xs text-neutral-300">#{stop.id}</span>
+				<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
+			</div>
 		</div>
 
 		<!-- TODO: get bus transfers and also subway transfers -->
@@ -62,7 +64,7 @@
 	{/if} -->
 
 		<div
-			class="flex border max-h-96 border-neutral-800 flex-col rounded shadow-lg bg-neutral-900/50 text-indigo-400"
+			class="flex border overflow-auto max-h-96 border-neutral-800 flex-col rounded shadow-lg bg-neutral-900/50 text-indigo-400"
 		>
 			{#if $stop_times.length}
 				{#each $stop_times as stop_time}

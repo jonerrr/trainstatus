@@ -34,7 +34,7 @@
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
-		<div class="flex gap-2 items-center text-indigo-400">
+		<div class="flex max-w-[calc(100%-45px)] gap-2 items-center text-indigo-400">
 			{#if $trip && $route}
 				<div class="flex flex-col">
 					{#if $trip.passengers}
@@ -56,7 +56,7 @@
 	</div>
 
 	{#if $stop_times.length}
-		<div class="max-h-full">
+		<div class="max-h-[75vh] overflow-auto">
 			{#each $stop_times as stop_time}
 				<BusTimes {stop_time} />
 			{/each}
