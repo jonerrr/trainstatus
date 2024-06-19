@@ -17,10 +17,10 @@ export const trips = writable<Trip[]>([]);
 export const stop_times = writable<StopTime[]>([]);
 export const alerts = writable<Alert[]>([]);
 
-export const pinned_routes = persisted('pinned_routes', ['J']);
+export const pinned_routes = persisted('pinned_routes', []);
 // which of the pin lists have accordion open
 // export const expanded_pinned = persisted('expanded_pinned', ['routes']);
-export const pinned_stops = persisted('pinned_stops', ['631']);
+export const pinned_stops = persisted('pinned_stops', []);
 // the amount of elements to show in pinned routes list before scroll is required
 // export const pinned_routes_shown = persisted('pinned_routes_shown', 1);
 export const location_status = persisted<LocationStatus>(

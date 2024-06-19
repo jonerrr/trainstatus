@@ -11,7 +11,7 @@
 </script>
 
 <button
-	class="border-neutral-600 w-full bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 flex justify-between"
+	class="border-neutral-600 w-full bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 flex justify-between -y1"
 	transition:slide={{ easing: quintOut, axis: 'y' }}
 	on:click={() => {
 		pushState('', {

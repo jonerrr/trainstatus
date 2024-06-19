@@ -24,7 +24,7 @@
 
 <!-- list of stops and their arrival times -->
 <div
-	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80vh]
+	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80dvh]
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full pt-1">
@@ -44,7 +44,7 @@
 	</div>
 
 	{#if $trip_stop_times.length}
-		<div class="max-h-[75vh] pt-2 overflow-auto">
+		<div class="max-h-[75dvh] pt-2 overflow-auto">
 			{#each $trip_stop_times as stop_time}
 				<Times {stop_time} />
 			{/each}

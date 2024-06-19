@@ -48,10 +48,10 @@
       false,
       false,
       false,
-      false,
-      false,
-      false,
-      false
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "665ea605ac8d03c8a2205d87e4ef0a294a48aaa90af5b7b062d8390bf277a4eb"

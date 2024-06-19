@@ -28,7 +28,7 @@
 
 <!-- list of stops and their arrival times -->
 <div
-	class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1
+	class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1 rounded
 	max-w-[450px]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
@@ -55,7 +55,7 @@
 	</div>
 
 	{#if $stop_times.length}
-		<div class="max-h-[75vh] pt-1 flex flex-col gap-1 overflow-auto">
+		<div class="max-h-[75dvh] pt-1 flex flex-col gap-1 overflow-auto">
 			{#each $stop_times as stop_time}
 				<BusTimes {stop_time} />
 			{/each}

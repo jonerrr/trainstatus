@@ -6,6 +6,7 @@ use http::HeaderMap;
 use serde::Serialize;
 use sqlx::types::JsonValue;
 use sqlx::{FromRow, PgPool};
+use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
 pub struct Stop {
@@ -82,7 +83,7 @@ struct Arrival {
     route_id: Option<String>,
     direction: Option<i16>,
     assigned: Option<bool>,
-    trip_id: String,
+    trip_id: Option<Uuid>,
     // created_at: Option<DateTime<Utc>>,
 }
 
