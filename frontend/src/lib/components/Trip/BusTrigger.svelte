@@ -2,11 +2,10 @@
 	import { derived } from 'svelte/store';
 	import { pushState } from '$app/navigation';
 	import { bus_trips } from '$lib/stores';
-	import type { BusRoute, BusStop, BusStopTime } from '$lib/bus_api';
+	import type { BusRoute, BusStopTime } from '$lib/bus_api';
 	import BusIcon from '$lib/components/BusIcon.svelte';
 	import BusCapacity from '$lib/components/Trip/BusCapacity.svelte';
 
-	export let stop: BusStop;
 	export let route: BusRoute;
 	export let stop_time: BusStopTime;
 
@@ -54,6 +53,6 @@
 	{/if}
 
 	<div class="text-right">
-		{stop.routes.find((r) => r.id === stop_time.route_id)?.headsign}
+		{$trip?.headsign}
 	</div>
 </button>

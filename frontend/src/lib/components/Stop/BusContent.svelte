@@ -64,16 +64,13 @@
 		</div>
 	{/if} -->
 
+		<!-- TODO: check if stop sequence 0 is greater than now and then mark that its scheduled -->
 		<div
 			class="flex flex-col gap-1 border overflow-auto max-h-96 border-neutral-800 rounded shadow-lg bg-neutral-900/50 text-indigo-400"
 		>
 			{#if $stop_times.length}
 				{#each $stop_times as stop_time}
-					<BusTrigger
-						{stop_time}
-						{stop}
-						route={stop_routes.find((r) => r.id === stop_time.route_id)}
-					/>
+					<BusTrigger {stop_time} route={stop_routes.find((r) => r.id === stop_time.route_id)} />
 				{/each}
 			{:else}
 				<h2 class="text-neutral-300 text-center">No upcoming buses</h2>

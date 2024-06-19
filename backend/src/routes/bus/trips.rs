@@ -23,6 +23,7 @@ pub struct BusTrip {
     passengers: Option<i32>,
     capacity: Option<i32>,
     stop_id: Option<i32>,
+    headsign: Option<String>,
 }
 
 pub async fn get(
@@ -35,7 +36,7 @@ pub async fn get(
     let trips = sqlx::query_as!(
         BusTrip,
         r#"
-        SELECT
+SELECT
 	t.id,
 	t.route_id,
 	t.direction,
@@ -47,7 +48,16 @@ pub async fn get(
 	bp.progress_status,
 	bp.passengers,
 	bp.capacity,
-	bp.stop_id
+	bp.stop_id,
+	(
+	SELECT
+		brs.headsign
+	FROM
+		bus_route_stops brs
+	WHERE
+		brs.route_id = t.route_id
+		AND brs.direction = t.direction
+	LIMIT 1) AS headsign
 FROM
 	bus_trips t
 LEFT JOIN bus_positions bp ON

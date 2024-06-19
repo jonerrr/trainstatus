@@ -88,6 +88,7 @@ export interface BusTrip {
 	passengers: number | null;
 	capacity: number | null;
 	stop_id: number | null;
+	headsign: string;
 }
 
 export interface BusStopTime {
