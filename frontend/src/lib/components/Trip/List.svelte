@@ -25,7 +25,7 @@
 	});
 </script>
 
-<div class="flex gap-1 flex-col overflow-auto max-h-[70dvh]">
+<div class="flex gap-1 flex-col overflow-auto max-h-96">
 	{#if $stop_times.length}
 		{#each $stop_times as stop_time (stop_time.trip_id)}
 			<Trigger {stop_time} {stop} />

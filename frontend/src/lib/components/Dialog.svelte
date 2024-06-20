@@ -24,8 +24,12 @@
 				node.inert = true;
 				node.showModal();
 				node.inert = false;
+
+				// prevent scrolling when dialog is open
+				document.body.style.overflow = 'hidden';
 			} else {
 				node.close();
+				document.body.style.overflow = 'auto';
 			}
 		});
 
