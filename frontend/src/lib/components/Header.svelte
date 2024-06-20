@@ -2,7 +2,7 @@
 	import { offline } from '$lib/stores';
 </script>
 
-<header class="text-4xl p-2 font-bold text-indigo-400 flex justify-between">
+<header class="text-4xl p-2 font-bold text-indigo-400 flex justify-between pointer-events-none">
 	<div
 		class="font-bold"
 		style="background: linear-gradient(45deg, #c026d3, #4338ca); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"
