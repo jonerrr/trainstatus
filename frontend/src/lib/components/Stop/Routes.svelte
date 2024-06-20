@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 
 	export let routes: RouteStop[];
+	export let link: boolean = false;
 </script>
 
 <div class="flex gap-1">
@@ -14,7 +15,7 @@
 			width="2rem"
 			height="2rem"
 			name={route.id}
-			link={false}
+			{link}
 		/>
 	{/each}
 </div>

@@ -34,10 +34,10 @@
 	});
 </script>
 
-<div class="p-2 max-h-[85dvh] overflow-clip">
+<div class="p-2">
 	{#if $stop}
-		<div class="flex items-center gap-2 py-1 max-w-[calc(100%-60px)]">
-			<Routes routes={$stop.routes} />
+		<div class="flex items-center gap-2 py-1 max-w-[calc(100%-65px)]">
+			<Routes link={true} routes={$stop.routes} />
 
 			<h2 class="font-bold text-xl text-indigo-300">{$stop.name}</h2>
 		</div>

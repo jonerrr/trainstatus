@@ -16,6 +16,7 @@
 <!-- Icon component only works with complete: false svgs -->
 
 <button
+	aria-label={`Route Alerts for ${name}`}
 	on:click={() => {
 		if (link) pushState('', { dialog_open: true, dialog_id: name, dialog_type: 'route_alert' });
 	}}
