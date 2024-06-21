@@ -9,10 +9,12 @@
 		LocationStatus,
 		stops,
 		bus_stops,
-		pinned_bus_stops
+		pinned_bus_stops,
+		pinned_trips
 	} from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
+	import TripList from '$lib/components/Trip/List.svelte';
 
 	let stop_ids = writable<string[]>([]);
 	let bus_stop_ids = writable<number[]>([]);
@@ -93,6 +95,10 @@
 </svelte:head>
 
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
+	{#if $pinned_trips.length}
+		<TripList title="Pinned Trips" trip_ids={pinned_trips} />
+	{/if}
+
 	{#if $pinned_routes.length}
 		<RouteAlertList expand={false} title="Pinned Routes" bind:route_ids={$pinned_routes} />
 	{/if}
