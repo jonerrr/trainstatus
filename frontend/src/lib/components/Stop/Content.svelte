@@ -5,7 +5,7 @@
 	import { derived } from 'svelte/store';
 	import { stops, stop_direction } from '$lib/stores';
 	import { Direction } from '$lib/api';
-	import TripList from '$lib/components/Trip/List.svelte';
+	import TripList from '$lib/components/Trip/StopTimeList.svelte';
 	import Routes from '$lib/components/Stop/Routes.svelte';
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
 
