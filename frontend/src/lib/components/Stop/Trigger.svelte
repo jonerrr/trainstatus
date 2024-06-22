@@ -20,6 +20,7 @@
 </script>
 
 <button
+	id="list-item"
 	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
 	on:click={() => {
 		pushState('', {

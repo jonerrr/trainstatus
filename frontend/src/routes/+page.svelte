@@ -96,11 +96,11 @@
 
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
 	{#if $pinned_trips.length}
-		<TripList title="Pinned Trips" trip_ids={pinned_trips} />
+		<TripList manage_height={true} title="Pinned Trips" trip_ids={pinned_trips} />
 	{/if}
 
 	{#if $pinned_routes.length}
-		<RouteAlertList expand={false} title="Pinned Routes" bind:route_ids={$pinned_routes} />
+		<RouteAlertList manage_height={true} title="Pinned Routes" bind:route_ids={$pinned_routes} />
 	{/if}
 
 	{#if $pinned_stops.length || $pinned_bus_stops.length}
@@ -113,7 +113,13 @@
 	{/if}
 
 	<!-- closest stops -->
-	<StopList {bus_stop_ids} {stop_ids} title="Nearby Stops" show_location={true}>
+	<StopList
+		manage_height={false}
+		{bus_stop_ids}
+		{stop_ids}
+		title="Nearby Stops"
+		show_location={true}
+	>
 		<div slot="location" class="flex gap-2">
 			{#if $location_status === LocationStatus.Loading}
 				<div class="flex gap-1 items-center text-white rounded px-2 py-1 bg-indigo-600">

@@ -24,6 +24,7 @@
 </script>
 
 <button
+	id="list-item"
 	class="w-full flex justify-between items-center py-1"
 	on:click={() => {
 		pushState('', {
