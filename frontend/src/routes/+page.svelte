@@ -105,8 +105,8 @@
 
 	{#if $pinned_stops.length || $pinned_bus_stops.length}
 		<StopList
+			manage_height={true}
 			bus_stop_ids={pinned_bus_stops}
-			expand={false}
 			stop_ids={pinned_stops}
 			title="Pinned Stops"
 		/>
