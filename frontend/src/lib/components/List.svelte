@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onDestroy, onMount } from 'svelte';
+
 	// import { item_heights } from '$lib/stores';
 	// import { derived } from 'svelte/store';
 
@@ -9,25 +11,33 @@
 
 	// set a max height for the list
 	export let expand: boolean = true;
+	export let manage_height: boolean = true;
 	export let min_h: number = 50;
 
-	// calculate height of list (maybe make static)
-	// const item_heights: number[] = [];
-	// $: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
+	let list_height = 0;
+	let interval: number;
 
-	// const min_h = derived(item_heights, ($item_heights) => {
-	// 	const h = $item_heights[id];
-	// 	console.log(id, h);
-	// 	return h;
-	// });
+	if (manage_height) {
+		onMount(() => {
+			setInterval(() => {
+				if (list_el == null) return;
+				// TODO: make button component and reuse (it will include list-item id)
+				const els = Array.from(list_el.querySelectorAll('#list-item')).slice(0, 3);
+				//@ts-expect-error
+				list_height = els.reduce((h, e) => e.offsetHeight + h, 0);
+				// console.log(list_height);
+			}, 500);
+		});
 
-	// export let show_search = false;
-	// TODO: figure out how to put min-h logic in here (maybe store each length in a store and get in the list using a list of ids passed to the list)
+		onDestroy(() => {
+			clearInterval(interval);
+		});
+	}
 </script>
 
 <div
 	bind:this={list_el}
-	style={!expand ? `min-height: ${40 + min_h}px; max-height: ${40 + min_h}px;` : ''}
+	style={manage_height ? `min-height: ${list_height + 50}px;` : ''}
 	class={`relative flex flex-col text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 overflow-auto ${$$props.class} ?? ''}`}
 >
 	<slot />

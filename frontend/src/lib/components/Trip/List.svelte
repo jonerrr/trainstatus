@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { createTabs, melt } from '@melt-ui/svelte';
-	import { onMount } from 'svelte';
-	import { derived, writable, type Writable } from 'svelte/store';
-	import { type Stop } from '$lib/api';
-	import type { BusStop } from '$lib/bus_api';
+	import { derived, writable } from 'svelte/store';
 	import {
 		stops as stop_store,
 		bus_stops as bus_stop_store,
@@ -23,11 +20,10 @@
 		defaultValue: 'Train'
 	});
 
-	// const triggers = ['Train', 'Bus'];
-
 	export let title: string = 'Trips';
-	export let trip_ids: Writable<string[]> = writable([]);
-	export let bus_trip_ids: Writable<string[]> = writable([]);
+	export let trip_ids = writable<string[]>([]);
+	export let manage_height = true;
+	// export let bus_trip_ids: Writable<string[]> = writable([]);
 	// show search bar on bottom
 
 	const wanted_trips = derived([trip_ids, trips], ([$trip_ids, $trip_store]) => {
@@ -37,14 +33,9 @@
 
 	// remove from pinned trips if it no longer exists
 	$: $pinned_trips = $pinned_trips.filter((p) => $wanted_trips.find((t) => t.id === p));
-
-	// calculate height of list
-	// const item_heights: number[] = [];
-	// $: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
-	$: min_h = 50;
 </script>
 
-<List bind:min_h>
+<List bind:manage_height>
 	<div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
 		<div class="flex pb-1 justify-between">
 			<div class="flex gap-2">

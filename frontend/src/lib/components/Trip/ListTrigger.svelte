@@ -9,22 +9,23 @@
 
 	export let trip: Trip;
 
-	$: console.log(new Date(trip.updated_at));
-	// TODO: make sure it updates properly
 	$: trip_stop_times = derived(stop_times, ($stop_times) =>
 		$stop_times.filter((st) => st.trip_id === trip.id)
 	);
 
 	// Check if trip stop id is in trip stop times, and if it isn't look up the first stop time
 	$: current_stop_id =
-		$trip_stop_times.find((s) => s.stop_id === trip.stop_id)?.stop_id ||
-		$trip_stop_times.at(0)?.stop_id;
+		trip.train_status && trip.stop_id ? trip.stop_id : $trip_stop_times.at(0)?.stop_id;
+	// ? $trip_stop_times.find((s) => s.stop_id === trip.stop_id)?.stop_id
+	// : $trip_stop_times.at(0)?.stop_id;
 	$: current_stop = $stops.find((s) => s.id === current_stop_id);
 
 	$: last_stop = $stops.find((s) => s.id === $trip_stop_times.at(-1)?.stop_id);
 </script>
 
+<!-- TODO: make button component and reuse -->
 <button
+	id="list-item"
 	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
 	on:click={() => {
 		pushState('', {
@@ -37,7 +38,7 @@
 	<div class="flex gap-1 items-center">
 		<Icon width="2rem" height="2rem" name={trip.route_id} />
 		<ArrowBigRight />
-		<div class={`${!trip.assigned ? 'italic' : ''}`}>
+		<div class={`${!trip.assigned ? 'italic' : ''} pr-2`}>
 			{last_stop?.name}
 		</div>
 	</div>
@@ -53,6 +54,5 @@
 	{:else}
 		<div class="text-neutral-400">Next stop: {current_stop?.name}</div>
 	{/if}
-
 	<Pin item_id={trip.id} store={pinned_trips} />
 </button>

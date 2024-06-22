@@ -12,5 +12,5 @@
 <!-- TODO: show routes even when there is no alert for them -->
 
 <div class="p-1">
-	<List />
+	<List manage_height={false} />
 </div>

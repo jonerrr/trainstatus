@@ -1,11 +1,11 @@
 # Trainstat.us
 
-Best website to check the status of your train.
+The best website to check the status of your train (and bus).
 
 ## Features
 
 - Blazingly fast
-- Real-time information that updates every 10 seconds
+- Real-time information that automatically updates
 - Works offline
 - Installable as a PWA
 - Shallow routing between dialogs so you never lose your place

@@ -30,7 +30,7 @@
 	// show ask for location button
 	export let show_location: boolean = false;
 	// set a max height for the list
-	export let expand: boolean = true;
+	export let manage_height: boolean = true;
 
 	const stops = derived([stop_ids, stop_store], ([$stop_ids, $stop_store]) => {
 		// this preserves the order of stop_ids but its slower
@@ -118,14 +118,9 @@
 		// initialize when the component mounts
 		searchWorker.postMessage({ type: 'load' });
 	});
-
-	// calculate height of list
-	// const item_heights: number[] = [];
-	// $: min_h = item_heights.slice(0, 2).reduce((acc, cur) => acc + cur, 0);
-	$: min_h = 50;
 </script>
 
-<List bind:expand bind:min_h bind:this={list_el}>
+<List bind:manage_height bind:this={list_el}>
 	<div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
 		<div class="flex pb-1 justify-between">
 			<div class="flex gap-2">

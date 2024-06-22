@@ -12,5 +12,5 @@
 </svelte:head>
 
 <div class="p-1">
-	<List {stop_ids} {bus_stop_ids} title="Stops" show_search={true} />
+	<List {stop_ids} {bus_stop_ids} title="Stops" manage_height={false} show_search={true} />
 </div>
