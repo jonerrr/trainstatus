@@ -10,9 +10,7 @@
 	}
 
 	// set a max height for the list
-	export let expand: boolean = true;
 	export let manage_height: boolean = true;
-	export let min_h: number = 50;
 
 	let list_height = 0;
 	let interval: number;
