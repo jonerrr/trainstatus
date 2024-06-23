@@ -24,7 +24,7 @@
 				//@ts-expect-error
 				list_height = els.reduce((h, e) => e.offsetHeight + h, 0);
 				// console.log(list_height);
-			}, 500);
+			}, 50);
 		});
 
 		onDestroy(() => {
@@ -35,7 +35,7 @@
 
 <div
 	bind:this={list_el}
-	style={manage_height ? `min-height: ${list_height + 50}px;` : ''}
+	style={manage_height ? `min-height: ${list_height + 40}px;` : ''}
 	class={`relative flex flex-col text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 overflow-auto ${$$props.class} ?? ''}`}
 >
 	<slot />
