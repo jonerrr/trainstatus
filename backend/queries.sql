@@ -198,3 +198,31 @@ FROM
     LEFT JOIN bus_route_stops brs ON brs.stop_id = s.id
 GROUP BY
     s.id;
+
+-- get slowest/fastest trips
+WITH trip_durations AS (
+    SELECT
+        trip_id,
+        MIN(arrival) AS first_stop_time,
+        MAX(arrival) AS last_stop_time,
+        MAX(arrival) - MIN(arrival) AS duration
+    FROM
+        stop_times
+    GROUP BY
+        trip_id
+)
+SELECT
+    trip_id,
+    first_stop_time,
+    last_stop_time,
+    duration,
+    t.*
+FROM
+    trip_durations
+    LEFT JOIN trips t ON trip_durations.trip_id = t.id
+WHERE
+    duration > '00:01:00'
+ORDER BY
+    duration
+LIMIT
+    50;
