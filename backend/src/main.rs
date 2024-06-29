@@ -1,4 +1,5 @@
 use axum::{body::Body, response::Response, routing::get, Router};
+use chrono::{Days, Duration, Utc};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
@@ -46,35 +47,39 @@ async fn main() {
         .unwrap();
     sqlx::migrate!().run(&pool).await.unwrap();
 
-    match var("DISABLE_BUS") {
-        Ok(_) => {
-            tracing::info!("Bus stuff disabled");
+    let last_updated = sqlx::query!("SELECT update_at FROM last_update")
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+
+    let should_update = match last_updated {
+        Some(last_updated) => {
+            tracing::info!("Last updated at: {}", last_updated.update_at);
+            let now = Utc::now();
+            let days = Days::new(10);
+
+            last_updated.update_at < now.checked_sub_days(days).unwrap()
         }
-        Err(_) => {
-            if bus::imports::should_update(&pool).await {
-                tracing::info!("Updating bus stops and routes");
-                bus::imports::stops_and_routes(&pool).await;
-            }
-            bus::trips::import(pool.clone()).await;
-            bus::positions::import(pool.clone()).await;
-        }
+        None => true,
+    };
+
+    if should_update {
+        tracing::info!("Updating bus stops and routes");
+        bus::imports::stops_and_routes(&pool).await;
+        tracing::info!("Updating train stops and routes");
+        imports::stops_and_routes(&pool).await;
+
+        sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 
-    // imports::transfers(&pool).await;
-    if imports::should_update(&pool).await {
-        tracing::info!("Updating stops and routes");
-        imports::stops_and_routes(&pool).await;
-        tracing::info!("Updating transfers");
-        // imports::transfers(&pool).await;
-    }
+    bus::trips::import(pool.clone()).await;
+    bus::positions::import(pool.clone()).await;
 
     trips::import(pool.clone()).await;
     alerts::import(pool.clone()).await;
-
-    // let origins = [
-    //     "http://localhost:5173".parse().unwrap(),
-    //     "https://trainstat.us".parse().unwrap(),
-    // ];
 
     let app = Router::new()
         .route(

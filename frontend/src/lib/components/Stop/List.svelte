@@ -122,7 +122,7 @@
 
 <List bind:manage_height bind:this={list_el}>
 	<div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
-		<div class="flex pb-1 justify-between">
+		<div id="list-item" class="flex pb-1 justify-between">
 			<div class="flex gap-2">
 				<div class="font-semibold text-lg text-indigo-300">{title}</div>
 
