@@ -13,11 +13,11 @@
 </script>
 
 <List bind:manage_height class="max-h-[calc(100dvh-8rem)]">
-	<div class="flex text-lg justify-between self-center w-full">
+	<div id="list-item" class="flex text-lg justify-between self-center w-full">
 		<div class="font-semibold text-indigo-300">{title}</div>
 	</div>
 	<div class="flex flex-col mt-1 gap-1">
-		{#each route_ids as route_id, i (route_id)}
+		{#each route_ids as route_id (route_id)}
 			<div
 				id="list-item"
 				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"

@@ -9,7 +9,7 @@
 		list_el.scrollIntoView({ behavior: 'smooth' });
 	}
 
-	// set a max height for the list
+	// manage the min/max height of the list
 	export let manage_height: boolean = true;
 
 	let list_height = 0;
@@ -21,9 +21,8 @@
 				if (list_el == null) return;
 				// TODO: make button component and reuse (it will include list-item id)
 				const els = Array.from(list_el.querySelectorAll('#list-item')).slice(0, 3);
-				//@ts-expect-error
-				list_height = els.reduce((h, e) => e.offsetHeight + h, 0);
-				// console.log(list_height);
+				list_height = els.reduce((h, e) => e.clientHeight + h, 0);
+				list_height += 10;
 			}, 50);
 		});
 
@@ -35,7 +34,7 @@
 
 <div
 	bind:this={list_el}
-	style={manage_height ? `min-height: ${list_height + 40}px;` : ''}
+	style={manage_height ? `min-height: ${list_height}px; max-height: ${list_height}px;` : ''}
 	class={`relative flex flex-col text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 overflow-auto ${$$props.class} ?? ''}`}
 >
 	<slot />

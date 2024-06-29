@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT update_at FROM last_update",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "update_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "cda7e98ee4f91e34f5de6021af34d52b1cc817fde09db001adc4c0f247dc9910"
+}
