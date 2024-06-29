@@ -228,36 +228,5 @@
 				<CircleX />
 			</button>
 		</div>
-		<!-- <button
-			on:click={() => {
-				pushState('', {
-					dialog_open: false,
-					dialog_id: '',
-					dialog_type: ''
-				});
-			}}
-			aria-label="Close dialog"
-			class="absolute right-[5px] top-[10px] inline-flex h-8 w-8
-                appearance-none items-center justify-center"
-		>
-			<CircleX />
-		</button>
-
-		{#if !copied}
-			<button
-				class="absolute appearance-none items-center justify-center right-[40px] top-[10px] inline-flex h-8 w-8"
-				aria-label="Share"
-				on:click={share}
-			>
-				<Share class="h-6 w-6" />
-			</button>
-		{:else}
-			<button
-				class="absolute appearance-none items-center justify-center right-[40px] top-[10px] inline-flex h-8 w-8 text-green-600"
-				aria-label="Link copied to clipboard"
-			>
-				<ClipboardCheck class="h-6 w-6" />
-			</button>
-		{/if} -->
 	{/key}
 </dialog>

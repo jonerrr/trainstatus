@@ -26,8 +26,7 @@
 
 <!-- list of stops and their arrival times -->
 <div
-	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80dvh]
-	max-w-[450px]"
+	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80dvh]"
 >
 	<div class="flex items-center justify-between bg-neutral-800 w-full pt-1">
 		<div class="flex gap-2 items-center text-indigo-400 max-w-[calc(100%-75px)]">

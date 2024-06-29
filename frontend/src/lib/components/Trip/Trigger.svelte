@@ -5,7 +5,7 @@
 	import { stops, stop_times, trips } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 
-	export let stop: Stop;
+	// export let stop: Stop;
 	export let stop_time: StopTime;
 
 	$: trip = derived(trips, ($trips) => {
