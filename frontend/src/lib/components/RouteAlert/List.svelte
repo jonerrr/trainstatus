@@ -18,13 +18,7 @@
 	</div>
 	<div class="flex flex-col mt-1 gap-1">
 		{#each route_ids as route_id (route_id)}
-			<div
-				id="list-item"
-				class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
-				transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
-			>
-				<Trigger {route_id} />
-			</div>
+			<Trigger {route_id} />
 		{/each}
 	</div>
 </List>

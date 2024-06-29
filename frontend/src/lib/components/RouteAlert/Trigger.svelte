@@ -2,10 +2,13 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { derived } from 'svelte/store';
+	import { slide } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
 	import { pinned_routes, alerts } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Pin from '$lib/components/Pin.svelte';
+
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
@@ -25,7 +28,8 @@
 
 <button
 	id="list-item"
-	class="w-full flex justify-between items-center py-1"
+	class="w-full flex justify-between items-center py-1 border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
+	transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 	on:click={() => {
 		pushState('', {
 			dialog_open: true,
