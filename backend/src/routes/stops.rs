@@ -79,7 +79,7 @@ GROUP BY
 }
 
 #[derive(FromRow, Serialize)]
-struct Arrival {
+struct StopTime {
     stop_id: String,
     arrival: Option<DateTime<Utc>>,
     departure: Option<DateTime<Utc>>,
@@ -90,14 +90,14 @@ struct Arrival {
     // created_at: Option<DateTime<Utc>>,
 }
 
-pub async fn arrivals(
+pub async fn times(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
 ) -> Result<impl IntoResponse, ServerError> {
-    let arrivals = {
+    let stop_times = {
         if params.stop_ids.is_empty() {
             sqlx::query_as!(
-                Arrival,
+                StopTime,
                 "SELECT
                 st.stop_id,
                 st.arrival,
@@ -121,7 +121,7 @@ pub async fn arrivals(
             .await?
         } else {
             sqlx::query_as!(
-                Arrival,
+                StopTime,
                 "SELECT
                 st.stop_id,
                 st.arrival,
@@ -148,5 +148,5 @@ pub async fn arrivals(
         }
     };
 
-    Ok(Json(arrivals))
+    Ok(Json(stop_times))
 }

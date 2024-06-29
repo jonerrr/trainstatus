@@ -1,7 +1,12 @@
 use crate::routes::{errors::ServerError, parse_list};
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Json,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use sqlx::types::JsonValue;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
@@ -64,4 +69,49 @@ WHERE
     .await?;
 
     Ok(Json(trips))
+}
+
+#[derive(FromRow, Serialize)]
+pub struct TripData {
+    id: Uuid,
+    mta_id: String,
+    train_id: String,
+    route_id: String,
+    express: bool,
+    direction: i16,
+    assigned: bool,
+    created_at: chrono::DateTime<Utc>,
+    stop_times: Option<JsonValue>,
+}
+
+pub async fn by_id(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ServerError> {
+    let trip = sqlx::query_as!(
+        TripData,
+        r#"SELECT
+		t.*,
+		jsonb_agg(jsonb_build_object('stop_id',
+		st.stop_id,
+		'arrival',
+		st.arrival,
+		'departure',
+		st.departure)
+	ORDER BY
+		st.arrival) AS stop_times
+	FROM
+		trips t
+	LEFT JOIN stop_times st ON 
+		st.trip_id = t.id
+	WHERE
+		t.id = $1
+	GROUP BY
+		t.id"#,
+        id
+    )
+    .fetch_one(&pool)
+    .await?;
+
+    Ok(Json(trip))
 }

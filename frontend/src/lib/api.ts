@@ -23,7 +23,7 @@ export async function update_data(
 	try {
 		const [tripsResponse, stopTimesResponse, alertsResponse] = await Promise.all([
 			fetch('/api/trips'),
-			fetch('/api/arrivals'),
+			fetch('/api/stops/times'),
 			fetch('/api/alerts')
 		]);
 
