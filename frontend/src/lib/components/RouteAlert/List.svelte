@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { slide } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
 	import { all_route_ids } from '$lib/api';
 	import List from '$lib/components/List.svelte';
 	import Trigger from '$lib/components/RouteAlert/Trigger.svelte';

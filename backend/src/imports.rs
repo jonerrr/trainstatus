@@ -5,17 +5,17 @@ use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
 
-pub async fn should_update(pool: &PgPool) -> bool {
-    let stop_count = sqlx::query!("SELECT COUNT(*) FROM stops as count")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-        .count
-        .unwrap();
+// pub async fn should_update(pool: &PgPool) -> bool {
+//     let stop_count = sqlx::query!("SELECT COUNT(*) FROM stops as count")
+//         .fetch_one(pool)
+//         .await
+//         .unwrap()
+//         .count
+//         .unwrap();
 
-    // the amount of stops that should be in the database
-    stop_count != 496
-}
+//     // the amount of stops that should be in the database
+//     stop_count != 496
+// }
 
 // convert strings to numbers
 pub fn de_str_to_i16<'de, D>(deserializer: D) -> Result<i16, D::Error>

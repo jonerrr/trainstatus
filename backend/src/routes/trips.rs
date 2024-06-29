@@ -1,4 +1,4 @@
-use crate::routes::{errors::ServerError, parse_list};
+use crate::routes::{errors::ServerError, parse_list, CurrentTime};
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -22,7 +22,6 @@ pub struct Trip {
     train_status: Option<i16>,
     current_stop_sequence: Option<i16>,
     updated_at: Option<chrono::DateTime<Utc>>,
-    // stop_times: Option<Vec<JsonValue>>,
 }
 
 fn all_stops() -> Vec<String> {
@@ -33,7 +32,6 @@ fn all_stops() -> Vec<String> {
 pub struct Parameters {
     #[serde(deserialize_with = "parse_list", default = "all_stops")]
     pub stop_ids: Vec<String>,
-    pub times: Option<bool>,
 }
 
 pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
