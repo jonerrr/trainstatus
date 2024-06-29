@@ -5,16 +5,16 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 
-pub async fn should_update(pool: &PgPool) -> bool {
-    let count = sqlx::query!("SELECT COUNT(*) FROM bus_route_stops as count")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-        .count
-        .unwrap();
-    // this is the correct route stop count
-    count != 24690
-}
+// pub async fn should_update(pool: &PgPool) -> bool {
+//     let count = sqlx::query!("SELECT COUNT(*) FROM bus_route_stops as count")
+//         .fetch_one(pool)
+//         .await
+//         .unwrap()
+//         .count
+//         .unwrap();
+//     // this is the correct route stop count
+//     count != 24690
+// }
 
 // id, long_name, short_name, color, route_type
 #[derive(Serialize)]

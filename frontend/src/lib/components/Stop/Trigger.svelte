@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { pushState } from '$app/navigation';
 	import { pinned_stops, stop_times } from '$lib/stores';
 	import { Direction, StopType, type Stop } from '$lib/api';
 	import Pin from '$lib/components/Pin.svelte';
 	import Arrivals from '$lib/components/Stop/Arrivals.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	export let stop: Stop;
 
@@ -19,15 +19,11 @@
 	$: other_route_ids = Array.from(new Set(other_routes.filter((r) => !base_routes.includes(r))));
 </script>
 
-<button
-	id="list-item"
-	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
-	on:click={() => {
-		pushState('', {
-			dialog_id: stop.id,
-			dialog_type: 'stop',
-			dialog_open: true
-		});
+<TriggerButton
+	state={{
+		dialog_id: stop.id,
+		dialog_type: 'stop',
+		dialog_open: true
 	}}
 >
 	<div class="w-[25%] grow-0 font-semibold text-indigo-200">
@@ -65,4 +61,4 @@
 	<div>
 		<Pin item_id={stop.id} store={pinned_stops} />
 	</div>
-</button>
+</TriggerButton>

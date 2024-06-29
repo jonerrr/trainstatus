@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ArrowBigRight } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
-	import { pushState } from '$app/navigation';
 	import { stop_times, stops, pinned_trips } from '$lib/stores';
 	import { TrainStatus, type Trip } from '$lib/api';
 	import Pin from '$lib/components/Pin.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	export let trip: Trip;
 
@@ -24,15 +24,11 @@
 </script>
 
 <!-- TODO: make button component and reuse -->
-<button
-	id="list-item"
-	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
-	on:click={() => {
-		pushState('', {
-			dialog_id: trip.id,
-			dialog_type: 'trip',
-			dialog_open: true
-		});
+<TriggerButton
+	state={{
+		dialog_id: trip.id,
+		dialog_type: 'trip',
+		dialog_open: true
 	}}
 >
 	<div class="flex gap-1 items-center">
@@ -55,4 +51,4 @@
 		<div class="text-neutral-400">Next stop: {current_stop?.name}</div>
 	{/if}
 	<Pin item_id={trip.id} store={pinned_trips} />
-</button>
+</TriggerButton>

@@ -2,12 +2,10 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { derived } from 'svelte/store';
-	import { slide } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
-	import { pushState } from '$app/navigation';
 	import { pinned_routes, alerts } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Pin from '$lib/components/Pin.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	dayjs.extend(relativeTime);
 
@@ -26,16 +24,11 @@
 	});
 </script>
 
-<button
-	id="list-item"
-	class="w-full flex justify-between items-center py-1 border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1"
-	transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
-	on:click={() => {
-		pushState('', {
-			dialog_open: true,
-			dialog_id: route_id,
-			dialog_type: 'route_alert'
-		});
+<TriggerButton
+	state={{
+		dialog_open: true,
+		dialog_id: route_id,
+		dialog_type: 'route_alert'
 	}}
 >
 	<div class="flex gap-2 items-center">
@@ -60,4 +53,4 @@
 	<div>
 		<Pin item_id={route_id} store={pinned_routes} />
 	</div>
-</button>
+</TriggerButton>

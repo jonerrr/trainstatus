@@ -19,12 +19,11 @@
 		onMount(() => {
 			setInterval(() => {
 				if (list_el == null) return;
-				// TODO: make button component and reuse (it will include list-item id)
+
 				const els = Array.from(list_el.querySelectorAll('#list-item')).slice(0, 3);
-				// console.log(els.length);
 				list_height = els.reduce((h, e) => e.clientHeight + h, 0);
 				list_height += 10;
-			}, 50);
+			}, 100);
 		});
 
 		onDestroy(() => {

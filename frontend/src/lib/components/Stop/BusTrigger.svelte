@@ -9,12 +9,12 @@
 		ArrowUpRight,
 		ArrowUp
 	} from 'lucide-svelte';
-	import { pushState } from '$app/navigation';
 	import type { BusStop } from '$lib/bus_api';
 	import { pinned_bus_stops, bus_routes } from '$lib/stores';
 	import Pin from '$lib/components/Pin.svelte';
 	import BusArrivals from '$lib/components/Stop/BusArrivals.svelte';
 	import BusIcon from '$lib/components/BusIcon.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	export let stop: BusStop;
 
@@ -25,15 +25,11 @@
 	$: stop_routes = $bus_routes.filter((r) => stop_route_ids.includes(r.id));
 </script>
 
-<button
-	id="list-item"
-	class="border-neutral-600 bg-neutral-700 rounded border shadow-2xl hover:bg-neutral-900 px-1 w-full flex justify-between items-center py-1"
-	on:click={() => {
-		pushState('', {
-			dialog_id: stop.id,
-			dialog_type: 'bus_stop',
-			dialog_open: true
-		});
+<TriggerButton
+	state={{
+		dialog_id: stop.id,
+		dialog_type: 'bus_stop',
+		dialog_open: true
 	}}
 >
 	<!-- TODO: make spacing consistent (use grid maybe idk) -->
@@ -85,4 +81,4 @@
 	<div>
 		<Pin item_id={stop.id} store={pinned_bus_stops} />
 	</div>
-</button>
+</TriggerButton>
