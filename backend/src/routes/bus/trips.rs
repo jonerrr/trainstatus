@@ -1,4 +1,5 @@
-use crate::routes::{bus::routes::Parameters, errors::ServerError};
+use super::stops::Parameters;
+use crate::routes::errors::ServerError;
 use axum::{
     extract::{Query, State},
     response::IntoResponse,

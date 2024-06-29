@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
-	import { monitored_routes } from '$lib/stores';
+	import { monitored_routes, bus_trips } from '$lib/stores';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
@@ -65,6 +65,9 @@
 
 	let copied = false;
 
+	// for bus trips, we need to also specify the route id to monitor, otherwise the trip won't show up
+	let preload_bus_route: string;
+
 	function share() {
 		let param = '';
 		let title = '';
@@ -88,10 +91,17 @@
 			case 'bus_trip':
 				param = 'bt';
 				title = 'View Bus Trip';
+				const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+				preload_bus_route = trip.route_id;
+
 				break;
 		}
 
 		let url = window.location.origin + `/?${param}=${$page.state.dialog_id}`;
+		if (preload_bus_route) {
+			url += `&pr=${preload_bus_route}`;
+		}
+
 		if (!navigator.share) {
 			navigator.clipboard.writeText(url);
 			copied = true;

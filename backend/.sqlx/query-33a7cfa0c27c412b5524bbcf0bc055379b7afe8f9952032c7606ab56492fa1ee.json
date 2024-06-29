@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n\t\tt.*,\n\t\tjsonb_agg(jsonb_build_object('stop_id',\n\t\tst.stop_id,\n\t\t'arrival',\n\t\tst.arrival,\n\t\t'departure',\n\t\tst.departure)\n\tORDER BY\n\t\tst.arrival) AS stop_times\n\tFROM\n\t\ttrips t\n\tLEFT JOIN stop_times st ON \n\t\tst.trip_id = t.id\n\tWHERE\n\t\tt.id = $1\n\tGROUP BY\n\t\tt.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "mta_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "train_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "assigned",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 6,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "express",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "stop_times",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "33a7cfa0c27c412b5524bbcf0bc055379b7afe8f9952032c7606ab56492fa1ee"
+}

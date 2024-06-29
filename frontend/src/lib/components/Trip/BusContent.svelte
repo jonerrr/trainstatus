@@ -11,7 +11,6 @@
 	$: trip = derived(bus_trips, ($bus_trips) => {
 		return $bus_trips.find((t) => t.id === trip_id);
 	});
-	// TODO: maybe check and make sure arrival is gt now
 	$: stop_times = derived(bus_stop_times, ($bus_stop_times) => {
 		return $bus_stop_times.filter((st) => st.trip_id === trip_id);
 	});
@@ -50,7 +49,7 @@
 
 	{#if $stop_times.length}
 		<div class="max-h-[75dvh] pt-1 flex flex-col gap-1 overflow-auto">
-			{#each $stop_times as stop_time (stop_time.trip_id)}
+			{#each $stop_times as stop_time (stop_time.stop_id)}
 				<BusTimes {stop_time} />
 			{/each}
 		</div>

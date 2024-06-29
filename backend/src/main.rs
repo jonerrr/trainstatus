@@ -1,5 +1,5 @@
 use axum::{body::Body, response::Response, routing::get, Router};
-use chrono::{Days, Duration, Utc};
+use chrono::{Days, Utc};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
@@ -91,13 +91,15 @@ async fn main() {
             }),
         )
         .route("/stops", get(routes::stops::get))
-        .route("/arrivals", get(routes::stops::arrivals))
+        .route("/stops/times", get(routes::stops::times))
         .route("/trips", get(routes::trips::get))
+        .route("/trips/:id", get(routes::trips::by_id))
         .route("/alerts", get(routes::alerts::get))
+        // bus stuff
         .route("/bus/stops", get(routes::bus::stops::get))
+        .route("/bus/stops/times", get(routes::bus::stops::times))
         .route("/bus/trips", get(routes::bus::trips::get))
         .route("/bus/routes", get(routes::bus::routes::get))
-        .route("/bus/routes/arrivals", get(routes::bus::routes::arrivals))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .with_state(pool);

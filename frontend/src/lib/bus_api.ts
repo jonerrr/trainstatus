@@ -14,7 +14,7 @@ export async function update_bus_data(
 		const route_l = routes.join(',');
 		const [tripsResponse, stopTimesResponse] = await Promise.all([
 			fetch(`/api/bus/trips?route_ids=${route_l}`),
-			fetch(`/api/bus/routes/arrivals?route_ids=${route_l}`)
+			fetch(`/api/bus/stops/times?route_ids=${route_l}`)
 		]);
 
 		if (
