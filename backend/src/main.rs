@@ -1,7 +1,10 @@
 use axum::{body::Body, response::Response, routing::get, Router};
 use chrono::{Days, Utc};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{convert::Infallible, env::var};
+use std::{
+    convert::Infallible,
+    env::{self, var},
+};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -63,7 +66,7 @@ async fn main() {
         None => true,
     };
 
-    if should_update {
+    if should_update || env::var("FORCE_UPDATE").is_ok() {
         tracing::info!("Updating bus stops and routes");
         bus::imports::stops_and_routes(&pool).await;
         tracing::info!("Updating train stops and routes");
