@@ -199,13 +199,16 @@
 		case 'bus_stop':
 			pin_store = pinned_bus_stops;
 			break;
-		case 'bus_trip':
+		// need brackets bc of svelte issue https://github.com/sveltejs/svelte/issues/6706
+		case 'bus_trip': {
 			pin_store = pinned_bus_trips;
 			// TODO: fix this
 			// need to preload the route for bus trips
-			// const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+			const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+			pin_id = `${trip.route_id}_${$page.state.dialog_id}`;
 			// preload_bus_route = trip.route_id;
 			break;
+		}
 		default:
 			pin_store = pinned_stops;
 	}

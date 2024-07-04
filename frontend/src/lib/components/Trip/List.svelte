@@ -2,14 +2,7 @@
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { createTabs, melt } from '@melt-ui/svelte';
 	import { derived, writable } from 'svelte/store';
-	import {
-		stops as stop_store,
-		bus_stops as bus_stop_store,
-		monitored_routes,
-		trips,
-		bus_trips,
-		pinned_trips
-	} from '$lib/stores';
+	import { monitored_routes, trips, bus_trips, pinned_trips, pinned_bus_trips } from '$lib/stores';
 	import List from '$lib/components/List.svelte';
 	import Trigger from '$lib/components/Trip/ListTrigger.svelte';
 
@@ -34,6 +27,8 @@
 	const wanted_bus_trips = derived(
 		[bus_trip_ids, bus_trips],
 		([$bus_trip_ids, $bus_trip_store]) => {
+			const trips = $bus_trip_ids.map((t) => t.split('_'));
+
 			// this preserves the order of stop_ids but its slower
 			return $bus_trip_store.filter((st) => $bus_trip_ids.includes(st.id));
 		}

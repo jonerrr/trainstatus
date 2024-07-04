@@ -10,7 +10,8 @@
 		stops,
 		bus_stops,
 		pinned_bus_stops,
-		pinned_trips
+		pinned_trips,
+		pinned_bus_trips
 	} from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
@@ -96,7 +97,12 @@
 
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
 	{#if $pinned_trips.length}
-		<TripList manage_height={true} title="Pinned Trips" trip_ids={pinned_trips} />
+		<TripList
+			manage_height={true}
+			title="Pinned Trips"
+			trip_ids={pinned_trips}
+			bus_trip_ids={pinned_bus_trips}
+		/>
 	{/if}
 
 	{#if $pinned_routes.length}
