@@ -34,34 +34,40 @@ pub struct Parameters {
     pub stop_ids: Vec<String>,
 }
 
-pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+pub async fn get(
+    State(pool): State<PgPool>,
+    time: CurrentTime,
+) -> Result<impl IntoResponse, ServerError> {
     let trips = sqlx::query_as!(
         Trip,
+        // Need the `?` to make the joined columns optional, otherwise it errors out
         r#"SELECT
-	t.id,
-	t.route_id,
-    t.express,
-	t.direction,
-	t.assigned,
-	t.created_at,
-	p.stop_id,
-	p.train_status,
-	p.current_stop_sequence,
-	p.updated_at
-FROM
-	trips t
-LEFT JOIN positions p ON
-	p.trip_id = t.id
-WHERE
-	t.id = ANY(
-	SELECT
-		t.id
-	FROM
-		trips t
-	LEFT JOIN stop_times st ON
-		st.trip_id = t.id
-	WHERE
-		st.arrival > now())"#
+            t.id,
+            t.route_id,
+            t.express,
+            t.direction,
+            t.assigned,
+            t.created_at,
+            p.stop_id AS "stop_id?",
+            p.train_status AS "train_status?",
+            p.current_stop_sequence AS "current_stop_sequence?",
+            p.updated_at AS "updated_at?"
+        FROM
+            trips t
+        LEFT JOIN positions p ON
+            p.trip_id = t.id
+        WHERE
+            t.id = ANY(
+                SELECT
+                    t.id
+                FROM
+                    trips t
+                LEFT JOIN stop_times st ON
+                    st.trip_id = t.id
+                WHERE
+                    st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+            )"#,
+        time.0
     )
     .fetch_all(&pool)
     .await?;

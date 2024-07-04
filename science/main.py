@@ -3,8 +3,12 @@
 import pandas as pd
 import pandas as pd
 from sqlalchemy import create_engine
+from os import environ
 
 # TODO: import uri from env
+uri = environ.get("DATABASE_URI")
+
+alchemyEngine = create_engine(uri)
 
 
 def longest_trip(df: pd.DataFrame):
@@ -19,22 +23,20 @@ def longest_trip(df: pd.DataFrame):
 
 
 def main():
-    alchemyEngine = create_engine(uri)
-
     # get the longest wait between stops
-    df = pd.read_sql(
-        """
-        SELECT
-	        st.*, t.route_id, t.direction, t.created_at
-            FROM
-                stop_times st
-            LEFT JOIN trips t ON st.trip_id = t.id
-            ORDER BY
-                st.arrival""",
-        alchemyEngine,
-    )
+    # df = pd.read_sql(
+    #     """
+    #     SELECT
+    #         st.*, t.route_id, t.direction, t.created_at
+    #         FROM
+    #             stop_times st
+    #         LEFT JOIN trips t ON st.trip_id = t.id
+    #         ORDER BY
+    #             st.arrival""",
+    #     alchemyEngine,
+    # )
 
-    longest_trip(df)
+    # longest_trip()
     quit()
 
     # print(df.dtypes)

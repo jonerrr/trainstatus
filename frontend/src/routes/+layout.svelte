@@ -11,7 +11,8 @@
 		alerts,
 		monitored_routes,
 		bus_trips,
-		bus_stop_times
+		bus_stop_times,
+		current_time
 	} from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -23,9 +24,16 @@
 	let last_monitored_routes: string[] = [];
 
 	onMount(async () => {
-		interval = setInterval(async () => {
-			await update_data(fetch, trips, stop_times, alerts);
-		}, 15000);
+		const time = $current_time ? Math.floor($current_time.getTime() / 1000) : null;
+
+		// update subway data only if they want realtime data
+		if (!time) {
+			interval = setInterval(async () => {
+				await update_data(fetch, trips, stop_times, alerts, null);
+			}, 10000);
+		} else {
+			await update_data(fetch, trips, stop_times, alerts, time);
+		}
 
 		// update bus routes data when monitored routes change
 		// TODO: maybe check if there are no new routes and then don't update
