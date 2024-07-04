@@ -5,6 +5,7 @@
 	import BusIcon from '$lib/components/BusIcon.svelte';
 
 	export let stop_id: number;
+	// export let actions_width: number;
 
 	// const stop = derived(bus_stops, ($stops) => {
 	// 	return $stops.find((s) => s.id === stop_id);

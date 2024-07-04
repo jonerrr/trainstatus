@@ -10,6 +10,7 @@
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
 
 	export let stop_id: string;
+	export let actions_width: number;
 
 	const stop = derived(stops, ($stops) => {
 		return $stops.find((s) => s.id === stop_id);
@@ -36,7 +37,7 @@
 
 <div class="p-2">
 	{#if $stop}
-		<div class="flex items-center gap-2 py-1 max-w-[calc(100%-65px)]">
+		<div style={`max-width: calc(100% - ${actions_width}px);`} class="flex items-center gap-2 py-1">
 			<Routes link={true} routes={$stop.routes} />
 
 			<h2 class="font-bold text-xl text-indigo-300">{$stop.name}</h2>

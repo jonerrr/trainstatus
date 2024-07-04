@@ -44,6 +44,13 @@ export const bus_stop_times = writable<BusStopTime[]>([]);
 // export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
 export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
 
+// export interface PinnedBusTrip {
+// 	id: string;
+// 	routes: string[];
+// }
+// format is route_trip_id
+export const pinned_bus_trips = persisted<string[]>('pinned_bus_trips', []);
+
 // stores the time of data they want, null = current time
 export const data_at = writable<Date | null>(null);
 
