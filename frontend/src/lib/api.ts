@@ -1,5 +1,5 @@
 import { type Writable } from 'svelte/store';
-import { offline, current_time } from '$lib/stores';
+import { offline } from '$lib/stores';
 import icons from '$lib/icons';
 
 const train_regex = /(\[(.+?)\])/gm;

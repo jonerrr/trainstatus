@@ -1,5 +1,5 @@
 use super::stops::Parameters;
-use crate::routes::errors::ServerError;
+use crate::routes::{errors::ServerError, CurrentTime};
 use axum::{
     extract::{Query, State},
     response::IntoResponse,
@@ -30,8 +30,9 @@ pub struct BusTrip {
 pub async fn get(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
+    time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    // return all trips if no stop_ids are provided
+    // params.route_id must be supplied unlike train data bc bus data is too large
 
     // return trips without stop_times
     let trips = sqlx::query_as!(
@@ -72,9 +73,10 @@ LEFT JOIN bus_positions bp ON
 	LEFT JOIN bus_stop_times st ON
 		st.trip_id = t.id
 	WHERE
-		st.arrival > now())
+		st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))
 WHERE
-	t.route_id = ANY($1)"#,
+	t.route_id = ANY($2)"#,
+        time.0,
         &params.route_ids
     )
     .fetch_all(&pool)

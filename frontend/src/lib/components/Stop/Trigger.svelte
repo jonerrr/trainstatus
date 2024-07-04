@@ -12,10 +12,10 @@
 	const base_routes = stop.routes
 		.filter((r) => r.stop_type === StopType.FullTime || r.stop_type === StopType.PartTime)
 		.map((r) => r.id);
-	const other_routes = $stop_times
-		.filter((st) => st.arrival > new Date() && st.stop_id === stop.id)
-		.map((st) => st.route_id);
+	//  st.arrival > new Date() &&
+	const other_routes = $stop_times.filter((st) => st.stop_id === stop.id).map((st) => st.route_id);
 
+	// get all routes that are not base routes
 	$: other_route_ids = Array.from(new Set(other_routes.filter((r) => !base_routes.includes(r))));
 </script>
 
