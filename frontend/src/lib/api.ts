@@ -1,5 +1,5 @@
 import { type Writable } from 'svelte/store';
-import { offline } from '$lib/stores';
+import { offline, current_time } from '$lib/stores';
 import icons from '$lib/icons';
 
 const train_regex = /(\[(.+?)\])/gm;
@@ -18,13 +18,14 @@ export async function update_data(
 	fetch: Fetch,
 	trip_store: Writable<Trip[]>,
 	stop_time_store: Writable<StopTime[]>,
-	alert_store: Writable<Alert[]>
+	alert_store: Writable<Alert[]>,
+	time: number | null
 ) {
 	try {
 		const [tripsResponse, stopTimesResponse, alertsResponse] = await Promise.all([
-			fetch('/api/trips'),
-			fetch('/api/stops/times'),
-			fetch('/api/alerts')
+			fetch(`/api/trips${time ? `?at=${time}` : ''}`),
+			fetch(`/api/stops/times${time ? `?at=${time}` : ''}`),
+			fetch(`/api/alerts${time ? `?at=${time}` : ''}`)
 		]);
 
 		if (

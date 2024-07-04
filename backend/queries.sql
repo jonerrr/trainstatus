@@ -226,3 +226,24 @@ ORDER BY
     duration
 LIMIT
     50;
+
+-- get alerts with most affected entities
+SELECT
+    ae.alert_id,
+    a.header_plain,
+    a.description_plain,
+    a.alert_type,
+    array_agg(DISTINCT ae.route_id)
+FROM
+    affected_entities ae
+    LEFT JOIN alerts a ON a.id = ae.alert_id
+WHERE
+    ae.route_id IS NOT NULL
+    AND lower(a.alert_type) NOT LIKE '%planned%'
+GROUP BY
+    ae.alert_id,
+    a.header_plain,
+    a.description_plain,
+    a.alert_type
+ORDER BY
+    array_length(ARRAY_AGG(DISTINCT ae.route_id), 1) DESC

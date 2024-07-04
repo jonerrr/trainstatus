@@ -25,10 +25,11 @@ where
         .collect())
 }
 
-// this represents the current time to use for sql queries. default is current time
-pub struct CurrentTime(pub DateTime<Utc>);
+// this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
+#[derive(Debug)]
+pub struct CurrentTime(pub DateTime<Utc>, pub bool);
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct QueryParams {
     pub at: Option<i64>,
 }
@@ -53,16 +54,16 @@ where
             Some(at) => {
                 let time = Utc.timestamp_opt(at, 0);
                 match time {
-                    chrono::LocalResult::Single(time) => CurrentTime(time),
+                    chrono::LocalResult::Single(time) => CurrentTime(time, true),
                     _ => {
                         tracing::error!("Invalid timestamp: {}", at);
-                        CurrentTime(Utc::now())
+                        CurrentTime(Utc::now(), false)
                     }
                 }
             }
             None => {
                 let now = chrono::Utc::now();
-                CurrentTime(now)
+                CurrentTime(now, false)
             }
         };
 

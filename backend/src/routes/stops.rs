@@ -1,3 +1,4 @@
+use super::CurrentTime;
 use super::{errors::ServerError, trips::Parameters};
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse, Json};
@@ -93,6 +94,7 @@ struct StopTime {
 pub async fn times(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
+    time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     let stop_times = {
         if params.stop_ids.is_empty() {
@@ -112,10 +114,11 @@ pub async fn times(
                 ON
                 t.id = st.trip_id
             WHERE
-                st.arrival > now()
+                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
             ORDER BY
                 st.arrival
         ",
+                time.0
             )
             .fetch_all(&pool)
             .await?
@@ -136,11 +139,11 @@ pub async fn times(
                 ON
                 t.id = st.trip_id
             WHERE
-                st.arrival > now()
-                AND st.stop_id = ANY($1)
+                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                AND st.stop_id = ANY($2)
             ORDER BY
-                st.arrival
-        ",
+                st.arrival",
+                time.0,
                 &params.stop_ids
             )
             .fetch_all(&pool)

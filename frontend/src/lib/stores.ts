@@ -43,3 +43,6 @@ export const bus_stop_times = writable<BusStopTime[]>([]);
 
 // export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
 export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
+
+// stores the time of data they want, null = current time
+export const current_time = writable<Date | null>(null);

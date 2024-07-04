@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n        a.id ,\n        a.alert_type,\n        a.header_html ,\n        a.description_html ,\n        a.created_at ,\n        a.updated_at,\n        ap.start_time,\n        ap.end_time,\n        jsonb_agg(DISTINCT ae) AS entities\n    FROM\n        alerts a\n    LEFT JOIN active_periods ap ON\n        a.id = ap.alert_id\n    LEFT JOIN affected_entities ae ON\n        a.id = ae.alert_id\n    WHERE\n        a.in_feed IS TRUE\n        AND ae.route_id IS NOT NULL\n        AND ap.start_time < now()\n        AND (ap.end_time > now()\n            OR ap.end_time IS NULL)\n    GROUP BY\n        a.id,\n        ap.start_time ,\n        ap.end_time",
+  "query": "SELECT\n            a.id,\n            a.alert_type,\n            a.header_html,\n            a.description_html,\n            a.created_at,\n            a.updated_at,\n            ap.start_time,\n            ap.end_time,\n            jsonb_agg(DISTINCT ae) AS entities\n        FROM\n            alerts a\n        LEFT JOIN active_periods ap ON\n            a.id = ap.alert_id\n        LEFT JOIN affected_entities ae ON\n            a.id = ae.alert_id\n        WHERE\n            a.in_feed IS TRUE\n            AND ae.route_id IS NOT NULL\n            AND ap.start_time < $1\n            AND (ap.end_time > $1\n                OR ap.end_time IS NULL)\n        GROUP BY\n            a.id,\n            ap.start_time,\n            ap.end_time",
   "describe": {
     "columns": [
       {
@@ -50,7 +50,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Timestamptz"
+      ]
     },
     "nullable": [
       false,
@@ -64,5 +66,5 @@
       null
     ]
   },
-  "hash": "0e77e01746d296db32585e9e141c4e38385baed3ff85a12903ee93c5067e2e9e"
+  "hash": "c3800249d8b28acc1ca66d9d91f7a0cb4d7d74d66837defd47c1ac0b9ced4cce"
 }
