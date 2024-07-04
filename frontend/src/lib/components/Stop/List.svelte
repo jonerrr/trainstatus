@@ -71,15 +71,20 @@
 
 	let search_el: HTMLInputElement;
 
+	let search = 'loading';
+	let search_term = '';
+	let searchWorker: Worker;
+
 	function clearSearch() {
 		// reset stop ids
 		$stop_ids = $stop_store.slice(0, 15).map((s) => s.id);
 		$bus_stop_ids = $bus_stop_store.slice(0, 15).map((s) => s.id);
-		search_el.value = '';
+		// search_el.value = '';
+		search_term = '';
 	}
 
 	let list_el: List;
-	function searchStops(e: any) {
+	function searchStops(e: { target: { value: string } }) {
 		// If search is empty, clear search and show all stops
 		if (e.target.value === '') {
 			clearSearch();
@@ -93,30 +98,41 @@
 		});
 	}
 
-	let search = 'loading';
-	let search_term = '';
-	let searchWorker: Worker;
-
 	onMount(() => {
-		// create worker
-		searchWorker = new SearchWorker();
-		// listen for messages
-		searchWorker.addEventListener('message', (e) => {
-			const { type, payload } = e.data;
+		if (show_search) {
+			// create worker
+			searchWorker = new SearchWorker();
+			// listen for messages
+			searchWorker.addEventListener('message', (e) => {
+				const { type, payload } = e.data;
 
-			if (type === 'ready') search = 'ready';
+				if (type === 'ready') search = 'ready';
 
-			if (type === 'results' && payload.results.length) {
-				if (payload.search_type === 'Train') $stop_ids = payload.results;
-				else if (payload.search_type === 'Bus') $bus_stop_ids = payload.results;
+				if (type === 'results' && payload.results.length) {
+					if (payload.search_type === 'Train') $stop_ids = payload.results;
+					else if (payload.search_type === 'Bus') $bus_stop_ids = payload.results;
 
-				if (payload.results && payload.results.length < 6) {
-					list_el.scrollIntoView();
+					if (payload.results && payload.results.length < 6) {
+						list_el.scrollIntoView();
+					}
 				}
-			}
-		});
-		// initialize when the component mounts
-		searchWorker.postMessage({ type: 'load' });
+			});
+			// initialize when the component mounts
+			searchWorker.postMessage({ type: 'load' });
+
+			// watch if they change modes, and rerun search if they do
+			value.subscribe((value) => {
+				if (search === 'ready' && search_term !== '') {
+					searchWorker.postMessage({
+						type: 'search',
+						payload: { search_term, search_type: value }
+					});
+					// make sure there is a search el otherwise we get undefined error
+				} else if (search_el) {
+					clearSearch();
+				}
+			});
+		}
 	});
 </script>
 
@@ -175,6 +191,7 @@
 			<div class="relative">
 				<input
 					bind:this={search_el}
+					bind:value={search_term}
 					on:input={debounce(searchStops)}
 					type="search"
 					placeholder="Search stops"
