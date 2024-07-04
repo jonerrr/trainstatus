@@ -45,8 +45,8 @@
 		<div class="text-neutral-400">In transit to {current_stop?.name}</div>
 	{:else if trip.train_status === TrainStatus.Incoming}
 		<div class="text-neutral-400">Arriving at {current_stop?.name}</div>
-	{:else if !trip.assigned}
-		<div class="text-neutral-400">Not assigned</div>
+		<!-- {:else if !trip.assigned}
+		<div class="text-neutral-400">Not assigned</div> -->
 	{:else}
 		<div class="text-neutral-400">Next stop: {current_stop?.name}</div>
 	{/if}
