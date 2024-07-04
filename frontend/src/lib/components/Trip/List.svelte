@@ -23,13 +23,21 @@
 	export let title: string = 'Trips';
 	export let trip_ids = writable<string[]>([]);
 	export let manage_height = true;
-	// export let bus_trip_ids: Writable<string[]> = writable([]);
+	export let bus_trip_ids = writable<string[]>([]);
 	// show search bar on bottom
 
 	const wanted_trips = derived([trip_ids, trips], ([$trip_ids, $trip_store]) => {
 		// this preserves the order of stop_ids but its slower
 		return $trip_store.filter((st) => $trip_ids.includes(st.id));
 	});
+
+	const wanted_bus_trips = derived(
+		[bus_trip_ids, bus_trips],
+		([$bus_trip_ids, $bus_trip_store]) => {
+			// this preserves the order of stop_ids but its slower
+			return $bus_trip_store.filter((st) => $bus_trip_ids.includes(st.id));
+		}
+	);
 
 	// remove from pinned trips if it no longer exists
 	$: $pinned_trips = $pinned_trips.filter((p) => $wanted_trips.find((t) => t.id === p));

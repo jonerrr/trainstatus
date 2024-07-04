@@ -1,15 +1,24 @@
 <script lang="ts">
 	import { CircleX, Share, ClipboardCheck } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import type { Writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
-	import { bus_trips } from '$lib/stores';
+	import {
+		bus_trips,
+		pinned_bus_stops,
+		pinned_bus_trips,
+		pinned_routes,
+		pinned_stops,
+		pinned_trips
+	} from '$lib/stores';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
 	import BusStopContent from '$lib/components/Stop/BusContent.svelte';
 	import BusTripContent from '$lib/components/Trip/BusContent.svelte';
+	import Pin from '$lib/components/Pin.svelte';
 
 	// detect if user is swiping back and disable close on outside click
 
@@ -173,6 +182,36 @@
 			});
 		}
 	});
+
+	let pin_store: Writable<any>;
+	$: pin_id = $page.state.dialog_id;
+
+	$: switch ($page.state.dialog_type) {
+		case 'stop':
+			pin_store = pinned_stops;
+			break;
+		case 'trip':
+			pin_store = pinned_trips;
+			break;
+		case 'route_alert':
+			pin_store = pinned_routes;
+			break;
+		case 'bus_stop':
+			pin_store = pinned_bus_stops;
+			break;
+		case 'bus_trip':
+			pin_store = pinned_bus_trips;
+			// TODO: fix this
+			// need to preload the route for bus trips
+			// const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+			// preload_bus_route = trip.route_id;
+			break;
+		default:
+			pin_store = pinned_stops;
+	}
+
+	// used to set the max width of the content titles
+	let actions_width: number;
 </script>
 
 <!-- TODO: figure out transitions -->
@@ -185,18 +224,23 @@
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
 	{#key $page.state.dialog_id}
 		{#if $page.state.dialog_type === 'stop'}
-			<StopContent bind:stop_id={$page.state.dialog_id} />
+			<StopContent bind:actions_width bind:stop_id={$page.state.dialog_id} />
 		{:else if $page.state.dialog_type === 'trip'}
-			<TripContent bind:trip_id={$page.state.dialog_id} />
+			<TripContent bind:actions_width bind:trip_id={$page.state.dialog_id} />
 		{:else if $page.state.dialog_type === 'route_alert'}
 			<RouteAlertContent bind:route_id={$page.state.dialog_id} />
 		{:else if $page.state.dialog_type === 'bus_stop'}
 			<BusStopContent bind:stop_id={$page.state.dialog_id} />
 		{:else if $page.state.dialog_type === 'bus_trip'}
-			<BusTripContent bind:trip_id={$page.state.dialog_id} />
+			<BusTripContent bind:actions_width bind:trip_id={$page.state.dialog_id} />
 		{/if}
 
-		<div class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center">
+		<div
+			bind:offsetWidth={actions_width}
+			class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center"
+		>
+			<Pin store={pin_store} item_id={pin_id} />
+
 			{#if !copied}
 				<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
 					<Share class="h-6 w-6" />

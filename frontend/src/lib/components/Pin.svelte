@@ -26,8 +26,8 @@
 	use:melt={$root}
 	on:click|stopPropagation
 	aria-label="Pin to home screen"
-	class="z-30 grid h-9 w-9 place-items-center items-center justify-center rounded-md
-text-base text-indigo-300 leading-4 data-[state=on]:text-indigo-600
+	class="z-30 grid h-8 w-8 place-items-center items-center justify-center rounded-md
+text-base text-indigo-300 data-[state=on]:text-indigo-600
 data-[disabled]:cursor-not-allowed
 "
 >
