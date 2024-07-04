@@ -48,7 +48,7 @@ export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
 // 	id: string;
 // 	routes: string[];
 // }
-// format is route_trip_id
+// format is route id _ trip id
 export const pinned_bus_trips = persisted<string[]>('pinned_bus_trips', []);
 
 // stores the time of data they want, null = current time
