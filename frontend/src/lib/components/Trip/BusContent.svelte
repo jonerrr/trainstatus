@@ -22,10 +22,7 @@
 </script>
 
 <!-- list of stops and their arrival times -->
-<div
-	class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1 rounded
-	max-w-[450px]"
->
+<div class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1 rounded">
 	<div class="flex items-center justify-between bg-neutral-800 w-full">
 		<div class="flex max-w-[calc(100%-65px)] gap-2 items-center text-indigo-400">
 			{#if $trip && $route}

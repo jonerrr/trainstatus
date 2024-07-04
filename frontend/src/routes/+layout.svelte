@@ -32,9 +32,15 @@
 			interval = setInterval(async () => {
 				await update_data(fetch, trips, stop_times, alerts, null);
 			}, 10000);
+
+			// Interval for update_bus_data
+			bus_interval = setInterval(async () => {
+				//TODO: maybe add a check to make sure length is greater than 0
+				await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, null);
+			}, 30000);
 		} else {
-			console.log('static data');
 			await update_data(fetch, trips, stop_times, alerts, time);
+			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, time);
 		}
 
 		// update bus routes data when monitored routes change
@@ -42,15 +48,9 @@
 			if (routes.length && routes.sort().toString() !== last_monitored_routes.sort().toString()) {
 				// console.log('updating bus data', routes);
 				last_monitored_routes = routes.sort();
-				await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
+				await update_bus_data(fetch, bus_trips, bus_stop_times, routes, time);
 			}
 		});
-
-		// Interval for update_bus_data
-		bus_interval = setInterval(async () => {
-			//TODO: maybe add a check to make sure length is greater than 0
-			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
-		}, 30000);
 	});
 
 	// Don't think we need this bc its a layout and won't be unmounted
