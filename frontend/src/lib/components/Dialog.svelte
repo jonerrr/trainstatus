@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { pushState, preloadData } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
-	import { monitored_routes, bus_trips } from '$lib/stores';
+	import { bus_trips } from '$lib/stores';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
 	import RouteAlertContent from '$lib/components/RouteAlert/Content.svelte';
@@ -19,7 +19,7 @@
 		page.subscribe((p) => {
 			if (p.state.dialog_open) {
 				// prevent close state issues
-				// node.close();
+				node.close();
 				// this prevents auto focusing on close button when opening dialog
 				node.inert = true;
 				node.showModal();
@@ -87,13 +87,15 @@
 			case 'bus_stop':
 				param = 'bs';
 				title = 'View Bus Stop';
+				// don't need to preload bus stops bc it is checked in other component
+				// const stop = $bus_stops.find((s) => s.id === $page.state.dialog_id)!;
+				// preload_bus_route = stop.routes.map((r) => r.id).join(',');
 				break;
 			case 'bus_trip':
 				param = 'bt';
 				title = 'View Bus Trip';
 				const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
 				preload_bus_route = trip.route_id;
-
 				break;
 		}
 
@@ -126,12 +128,6 @@
 
 		const open_bus_stop_id = $page.url.searchParams.get('bs');
 		const open_bus_trip_id = $page.url.searchParams.get('bt')?.toLowerCase();
-
-		const preload_route_ids = $page.url.searchParams.get('pr')?.toUpperCase().split(',');
-		if (preload_route_ids) {
-			console.log('preloading routes');
-			$monitored_routes = [...preload_route_ids, ...$monitored_routes].slice(0, 15);
-		}
 
 		if (open_stop_id) {
 			// Make sure data is loaded in before opening dialog otherwise we get an error

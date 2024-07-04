@@ -45,4 +45,12 @@ export const bus_stop_times = writable<BusStopTime[]>([]);
 export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
 
 // stores the time of data they want, null = current time
-export const current_time = writable<Date | null>(null);
+export const data_at = writable<Date | null>(null);
+
+// for train, stop id is string but for bus its number
+// type StopIdType<T> = T extends StopTime[] ? string : T extends BusStopTime[] ? number : never;
+
+// export function get_stop_times<T extends StopTime[] | BusStopTime[]>(
+// 	store: Writable<T>,
+// 	stop_id: StopIdType<T>
+// ) {}

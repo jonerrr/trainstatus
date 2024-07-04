@@ -12,7 +12,7 @@
 		monitored_routes,
 		bus_trips,
 		bus_stop_times,
-		current_time
+		data_at
 	} from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -24,28 +24,31 @@
 	let last_monitored_routes: string[] = [];
 
 	onMount(async () => {
-		const time = $current_time ? Math.floor($current_time.getTime() / 1000) : null;
+		// convert time to unix timestamp
+		const time = $data_at ? Math.floor($data_at.getTime() / 1000) : null;
 
-		// update subway data only if they want realtime data
+		// update subway data every 10 sec only if they want realtime data
 		if (!time) {
 			interval = setInterval(async () => {
 				await update_data(fetch, trips, stop_times, alerts, null);
 			}, 10000);
 		} else {
+			console.log('static data');
 			await update_data(fetch, trips, stop_times, alerts, time);
 		}
 
 		// update bus routes data when monitored routes change
-		// TODO: maybe check if there are no new routes and then don't update
 		monitored_routes.subscribe(async (routes) => {
-			if (routes.length && JSON.stringify(routes) !== JSON.stringify(last_monitored_routes)) {
-				last_monitored_routes = routes;
+			if (routes.length && routes.sort().toString() !== last_monitored_routes.sort().toString()) {
+				// console.log('updating bus data', routes);
+				last_monitored_routes = routes.sort();
 				await update_bus_data(fetch, bus_trips, bus_stop_times, routes);
 			}
 		});
 
 		// Interval for update_bus_data
 		bus_interval = setInterval(async () => {
+			//TODO: maybe add a check to make sure length is greater than 0
 			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes);
 		}, 30000);
 	});
@@ -55,6 +58,14 @@
 		clearInterval(interval);
 		clearInterval(bus_interval);
 	});
+
+	// preserve at query string
+	// beforeNavigate(({ from, to, cancel }) => {
+	// 	if (from?.url.searchParams.has('at') && !to?.url.searchParams.has('at')) {
+	// 		cancel();
+	// 		goto(to?.url.pathname + `?at=${from.url.searchParams.get('at')}`);
+	// 	}
+	// });
 
 	// register swiper.js for alert carousel
 	register();

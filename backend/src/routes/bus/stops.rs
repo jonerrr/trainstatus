@@ -1,4 +1,4 @@
-use crate::routes::{errors::ServerError, parse_list};
+use crate::routes::{errors::ServerError, parse_list, CurrentTime};
 use axum::{
     extract::{Query, State},
     response::IntoResponse,
@@ -70,11 +70,11 @@ pub struct StopTime {
 pub async fn times(
     State(pool): State<PgPool>,
     params: Query<Parameters>,
+    time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     let stop_times = sqlx::query_as!(
         StopTime,
-        "
-        SELECT
+        "SELECT
             bst.*, bt.route_id
         FROM
             bus_stop_times bst
@@ -82,10 +82,11 @@ pub async fn times(
             bt.id = bst.trip_id
         WHERE
             bt.route_id = ANY($1)
-            AND bst.arrival > now()
+            AND bst.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
         ORDER BY
             bst.arrival",
-        &params.route_ids
+        &params.route_ids,
+        time.0
     )
     .fetch_all(&pool)
     .await?;

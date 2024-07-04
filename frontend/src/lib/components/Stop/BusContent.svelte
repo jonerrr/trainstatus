@@ -10,7 +10,7 @@
 	// 	return $stops.find((s) => s.id === stop_id);
 	// });
 	$: stop = $bus_stops.find((s) => s.id === stop_id);
-	$: stop_route_ids = stop?.routes.map((r) => r.id);
+	$: stop_route_ids = stop?.routes.map((r) => r.id) ?? [];
 	$: stop_routes = $bus_routes.filter((r) => stop_route_ids?.includes(r.id));
 
 	// make sure route is being monitored (might not be if dialog is opened by query param)

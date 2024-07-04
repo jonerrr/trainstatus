@@ -1,27 +1,26 @@
 <script lang="ts">
 	import { derived } from 'svelte/store';
 	import { type Direction, type Stop } from '$lib/api';
-	import { stop_times as stop_time_store } from '$lib/stores';
+	import { stop_times as stop_time_store, data_at } from '$lib/stores';
 	import Trigger from '$lib/components/Trip/Trigger.svelte';
 
 	export let stop: Stop;
 	export let direction: Direction;
 
-	$: stop_times = derived(stop_time_store, ($stop_time_store) => {
+	const stop_times = derived(stop_time_store, ($stop_time_store) => {
 		const st = $stop_time_store.filter(
-			(st) => st.arrival > new Date() && st.stop_id === stop.id && st.direction === direction
+			(st) => st.stop_id === stop.id && st.direction === direction
 		);
 
-		return st
-			.map((st) => {
-				const arrival = st.arrival.getTime();
-				const now = new Date().getTime();
-				const eta = (arrival - now) / 1000 / 60;
+		return st.map((st) => {
+			const arrival = st.arrival.getTime();
+			const now = $data_at ?? new Date();
+			const eta = (arrival - now.getTime()) / 1000 / 60;
 
-				st.eta = eta;
-				return st;
-			})
-			.sort((a, b) => a.eta! - b.eta!);
+			st.eta = eta;
+			return st;
+		});
+		// .sort((a, b) => a.eta! - b.eta!);
 	});
 </script>
 
