@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { derived } from 'svelte/store';
-	import { bus_stops, bus_routes, bus_stop_times, monitored_routes } from '$lib/stores';
+	import { bus_stops, bus_routes, bus_stop_times, monitored_routes, data_at } from '$lib/stores';
 	import BusTrigger from '$lib/components/Trip/BusTrigger.svelte';
 	import BusIcon from '$lib/components/BusIcon.svelte';
 
@@ -21,13 +21,13 @@
 	});
 
 	const stop_times = derived(bus_stop_times, ($bus_stop_times) => {
-		const st = $bus_stop_times.filter((st) => st.arrival > new Date() && st.stop_id === stop_id);
+		const st = $bus_stop_times.filter((st) => st.stop_id === stop_id);
 
 		return st
 			.map((st) => {
 				const arrival = st.arrival.getTime();
-				const now = new Date().getTime();
-				const eta = (arrival - now) / 1000 / 60;
+				const now = $data_at ?? new Date();
+				const eta = (arrival - now.getTime()) / 1000 / 60;
 
 				st.eta = eta;
 				return st;

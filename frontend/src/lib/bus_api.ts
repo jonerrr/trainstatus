@@ -8,13 +8,14 @@ export async function update_bus_data(
 	fetch: Fetch,
 	trip_store: Writable<BusTrip[]>,
 	stop_time_store: Writable<BusStopTime[]>,
-	routes: string[]
+	routes: string[],
+	time: number | null
 ) {
 	try {
 		const route_l = routes.join(',');
 		const [tripsResponse, stopTimesResponse] = await Promise.all([
-			fetch(`/api/bus/trips?route_ids=${route_l}`),
-			fetch(`/api/bus/stops/times?route_ids=${route_l}`)
+			fetch(`/api/bus/trips?route_ids=${route_l}${time ? `&at=${time}` : ''}`),
+			fetch(`/api/bus/stops/times?route_ids=${route_l}${time ? `&at=${time}` : ''}`)
 		]);
 
 		if (
