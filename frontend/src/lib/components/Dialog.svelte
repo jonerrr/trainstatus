@@ -14,7 +14,8 @@
 		pinned_bus_trips,
 		pinned_routes,
 		pinned_stops,
-		pinned_trips
+		pinned_trips,
+		monitored_routes
 	} from '$lib/stores';
 	import StopContent from '$lib/components/Stop/Content.svelte';
 	import TripContent from '$lib/components/Trip/Content.svelte';
@@ -82,38 +83,55 @@
 	let preload_bus_route: string;
 
 	function share() {
-		let title = '';
+		// let title = '';
+		// switch ($page.state.dialog_type) {
+		// 	case 'stop':
+		// 		// param = 's';
+		// 		title = 'View Stop';
+		// 		break;
+		// 	case 'trip':
+		// 		// param = 't';
+		// 		title = 'View Trip';
+		// 		break;
+		// 	case 'route_alert':
+		// 		// param = 'r';
+		// 		title = 'View Route Alert';
+		// 		break;
+		// 	case 'bus_stop':
+		// 		// param = 'bs';
+		// 		title = 'View Bus Stop';
+		// 		// don't need to preload bus stops bc it is checked in other component
+		// 		// const stop = $bus_stops.find((s) => s.id === $page.state.dialog_id)!;
+		// 		// preload_bus_route = stop.routes.map((r) => r.id).join(',');
+		// 		break;
+		// 	case 'bus_trip':
+		// 		// param = 'bt';
+		// 		title = 'View Bus Trip';
+		// 		const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+		// 		preload_bus_route = trip.route_id;
+		// 		break;
+		// }
+
+		let id = $page.state.dialog_id;
+
 		switch ($page.state.dialog_type) {
-			case 'stop':
-				// param = 's';
-				title = 'View Stop';
-				break;
-			case 'trip':
-				// param = 't';
-				title = 'View Trip';
-				break;
-			case 'route_alert':
-				// param = 'r';
-				title = 'View Route Alert';
+			case 'bus_trip':
+				const trip = $bus_trips.find((t) => t.id === id)!;
+				id = `${id}_${trip.route_id}`;
 				break;
 			case 'bus_stop':
-				// param = 'bs';
-				title = 'View Bus Stop';
-				// don't need to preload bus stops bc it is checked in other component
-				// const stop = $bus_stops.find((s) => s.id === $page.state.dialog_id)!;
-				// preload_bus_route = stop.routes.map((r) => r.id).join(',');
-				break;
-			case 'bus_trip':
-				// param = 'bt';
-				title = 'View Bus Trip';
-				const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
-				preload_bus_route = trip.route_id;
+				const stop = $bus_stops.find((s) => s.id === id)!;
+				id = [id, ...stop.routes.map((r) => r.id)].join('_');
 				break;
 		}
+		// if ($page.state.dialog_type === 'bus_trip') {
+		// 	const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
+		// 	preload_bus_route = trip.route_id;
+		// 	id = `${trip.route_id}_${$page.state.dialog_id}`;
+		// }
 
 		// dialog type + id
-		let url =
-			window.location.origin + `/?dt=${$page.state.dialog_type}&id=${$page.state.dialog_id}`;
+		let url = window.location.origin + `/?dt=${$page.state.dialog_type}&id=${id}`;
 		if (preload_bus_route) {
 			url += `&pr=${preload_bus_route}`;
 		}
@@ -126,7 +144,7 @@
 			}, 800);
 		} else {
 			navigator.share({
-				title,
+				title: document.title,
 				url
 			});
 		}
@@ -160,19 +178,44 @@
 				break;
 			case 'bus_stop':
 				pin_store = pinned_bus_stops;
-				if (!$bus_stops.some((s) => s.id === p.state.dialog_id)) {
-					replaceState('', { ...$page.state, dialog_id: 'error' });
+				const stop_info = (p.state.dialog_id as number).toString().split('_');
+
+				const stop_id = parseInt(stop_info[0]);
+				if (stop_info.length > 1) {
+					$monitored_routes = [...new Set([...$monitored_routes, ...stop_info.slice(1)])];
+
+					replaceState('', { ...$page.state, dialog_id: stop_id });
+
+					console.log('monitored stops', $monitored_routes);
 				}
+
+				// if (!$bus_stops.some((s) => s.id === p.state.dialog_id)) {
+				// 	replaceState('', { ...$page.state, dialog_id: 'error' });
+				// }
 
 				break;
 			// need brackets bc of svelte issue https://github.com/sveltejs/svelte/issues/6706
 			case 'bus_trip': {
 				pin_store = pinned_bus_trips;
-				// TODO: implement bus trips
+
+				// first is trip id, the rest are route ids that must be monitored
+				const trip_info = (p.state.dialog_id as string).split('_');
+
+				const trip_id = trip_info[0];
+				if (trip_info.length > 1) {
+					$monitored_routes = [...new Set([...$monitored_routes, ...trip_info.slice(1)])];
+
+					replaceState('', { ...$page.state, dialog_id: trip_id });
+
+					console.log('monitored routes', $monitored_routes);
+				}
+				// if (!$bus_trips.some((s) => s.id === p.state.dialog_id)) {
+				// 	replaceState('', { ...$page.state, dialog_id: 'error' });
+				// }
+
 				// need to preload the route for bus trips
-				const trip = $bus_trips.find((t) => t.id === p.state.dialog_id)!;
-				item_id = `${trip.route_id}_${p.state.dialog_id}`;
-				// preload_bus_route = trip.route_id;
+				// const trip = $bus_trips.find((t) => t.id === p.state.dialog_id)!;
+				// item_id = `${trip.route_id}_${p.state.dialog_id}`;
 				break;
 			}
 			default:
