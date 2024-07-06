@@ -22,6 +22,12 @@
 	// TODO: add button to load previous stop times and fetch from api
 </script>
 
+<svelte:head>
+	{#if $trip}
+		<title>{$trip.route_id} | {$trip.headsign}</title>
+	{/if}
+</svelte:head>
+
 <!-- list of stops and their arrival times -->
 <div class="relative text-white bg-neutral-800/90 border border-neutral-700 p-1 rounded">
 	<div

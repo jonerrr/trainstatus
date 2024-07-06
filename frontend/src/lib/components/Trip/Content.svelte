@@ -24,6 +24,12 @@
 	// TODO: fix state not updating properly
 </script>
 
+<svelte:head>
+	{#if $trip && last_stop}
+		<title>{$trip.route_id} | {last_stop.name}</title>
+	{/if}
+</svelte:head>
+
 <!-- list of stops and their arrival times -->
 <div
 	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80dvh]"
