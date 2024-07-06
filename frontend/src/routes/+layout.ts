@@ -1,4 +1,5 @@
 import { update_data } from '$lib/api';
+import { pushState } from '$app/navigation';
 import {
 	stops,
 	trips,
@@ -28,10 +29,4 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 	stops.set(stops_res);
 	bus_stops.set(bus_stops_res);
 	bus_routes.set(bus_routes_res);
-
-	// check if they want to preload any bus routes (from share trip link)
-	const preload_routes = url.searchParams.get('pr')?.toUpperCase();
-	if (preload_routes) {
-		monitored_routes.set(preload_routes.split(','));
-	}
 };

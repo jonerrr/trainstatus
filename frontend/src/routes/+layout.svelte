@@ -2,7 +2,9 @@
 	import '../app.css';
 	import '@fontsource/inter';
 	import { register } from 'swiper/element/bundle';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
+	import { pushState } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { update_data } from '$lib/api';
 	import { update_bus_data } from '$lib/bus_api';
 	import {
@@ -41,6 +43,29 @@
 		} else {
 			await update_data(fetch, trips, stop_times, alerts, time);
 			await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, time);
+		}
+
+		const dialog_type_regex = /(bus_)?(stop|trip)|route_alert|route/;
+		const dialog_type = $page.url.searchParams.get('dt') as App.PageState['dialog_type'];
+		const dialog_id = $page.url.searchParams.get('id');
+		// check if dialog is valid
+
+		// check if they want to preload any bus routes (from share trip link)
+		const preload_routes = $page.url.searchParams.get('pr')?.toUpperCase();
+		if (preload_routes) {
+			monitored_routes.set(preload_routes.split(','));
+		}
+
+		if (dialog_type && dialog_type_regex.test(dialog_type) && dialog_id) {
+			// console.log('pushing state', dialog_id, dialog_type);
+
+			// tick prevents undefined error when pushing in onMount https://github.com/sveltejs/kit/issues/11466
+			await tick();
+			pushState('', {
+				dialog_open: true,
+				dialog_id,
+				dialog_type
+			});
 		}
 
 		// update bus routes data when monitored routes change

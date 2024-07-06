@@ -40,10 +40,6 @@
 			<h2 class={`font-bold text-xl text-indigo-300 ${$trip.assigned ? '' : 'italic'}`}>
 				{last_stop?.name}
 			</h2>
-
-			<!-- <Pin store={pinned_trips} item_id={$trip.id} /> -->
-		{:else}
-			<h1 class="p-2">Trip not found</h1>
 		{/if}
 	</div>
 

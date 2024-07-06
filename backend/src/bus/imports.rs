@@ -41,7 +41,10 @@ struct RouteStop {
 }
 
 // could hypothetically use transactions to prevent conflicts
-pub async fn stops_and_routes(pool: &PgPool) {
+pub async fn stops_and_routes(
+    pool: &PgPool,
+    stop_geos: &mut Vec<crate::geo::StopGeometry<i32, String>>,
+) {
     // these vectors store the data that will be inserted into the db all at once at the end
     let mut routes: Vec<Route> = Vec::new();
     let mut stops: Vec<Stop> = Vec::new();
@@ -60,7 +63,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // TODO: dont convert to tuple and just use struct
     for mut route in all_routes.into_iter() {
         // get the stops for the route
-        let r_stops = RouteStops::get(&route.id).await;
+        let r_stops: RouteStops = RouteStops::get(&route.id).await;
 
         route.id = route
             .id
@@ -134,6 +137,17 @@ pub async fn stops_and_routes(pool: &PgPool) {
     // dbg!(route_stops.len());
 
     // insert routes into db
+
+    // add stops to geo vec
+    for stop in stops.iter() {
+        stop_geos.push(crate::geo::StopGeometry {
+            id: stop.0,
+            name: stop.1.clone(),
+            point: geo_types::Point::new(stop.4 as f64, stop.3 as f64),
+            // stop_type: crate::geo::StopType::Bus,
+            closest_stops: None,
+        });
+    }
 
     let mut query_builder =
         QueryBuilder::new("INSERT INTO bus_routes (id, long_name, short_name, color, shuttle)");

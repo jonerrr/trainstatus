@@ -83,8 +83,6 @@
 				<TripList stop={$stop} direction={Direction.South} />
 			</div>
 		</div>
-	{:else}
-		<h2 class="p-2">Invalid stop</h2>
 	{/if}
 </div>
 
