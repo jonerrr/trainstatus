@@ -2,7 +2,7 @@
 	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices } from 'lucide-svelte';
 	import type { Writable } from 'svelte/store';
 	import { page } from '$app/stores';
-	import { pushState } from '$app/navigation';
+	import { pushState, replaceState } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
 	import {
 		trips,
@@ -42,6 +42,7 @@
 			} else {
 				node.close();
 				document.body.style.overflow = 'auto';
+				document.title = 'Trainstat.us | Home';
 			}
 		});
 
@@ -81,30 +82,29 @@
 	let preload_bus_route: string;
 
 	function share() {
-		let param = '';
 		let title = '';
 		switch ($page.state.dialog_type) {
 			case 'stop':
-				param = 's';
+				// param = 's';
 				title = 'View Stop';
 				break;
 			case 'trip':
-				param = 't';
+				// param = 't';
 				title = 'View Trip';
 				break;
 			case 'route_alert':
-				param = 'r';
+				// param = 'r';
 				title = 'View Route Alert';
 				break;
 			case 'bus_stop':
-				param = 'bs';
+				// param = 'bs';
 				title = 'View Bus Stop';
 				// don't need to preload bus stops bc it is checked in other component
 				// const stop = $bus_stops.find((s) => s.id === $page.state.dialog_id)!;
 				// preload_bus_route = stop.routes.map((r) => r.id).join(',');
 				break;
 			case 'bus_trip':
-				param = 'bt';
+				// param = 'bt';
 				title = 'View Bus Trip';
 				const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
 				preload_bus_route = trip.route_id;
@@ -142,26 +142,26 @@
 			case 'stop':
 				pin_store = pinned_stops;
 				if (!$stops.some((s) => s.id === p.state.dialog_id)) {
-					pushState('', { ...$page.state, dialog_id: 'error' });
+					replaceState('', { ...$page.state, dialog_id: 'error' });
 				}
 
 				break;
 			case 'trip':
 				pin_store = pinned_trips;
 				if (!$trips.some((t) => t.id === p.state.dialog_id)) {
-					pushState('', { ...$page.state, dialog_id: 'error' });
+					replaceState('', { ...$page.state, dialog_id: 'error' });
 				}
 				break;
 			case 'route_alert':
 				pin_store = pinned_routes;
 				if (!all_route_ids.includes(p.state.dialog_id as string)) {
-					pushState('', { ...$page.state, dialog_id: 'error' });
+					replaceState('', { ...$page.state, dialog_id: 'error' });
 				}
 				break;
 			case 'bus_stop':
 				pin_store = pinned_bus_stops;
 				if (!$bus_stops.some((s) => s.id === p.state.dialog_id)) {
-					pushState('', { ...$page.state, dialog_id: 'error' });
+					replaceState('', { ...$page.state, dialog_id: 'error' });
 				}
 
 				break;

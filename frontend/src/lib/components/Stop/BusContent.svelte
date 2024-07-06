@@ -38,6 +38,12 @@
 	// TODO: get how many stops away the bus is
 </script>
 
+<svelte:head>
+	{#if stop}
+		<title>{stop.routes.map((r) => r.id).join(', ')} | {stop.name}</title>
+	{/if}
+</svelte:head>
+
 {#if stop}
 	<div class="p-4">
 		<div class="flex gap-1">

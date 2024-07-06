@@ -34,6 +34,14 @@
 	// TODO: show route map after alerts
 </script>
 
+<svelte:head>
+	{#if $route_alerts.length}
+		<title>{route_id} | {$route_alerts[0].alert_type}</title>
+	{:else}
+		<title>{route_id} | No alerts</title>
+	{/if}
+</svelte:head>
+
 <!-- TODO: fix swiper slides breaking for certain alerts (i think i need to somehow update the component) -->
 <!-- it seems to fix itself when clicking outside of the dialog (but that closes it) -->
 <!-- <div class="max-h-[80vh]"> -->

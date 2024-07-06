@@ -4,7 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import { derived } from 'svelte/store';
 	import { stops, stop_direction } from '$lib/stores';
-	import { Direction } from '$lib/api';
+	import { Direction, TrainStatus } from '$lib/api';
 	import TripList from '$lib/components/Trip/StopTimeList.svelte';
 	import Routes from '$lib/components/Stop/Routes.svelte';
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
@@ -34,6 +34,12 @@
 		easing: cubicInOut
 	});
 </script>
+
+<svelte:head>
+	{#if $stop}
+		<title>{$stop.routes.map((r) => r.id).join(', ')} | {$stop.name}</title>
+	{/if}
+</svelte:head>
 
 <div class="p-2">
 	{#if $stop}
