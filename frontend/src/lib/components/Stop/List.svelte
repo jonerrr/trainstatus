@@ -42,7 +42,6 @@
 		return st;
 	});
 
-	// TODO: not sure if we want to ignore shuttles
 	const bus_stops = derived([bus_stop_ids, bus_stop_store], ([$bus_stop_ids, $bus_stop_store]) => {
 		// this preserves the order of stop_ids but its slower
 		const st = show_location
