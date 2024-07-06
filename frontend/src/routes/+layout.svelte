@@ -48,13 +48,8 @@
 		const dialog_type_regex = /(bus_)?(stop|trip)|route_alert|route/;
 		const dialog_type = $page.url.searchParams.get('dt') as App.PageState['dialog_type'];
 		const dialog_id = $page.url.searchParams.get('id');
-		// check if dialog is valid
 
 		// check if they want to preload any bus routes (from share trip link)
-		const preload_routes = $page.url.searchParams.get('pr')?.toUpperCase();
-		if (preload_routes) {
-			monitored_routes.set(preload_routes.split(','));
-		}
 
 		if (dialog_type && dialog_type_regex.test(dialog_type) && dialog_id) {
 			// console.log('pushing state', dialog_id, dialog_type);

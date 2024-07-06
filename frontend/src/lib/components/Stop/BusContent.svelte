@@ -15,11 +15,11 @@
 	$: stop_routes = $bus_routes.filter((r) => stop_route_ids?.includes(r.id));
 
 	// make sure route is being monitored (might not be if dialog is opened by query param)
-	$: stop_routes.forEach((route) => {
-		if (!$monitored_routes.includes(route.id)) {
-			$monitored_routes.push(route.id);
-		}
-	});
+	// $: stop_routes.forEach((route) => {
+	// 	if (!$monitored_routes.includes(route.id)) {
+	// 		$monitored_routes.push(route.id);
+	// 	}
+	// });
 
 	const stop_times = derived(bus_stop_times, ($bus_stop_times) => {
 		const st = $bus_stop_times.filter((st) => st.stop_id === stop_id);
