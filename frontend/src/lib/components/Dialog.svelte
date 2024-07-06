@@ -1,11 +1,14 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck } from 'lucide-svelte';
-	import { onMount } from 'svelte';
+	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices } from 'lucide-svelte';
 	import type { Writable } from 'svelte/store';
 	import { page } from '$app/stores';
-	import { pushState, preloadData } from '$app/navigation';
+	import { pushState } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
 	import {
+		trips,
+		stops,
+		bus_stops,
+		bus_routes,
 		bus_trips,
 		pinned_bus_stops,
 		pinned_bus_trips,
@@ -108,7 +111,9 @@
 				break;
 		}
 
-		let url = window.location.origin + `/?${param}=${$page.state.dialog_id}`;
+		// dialog type + id
+		let url =
+			window.location.origin + `/?dt=${$page.state.dialog_type}&id=${$page.state.dialog_id}`;
 		if (preload_bus_route) {
 			url += `&pr=${preload_bus_route}`;
 		}
@@ -127,92 +132,53 @@
 		}
 	}
 
-	// Check if user is trying to open a dialog from the URL
 	// Maybe we should pushstate the query params so its easy to copy
-	onMount(async () => {
-		// stop and routes should be uppercase but trip ids should be lowercase because they are uuids
-		const open_stop_id = $page.url.searchParams.get('s')?.toUpperCase();
-		const open_route_id = $page.url.searchParams.get('r')?.toUpperCase();
-		const open_trip_id = $page.url.searchParams.get('t')?.toLowerCase();
-
-		const open_bus_stop_id = $page.url.searchParams.get('bs');
-		const open_bus_trip_id = $page.url.searchParams.get('bt')?.toLowerCase();
-
-		if (open_stop_id) {
-			// Make sure data is loaded in before opening dialog otherwise we get an error
-			await preloadData('/');
-			pushState('', {
-				dialog_open: true,
-				dialog_id: open_stop_id,
-				dialog_type: 'stop'
-			});
-		} else if (open_route_id) {
-			if (all_route_ids.includes(open_route_id)) {
-				await preloadData('/');
-				pushState('', {
-					dialog_open: true,
-					dialog_id: open_route_id,
-					dialog_type: 'route_alert'
-				});
-			} else {
-				console.error('invalid route id');
-			}
-		} else if (open_trip_id) {
-			await preloadData('/');
-			pushState('', {
-				dialog_open: true,
-				dialog_id: open_trip_id,
-				dialog_type: 'trip'
-			});
-		} else if (open_bus_stop_id) {
-			await preloadData('/');
-
-			pushState('', {
-				dialog_open: true,
-				dialog_id: parseInt(open_bus_stop_id),
-				dialog_type: 'bus_stop'
-			});
-		} else if (open_bus_trip_id) {
-			await preloadData('/');
-
-			pushState('', {
-				dialog_open: true,
-				dialog_id: open_bus_trip_id,
-				dialog_type: 'bus_trip'
-			});
-		}
-	});
 
 	let pin_store: Writable<any>;
-	$: pin_id = $page.state.dialog_id;
+	$: item_id = $page.state.dialog_id;
 
-	$: switch ($page.state.dialog_type) {
-		case 'stop':
-			pin_store = pinned_stops;
-			break;
-		case 'trip':
-			pin_store = pinned_trips;
-			break;
-		case 'route_alert':
-			pin_store = pinned_routes;
-			break;
-		case 'bus_stop':
-			pin_store = pinned_bus_stops;
-			break;
-		// need brackets bc of svelte issue https://github.com/sveltejs/svelte/issues/6706
-		case 'bus_trip': {
-			pin_store = pinned_bus_trips;
-			// TODO: fix this
-			// need to preload the route for bus trips
-			const trip = $bus_trips.find((t) => t.id === $page.state.dialog_id)!;
-			pin_id = `${trip.route_id}_${$page.state.dialog_id}`;
-			// preload_bus_route = trip.route_id;
-			break;
+	page.subscribe((p) => {
+		switch (p.state.dialog_type) {
+			case 'stop':
+				pin_store = pinned_stops;
+				if (!$stops.some((s) => s.id === p.state.dialog_id)) {
+					pushState('', { ...$page.state, dialog_id: 'error' });
+				}
+
+				break;
+			case 'trip':
+				pin_store = pinned_trips;
+				if (!$trips.some((t) => t.id === p.state.dialog_id)) {
+					pushState('', { ...$page.state, dialog_id: 'error' });
+				}
+				break;
+			case 'route_alert':
+				pin_store = pinned_routes;
+				if (!all_route_ids.includes(p.state.dialog_id as string)) {
+					pushState('', { ...$page.state, dialog_id: 'error' });
+				}
+				break;
+			case 'bus_stop':
+				pin_store = pinned_bus_stops;
+				if (!$bus_stops.some((s) => s.id === p.state.dialog_id)) {
+					pushState('', { ...$page.state, dialog_id: 'error' });
+				}
+
+				break;
+			// need brackets bc of svelte issue https://github.com/sveltejs/svelte/issues/6706
+			case 'bus_trip': {
+				pin_store = pinned_bus_trips;
+				// TODO: implement bus trips
+				// need to preload the route for bus trips
+				const trip = $bus_trips.find((t) => t.id === p.state.dialog_id)!;
+				item_id = `${trip.route_id}_${p.state.dialog_id}`;
+				// preload_bus_route = trip.route_id;
+				break;
+			}
+			default:
+				pin_store = pinned_stops;
 		}
-		default:
-			pin_store = pinned_stops;
-	}
-
+	});
 	// used to set the max width of the content titles
 	let actions_width: number;
 </script>
@@ -225,38 +191,74 @@
 	bind:this={dialog_el}
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->
-	{#key $page.state.dialog_id}
-		{#if $page.state.dialog_type === 'stop'}
-			<StopContent bind:actions_width bind:stop_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'trip'}
-			<TripContent bind:actions_width bind:trip_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'route_alert'}
-			<RouteAlertContent bind:route_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'bus_stop'}
-			<BusStopContent bind:stop_id={$page.state.dialog_id} />
-		{:else if $page.state.dialog_type === 'bus_trip'}
-			<BusTripContent bind:actions_width bind:trip_id={$page.state.dialog_id} />
-		{/if}
 
-		<div
-			bind:offsetWidth={actions_width}
-			class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center"
-		>
-			<Pin store={pin_store} item_id={pin_id} />
-
-			{#if !copied}
-				<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
-					<Share class="h-6 w-6" />
-				</button>
-			{:else}
-				<button
-					class="appearance-none inline-flex h-8 w-8 text-green-600"
-					aria-label="Link copied to clipboard"
-				>
-					<ClipboardCheck class="h-6 w-6" />
-				</button>
+	{#key item_id}
+		{#if item_id !== 'error'}
+			{#if $page.state.dialog_type === 'stop' && typeof item_id === 'string'}
+				<StopContent bind:actions_width bind:stop_id={item_id} />
+			{:else if $page.state.dialog_type === 'trip' && typeof item_id === 'string'}
+				<TripContent bind:actions_width bind:trip_id={item_id} />
+			{:else if $page.state.dialog_type === 'route_alert' && typeof item_id === 'string'}
+				<RouteAlertContent bind:route_id={item_id} />
+			{:else if $page.state.dialog_type === 'bus_stop' && typeof item_id === 'number'}
+				<BusStopContent bind:stop_id={item_id} />
+			{:else if $page.state.dialog_type === 'bus_trip' && typeof item_id === 'string'}
+				<BusTripContent bind:actions_width bind:trip_id={item_id} />
 			{/if}
 
+			<div
+				bind:offsetWidth={actions_width}
+				class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center"
+			>
+				<Pin store={pin_store} {item_id} />
+
+				{#if !copied}
+					<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
+						<Share class="h-6 w-6" />
+					</button>
+				{:else}
+					<button
+						class="appearance-none inline-flex h-8 w-8 text-green-600"
+						aria-label="Link copied to clipboard"
+					>
+						<ClipboardCheck class="h-6 w-6" />
+					</button>
+				{/if}
+
+				<button
+					on:click={() => {
+						pushState('', {
+							dialog_open: false,
+							dialog_id: '',
+							dialog_type: ''
+						});
+					}}
+					aria-label="Close dialog"
+					class="appearance-none inline-flex h-8 w-8"
+				>
+					<CircleX />
+				</button>
+			</div>
+		{:else}
+			<h2 class="p-4 items-center text-lg text-red-400 flex gap-2">
+				<CircleHelp />
+				{$page.state.dialog_type} not found
+				<button
+					on:click={() => {
+						pushState('', {
+							dialog_open: true,
+							dialog_id: $stops[Math.floor(Math.random() * $stops.length)].id,
+							dialog_type: 'stop'
+						});
+					}}
+					aria-label="Random stop"
+					class="pl-4 h-10 w-10 text-indigo-700 hover:animate-bounce hover:font-bold"
+				>
+					<Dices />
+				</button>
+			</h2>
+
+			<!-- close button -->
 			<button
 				on:click={() => {
 					pushState('', {
@@ -266,10 +268,10 @@
 					});
 				}}
 				aria-label="Close dialog"
-				class="appearance-none inline-flex h-8 w-8"
+				class="appearance none inline-flex h-8 w-8 absolute right-[5px] top-[5px]"
 			>
 				<CircleX />
 			</button>
-		</div>
+		{/if}
 	{/key}
 </dialog>

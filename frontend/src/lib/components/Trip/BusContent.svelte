@@ -41,8 +41,6 @@
 			<ArrowBigRight class="w-8" />
 
 			<h2 class="font-bold text-xl text-indigo-300">{$trip.headsign}</h2>
-		{:else}
-			<h1 class="p-2">Trip not found</h1>
 		{/if}
 	</div>
 

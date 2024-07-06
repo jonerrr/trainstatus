@@ -78,6 +78,4 @@
 			{/if}
 		</div>
 	</div>
-{:else}
-	<h2>Invalid stop ID</h2>
 {/if}
