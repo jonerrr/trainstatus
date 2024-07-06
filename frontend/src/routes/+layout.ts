@@ -1,14 +1,5 @@
 import { update_data } from '$lib/api';
-import { pushState } from '$app/navigation';
-import {
-	stops,
-	trips,
-	stop_times,
-	alerts,
-	bus_stops,
-	bus_routes,
-	monitored_routes
-} from '$lib/stores';
+import { stops, trips, stop_times, alerts, bus_stops, bus_routes } from '$lib/stores';
 import type { LayoutLoad } from './$types';
 
 // load data here first for SSR benefits (i think)

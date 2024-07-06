@@ -453,12 +453,39 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 Some(time) => time.to_owned(),
                 None => {
                     // tracing::debug!("Skipping trip without start time");
+
                     // This is how you parse the origin time according to MTA's gtfs docs
-                    let origin_time =
-                        trip_id.split_once('_').unwrap().0.parse::<u32>().unwrap() / 100;
+                    let mut origin_time =
+                        trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
+
+                    // time greater than 1440 (1 day) means its the next day or negative means its the previous day
+                    if origin_time > 1440 {
+                        origin_time -= 1440;
+
+                        // tracing::warn!(
+                        //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
+                        //     origin_time / 60,
+                        //     origin_time % 60,
+                        //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+                        //     origin_time,
+                        //     trip_update.trip.start_date.as_ref()
+                        // );
+                    } else if origin_time < 0 {
+                        origin_time += 1440;
+
+                        // tracing::warn!(
+                        //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
+                        //     origin_time / 60,
+                        //     origin_time % 60,
+                        //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+                        //     origin_time,
+                        //     trip_update.trip.start_date.as_ref()
+                        // );
+                    }
+
                     match NaiveTime::from_hms_opt(
-                        origin_time / 60,
-                        origin_time % 60,
+                        origin_time as u32 / 60,
+                        origin_time as u32 % 60,
                         ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
                     ) {
                         Some(time) => time.to_string(),
