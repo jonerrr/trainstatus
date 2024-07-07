@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT lat, lon, id, name FROM stops",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lat",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 1,
+        "name": "lon",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1e7b4981ba617034d5e270f55b9e46a780c3f406ead7994cfa6b3376b6baf8e7"
+}

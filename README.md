@@ -12,6 +12,7 @@ The best website to check the status of your train (and bus).
 - Shareable links for your trip
 - Works on mobile and desktop
 - No ads or tracking (your geolocation data never leaves your device)
+- View historical data
 
 ## Requirements
 
@@ -21,4 +22,4 @@ The best website to check the status of your train (and bus).
 
 ## Config
 
-Set `DISABLE_BUS` env to disable all bus data collection
+Set `FORCE_UPDATE` env on the backend to force updating bus and train data

@@ -1,4 +1,4 @@
-use crate::feed;
+use crate::feed::{self, trip_update::StopTimeUpdate, TripDescriptor};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
@@ -6,6 +6,7 @@ use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use thiserror::Error;
 use tokio::time::sleep;
+use tracing::span;
 use uuid::Uuid;
 
 // use std::io::Write;
@@ -48,7 +49,9 @@ pub enum DecodeFeedError {
 
     #[error("SIRI error: {0}")]
     Siri(String), // #[error("no stop times for endpoint {endpoint:?}")]
-                  // NoStopTimes { endpoint: String },
+    // NoStopTimes { endpoint: String },
+    #[error("IntoTripError: {0}")]
+    IntoTripError(#[from] IntoTripError),
 }
 
 pub async fn import(pool: PgPool) {
@@ -76,6 +79,137 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
     }
 }
 
+pub struct Trip {
+    id: Uuid,
+    mta_id: String,
+    train_id: String,
+    created_at: DateTime<Utc>,
+    assigned: bool,
+    // 0 = south, 1 = north
+    // it will be optional if direction wasn't found in nyct_trip_descriptor and needs to be determined from stop_id
+    direction: Option<i16>,
+    route_id: String,
+    express: bool,
+}
+
+#[derive(Error, Debug)]
+pub enum IntoTripError {
+    #[error("Trip ID not found")]
+    TripId,
+    #[error("Route ID not found")]
+    RouteId,
+    #[error("NYCT Trip Descriptor not found\n{0}")]
+    NyctTripDescriptor(String),
+    #[error("Train ID not found")]
+    TrainId,
+    #[error("Direction not found\n{0}")]
+    Direction(String),
+    #[error("Start time not found\n{0}")]
+    StartTime(String),
+    #[error("Start date not found\n{0}")]
+    StartDate(String),
+}
+
+impl TripDescriptor {
+    // result is (route_id, express)
+    pub fn parse_route_id(&self) -> Result<(String, bool), IntoTripError> {
+        self.route_id
+            .as_ref()
+            .ok_or(IntoTripError::RouteId)
+            .map(|id| {
+                let mut route_id = id.to_owned();
+                if route_id == "SS" {
+                    route_id = "SI".to_string();
+                };
+
+                let mut express = false;
+                if route_id.ends_with('X') {
+                    route_id.pop();
+                    express = true;
+                }
+                (route_id, express)
+            })
+    }
+}
+
+impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
+    fn into(self) -> Result<Trip, IntoTripError> {
+        let trip_id = self.trip_id.as_ref().ok_or(IntoTripError::TripId)?;
+        let (route_id, express) = self.parse_route_id()?;
+
+        let nyct_trip = self
+            .nyct_trip_descriptor
+            .as_ref()
+            // testing debug information by formatting self
+            .ok_or(IntoTripError::NyctTripDescriptor(format!("{:#?}", &self)))?;
+        let train_id = nyct_trip.train_id.as_ref().ok_or(IntoTripError::TrainId)?;
+        let assigned = nyct_trip.is_assigned.unwrap_or(false);
+        let direction = match nyct_trip.direction {
+            Some(d) => match d {
+                // north
+                1 => Some(1),
+                // south
+                3 => Some(0),
+                // east and west aren't used
+                _ => unreachable!(),
+            },
+            None => None,
+        };
+
+        let start_date = self
+            .start_date
+            .as_ref()
+            .ok_or(IntoTripError::StartDate(format!("{:#?}", &self)))?
+            .to_owned();
+
+        let start_time = match self.start_time.as_ref() {
+            Some(time) => time.to_owned(),
+            None => {
+                // This is how you parse the origin time according to MTA's gtfs docs
+                let mut origin_time =
+                    trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
+
+                // time greater than 1440 (1 day) means its the next day or negative means its the previous day
+                if origin_time > 1440 {
+                    origin_time -= 1440;
+                } else if origin_time < 0 {
+                    origin_time += 1440;
+                }
+
+                match NaiveTime::from_hms_opt(
+                    origin_time as u32 / 60,
+                    origin_time as u32 % 60,
+                    ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+                ) {
+                    Some(time) => time.to_string(),
+                    None => {
+                        return Err(IntoTripError::RouteId);
+                    }
+                }
+            }
+        };
+
+        let start_timestamp =
+            NaiveDateTime::parse_from_str(&(start_date + " " + &start_time), "%Y%m%d %H:%M:%S")
+                .unwrap()
+                .and_local_timezone(chrono_tz::America::New_York)
+                .unwrap();
+        // convert to utc
+        let start_timestamp = start_timestamp.to_utc();
+
+        Ok(Trip {
+            id: Uuid::now_v7(),
+            mta_id: trip_id.to_owned(),
+            train_id: train_id.to_owned(),
+            created_at: start_timestamp,
+            assigned,
+            direction,
+            route_id,
+            express,
+        })
+    }
+}
+
 pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedError> {
     let data = reqwest::Client::new()
         .get(format!(
@@ -97,20 +231,59 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
 
     // TODO: figure out why sometimes the stuff is empty
 
-    for entity in feed.entity {
-        // if entity.trip_update.is_none() && entity.vehicle.is_none() {
-        //     tracing::debug!(
-        //         "Skipping entity without trip_update or vehicle endpoint: {}",
-        //         endpoint
-        //     );
-        //     continue;
-        // }
+    // let mut trips: Vec<Trip> = vec![];
 
+    for entity in feed.entity {
         if let Some(trip_update) = entity.trip_update {
-            // used to get the direction
-            // if trip_update.stop_time_update.is_empty() {
-            //     continue;
+            // let trip_span = span!(
+            //     tracing::Level::TRACE,
+            //     "trip_update",
+            //     trip_id = trip_update.trip.trip_id,
+            //     start_date = trip_update.trip.start_date,
+            //     start_time = trip_update.trip.start_time,
+            //     nyct_trip_descriptor = format!("{:#?}", trip_update.trip.nyct_trip_descriptor)
+            // );
+            // let _enter = trip_span.enter();
+
+            // let mut trip = match trip_update.trip.clone().into() {
+            //     Ok(t) => t,
+            //     Err(e) => {
+            //         tracing::error!("Error parsing trip: {:?}", e);
+            //         continue;
+            //     }
+            // };
+
+            // match trip.direction {
+            //     Some(_) => (),
+            //     None => {
+            //         let mut first_stop_id = match trip_update.stop_time_update.first() {
+            //             Some(stop_time) => match stop_time.stop_id.as_ref() {
+            //                 Some(id) => id.clone(),
+            //                 None => {
+            //                     tracing::debug!(
+            //                         "Skipping trip without stop_id in stop_time_update {}",
+            //                         endpoint
+            //                     );
+            //                     continue;
+            //                 }
+            //             },
+            //             None => {
+            //                 tracing::debug!(
+            //                     "Skipping trip without any stop times endpoint: {}",
+            //                     endpoint
+            //                 );
+            //                 continue;
+            //             }
+            //         };
+            //         trip.direction = match first_stop_id.pop() {
+            //             Some('N') => Some(1),
+            //             Some('S') => Some(0),
+            //             _ => unreachable!(),
+            //         };
+            //     }
             // }
+
+            // trips.push(trip);
 
             let trip_id = match trip_update.trip.trip_id.as_ref() {
                 Some(id) => id,
@@ -379,6 +552,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 tracing::error!("No trip for vehicle");
                 continue;
             };
+            // let trip_d = trip.clone().into()?;
 
             let train_status = vehicle.current_status.map(|s| s as i16);
 
@@ -391,6 +565,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 tracing::error!("No timestamp for vehicle");
                 continue;
             };
+
+            // let (route_id, express) = trip.parse_route_id()?;
 
             let Some(trip_id) = trip.trip_id else {
                 tracing::error!("No trip_id for vehicle");

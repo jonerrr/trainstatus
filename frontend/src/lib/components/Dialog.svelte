@@ -84,7 +84,7 @@
 
 		// /^\d{6}$/m
 
-		if ($page.state.dialog_type) {
+		if ($page.state.dialog_type === 'bus_trip') {
 			// get route ID of trip to monitor
 			const trip = $bus_trips.find((t) => t.id === id)!;
 			id = `${id}_${trip.route_id}`;

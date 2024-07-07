@@ -1,5 +1,4 @@
 CREATE TABLE IF NOT EXISTS trips (
-    -- probably should be a different type, no need for UUID
     id UUID PRIMARY KEY,
     mta_id VARCHAR NOT NULL,
     train_id VARCHAR NOT NULL,

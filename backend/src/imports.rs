@@ -156,10 +156,7 @@ struct Stop(
 
 // TODO: should probably split this up into smaller functions
 
-pub async fn stops_and_routes(
-    pool: &PgPool,
-    stop_geos: &mut Vec<crate::geo::StopGeometry<String, i32>>,
-) {
+pub async fn stops_and_routes(pool: &PgPool) {
     // store the routes and their stops
     // need to add them after adding routes and stops to the database
     // let mut route_stop_map: HashMap<String, Vec<RouteStop>> = HashMap::new();
@@ -299,17 +296,6 @@ pub async fn stops_and_routes(
             )
         })
         .collect::<Vec<Stop>>();
-
-    // add stop data to the stop_geos vector
-    for stop in stops.iter() {
-        stop_geos.push(crate::geo::StopGeometry {
-            id: stop.0.clone(),
-            name: stop.1.clone(),
-            point: geo_types::Point::new(stop.7 as f64, stop.8 as f64),
-            // stop_type: crate::geo::StopType::Train,
-            closest_stops: None,
-        });
-    }
 
     // insert all stops into the database
     let mut query_builder = QueryBuilder::new(
