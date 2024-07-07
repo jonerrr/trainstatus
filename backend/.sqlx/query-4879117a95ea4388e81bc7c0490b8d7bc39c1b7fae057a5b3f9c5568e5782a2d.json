@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bs.lat, bs.lon, bs.id, bs.name, brs.route_id FROM bus_stops bs JOIN bus_route_stops brs ON bs.id = brs.stop_id JOIN bus_routes b ON brs.route_id = b.id WHERE b.shuttle IS FALSE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lat",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 1,
+        "name": "lon",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "route_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4879117a95ea4388e81bc7c0490b8d7bc39c1b7fae057a5b3f9c5568e5782a2d"
+}

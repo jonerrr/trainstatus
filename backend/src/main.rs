@@ -1,11 +1,6 @@
-use ::geo::{HaversineClosestPoint, HaversineDistance, MultiPoint};
 use axum::{body::Body, response::Response, routing::get, Router};
 use chrono::{Days, Utc};
-use itertools::Itertools;
-use rayon::prelude::*;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::fs::File;
-use std::io::Write;
 use std::{
     convert::Infallible,
     env::{self, var},
@@ -15,7 +10,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
 mod bus;
-mod geo;
+// mod geo;
 mod imports;
 mod routes;
 mod trips;
@@ -74,91 +69,12 @@ async fn main() {
     };
 
     if should_update || env::var("FORCE_UPDATE").is_ok() {
-        let mut stop_geos: Vec<crate::geo::StopGeometry<String, i32>> = vec![];
-        let mut bus_stop_geos: Vec<crate::geo::StopGeometry<i32, String>> = vec![];
+        // update_transfers(&pool).await;
 
         tracing::info!("Updating bus stops and routes");
-        bus::imports::stops_and_routes(&pool, &mut bus_stop_geos).await;
+        bus::imports::stops_and_routes(&pool).await;
         tracing::info!("Updating train stops and routes");
-        imports::stops_and_routes(&pool, &mut stop_geos).await;
-
-        dbg!(stop_geos.len());
-        // let stop_points = stop_geos
-        //     .iter()
-        //     .map(|s| s.point)
-        //     .collect::<MultiPoint<f64>>();
-
-        let stop_geos = stop_geos
-            .par_iter()
-            .map(|sg| {
-                let mut new_sg = sg.clone();
-
-                let bus_stops = bus_stop_geos
-                    .iter()
-                    .enumerate()
-                    .map(|(i, p)| (i, p.point.haversine_distance(&sg.point)))
-                    .sorted_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-                    .take(5)
-                    .collect::<Vec<_>>();
-
-                new_sg.closest_stops = Some(
-                    bus_stops
-                        .iter()
-                        .map(|(i, _)| bus_stop_geos[*i].clone())
-                        .collect(),
-                );
-
-                // let closest = stop_geos
-                //     .iter()
-                //     .enumerate()
-                //     .map(|(i, p)| (i, p.point.haversine_distance(&sg.point)))
-                //     .sorted_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-                // let stops = closest
-                //     .take(3)
-                //     .map(|(i, _)| stop_geos[i].id.clone())
-                //     .collect::<Vec<_>>();
-
-                // new_sg.closest_stops = Some(stops);
-
-                new_sg
-            })
-            .collect::<Vec<_>>();
-
-        // stop_points.haversine_closest_point(from)
-        // let stop_geos = stop_geos
-        //     .par_iter()
-        //     .map(|sg| {
-        //         let mut new_sg = sg.clone();
-
-        //         let closest = stop_points
-        //             .iter()
-        //             .enumerate()
-        //             .map(|(i, p)| (i, p.haversine_distance(&sg.point)))
-        //             .sorted_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-        //         let stops = closest
-        //             .take(3)
-        //             .map(|(i, _)| stop_geos[i].id.clone())
-        //             .collect::<Vec<_>>();
-
-        //         new_sg.closest_stops = Some(stops);
-
-        //         new_sg
-        //         // TODO: use that to find paired bus stops
-        //         // let closest = stop_points.haversine_closest_point(&sg.point);
-        //     })
-        //     .collect::<Vec<_>>();
-        // TODO: find bus stops pair by finding closest point that has same routeid
-
-        dbg!(&stop_geos);
-
-        // Save stop_geos to a file
-        let stop_geos_file = "stop_geos.txt";
-        let mut file = File::create(stop_geos_file).unwrap();
-        for stop_geo in &stop_geos {
-            writeln!(file, "{:?}", stop_geo).unwrap();
-        }
+        imports::stops_and_routes(&pool).await;
 
         sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
             .execute(&pool)
