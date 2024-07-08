@@ -6,8 +6,7 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::types::JsonValue;
-use sqlx::{FromRow, PgPool};
+use sqlx::{types::JsonValue, FromRow, PgPool};
 use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
@@ -114,8 +113,11 @@ pub async fn by_id(
 		t.id"#,
         id
     )
-    .fetch_one(&pool)
+    .fetch_optional(&pool)
     .await?;
 
-    Ok(Json(trip))
+    match trip {
+        Some(trip) => Ok(Json(trip)),
+        None => Err(ServerError::NotFound),
+    }
 }
