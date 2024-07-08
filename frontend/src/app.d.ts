@@ -11,7 +11,7 @@ declare global {
 			// blank is not open
 			dialog_type: 'stop' | 'trip' | 'route_alert' | 'route' | 'bus_stop' | 'bus_trip' | '';
 			// list of bus routes to monitor
-			monitor_routes?: string[];
+			// monitor_routes?: string[];
 		}
 		// interface Platform {}
 	}

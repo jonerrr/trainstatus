@@ -208,7 +208,12 @@
 				bind:offsetWidth={actions_width}
 				class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center"
 			>
-				<Pin store={pin_store} {item_id} />
+				<Pin
+					store={pin_store}
+					item_id={$page.state.dialog_type === 'bus_trip'
+						? `${item_id}_${$bus_trips.find((t) => t.id === item_id)?.route_id}`
+						: item_id}
+				/>
 
 				{#if !copied}
 					<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>

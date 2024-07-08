@@ -74,7 +74,9 @@
 				console.error('Error getting location', e);
 
 				location_status.set(LocationStatus.Denied);
-			}
+			},
+			// 1 minute
+			{ maximumAge: 60 * 1000 }
 		);
 	}
 
@@ -96,7 +98,7 @@
 </svelte:head>
 
 <div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
-	{#if $pinned_trips.length}
+	{#if $pinned_trips.length || $pinned_bus_trips.length}
 		<TripList
 			manage_height={true}
 			title="Pinned Trips"
