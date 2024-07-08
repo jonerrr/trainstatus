@@ -10,6 +10,8 @@ use serde_json::json;
 pub enum ServerError {
     #[error("{0}")]
     Database(#[from] sqlx::Error),
+    #[error("Not found")]
+    NotFound,
 }
 
 impl IntoResponse for ServerError {
@@ -21,6 +23,7 @@ impl IntoResponse for ServerError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Database error".to_string(),
             ),
+            ServerError::NotFound => (StatusCode::NOT_FOUND, "Not found".to_string()),
         };
 
         let body = Json(json!({ "message": message }));

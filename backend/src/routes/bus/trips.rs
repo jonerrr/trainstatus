@@ -1,13 +1,13 @@
 use super::stops::Parameters;
 use crate::routes::{errors::ServerError, CurrentTime};
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
     Json,
 };
 use chrono::Utc;
 use serde::Serialize;
-use sqlx::{FromRow, PgPool};
+use sqlx::{types::JsonValue, FromRow, PgPool};
 use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
@@ -87,3 +87,66 @@ WHERE
 }
 
 //
+
+#[derive(FromRow, Serialize)]
+pub struct BusTripData {
+    id: Uuid,
+    route_id: String,
+    direction: i16,
+    vehicle_id: i32,
+    deviation: Option<i32>,
+    created_at: chrono::DateTime<Utc>,
+    headsign: Option<String>,
+    stop_times: Option<JsonValue>,
+}
+
+pub async fn by_id(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ServerError> {
+    let trip = sqlx::query_as!(
+        BusTripData,
+        r#"SELECT
+	t.id,
+	t.route_id,
+	t.direction,
+	t.vehicle_id,
+	t.created_at,
+	t.deviation,
+	jsonb_agg(jsonb_build_object('stop_id',
+	bst.stop_id,
+	'arrival',
+	bst.arrival,
+	'departure',
+	bst.departure,
+	'stop_sequence',
+	bst.stop_sequence)
+ORDER BY
+	bst.arrival) AS stop_times, 
+	(
+	SELECT
+		brs.headsign
+	FROM
+		bus_route_stops brs
+	WHERE
+		brs.route_id = t.route_id
+		AND brs.direction = t.direction
+	LIMIT 1) AS headsign
+FROM
+	bus_trips t
+LEFT JOIN bus_stop_times bst ON
+	t.id = bst.trip_id
+WHERE
+	t.id = $1
+GROUP BY
+	t.id"#,
+        id
+    )
+    .fetch_optional(&pool)
+    .await?;
+
+    match trip {
+        Some(trip) => Ok(Json(trip)),
+        None => Err(ServerError::NotFound),
+    }
+}

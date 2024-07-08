@@ -106,6 +106,7 @@ async fn main() {
         .route("/bus/stops", get(routes::bus::stops::get))
         .route("/bus/stops/times", get(routes::bus::stops::times))
         .route("/bus/trips", get(routes::bus::trips::get))
+        .route("/bus/trips/:id", get(routes::bus::trips::by_id))
         .route("/bus/routes", get(routes::bus::routes::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
