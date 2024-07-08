@@ -5,6 +5,7 @@
 	import { monitored_routes, trips, bus_trips, pinned_trips, pinned_bus_trips } from '$lib/stores';
 	import List from '$lib/components/List.svelte';
 	import Trigger from '$lib/components/Trip/ListTrigger.svelte';
+	import BusTrigger from '$lib/components/Trip/ListBusTrigger.svelte';
 
 	const {
 		elements: { root, list, content, trigger },
@@ -27,15 +28,22 @@
 	const wanted_bus_trips = derived(
 		[bus_trip_ids, bus_trips],
 		([$bus_trip_ids, $bus_trip_store]) => {
-			const trips = $bus_trip_ids.map((t) => t.split('_'));
+			const trip_info = $bus_trip_ids.map((t) => t.split('_'));
+			const trip_ids = trip_info.map((t) => t[0]);
+			const trip_routes = trip_info.map((t) => t[1]);
+			$monitored_routes = [...new Set([...trip_routes, ...$monitored_routes])].slice(0, 15);
 
 			// this preserves the order of stop_ids but its slower
-			return $bus_trip_store.filter((st) => $bus_trip_ids.includes(st.id));
+			return $bus_trip_store.filter((st) => trip_ids.includes(st.id));
 		}
 	);
 
+	console.log($wanted_bus_trips);
+
 	// remove from pinned trips if it no longer exists
 	$: $pinned_trips = $pinned_trips.filter((p) => $wanted_trips.find((t) => t.id === p));
+	// TODO: figure out a better way to remove old bus trips
+	// $: $pinned_bus_trips = $pinned_bus_trips.filter((p) => $wanted_bus_trips.find((t) => t.id === p));
 </script>
 
 <List bind:manage_height>
@@ -67,13 +75,17 @@
 		<!-- TODO: use melt $content instead of if statement -->
 		<div class={`flex flex-col gap-1 max-h-[calc(100dvh-4rem)]`}>
 			{#if $value === 'Train'}
-				{#if $wanted_trips}
+				{#if $wanted_trips.length}
 					{#each $wanted_trips as trip (trip.id)}
 						<Trigger {trip} />
 					{/each}
 				{/if}
 			{:else if $value === 'Bus'}
-				Coming soon (sorry)
+				{#if $wanted_bus_trips.length}
+					{#each $wanted_bus_trips as trip (trip.id)}
+						<BusTrigger {trip} />
+					{/each}
+				{/if}
 			{/if}
 		</div>
 	</div>
