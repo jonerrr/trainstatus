@@ -128,23 +128,23 @@
 		title="Nearby Stops"
 		show_location={true}
 	>
-		<div slot="location" class="flex gap-2">
+		<div slot="location">
 			{#if $location_status === LocationStatus.Loading}
-				<div class="flex gap-1 items-center text-white rounded px-2 py-1 bg-indigo-600">
-					<Locate class="w-4 h-4 animate-spin" />
+				<div class="flex gap-1 items-center text-white rounded p-1 bg-indigo-600">
+					<Locate class="animate-spin" />
 				</div>
 			{:else}
 				<button
 					aria-label="Nearby stops"
-					class="items-center bg-indigo-500 text-white rounded px-2 py-1 active:bg-indigo-600 hover:bg-indigo-600"
+					class="items-center bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
 					on:click={get_nearby_stops}
 				>
 					{#if $location_status === LocationStatus.Denied}
-						<LocateOff class="w-4 h-4" />
+						<LocateOff />
 					{:else if $location_status === LocationStatus.Granted}
-						<LocateFixed class="w-4 h-4" />
+						<LocateFixed />
 					{:else}
-						<Locate class="w-4 h-4" />
+						<Locate />
 					{/if}
 				</button>
 			{/if}

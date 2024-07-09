@@ -59,7 +59,7 @@
 			</div>
 		{/if}
 
-		<div use:melt={$root} class="flex flex-col shadow-2xl text-indigo-400 bg-neutral-900/70">
+		<div use:melt={$root} class="flex flex-col shadow-2xl text-indigo-400 bg-neutral-900/80">
 			<div
 				use:melt={$list}
 				class="flex shrink-0 overflow-x-auto text-indigo-100"

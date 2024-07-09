@@ -4,6 +4,7 @@
 	import { TrainStatus, type Stop, type StopTime } from '$lib/api';
 	import { stops, stop_times, trips } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	// export let stop: Stop;
 	export let stop_time: StopTime;
@@ -22,9 +23,17 @@
 	// $: stops_away = $trip_stop_times.findIndex((st) => st.stop_id === stop_time.stop_id);
 </script>
 
+<TriggerButton
+	state={{
+		dialog_open: true,
+		dialog_id: stop_time.trip_id,
+		dialog_type: 'trip'
+	}}
+>
+	<!-- 
 <button
 	id="list-item"
-	class="w-full border-y border-neutral-400 mt-[-1px] p-[.5rem] flex justify-between items-center text-indigo-200 px-1"
+	class="w-full py-2 flex justify-between items-center text-indigo-200 px-1"
 	on:click={() => {
 		pushState('', {
 			dialog_open: true,
@@ -32,7 +41,7 @@
 			dialog_type: 'trip'
 		});
 	}}
->
+> -->
 	<!-- <div
 		class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
 	> -->
@@ -60,4 +69,5 @@
 		{last_stop?.name}
 	</div>
 	<!-- </div> -->
-</button>
+	<!-- </button> -->
+</TriggerButton>
