@@ -22,11 +22,9 @@
 			st.eta = eta;
 			return st;
 		});
-		// .sort((a, b) => a.eta! - b.eta!);
 	});
 </script>
 
-<!-- <div class="flex gap-1 flex-col overflow-auto max-h-96"> -->
 <List>
 	{#if $stop_times.length}
 		{#each $stop_times as stop_time (stop_time.trip_id)}

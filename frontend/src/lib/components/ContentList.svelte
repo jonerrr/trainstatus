@@ -29,6 +29,9 @@
 	});
 </script>
 
-<div bind:this={list_el} class="flex flex-col overflow-auto max-h-96 px-2">
+<div
+	bind:this={list_el}
+	class="flex flex-col divide-y divide-neutral-500 overflow-auto max-h-96 px-2"
+>
 	<slot />
 </div>
