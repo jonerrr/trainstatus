@@ -8,6 +8,8 @@
 	export let trip_id: string;
 	export let actions_width: number;
 
+	let show_previous_stops = false;
+
 	$: trip = derived(trips, ($trips) => {
 		return $trips.find((t) => t.id === trip_id);
 	});

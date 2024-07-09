@@ -23,7 +23,8 @@
 </script>
 
 <button
-	class="w-full flex justify-between items-center"
+	id="list-item"
+	class="w-full border-y border-neutral-400 mt-[-1px] p-[.5rem] flex justify-between items-center text-indigo-200 px-1"
 	on:click={() => {
 		pushState('', {
 			dialog_open: true,
@@ -32,27 +33,31 @@
 		});
 	}}
 >
-	<div
+	<!-- <div
 		class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
-	>
-		<!-- TODO: Some sort of animation when trip status is stopped to / arriving at this stop  -->
-		<div class="flex gap-12 items-center justify-between mx-1">
-			<div class="flex gap-2 items-center">
-				<!-- maybe enable link here -->
-				<Icon express={$trip?.express} link={false} name={stop_time.route_id} />
-				<div class={`${!$trip?.assigned ? 'italic' : ''}`}>
-					{stop_time.eta?.toFixed(0)}m
-				</div>
+	> -->
+	<!-- TODO: Some sort of animation when trip status is stopped to / arriving at this stop  -->
+	<div class="flex gap-2 items-center">
+		<!-- maybe enable link here -->
+		<Icon
+			width="20px"
+			height="20px"
+			express={$trip?.express}
+			link={false}
+			name={stop_time.route_id}
+		/>
+		<div class={`${!$trip?.assigned ? 'italic' : ''}`}>
+			{stop_time.eta?.toFixed(0)}m
+		</div>
 
-				<!-- {#if stops_away > 0}
+		<!-- {#if stops_away > 0}
 					<div class="text-indigo-200 text-xs">
 						{stops_away} stop{stops_away > 1 ? 's' : ''} away
 					</div>
 				{/if} -->
-			</div>
-			<div class="text-right">
-				{last_stop?.name}
-			</div>
-		</div>
 	</div>
+	<div class="text-right">
+		{last_stop?.name}
+	</div>
+	<!-- </div> -->
 </button>

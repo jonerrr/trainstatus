@@ -115,6 +115,11 @@ pub async fn times(
                 t.id = st.trip_id
             WHERE
                 st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+            OR t.id IN (
+                SELECT DISTINCT trip_id
+                FROM stop_times
+                WHERE arrival > $1
+            )
             ORDER BY
                 st.arrival
         ",

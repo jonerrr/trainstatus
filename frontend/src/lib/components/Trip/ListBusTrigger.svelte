@@ -48,7 +48,7 @@
 			</div>
 		{/if}
 
-		<div>
+		<div class="flex gap-2">
 			<span class="text-neutral-300">Current stop:</span>
 			{current_stop?.name}
 		</div>
