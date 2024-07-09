@@ -178,7 +178,7 @@
 		}
 	});
 	// used to set the max width of the content titles
-	let actions_width: number;
+	let actions_width: number = 0;
 </script>
 
 <!-- TODO: figure out transitions -->
@@ -204,30 +204,8 @@
 				<BusTripContent bind:actions_width bind:trip_id={item_id} />
 			{/if}
 
-			<div
-				bind:offsetWidth={actions_width}
-				class="z-40 absolute right-[5px] top-[10px] inline-flex gap-1 items-center"
-			>
-				<Pin
-					store={pin_store}
-					item_id={$page.state.dialog_type === 'bus_trip'
-						? `${item_id}_${$bus_trips.find((t) => t.id === item_id)?.route_id}`
-						: item_id}
-				/>
-
-				{#if !copied}
-					<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
-						<Share class="h-6 w-6" />
-					</button>
-				{:else}
-					<button
-						class="appearance-none inline-flex h-8 w-8 text-green-600"
-						aria-label="Link copied to clipboard"
-					>
-						<ClipboardCheck class="h-6 w-6" />
-					</button>
-				{/if}
-
+			<!-- bind:offsetWidth={actions_width} -->
+			<div class="z-40 flex items-center gap-1 justify-between px-2 pt-2">
 				<button
 					on:click={() => {
 						pushState('', {
@@ -241,6 +219,28 @@
 				>
 					<CircleX />
 				</button>
+
+				<div class="flex gap-1 items-center">
+					{#if !copied}
+						<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
+							<Share class="h-6 w-6" />
+						</button>
+					{:else}
+						<button
+							class="appearance-none inline-flex h-8 w-8 text-green-600"
+							aria-label="Link copied to clipboard"
+						>
+							<ClipboardCheck class="h-6 w-6" />
+						</button>
+					{/if}
+					<Pin
+						size={'size-6'}
+						store={pin_store}
+						item_id={$page.state.dialog_type === 'bus_trip'
+							? `${item_id}_${$bus_trips.find((t) => t.id === item_id)?.route_id}`
+							: item_id}
+					/>
+				</div>
 			</div>
 		{:else}
 			<h2 class="p-4 items-center text-lg text-red-400 flex gap-2">

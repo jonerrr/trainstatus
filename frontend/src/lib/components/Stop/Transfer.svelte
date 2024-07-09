@@ -9,7 +9,7 @@
 
 <button
 	on:click={() => pushState('', { dialog_id: stop_id, dialog_open: true, dialog_type: 'stop' })}
-	class="flex rounded gap-1 border border-neutral-700 bg-neutral-900 shadow-2xl"
+	class="flex rounded gap-1 border border-neutral-300 shadow-2xl active:border-indigo-400 hover:border-indigo-400"
 >
 	<Routes routes={stop.routes} />
 </button>

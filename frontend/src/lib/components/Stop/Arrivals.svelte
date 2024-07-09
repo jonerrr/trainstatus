@@ -17,15 +17,18 @@
 	// if user provided date, we use that as now
 
 	const stop_times = derived(stop_time_store, ($stop_time_store) => {
+		const now = $data_at ?? new Date();
+
 		const st = $stop_time_store.filter(
 			(st) =>
-				// st.arrival > new Date() &&
-				st.stop_id === stop.id && st.direction === direction && st.route_id === route_id
+				st.stop_id === stop.id &&
+				st.direction === direction &&
+				st.route_id === route_id &&
+				st.arrival > now
 		);
 
 		return st.map((st) => {
 			const arrival = st.arrival.getTime();
-			const now = $data_at ?? new Date();
 			const eta = (arrival - now.getTime()) / 1000 / 60;
 
 			st.eta = eta;
