@@ -130,13 +130,13 @@
 	>
 		<div slot="location">
 			{#if $location_status === LocationStatus.Loading}
-				<div class="flex gap-1 items-center text-white rounded p-1 bg-indigo-600">
+				<div class="text-white rounded p-1 bg-indigo-600">
 					<Locate class="animate-spin" />
 				</div>
 			{:else}
 				<button
 					aria-label="Nearby stops"
-					class="items-center bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
+					class="bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
 					on:click={get_nearby_stops}
 				>
 					{#if $location_status === LocationStatus.Denied}

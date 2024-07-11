@@ -7,6 +7,7 @@
 	// manage the min/max height of the list
 	export let manage_height: boolean = true;
 	export let title: string = 'List';
+	export let show_search: boolean = false;
 
 	export const tab_value = persisted(`${title.toLowerCase()}_tab`, 'Train');
 
@@ -41,15 +42,17 @@
 			clearInterval(interval);
 		});
 	}
+
+	const list_classes = `flex flex-col ${show_search ? 'max-h-[calc(100dvh-14rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`;
 </script>
 
 <div
 	use:melt={$root}
 	bind:this={list_el}
 	style={manage_height ? `min-height: ${list_height}px; max-height: ${list_height}px;` : ''}
-	class={`relative flex flex-col text-indigo-200 bg-neutral-800/90 border border-neutral-700 p-1 overflow-auto ${$$props.class} ?? ''}`}
+	class={`relative flex flex-col text-indigo-200 border-2 border-neutral-800 rounded overflow-auto ${$$props.class} ?? ''}`}
 >
-	<div id="list-item" class="flex pb-1 justify-between">
+	<div id="list-item" class="flex pb-1 justify-between p-1 bg-neutral-800">
 		<div class="font-bold text-lg text-indigo-300 flex gap-1">
 			{title}
 			<!-- for geolocate -->
@@ -77,14 +80,17 @@
 	</div>
 
 	{#if $value === 'Train'}
-		<div use:melt={$content('Train')}>
-			<slot />
+		<div class={list_classes} use:melt={$content('Train')}>
+			<slot name="train" />
 		</div>
 	{:else if $value === 'Bus'}
-		<div use:melt={$content('Bus')}>
+		<div class={list_classes} use:melt={$content('Bus')}>
 			<slot name="bus" />
 		</div>
 	{/if}
+
+	<slot />
+
 	<!-- TODO: Figure out why list height is wrong when using these -->
 	<!-- <div use:melt={$content('Train')}>
 		<slot />
