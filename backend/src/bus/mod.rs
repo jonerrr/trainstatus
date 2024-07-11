@@ -1,7 +1,7 @@
 use std::{env::var, sync::OnceLock};
 
-pub mod imports;
 pub mod positions;
+pub mod static_data;
 pub mod trips;
 
 // https://stackoverflow.com/a/77249700
