@@ -79,6 +79,7 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
     }
 }
 
+#[derive(Debug)]
 pub struct Trip {
     id: Uuid,
     mta_id: String,
@@ -133,26 +134,71 @@ impl TripDescriptor {
 }
 
 impl Trip {
-    pub async fn insert(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
-        sqlx::query!(
+    pub async fn insert(&mut self, pool: &PgPool) -> Result<(), sqlx::Error> {
+        let res =  sqlx::query!(
             r#"
             INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction, express)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned
+            ON CONFLICT (mta_id, train_id, created_at, direction) DO UPDATE SET assigned = EXCLUDED.assigned RETURNING id
             "#,
             self.id,
-            self.mta_id,
-            self.train_id,
+            &self.mta_id,
+            &self.train_id,
             &self.route_id,
-            self.created_at,
-            self.assigned,
+            &self.created_at,
+            &self.assigned,
             self.direction,
-            self.express
+           &self.express
         )
-        .execute(pool)
+        .fetch_one(pool)
         .await?;
+        self.id = res.id;
 
         Ok(())
+    }
+
+    // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
+    pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query_as!(
+            Self,
+            r#"
+            SELECT
+                id,
+                mta_id,
+                train_id,
+                created_at,
+                assigned,
+                direction,
+                route_id,
+                express
+            FROM
+                trips
+            WHERE
+                mta_id = $1
+                AND train_id = $2
+                AND created_at = $3
+                AND direction = $4
+            "#,
+            self.mta_id,
+            self.train_id,
+            self.created_at,
+            self.direction
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match res {
+            Some(t) => {
+                self.id = t.id;
+                self.assigned = t.assigned;
+                self.route_id = t.route_id;
+                self.express = t.express;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+
+        // Ok(res)
     }
 }
 
@@ -306,6 +352,13 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                     };
                 }
             }
+
+            // Check if trip already exists
+            // trip = trip.find(pool).await?;
+            // if let Some(db_trip) = trip.find(pool).await? {
+            //     trip = db_trip;
+            // }
+            trip.find(pool).await?;
 
             // let trip_id = match trip_update.trip.trip_id.as_ref() {
             //     Some(id) => id,
@@ -522,7 +575,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 })
                 .collect::<Vec<_>>();
 
-            trips.push(trip);
+            // trips.push(trip);
 
             // insert trip into db before stop times
             // not sure if we should upsert on conflict yet
@@ -549,6 +602,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 continue;
             }
 
+            trip.insert(pool).await?;
+
             // dbg!(stop_updates.len(), endpoint);
 
             // insert stop times
@@ -572,6 +627,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 tracing::error!("No trip for vehicle");
                 continue;
             };
+
+            // println!("{:#?}", &trip.nyct_trip_descriptor);
             // let trip_d = trip.clone().into()?;
 
             let train_status = vehicle.current_status.map(|s| s as i16);
@@ -588,26 +645,53 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
 
             // let (route_id, express) = trip.parse_route_id()?;
 
-            let Some(trip_id) = trip.trip_id else {
-                tracing::error!("No trip_id for vehicle");
-                continue;
+            // println!("{:#?}", vehicle.stop_id);
+
+            let mut trip = match trip.into() {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::error!("Error parsing trip: {:?}", e);
+                    continue;
+                }
             };
 
-            let Some(mut route_id) = trip.route_id else {
-                tracing::error!("No route_id for vehicle");
-                continue;
-            };
+            // if trip.direction.is_some() {
+            //     println!("{:#?}", &trip);
+            // }
 
-            // There is an express SI called SS in the feed but we are using SI for the route_id
-            if route_id == "SS" {
-                route_id = "SI".to_string();
-            };
-            // remove express train indicator
-            if route_id.ends_with('X') {
-                route_id.pop();
-            }
+            // if let Some(stop_id) = vehicle.stop_id {
+            //     if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+            //         continue;
+            //     }
 
-            // should i check if stop id is fake here?
+            //     match stop_id.pop() {
+            //         Some('N') => trip.direction = Some(1),
+            //         Some('S') => trip.direction = Some(0),
+            //         _ => unreachable!(),
+            //     }
+            // }
+
+            // println!("{:#?}", trip);
+
+            // let Some(trip_id) = trip.trip_id else {
+            //     tracing::error!("No trip_id for vehicle");
+            //     continue;
+            // };
+
+            // let Some(mut route_id) = trip.route_id else {
+            //     tracing::error!("No route_id for vehicle");
+            //     continue;
+            // };
+
+            // // There is an express SI called SS in the feed but we are using SI for the route_id
+            // if route_id == "SS" {
+            //     route_id = "SI".to_string();
+            // };
+            // // remove express train indicator
+            // if route_id.ends_with('X') {
+            //     route_id.pop();
+            // }
+
             let Some(mut stop_id) = vehicle.stop_id else {
                 tracing::error!("No stop_id for vehicle");
                 continue;
@@ -619,131 +703,158 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 continue;
             }
 
-            let Some(nyct_trip_descriptor) = trip.nyct_trip_descriptor else {
-                tracing::error!("No nyct_trip_descriptor for vehicle");
-                continue;
-            };
-
-            let train_id = nyct_trip_descriptor.train_id();
-
-            let direction: i16 = match nyct_trip_descriptor.direction {
-                Some(d) => match d {
-                    // north
-                    1 => 1,
-                    // south
-                    3 => 0,
-                    // east and west aren't used
-                    _ => unreachable!(),
-                },
+            match trip.direction {
+                Some(_) => (),
                 None => {
-                    // we can get direction from stop id instead
-                    match stop_direction {
-                        Some('N') => 1,
-                        Some('S') => 0,
+                    trip.direction = match stop_direction {
+                        Some('N') => Some(1),
+                        Some('S') => Some(0),
                         _ => unreachable!(),
-                    }
+                    };
                 }
-            };
+            }
 
-            let start_time = match trip.start_time.as_ref() {
-                Some(time) => time.to_owned(),
-                None => {
-                    // tracing::debug!("Skipping trip without start time");
-
-                    // This is how you parse the origin time according to MTA's gtfs docs
-                    let mut origin_time =
-                        trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
-
-                    // time greater than 1440 (1 day) means its the next day or negative means its the previous day
-                    if origin_time > 1440 {
-                        origin_time -= 1440;
-
-                        // tracing::warn!(
-                        //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
-                        //     origin_time / 60,
-                        //     origin_time % 60,
-                        //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
-                        //     origin_time,
-                        //     trip_update.trip.start_date.as_ref()
-                        // );
-                    } else if origin_time < 0 {
-                        origin_time += 1440;
-
-                        // tracing::warn!(
-                        //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
-                        //     origin_time / 60,
-                        //     origin_time % 60,
-                        //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
-                        //     origin_time,
-                        //     trip_update.trip.start_date.as_ref()
-                        // );
-                    }
-
-                    match NaiveTime::from_hms_opt(
-                        origin_time as u32 / 60,
-                        origin_time as u32 % 60,
-                        ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
-                    ) {
-                        Some(time) => time.to_string(),
-                        None => {
-                            tracing::warn!("Skipping vehicle without start time");
-                            continue;
-                        }
-                    }
-                }
-            };
-            let start_date = match trip.start_date.as_ref() {
-                Some(date) => date,
-                None => {
-                    tracing::debug!("Skipping vehicle without start date");
-                    continue;
-                }
-            };
-            let start_timestamp = format!("{} {}", start_date, start_time);
-            let start_timestamp =
-                NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
-                    .unwrap()
-                    .and_local_timezone(chrono_tz::America::New_York)
-                    .unwrap();
-            // convert to utc
-            let start_timestamp = start_timestamp.to_utc();
-
-            let trip = sqlx::query!(
-                "SELECT
-                    id
-                FROM
-                    trips
-                WHERE
-                    route_id = $1
-                    AND train_id = $2
-                    AND direction = $3
-                ORDER BY
-                    ABS(EXTRACT(EPOCH
-                FROM
-                    ($4 - created_at)))
-                LIMIT 1",
-                route_id,
-                train_id,
-                direction,
-                start_timestamp
-            )
-            .fetch_optional(pool)
-            .await?;
-
-            let trip_id = match trip {
-                Some(t) => t.id,
-                None => {
-                    tracing::debug!("No trip found for vehicle");
-                    continue;
-                }
-            };
+            // let Some(trip) = trip.find(pool).await? else {
+            //     tracing::error!("No trip found for vehicle");
+            //     continue;
+            // };
+            let trip_found = trip.find(pool).await?;
+            if !trip_found {
+                tracing::error!("No trip found for vehicle");
+            }
 
             sqlx::query!("
                 INSERT INTO positions (trip_id, stop_id, train_status, current_stop_sequence, updated_at)
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (trip_id)
-                DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at
-            ", trip_id, stop_id, train_status, current_stop_sequence, updated_at).execute(pool).await?;
+                DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at",
+                trip.id, stop_id, train_status, current_stop_sequence, updated_at).execute(pool).await?;
+
+            // let Some(nyct_trip_descriptor) = trip.nyct_trip_descriptor else {
+            //     tracing::error!("No nyct_trip_descriptor for vehicle");
+            //     continue;
+            // };
+
+            // let train_id = nyct_trip_descriptor.train_id();
+
+            // let direction: i16 = match nyct_trip_descriptor.direction {
+            //     Some(d) => match d {
+            //         // north
+            //         1 => 1,
+            //         // south
+            //         3 => 0,
+            //         // east and west aren't used
+            //         _ => unreachable!(),
+            //     },
+            //     None => {
+            //         // we can get direction from stop id instead
+            //         match stop_direction {
+            //             Some('N') => 1,
+            //             Some('S') => 0,
+            //             _ => unreachable!(),
+            //         }
+            //     }
+            // };
+
+            // let start_time = match trip.start_time.as_ref() {
+            //     Some(time) => time.to_owned(),
+            //     None => {
+            //         // tracing::debug!("Skipping trip without start time");
+
+            //         // This is how you parse the origin time according to MTA's gtfs docs
+            //         let mut origin_time =
+            //             trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
+
+            //         // time greater than 1440 (1 day) means its the next day or negative means its the previous day
+            //         if origin_time > 1440 {
+            //             origin_time -= 1440;
+
+            //             // tracing::warn!(
+            //             //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
+            //             //     origin_time / 60,
+            //             //     origin_time % 60,
+            //             //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+            //             //     origin_time,
+            //             //     trip_update.trip.start_date.as_ref()
+            //             // );
+            //         } else if origin_time < 0 {
+            //             origin_time += 1440;
+
+            //             // tracing::warn!(
+            //             //     "Skipping trip without start time {}:{}:{} | origin time {} | {:#?}",
+            //             //     origin_time / 60,
+            //             //     origin_time % 60,
+            //             //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+            //             //     origin_time,
+            //             //     trip_update.trip.start_date.as_ref()
+            //             // );
+            //         }
+
+            //         match NaiveTime::from_hms_opt(
+            //             origin_time as u32 / 60,
+            //             origin_time as u32 % 60,
+            //             ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+            //         ) {
+            //             Some(time) => time.to_string(),
+            //             None => {
+            //                 tracing::warn!("Skipping vehicle without start time");
+            //                 continue;
+            //             }
+            //         }
+            //     }
+            // };
+            // let start_date = match trip.start_date.as_ref() {
+            //     Some(date) => date,
+            //     None => {
+            //         tracing::debug!("Skipping vehicle without start date");
+            //         continue;
+            //     }
+            // };
+            // let start_timestamp = format!("{} {}", start_date, start_time);
+            // let start_timestamp =
+            //     NaiveDateTime::parse_from_str(&start_timestamp, "%Y%m%d %H:%M:%S")
+            //         .unwrap()
+            //         .and_local_timezone(chrono_tz::America::New_York)
+            //         .unwrap();
+            // // convert to utc
+            // let start_timestamp = start_timestamp.to_utc();
+
+            // let trip = sqlx::query!(
+            //     "SELECT
+            //         id
+            //     FROM
+            //         trips
+            //     WHERE
+            //         route_id = $1
+            //         AND train_id = $2
+            //         AND direction = $3
+            //     ORDER BY
+            //         ABS(EXTRACT(EPOCH
+            //     FROM
+            //         ($4 - created_at)))
+            //     LIMIT 1",
+            //     route_id,
+            //     train_id,
+            //     direction,
+            //     start_timestamp
+            // )
+            // .fetch_optional(pool)
+            // .await?;
+
+            // let trip_id = match trip {
+            //     Some(t) => t.id,
+            //     None => {
+            //         tracing::debug!("No trip found for vehicle");
+            //         continue;
+            //     }
+            // };
+
+            // sqlx::query!("
+            //     INSERT INTO positions (trip_id, stop_id, train_status, current_stop_sequence, updated_at)
+            //     VALUES ($1, $2, $3, $4, $5)
+            //     ON CONFLICT (trip_id)
+            //     DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at
+            // ", trip_id, stop_id, train_status, current_stop_sequence, updated_at).execute(pool).await?;
         }
     }
 
