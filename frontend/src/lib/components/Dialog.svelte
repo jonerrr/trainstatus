@@ -215,31 +215,33 @@
 						});
 					}}
 					aria-label="Close dialog"
-					class="appearance-none inline-flex h-8 w-8"
+					class="appearance-none h-8 w-8 flex"
 				>
 					<CircleX />
 				</button>
 
 				<div class="flex gap-1 items-center">
 					{#if !copied}
-						<button class="appearance-none inline-flex h-8 w-8" aria-label="Share" on:click={share}>
+						<button class="appearance-none h-8 w-8 flex" aria-label="Share" on:click={share}>
 							<Share class="h-6 w-6" />
 						</button>
 					{:else}
 						<button
-							class="appearance-none inline-flex h-8 w-8 text-green-600"
+							class="appearance-none flex h-8 w-8 text-green-600"
 							aria-label="Link copied to clipboard"
 						>
 							<ClipboardCheck class="h-6 w-6" />
 						</button>
 					{/if}
-					<Pin
-						size={'size-6'}
-						store={pin_store}
-						item_id={$page.state.dialog_type === 'bus_trip'
-							? `${item_id}_${$bus_trips.find((t) => t.id === item_id)?.route_id}`
-							: item_id}
-					/>
+					<!-- TODO: fix so we don't need pb-1 to center -->
+					<div class="pb-1">
+						<Pin
+							store={pin_store}
+							item_id={$page.state.dialog_type === 'bus_trip'
+								? `${item_id}_${$bus_trips.find((t) => t.id === item_id)?.route_id}`
+								: item_id}
+						/>
+					</div>
 				</div>
 			</div>
 		{:else}
@@ -271,7 +273,7 @@
 					});
 				}}
 				aria-label="Close dialog"
-				class="appearance none inline-flex h-8 w-8 absolute right-[5px] top-[5px]"
+				class="appearance none h-8 w-8 absolute right-[5px] top-[5px]"
 			>
 				<CircleX />
 			</button>

@@ -57,15 +57,13 @@
 	>
 		{#each $route_alerts as alert}
 			<swiper-slide>
-				<div class="relative flex flex-col max-h-[82dvh] p-2">
-					<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
+				<div class="relative flex flex-col max-h-[80dvh]">
+					<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300 p-1">
 						<Icon link={false} width="2rem" height="2rem" name={route_id} />
 						{alert.alert_type}
 					</h2>
 
-					<div
-						class="text-indigo-200 max-h-[80dvh] overflow-auto border border-neutral-700 rounded my-2"
-					>
+					<div class="text-indigo-200 max-h-[80dvh] overflow-auto bg-neutral-900 p-1">
 						<!-- hypothetically, the MTA could XSS this website (that would be silly) -->
 						{@html alert.header_html}
 						<!-- TODO: remove links or mark them as links -->
@@ -74,7 +72,7 @@
 						{/if}
 					</div>
 
-					<div class="text-sm text-neutral-400 flex justify-between">
+					<div class="text-sm text-neutral-400 flex justify-between bg-neutral-900">
 						<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
 						{#if alert.end_time}
 							<!-- TODO: get the earliest end_time from API -->
@@ -86,10 +84,8 @@
 		{/each}
 	</swiper-container>
 {:else}
-	<div class="p-2">
-		<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300">
-			<Icon width="2rem" height="2rem" name={route_id} />
-		</h2>
+	<div class="flex items-center gap-2 bg-neutral-900 p-2">
+		<Icon width="2rem" height="2rem" name={route_id} />
 		<div class="text-indigo-200">No alerts</div>
 	</div>
 {/if}
@@ -98,7 +94,7 @@
 
 <style lang="postcss">
 	swiper-container::part(pagination) {
-		@apply sticky bottom-2;
+		@apply sticky bottom-0;
 	}
 
 	/* :global(.swiper-slide) {

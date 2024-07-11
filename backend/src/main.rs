@@ -13,6 +13,7 @@ mod bus;
 // mod geo;
 mod routes;
 mod static_data;
+mod trip;
 mod trips;
 
 pub mod feed {

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { derived } from 'svelte/store';
-	import { pushState } from '$app/navigation';
 	import { TrainStatus, type Stop, type StopTime } from '$lib/api';
 	import { stops, stop_times, trips } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
@@ -30,22 +29,6 @@
 		dialog_type: 'trip'
 	}}
 >
-	<!-- 
-<button
-	id="list-item"
-	class="w-full py-2 flex justify-between items-center text-indigo-200 px-1"
-	on:click={() => {
-		pushState('', {
-			dialog_open: true,
-			dialog_id: stop_time.trip_id,
-			dialog_type: 'trip'
-		});
-	}}
-> -->
-	<!-- <div
-		class="w-full border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 px-1 text-neutral-300"
-	> -->
-	<!-- TODO: Some sort of animation when trip status is stopped to / arriving at this stop  -->
 	<div class="flex gap-2 items-center">
 		<!-- maybe enable link here -->
 		<Icon
@@ -68,6 +51,4 @@
 	<div class="text-right">
 		{last_stop?.name}
 	</div>
-	<!-- </div> -->
-	<!-- </button> -->
 </TriggerButton>

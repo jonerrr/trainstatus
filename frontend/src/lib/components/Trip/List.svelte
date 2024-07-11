@@ -46,47 +46,20 @@
 	// $: $pinned_bus_trips = $pinned_bus_trips.filter((p) => $wanted_bus_trips.find((t) => t.id === p));
 </script>
 
-<List bind:manage_height>
-	<div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
-		<div id="list-item" class="flex pb-1 justify-between">
-			<div class="flex gap-2">
-				<div class="font-semibold text-lg text-indigo-300">{title}</div>
-			</div>
+<List bind:manage_height bind:title>
+	<div slot="train" class="divide-y divide-neutral-800">
+		{#if $wanted_trips.length}
+			{#each $wanted_trips as trip (trip.id)}
+				<Trigger {trip} />
+			{/each}
+		{/if}
+	</div>
 
-			<div
-				use:melt={$list}
-				class="grid grid-cols-2 bg-neutral-900 rounded shrink-0 overflow-x-auto text-indigo-100 border border-neutral-500"
-				aria-label="List"
-			>
-				<button
-					use:melt={$trigger('Train')}
-					class="trigger px-2 rounded-l relative border-neutral-400 border-r data-[state=active]:bg-indigo-800"
-				>
-					<TrainFront />
-				</button>
-				<button
-					use:melt={$trigger('Bus')}
-					class="px-2 trigger rounded-r relative border-neutral-400 border-l data-[state=active]:bg-indigo-800"
-				>
-					<BusFront />
-				</button>
-			</div>
-		</div>
-		<!-- TODO: use melt $content instead of if statement -->
-		<div class={`flex flex-col gap-1 max-h-[calc(100dvh-4rem)]`}>
-			{#if $value === 'Train'}
-				{#if $wanted_trips.length}
-					{#each $wanted_trips as trip (trip.id)}
-						<Trigger {trip} />
-					{/each}
-				{/if}
-			{:else if $value === 'Bus'}
-				{#if $wanted_bus_trips.length}
-					{#each $wanted_bus_trips as trip (trip.id)}
-						<BusTrigger {trip} />
-					{/each}
-				{/if}
-			{/if}
-		</div>
+	<div slot="bus" class="divide-y divide-neutral-800">
+		{#if $wanted_bus_trips.length}
+			{#each $wanted_bus_trips as trip (trip.id)}
+				<BusTrigger {trip} />
+			{/each}
+		{/if}
 	</div>
 </List>

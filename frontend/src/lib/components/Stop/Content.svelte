@@ -4,7 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import { derived } from 'svelte/store';
 	import { stops, stop_direction } from '$lib/stores';
-	import { Direction, TrainStatus } from '$lib/api';
+	import { Direction } from '$lib/api';
 	import TripList from '$lib/components/Trip/StopTimeList.svelte';
 	import Routes from '$lib/components/Stop/Routes.svelte';
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
@@ -41,52 +41,49 @@
 	{/if}
 </svelte:head>
 
-<div class="">
-	{#if $stop}
-		<div class="flex items-center gap-2 p-1">
-			<h2 class="font-bold text-xl text-indigo-300">{$stop.name}</h2>
+{#if $stop}
+	<div class="flex items-center gap-2 p-1">
+		<h2 class="font-bold text-xl text-indigo-300">{$stop.name}</h2>
+		<Routes link={true} routes={$stop.routes} />
+	</div>
 
-			<Routes link={true} routes={$stop.routes} />
-		</div>
+	{#if $stop.transfers.length}
+		<div class="flex gap-2 pb-1 px-1 items-center flex-wrap">
+			<h2 class="text-base text-indigo-200">Transfers:</h2>
 
-		{#if $stop.transfers.length}
-			<div class="flex gap-2 pb-1 px-1 items-center flex-wrap">
-				<h2 class="text-base text-indigo-200">Transfers:</h2>
-
-				{#each $stop.transfers as stop_id}
-					<Transfer {stop_id} />
-				{/each}
-			</div>
-		{/if}
-
-		<div use:melt={$root} class="flex flex-col shadow-2xl text-indigo-400 bg-neutral-900/80">
-			<div
-				use:melt={$list}
-				class="flex shrink-0 overflow-x-auto text-indigo-100"
-				aria-label="Trip information"
-			>
-				{#each triggers as triggerItem}
-					<button use:melt={$trigger(triggerItem.id)} class="trigger relative">
-						{triggerItem.title}
-						{#if $value === triggerItem.id}
-							<div
-								in:send={{ key: 'trigger' }}
-								out:receive={{ key: 'trigger' }}
-								class="absolute bottom-1 left-1/2 h-1 w-1/2 -translate-x-1/2 rounded-full bg-indigo-400"
-							/>
-						{/if}
-					</button>
-				{/each}
-			</div>
-			<div use:melt={$content('northbound')}>
-				<TripList stop={$stop} direction={Direction.North} />
-			</div>
-			<div use:melt={$content('southbound')}>
-				<TripList stop={$stop} direction={Direction.South} />
-			</div>
+			{#each $stop.transfers as stop_id}
+				<Transfer {stop_id} />
+			{/each}
 		</div>
 	{/if}
-</div>
+
+	<div use:melt={$root} class="flex flex-col shadow-2xl text-indigo-400">
+		<div use:melt={$content('northbound')}>
+			<TripList stop={$stop} direction={Direction.North} />
+		</div>
+		<div use:melt={$content('southbound')}>
+			<TripList stop={$stop} direction={Direction.South} />
+		</div>
+		<div
+			use:melt={$list}
+			class="flex shrink-0 overflow-x-auto text-indigo-100 bg-neutral-800"
+			aria-label="Trip information"
+		>
+			{#each triggers as triggerItem}
+				<button use:melt={$trigger(triggerItem.id)} class="trigger relative">
+					{triggerItem.title}
+					{#if $value === triggerItem.id}
+						<div
+							in:send={{ key: 'trigger' }}
+							out:receive={{ key: 'trigger' }}
+							class="absolute top-1 left-1/2 h-1 w-1/2 -translate-x-1/2 rounded-full bg-indigo-400"
+						/>
+					{/if}
+				</button>
+			{/each}
+		</div>
+	</div>
+{/if}
 
 <style lang="postcss">
 	.trigger {
@@ -117,6 +114,7 @@
 		&[data-state='active'] {
 			@apply focus:relative;
 			color: theme('colors.indigo.200');
+			background-color: theme('colors.neutral.900');
 		}
 	}
 </style>

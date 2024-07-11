@@ -3,6 +3,7 @@
 	import { bus_stops, bus_routes, bus_stop_times, monitored_routes, data_at } from '$lib/stores';
 	import BusTrigger from '$lib/components/Trip/BusTrigger.svelte';
 	import BusIcon from '$lib/components/BusIcon.svelte';
+	import List from '$lib/components/ContentList.svelte';
 
 	export let stop_id: number;
 	// export let actions_width: number;
@@ -45,23 +46,24 @@
 </svelte:head>
 
 {#if stop}
-	<div class="p-4">
-		<div class="flex gap-1">
-			<!-- TODO: fix extra space when wrapping -->
-			<div class={`flex flex-wrap gap-1 my-auto`}>
-				{#each stop_routes as route}
-					<BusIcon {route} />
-				{/each}
-			</div>
-			<div class="flex flex-col gap-1">
-				<span class="text-xs text-neutral-300">#{stop.id}</span>
+	<div class="flex gap-1 p-1">
+		<!-- TODO: fix extra space when wrapping -->
 
-				<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
-			</div>
+		<div class="flex flex-col gap-1">
+			<span class="text-xs text-neutral-300">#{stop.id}</span>
+
+			<h2 class="font-bold text-xl text-indigo-300">{stop.name}</h2>
 		</div>
 
-		<!-- TODO: get bus transfers and also subway transfers -->
-		<!-- {#if $stop.transfers.length}
+		<div class={`flex flex-wrap gap-1 my-auto`}>
+			{#each stop_routes as route}
+				<BusIcon {route} />
+			{/each}
+		</div>
+	</div>
+
+	<!-- TODO: get bus transfers and also subway transfers -->
+	<!-- {#if $stop.transfers.length}
 		<div class="flex gap-2 pb-1 items-center flex-wrap">
 			<h2 class="text-lg">Transfers:</h2>
 
@@ -71,17 +73,16 @@
 		</div>
 	{/if} -->
 
-		<!-- TODO: check if stop sequence 0 is greater than now and then mark that its scheduled -->
-		<div
+	<!-- TODO: check if stop sequence 0 is greater than now and then mark that its scheduled -->
+	<!-- <div
 			class="flex flex-col gap-1 border overflow-auto max-h-96 border-neutral-800 rounded shadow-lg bg-neutral-900/50 text-indigo-400"
-		>
-			{#if $stop_times.length}
-				{#each $stop_times as stop_time}
-					<BusTrigger {stop_time} route={stop_routes.find((r) => r.id === stop_time.route_id)} />
-				{/each}
-			{:else}
-				<h2 class="text-neutral-300 text-center">No upcoming buses</h2>
-			{/if}
-		</div>
-	</div>
+		> -->
+	<List>
+		{#if $stop_times.length}
+			{#each $stop_times as stop_time}
+				<BusTrigger {stop_time} route={stop_routes.find((r) => r.id === stop_time.route_id)} />
+			{/each}
+		{/if}
+	</List>
+	<!-- </div> -->
 {/if}
