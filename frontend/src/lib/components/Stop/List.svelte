@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { BusFront, CircleX, TrainFront } from 'lucide-svelte';
-	import { createTabs, melt } from '@melt-ui/svelte';
+	import { CircleX } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import { persisted } from 'svelte-persisted-store';
 	import { derived, writable, type Writable } from 'svelte/store';
 	import SearchWorker from '$lib/search_worker?worker';
 	import { type Stop } from '$lib/api';
@@ -10,17 +10,6 @@
 	import Trigger from '$lib/components/Stop/Trigger.svelte';
 	import BusTrigger from '$lib/components/Stop/BusTrigger.svelte';
 	import List from '$lib/components/List.svelte';
-	// import { cubicInOut } from 'svelte/easing';
-	// import { crossfade } from 'svelte/transition';
-
-	const {
-		elements: { root, list, content, trigger },
-		states: { value }
-	} = createTabs({
-		defaultValue: 'Train'
-	});
-
-	// const triggers = ['Train', 'Bus'];
 
 	export let title: string = 'Stops';
 	export let stop_ids: Writable<string[]> = writable([]);
@@ -74,6 +63,8 @@
 	let search_term = '';
 	let searchWorker: Worker;
 
+	let tab_value = persisted(`${title.toLowerCase()}_tab`, 'Train');
+
 	function clearSearch() {
 		// reset stop ids
 		$stop_ids = $stop_store.slice(0, 15).map((s) => s.id);
@@ -93,7 +84,7 @@
 		search_term = e.target.value;
 		searchWorker.postMessage({
 			type: 'search',
-			payload: { search_term, search_type: $value }
+			payload: { search_term, search_type: $tab_value }
 		});
 	}
 
@@ -120,7 +111,7 @@
 			searchWorker.postMessage({ type: 'load' });
 
 			// watch if they change modes, and rerun search if they do
-			value.subscribe((value) => {
+			tab_value.subscribe((value) => {
 				if (search === 'ready' && search_term !== '') {
 					searchWorker.postMessage({
 						type: 'search',
@@ -135,7 +126,13 @@
 	});
 </script>
 
-<List bind:show_search bind:manage_height bind:this={list_el} bind:title>
+<List
+	bind:tab_value
+	class={$$props.class ?? undefined}
+	bind:manage_height
+	bind:this={list_el}
+	bind:title
+>
 	<div slot="title">
 		{#if show_location}
 			<slot name="location" />
@@ -167,7 +164,7 @@
 				on:input={debounce(searchStops)}
 				type="search"
 				placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
-				class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+				class="search-stops text-indigo-200 max-w-[calc(100dvw)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 			/>
 			<button
 				aria-label="Clear search"

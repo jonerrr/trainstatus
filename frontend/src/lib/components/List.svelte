@@ -7,9 +7,7 @@
 	// manage the min/max height of the list
 	export let manage_height: boolean = true;
 	export let title: string = 'List';
-	export let show_search: boolean = false;
-
-	export const tab_value = persisted(`${title.toLowerCase()}_tab`, 'Train');
+	export let tab_value = persisted(`${title.toLowerCase()}_tab`, 'Train');
 
 	const {
 		elements: { root, list, content, trigger },
@@ -25,6 +23,7 @@
 	}
 
 	let list_height = 0;
+	let title_height: number = 0;
 	let interval: number;
 
 	if (manage_height) {
@@ -43,17 +42,23 @@
 		});
 	}
 
-	const list_classes = `flex flex-col ${show_search ? 'max-h-[calc(100dvh-14rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`;
+	// ${show_search ? 'max-h-[calc(100dvh-11rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}
+
+	const list_classes = `flex flex-col overflow-auto ${$$props.class} ?? 'max-h-[calc(100dvh-4rem)]'}`;
 </script>
 
 <div
 	use:melt={$root}
 	bind:this={list_el}
 	style={manage_height ? `min-height: ${list_height}px; max-height: ${list_height}px;` : ''}
-	class={`relative flex flex-col text-indigo-200 border-2 border-neutral-800 rounded overflow-auto ${$$props.class} ?? ''}`}
+	class={`relative flex flex-col text-indigo-200 overflow-auto ${$$props.class} ?? ''}`}
 >
-	<div id="list-item" class="flex pb-1 justify-between p-1 bg-neutral-800">
-		<div class="font-bold text-lg text-indigo-300 flex gap-1">
+	<div
+		id="list-item"
+		bind:clientHeight={title_height}
+		class="flex z-40 w-full md:w-[60%] fixed justify-between bg-neutral-800 p-1 items-center"
+	>
+		<div class="font-bold text-lg text-indigo-300 flex gap-1 items-center">
 			{title}
 			<!-- for geolocate -->
 			<slot name="title" />
@@ -80,11 +85,15 @@
 	</div>
 
 	{#if $value === 'Train'}
-		<div class={list_classes} use:melt={$content('Train')}>
+		<div
+			style={`padding-top: ${title_height}px;`}
+			class={list_classes}
+			use:melt={$content('Train')}
+		>
 			<slot name="train" />
 		</div>
 	{:else if $value === 'Bus'}
-		<div class={list_classes} use:melt={$content('Bus')}>
+		<div style={`padding-top: ${title_height}px;`} class={list_classes} use:melt={$content('Bus')}>
 			<slot name="bus" />
 		</div>
 	{/if}

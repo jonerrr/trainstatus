@@ -11,6 +11,11 @@
 	<title>Trainstat.us | Stop Times</title>
 </svelte:head>
 
-<div class="p-1">
-	<List {stop_ids} {bus_stop_ids} title="Stops" manage_height={false} show_search={true} />
-</div>
+<List
+	{stop_ids}
+	{bus_stop_ids}
+	title="Stops"
+	manage_height={false}
+	class="max-h-[calc(100dvh-7.5rem)] overflow-auto"
+	show_search
+/>

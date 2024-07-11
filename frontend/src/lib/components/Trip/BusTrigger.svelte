@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { derived } from 'svelte/store';
-	import { pushState } from '$app/navigation';
 	import { bus_trips } from '$lib/stores';
 	import type { BusRoute, BusStopTime } from '$lib/bus_api';
 	import BusIcon from '$lib/components/BusIcon.svelte';
 	import BusCapacity from '$lib/components/Trip/BusCapacity.svelte';
+	import TriggerButton from '$lib/components/TriggerButton.svelte';
 
 	export let route: BusRoute;
 	export let stop_time: BusStopTime;
@@ -17,14 +17,11 @@
 	// TODO: show if its only scheduled and not real time (maybe check if bus has position or if it hasn't left first stop)
 </script>
 
-<button
-	class="w-full flex justify-between items-center p-1 border-neutral-700 bg-neutral-800 rounded border shadow-2xl hover:bg-neutral-900 text-neutral-300"
-	on:click={() => {
-		pushState('', {
-			dialog_open: true,
-			dialog_id: stop_time.trip_id,
-			dialog_type: 'bus_trip'
-		});
+<TriggerButton
+	state={{
+		dialog_open: true,
+		dialog_id: stop_time.trip_id,
+		dialog_type: 'bus_trip'
 	}}
 >
 	{#if $trip}
@@ -55,4 +52,4 @@
 	<div class="text-right">
 		{$trip?.headsign}
 	</div>
-</button>
+</TriggerButton>

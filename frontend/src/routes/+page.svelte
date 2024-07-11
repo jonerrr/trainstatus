@@ -97,7 +97,7 @@
 	<!-- TODO: show rt delays in embed -->
 </svelte:head>
 
-<div class="p-1 text-indigo-200 text-sm flex flex-col gap-2 max-h-[calc(100dvh-8rem)]">
+<div class="text-indigo-200 text-sm flex flex-col max-h-[calc(100dvh-8rem)]">
 	{#if $pinned_trips.length || $pinned_bus_trips.length}
 		<TripList
 			manage_height={true}

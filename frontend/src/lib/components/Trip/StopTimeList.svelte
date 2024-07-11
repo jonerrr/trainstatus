@@ -30,7 +30,5 @@
 		{#each $stop_times as stop_time (stop_time.trip_id)}
 			<Trigger {stop_time} />
 		{/each}
-	{:else}
-		<div class="text-neutral-300 text-center">No trips found</div>
 	{/if}
 </List>

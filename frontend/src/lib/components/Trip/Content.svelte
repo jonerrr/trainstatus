@@ -4,6 +4,7 @@
 	import { stops, trips, stop_times } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Times from '$lib/components/Trip/StopTime.svelte';
+	import List from '$lib/components/ContentList.svelte';
 
 	export let trip_id: string;
 	export let actions_width: number;
@@ -33,29 +34,23 @@
 </svelte:head>
 
 <!-- list of stops and their arrival times -->
-<div
-	class="relative overflow-auto text-white bg-neutral-800/90 border border-neutral-700 p-1 max-h-[80dvh]"
->
-	<div
-		style={`max-width: calc(100% - ${actions_width}px);`}
-		class="flex text-indigo-400 items-center bg-neutral-800 pt-1"
-	>
-		{#if $trip}
-			<Icon express={$trip.express} width="2rem" height="2rem" name={$trip.route_id} />
 
-			<ArrowBigRight class="w-8" />
+<div class="flex text-indigo-400 items-center p-1">
+	{#if $trip}
+		<Icon express={$trip.express} width="2rem" height="2rem" name={$trip.route_id} />
 
-			<h2 class={`font-bold text-xl text-indigo-300 ${$trip.assigned ? '' : 'italic'}`}>
-				{last_stop?.name}
-			</h2>
-		{/if}
-	</div>
+		<ArrowBigRight class="w-8" />
 
-	{#if $trip && $trip_stop_times.length}
-		<div class="max-h-[75dvh] pt-2 overflow-auto">
-			{#each $trip_stop_times as stop_time (stop_time.stop_id)}
-				<Times stop_id={$trip.stop_id} train_status={$trip.train_status} {stop_time} />
-			{/each}
-		</div>
+		<h2 class={`font-bold text-xl text-indigo-300 ${$trip.assigned ? '' : 'italic'}`}>
+			{last_stop?.name}
+		</h2>
 	{/if}
 </div>
+
+{#if $trip && $trip_stop_times.length}
+	<List>
+		{#each $trip_stop_times as stop_time (stop_time.stop_id)}
+			<Times stop_id={$trip.stop_id} train_status={$trip.train_status} {stop_time} />
+		{/each}
+	</List>
+{/if}

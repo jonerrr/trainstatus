@@ -3,7 +3,6 @@
 
 	let list_el: HTMLDivElement;
 
-	let max_item_height = 0;
 	let interval: number;
 
 	onMount(() => {
@@ -31,7 +30,7 @@
 
 <div
 	bind:this={list_el}
-	class="flex flex-col divide-y divide-neutral-500 overflow-auto max-h-96 px-2"
+	class="flex flex-col divide-y bg-neutral-900 divide-neutral-800 text-indigo-200 overflow-auto max-h-96 px-2"
 >
 	<slot />
 </div>
