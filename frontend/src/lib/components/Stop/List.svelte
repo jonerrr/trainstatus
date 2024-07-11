@@ -135,63 +135,22 @@
 	});
 </script>
 
-<List bind:manage_height bind:this={list_el} bind:title>
+<List bind:show_search bind:manage_height bind:this={list_el} bind:title>
 	<div slot="title">
 		{#if show_location}
 			<slot name="location" />
 		{/if}
 	</div>
 
-	<!-- <div use:melt={$root} class="flex border border-neutral-800 flex-col rounded-xl shadow-lg">
-		<div id="list-item" class="flex pb-1 justify-between">
-			<div class="flex gap-2">
-				<div class="font-semibold text-lg text-indigo-300">{title}</div>
-			</div> -->
-
-	<!-- <div
-				use:melt={$list}
-				class="grid grid-cols-2 bg-neutral-900 rounded shrink-0 overflow-x-auto text-indigo-100 border border-neutral-500"
-				aria-label="List"
-			>
-				<button
-					use:melt={$trigger('Train')}
-					class="trigger px-2 rounded-l relative border-neutral-400 border-r data-[state=active]:bg-indigo-800"
-				>
-					<TrainFront />
-				</button>
-				<button
-					use:melt={$trigger('Bus')}
-					class="px-2 trigger rounded-r relative border-neutral-400 border-l data-[state=active]:bg-indigo-800"
-				>
-					<BusFront />
-				</button>
-			</div>
-		</div> -->
-	<!-- <div
-		class={`flex flex-col gap-1 ${show_search ? 'max-h-[calc(100dvh-13rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}`}
-	>
-		{#if $value === 'Train'}
-			{#if $stops}
-				{#each $stops as stop (stop?.id)}
-					<Trigger {stop} />
-				{/each}
-			{/if}
-		{:else if $value === 'Bus'}
-			{#if $bus_stops}
-				{#each $bus_stops as stop (stop?.id)}
-					<BusTrigger {stop} />
-				{/each}
-			{/if}
+	<div slot="train" class="divide-y divide-neutral-800">
+		{#if $stops}
+			{#each $stops as stop (stop?.id)}
+				<Trigger {stop} />
+			{/each}
 		{/if}
-	</div> -->
+	</div>
 
-	{#if $stops}
-		{#each $stops as stop (stop?.id)}
-			<Trigger {stop} />
-		{/each}
-	{/if}
-
-	<div slot="bus">
+	<div slot="bus" class="divide-y divide-neutral-800">
 		{#if $bus_stops}
 			{#each $bus_stops as stop (stop?.id)}
 				<BusTrigger {stop} />
@@ -200,14 +159,14 @@
 	</div>
 
 	<!-- TODO: prevent virtual keyboard from blocking results (use window.visualViewport.height to calculate max height of stops list or virtual keyboard api whenever that comes out) -->
-	{#if show_search && search === 'ready'}
+	{#if show_search}
 		<div class="relative">
 			<input
 				bind:this={search_el}
 				bind:value={search_term}
 				on:input={debounce(searchStops)}
 				type="search"
-				placeholder="Search stops"
+				placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
 				class="search-stops text-indigo-200 max-w-[calc(100vw-10px)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 			/>
 			<button
