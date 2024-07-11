@@ -11,8 +11,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod alerts;
 mod bus;
 // mod geo;
-mod imports;
 mod routes;
+mod static_data;
 mod trips;
 
 pub mod feed {
@@ -72,9 +72,9 @@ async fn main() {
         // update_transfers(&pool).await;
 
         tracing::info!("Updating bus stops and routes");
-        bus::imports::stops_and_routes(&pool).await;
+        bus::static_data::stops_and_routes(&pool).await;
         tracing::info!("Updating train stops and routes");
-        imports::stops_and_routes(&pool).await;
+        static_data::stops_and_routes(&pool).await;
 
         sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
             .execute(&pool)

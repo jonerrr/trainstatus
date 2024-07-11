@@ -1,9 +1,8 @@
-use std::io::Cursor;
-
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
+use std::io::Cursor;
 
 // pub async fn should_update(pool: &PgPool) -> bool {
 //     let stop_count = sqlx::query!("SELECT COUNT(*) FROM stops as count")

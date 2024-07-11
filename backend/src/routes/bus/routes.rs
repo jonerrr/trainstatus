@@ -1,4 +1,4 @@
-use crate::{bus::imports::Route, routes::errors::ServerError};
+use crate::{bus::static_data::Route, routes::errors::ServerError};
 use axum::{extract::State, response::IntoResponse, Json};
 use http::HeaderMap;
 use sqlx::PgPool;
