@@ -51,7 +51,7 @@
 	use:melt={$root}
 	bind:this={list_el}
 	style={manage_height ? `min-height: ${list_height}px; max-height: ${list_height}px;` : ''}
-	class={`relative flex flex-col text-indigo-200 overflow-auto ${$$props.class} ?? ''}`}
+	class={`relative flex flex-col text-indigo-200 overflow-auto overscroll-nonebg-neutral-900 ${$$props.class} ?? ''}`}
 >
 	<div
 		id="list-item"

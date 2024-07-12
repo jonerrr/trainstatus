@@ -7,7 +7,7 @@
 	import List from '$lib/components/ContentList.svelte';
 
 	export let trip_id: string;
-	export let actions_width: number;
+	// export let actions_width: number;
 
 	let show_previous_stops = false;
 
