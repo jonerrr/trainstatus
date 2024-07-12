@@ -44,26 +44,22 @@
 
 <!-- TODO: fix swiper slides breaking for certain alerts (i think i need to somehow update the component) -->
 <!-- it seems to fix itself when clicking outside of the dialog (but that closes it) -->
-<!-- <div class="max-h-[80vh]"> -->
 {#if $route_alerts.length}
 	<swiper-container
-		style="--swiper-pagination-bullet-inactive-color: #0a0a0a; --swiper-pagination-color: #6366f1;"
+		style="--swiper-pagination-bullet-inactive-color: #818cf8; --swiper-pagination-color: #6366f1; background-color: #171717"
 		pagination="true"
 		auto-height="false"
-		observer="true"
-		observe-parents="true"
-		loop={$route_alerts.length > 1}
 		on:swiperinit={fix_swiper}
 	>
 		{#each $route_alerts as alert}
-			<swiper-slide>
+			<swiper-slide class="bg-neutral-900">
 				<div class="relative flex flex-col max-h-[80dvh]">
 					<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300 p-1">
 						<Icon link={false} width="2rem" height="2rem" name={route_id} />
 						{alert.alert_type}
 					</h2>
 
-					<div class="text-indigo-200 max-h-[80dvh] overflow-auto bg-neutral-900 p-1">
+					<div class="text-indigo-200 max-h-[80dvh] overflow-auto p-1 bg-neutral-900">
 						<!-- hypothetically, the MTA could XSS this website (that would be silly) -->
 						{@html alert.header_html}
 						<!-- TODO: remove links or mark them as links -->
@@ -72,7 +68,7 @@
 						{/if}
 					</div>
 
-					<div class="text-sm text-neutral-400 flex justify-between bg-neutral-900">
+					<div class="text-sm text-neutral-400 flex justify-between pl-1">
 						<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
 						{#if alert.end_time}
 							<!-- TODO: get the earliest end_time from API -->
@@ -84,20 +80,14 @@
 		{/each}
 	</swiper-container>
 {:else}
-	<div class="flex items-center gap-2 bg-neutral-900 p-2">
+	<div class="flex items-center gap-2 p-2">
 		<Icon width="2rem" height="2rem" name={route_id} />
-		<div class="text-indigo-200">No alerts</div>
+		<div class="text-neutral-200">No alerts</div>
 	</div>
 {/if}
 
-<!-- </div> -->
-
 <style lang="postcss">
 	swiper-container::part(pagination) {
-		@apply sticky bottom-0;
+		@apply sticky bottom-0 bg-neutral-900;
 	}
-
-	/* :global(.swiper-slide) {
-		width: fit-content;
-	} */
 </style>
