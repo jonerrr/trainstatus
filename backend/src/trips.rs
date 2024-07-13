@@ -493,7 +493,8 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
 
             let trip_found = trip.find(pool).await?;
             if !trip_found {
-                tracing::error!("No trip found for vehicle");
+                tracing::debug!("No trip found for vehicle");
+                continue;
             }
 
             sqlx::query!("

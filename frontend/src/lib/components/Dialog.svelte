@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices } from 'lucide-svelte';
-	import type { Writable } from 'svelte/store';
+	import { writable, type Writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { pushState, replaceState } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
@@ -8,7 +8,6 @@
 		trips,
 		stops,
 		bus_stops,
-		bus_routes,
 		bus_trips,
 		pinned_bus_stops,
 		pinned_bus_trips,
@@ -23,6 +22,7 @@
 	import BusStopContent from '$lib/components/Stop/BusContent.svelte';
 	import BusTripContent from '$lib/components/Trip/BusContent.svelte';
 	import Pin from '$lib/components/Pin.svelte';
+	import PastStops from '$lib/components/Trip/PastStops.svelte';
 
 	// detect if user is swiping back and disable close on outside click
 
@@ -168,17 +168,14 @@
 				// 	replaceState('', { ...$page.state, dialog_id: 'error' });
 				// }
 
-				// need to preload the route for bus trips
-				// const trip = $bus_trips.find((t) => t.id === p.state.dialog_id)!;
-				// item_id = `${trip.route_id}_${p.state.dialog_id}`;
 				break;
 			}
 			default:
 				pin_store = pinned_stops;
 		}
 	});
-	// used to set the max width of the content titles
-	let actions_width: number = 0;
+
+	let checked = writable(false);
 </script>
 
 <!-- TODO: figure out transitions -->
@@ -193,18 +190,17 @@
 	{#key item_id}
 		{#if item_id !== 'error'}
 			{#if $page.state.dialog_type === 'stop' && typeof item_id === 'string'}
-				<StopContent bind:actions_width bind:stop_id={item_id} />
+				<StopContent bind:stop_id={item_id} />
 			{:else if $page.state.dialog_type === 'trip' && typeof item_id === 'string'}
-				<TripContent bind:actions_width bind:trip_id={item_id} />
+				<TripContent bind:trip_id={item_id} />
 			{:else if $page.state.dialog_type === 'route_alert' && typeof item_id === 'string'}
 				<RouteAlertContent bind:route_id={item_id} />
 			{:else if $page.state.dialog_type === 'bus_stop' && typeof item_id === 'number'}
 				<BusStopContent bind:stop_id={item_id} />
 			{:else if $page.state.dialog_type === 'bus_trip' && typeof item_id === 'string'}
-				<BusTripContent bind:actions_width bind:trip_id={item_id} />
+				<BusTripContent bind:trip_id={item_id} />
 			{/if}
 
-			<!-- bind:offsetWidth={actions_width} -->
 			<div class="z-40 flex items-center gap-1 justify-between px-2 pt-2">
 				<button
 					on:click={() => {
@@ -219,6 +215,10 @@
 				>
 					<CircleX />
 				</button>
+
+				<!-- {#if $page.state.dialog_type === 'trip'}
+					<PastStops bind:checked />
+				{/if} -->
 
 				<div class="flex gap-1 items-center">
 					{#if !copied}

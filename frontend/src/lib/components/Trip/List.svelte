@@ -1,18 +1,9 @@
 <script lang="ts">
-	import { BusFront, TrainFront } from 'lucide-svelte';
-	import { createTabs, melt } from '@melt-ui/svelte';
 	import { derived, writable } from 'svelte/store';
 	import { monitored_routes, trips, bus_trips, pinned_trips, pinned_bus_trips } from '$lib/stores';
 	import List from '$lib/components/List.svelte';
 	import Trigger from '$lib/components/Trip/ListTrigger.svelte';
 	import BusTrigger from '$lib/components/Trip/ListBusTrigger.svelte';
-
-	const {
-		elements: { root, list, content, trigger },
-		states: { value }
-	} = createTabs({
-		defaultValue: 'Train'
-	});
 
 	export let title: string = 'Trips';
 	export let trip_ids = writable<string[]>([]);

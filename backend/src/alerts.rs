@@ -1,5 +1,8 @@
-use crate::{feed, trips::DecodeFeedError};
-use chrono::DateTime;
+use crate::{
+    feed::{self, alert},
+    trips::DecodeFeedError,
+};
+use chrono::{DateTime, Utc};
 use prost::Message;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sqlx::{PgPool, QueryBuilder};
@@ -18,6 +21,54 @@ pub async fn import(pool: PgPool) {
             sleep(Duration::from_secs(10)).await;
         }
     });
+}
+
+pub struct Alert {
+    pub id: Uuid,
+    pub mta_id: String,
+    pub alert_type: String,
+    pub header_plain: String,
+    pub header_html: String,
+    pub description_plain: Option<String>,
+    pub description_html: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub display_before_active: i32,
+}
+
+impl Alert {
+    pub async fn get_existing(&mut self, pool: &PgPool) -> Result<(), sqlx::Error> {
+        // let alert = sqlx::query_as!(Self, "SELECT * FROM alerts WHERE (mta_id = $1 OR header_plain = $2) AND created_at::date = current_date", self.mta_id, self.header_plain)
+        //     .fetch_optional(pool)
+        //     .await?;
+
+        // if let Some(alert) = alert {
+        //     self.id = alert.id;
+        //     self.alert_type = alert.alert_type;
+        //     self.header_plain = alert.header_plain;
+        //     self.header_html = alert.header_html;
+        //     self.description_plain = alert.description_plain;
+        //     self.description_html = alert.description_html;
+        //     self.created_at = alert.created_at;
+        //     self.updated_at = alert.updated_at;
+        //     self.display_before_active = alert.display_before_active;
+        // }
+
+        Ok(())
+    }
+}
+
+pub struct ActivePeriod {
+    pub alert_id: Uuid,
+    pub start_time: DateTime<Utc>,
+    pub end_time: Option<DateTime<Utc>>,
+}
+
+pub struct AffectedEntity {
+    pub alert_id: Uuid,
+    pub route_id: Option<String>,
+    pub stop_id: Option<String>,
+    pub sort_order: i32,
 }
 
 async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
@@ -80,15 +131,30 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
         let alert_type = mercury_alert.alert_type;
         let display_before_active = mercury_alert.display_before_active.unwrap_or(0) as i32;
 
-        let id_name = headers[0].clone()
-            + " "
-            + &created_at.to_rfc2822()
-            + " "
-            + &alert_type
-            + " "
-            + &display_before_active.to_string();
-        let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
+        // let id_name = headers[0].clone()
+        //     + " "
+        //     + &created_at.to_rfc2822()
+        //     + " "
+        //     + &alert_type
+        //     + " "
+        //     + &display_before_active.to_string();
+        // let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
+
+        let id = Uuid::now_v7();
         in_feed_ids.push(id);
+
+        // let alert = Alert {
+        //     id,
+        //     mta_id,
+        //     alert_type,
+        //     header_plain: headers[0].clone(),
+        //     header_html: headers[1].clone(),
+        //     description_plain,
+        //     description_html,
+        //     created_at,
+        //     updated_at,
+        //     display_before_active,
+        // };
 
         // delete duplicate alerts
         sqlx::query!(
