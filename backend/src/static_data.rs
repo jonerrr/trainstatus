@@ -328,6 +328,8 @@ pub async fn stops_and_routes(pool: &PgPool) {
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
+
+    tracing::info!("Finished updating train stops and routes");
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ArrowBigRight } from 'lucide-svelte';
 	import { derived } from 'svelte/store';
-	import { stops, trips, stop_times } from '$lib/stores';
+	import { stops, trips, stop_times, data_at } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Times from '$lib/components/Trip/StopTime.svelte';
 	import List from '$lib/components/ContentList.svelte';
@@ -9,14 +9,14 @@
 	export let trip_id: string;
 	// export let actions_width: number;
 
-	let show_previous_stops = false;
-
 	$: trip = derived(trips, ($trips) => {
 		return $trips.find((t) => t.id === trip_id);
 	});
 
 	$: trip_stop_times = derived(stop_times, ($stop_times) => {
-		return $stop_times.filter((st) => st.trip_id === trip_id);
+		return $stop_times.filter(
+			(st) => st.trip_id === trip_id && st.arrival > ($data_at ?? new Date())
+		);
 	});
 
 	$: last_stop = $trip_stop_times
@@ -24,7 +24,6 @@
 		: undefined;
 
 	// TODO: add button to load previous stop times and fetch from api
-	// TODO: fix state not updating properly
 </script>
 
 <svelte:head>

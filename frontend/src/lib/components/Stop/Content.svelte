@@ -10,7 +10,6 @@
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
 
 	export let stop_id: string;
-	export let actions_width: number;
 
 	const stop = derived(stops, ($stops) => {
 		return $stops.find((s) => s.id === stop_id);

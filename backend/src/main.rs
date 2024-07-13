@@ -1,19 +1,15 @@
 use axum::{body::Body, response::Response, routing::get, Router};
 use chrono::{Days, Utc};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{
-    convert::Infallible,
-    env::{self, var},
-};
+use std::{convert::Infallible, env::var, time::Duration};
+use tokio::time::sleep;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
 mod bus;
-// mod geo;
 mod routes;
 mod static_data;
-mod trip;
 mod trips;
 
 pub mod feed {
@@ -53,35 +49,42 @@ async fn main() {
         .unwrap();
     sqlx::migrate!().run(&pool).await.unwrap();
 
-    let last_updated = sqlx::query!("SELECT update_at FROM last_update")
-        .fetch_optional(&pool)
-        .await
-        .unwrap();
+    let s_pool = pool.clone();
+    tokio::spawn(async move {
+        loop {
+            let last_updated = sqlx::query!("SELECT update_at FROM last_update")
+                .fetch_optional(&s_pool)
+                .await
+                .unwrap();
 
-    let should_update = match last_updated {
-        Some(last_updated) => {
-            tracing::info!("Last updated at: {}", last_updated.update_at);
-            let now = Utc::now();
-            let days = Days::new(10);
+            let should_update = match last_updated {
+                Some(last_updated) => {
+                    // tracing::info!("Last updated at: {}", last_updated.update_at);
+                    let now = Utc::now();
+                    let days = Days::new(1);
 
-            last_updated.update_at < now.checked_sub_days(days).unwrap()
+                    last_updated.update_at < now.checked_sub_days(days).unwrap()
+                }
+                None => true,
+            };
+
+            if should_update || var("FORCE_UPDATE").is_ok() {
+                // update_transfers(&s_pool).await;
+
+                tracing::info!("Updating bus stops and routes");
+                bus::static_data::stops_and_routes(&s_pool).await;
+                tracing::info!("Updating train stops and routes");
+                static_data::stops_and_routes(&s_pool).await;
+
+                sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+                    .execute(&s_pool)
+                    .await
+                    .unwrap();
+            }
+
+            sleep(Duration::from_secs(60)).await;
         }
-        None => true,
-    };
-
-    if should_update || env::var("FORCE_UPDATE").is_ok() {
-        // update_transfers(&pool).await;
-
-        tracing::info!("Updating bus stops and routes");
-        bus::static_data::stops_and_routes(&pool).await;
-        tracing::info!("Updating train stops and routes");
-        static_data::stops_and_routes(&pool).await;
-
-        sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
-            .execute(&pool)
-            .await
-            .unwrap();
-    }
+    });
 
     bus::trips::import(pool.clone()).await;
     bus::positions::import(pool.clone()).await;
