@@ -76,7 +76,6 @@
 					>
 						<!-- hypothetically, the MTA could XSS this website (that would be silly) -->
 						{@html alert.header_html}
-						<!-- TODO: remove links or mark them as links -->
 						{#if alert.description_html}
 							{@html alert.description_html}
 						{/if}
@@ -85,7 +84,6 @@
 					<div class="text-sm text-neutral-400 flex justify-between pl-1">
 						<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
 						{#if alert.end_time}
-							<!-- TODO: get the earliest end_time from API -->
 							<div>End {dayjs(alert.end_time).fromNow()}</div>
 						{/if}
 					</div>
