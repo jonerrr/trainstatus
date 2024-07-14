@@ -3,13 +3,13 @@ use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
+use std::env::var;
 use std::time::Duration;
 use thiserror::Error;
+use tokio::fs::{create_dir, remove_file, write};
 use tokio::time::sleep;
 use tracing::span;
 use uuid::Uuid;
-
-// use std::io::Write;
 
 // A C E https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace
 // B D F M https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm
@@ -214,6 +214,7 @@ impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
             .ok_or(IntoTripError::NyctTripDescriptor(format!("{:#?}", &self)))?;
         let train_id = nyct_trip.train_id.as_ref().ok_or(IntoTripError::TrainId)?;
         let assigned = nyct_trip.is_assigned.unwrap_or(false);
+
         let direction = match nyct_trip.direction {
             Some(d) => match d {
                 // north
@@ -292,12 +293,14 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
         .await?;
 
     let feed = feed::FeedMessage::decode(data)?;
-    // if endpoint == "" {
-    //     let mut msgs = Vec::new();
-    //     write!(msgs, "{:#?}", feed).unwrap();
-    //     tokio::fs::remove_file("./gtfs.txt").await.ok();
-    //     tokio::fs::write("./gtfs.txt", msgs).await.unwrap();
-    // }
+    if var("DEBUG_GTFS").is_ok() {
+        let msgs = format!("{:#?}", feed);
+        create_dir("./gtfs").await.ok();
+        remove_file(format!("./gtfs/e{}.txt", &endpoint)).await.ok();
+        write(format!("./gtfs/e{}.txt", &endpoint), msgs)
+            .await
+            .unwrap();
+    }
 
     for entity in feed.entity {
         if let Some(trip_update) = entity.trip_update {

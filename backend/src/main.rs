@@ -61,7 +61,7 @@ async fn main() {
                 Some(last_updated) => {
                     // tracing::info!("Last updated at: {}", last_updated.update_at);
                     let now = Utc::now();
-                    let days = Days::new(1);
+                    let days = Days::new(3);
 
                     last_updated.update_at < now.checked_sub_days(days).unwrap()
                 }

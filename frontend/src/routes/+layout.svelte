@@ -14,7 +14,9 @@
 		monitored_routes,
 		bus_trips,
 		bus_stop_times,
-		data_at
+		data_at,
+		pinned_trips,
+		pinned_bus_trips
 	} from '$lib/stores';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
@@ -33,12 +35,18 @@
 		if (!time) {
 			interval = setInterval(async () => {
 				await update_data(fetch, trips, stop_times, alerts, null);
+
+				// remove from pinned trips if it no longer exists
+				$pinned_trips = $pinned_trips.filter((p) => $trips.find((t) => t.id === p));
 			}, 10000);
 
 			// Interval for update_bus_data
 			bus_interval = setInterval(async () => {
 				//TODO: maybe add a check to make sure length is greater than 0
 				await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, null);
+
+				// remove from pinned trips if it no longer exists
+				$pinned_bus_trips = $pinned_bus_trips.filter((p) => $bus_trips.find((t) => t.id === p));
 			}, 30000);
 		} else {
 			await update_data(fetch, trips, stop_times, alerts, time);

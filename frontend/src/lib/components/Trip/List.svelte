@@ -32,7 +32,7 @@
 	console.log($wanted_bus_trips);
 
 	// remove from pinned trips if it no longer exists
-	$: $pinned_trips = $pinned_trips.filter((p) => $wanted_trips.find((t) => t.id === p));
+	// $: $pinned_trips = $pinned_trips.filter((p) => $wanted_trips.find((t) => t.id === p));
 	// TODO: figure out a better way to remove old bus trips
 	// $: $pinned_bus_trips = $pinned_bus_trips.filter((p) => $wanted_bus_trips.find((t) => t.id === p));
 </script>
