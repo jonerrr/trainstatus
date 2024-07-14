@@ -8,7 +8,7 @@
 
 <button
 	id="list-item"
-	class="w-full flex justify-between items-center py-1 shadow-2xl px-1"
+	class="w-full flex justify-between items-center py-1 shadow-2xl px-1 transition-colors hover:bg-neutral-950"
 	transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 	on:click={() => {
 		pushState('', state);
