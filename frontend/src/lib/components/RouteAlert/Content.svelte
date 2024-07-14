@@ -5,6 +5,7 @@
 	import { alerts } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import { derived } from 'svelte/store';
+	import { onMount } from 'svelte';
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
@@ -30,6 +31,16 @@
 			// swiper.slideReset();
 		}, 500);
 	}
+
+	onMount(() => {
+		// remove href from all links in alert-text id
+		document
+			.getElementById('alert-text')
+			?.querySelectorAll('a')
+			.forEach((a) => {
+				a.removeAttribute('href');
+			});
+	});
 
 	// TODO: show route map after alerts
 </script>
@@ -59,7 +70,10 @@
 						{alert.alert_type}
 					</h2>
 
-					<div class="text-indigo-200 max-h-[80dvh] overflow-auto p-1 bg-neutral-900">
+					<div
+						id="alert-text"
+						class="text-indigo-200 max-h-[80dvh] overflow-auto p-1 bg-neutral-900"
+					>
 						<!-- hypothetically, the MTA could XSS this website (that would be silly) -->
 						{@html alert.header_html}
 						<!-- TODO: remove links or mark them as links -->
