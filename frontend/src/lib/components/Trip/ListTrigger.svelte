@@ -6,6 +6,7 @@
 	import Pin from '$lib/components/Pin.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import TriggerButton from '$lib/components/TriggerButton.svelte';
+	import Status from '$lib/components/Trip/Status.svelte';
 
 	export let trip: Trip;
 
@@ -39,16 +40,7 @@
 		</div>
 	</div>
 
-	{#if trip.train_status === TrainStatus.AtStop}
-		<div class="text-neutral-400">Arrived at {current_stop?.name}</div>
-	{:else if trip.train_status === TrainStatus.InTransitTo}
-		<div class="text-neutral-400">In transit to {current_stop?.name}</div>
-	{:else if trip.train_status === TrainStatus.Incoming}
-		<div class="text-neutral-400">Arriving at {current_stop?.name}</div>
-		<!-- {:else if !trip.assigned}
-		<div class="text-neutral-400">Not assigned</div> -->
-	{:else}
-		<div class="text-neutral-400">Next stop: {current_stop?.name}</div>
-	{/if}
+	<Status bind:train_status={trip.train_status} bind:stop={current_stop} />
+
 	<Pin item_id={trip.id} store={pinned_trips} />
 </TriggerButton>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { persisted } from 'svelte-persisted-store';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { createTabs, melt } from '@melt-ui/svelte';
 
@@ -28,18 +28,47 @@
 
 	if (manage_height) {
 		onMount(() => {
-			setInterval(() => {
+			setInterval(async () => {
 				if (list_el == null) return;
 
 				const els = Array.from(list_el.querySelectorAll('#list-item')).slice(0, 3);
+				// await tick();
 				list_height = els.reduce((h, e) => e.offsetHeight + h, 0);
 				// list_height += 10;
-			}, 100);
+			}, 5);
 		});
 
 		onDestroy(() => {
 			clearInterval(interval);
 		});
+		// let observer: MutationObserver;
+
+		// onMount(() => {
+		// 	// Callback function to execute when mutations are observed
+		// 	const callback = async (mutationsList: any, observer: any) => {
+		// 		console.log('Mutations observed:', mutationsList);
+
+		// 		// await tick();
+		// 		const els = Array.from(list_el.querySelectorAll('#list-item')).slice(0, 3);
+		// 		list_height = els.reduce((h, e) => e.offsetHeight + h, 0);
+		// 	};
+
+		// 	// Create an observer instance linked to the callback function
+		// 	observer = new MutationObserver(callback);
+
+		// 	// Start observing the target node for configured mutations
+		// 	observer.observe(list_el, { childList: true, subtree: true });
+
+		// 	// Initial calculation
+		// 	callback();
+		// });
+
+		// onDestroy(() => {
+		// 	// Disconnect the observer when the component is destroyed
+		// 	if (observer) {
+		// 		observer.disconnect();
+		// 	}
+		// });
 	}
 
 	// ${show_search ? 'max-h-[calc(100dvh-11rem)] overflow-auto' : 'max-h-[calc(100dvh-4rem)]'}

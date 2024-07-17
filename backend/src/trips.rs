@@ -4,6 +4,7 @@ use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
 use std::env::var;
+use std::str::FromStr;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::fs::{create_dir, remove_file, write};
@@ -153,6 +154,14 @@ impl Trip {
         .fetch_one(pool)
         .await?;
         self.id = res.id;
+
+        // if &self.mta_id == "107650_6..N01R" {
+        //     println!("{:#?}", &self);
+        // }
+
+        // if &self.id == &Uuid::from_str("0190b343-d063-7141-b9e7-15d503993f11").unwrap() {
+        //     println!("{:#?}", &self);
+        // }
 
         Ok(())
     }

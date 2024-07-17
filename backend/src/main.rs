@@ -59,9 +59,10 @@ async fn main() {
 
             let should_update = match last_updated {
                 Some(last_updated) => {
-                    // tracing::info!("Last updated at: {}", last_updated.update_at);
                     let now = Utc::now();
                     let days = Days::new(3);
+
+                    // tracing::info!("Updating data. Last updated at: {}", last_updated.update_at);
 
                     last_updated.update_at < now.checked_sub_days(days).unwrap()
                 }
@@ -71,18 +72,23 @@ async fn main() {
             if should_update || var("FORCE_UPDATE").is_ok() {
                 // update_transfers(&s_pool).await;
 
-                tracing::info!("Updating bus stops and routes");
+                // tracing::info!("Updating bus stops and routes");
                 bus::static_data::stops_and_routes(&s_pool).await;
-                tracing::info!("Updating train stops and routes");
+                // tracing::info!("Updating train stops and routes");
                 static_data::stops_and_routes(&s_pool).await;
 
+                // remove old update_ats
+                sqlx::query!("DELETE FROM last_update")
+                    .execute(&s_pool)
+                    .await
+                    .unwrap();
                 sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
                     .execute(&s_pool)
                     .await
                     .unwrap();
             }
 
-            sleep(Duration::from_secs(60)).await;
+            sleep(Duration::from_secs(60 * 60)).await;
         }
     });
 
