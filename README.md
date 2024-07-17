@@ -13,13 +13,18 @@ The best website to check the status of your train (and bus).
 - Works on mobile and desktop
 - No ads or tracking (your geolocation data never leaves your device)
 - View historical data
+- Simple API for developers
 
-## Requirements
+## Build Requirements
 
 - Postgres
 - Node.js
 - Pnpm
+- Rust
 
 ## Config
 
-Set `FORCE_UPDATE` env on the backend to force updating bus and train data
+### Backend
+
+- Set `FORCE_UPDATE` to force update static bus and train data
+- Set `DEBUG_GTFS` to save GTFS data to disk in the `./gtfs` folder
