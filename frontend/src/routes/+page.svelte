@@ -75,8 +75,8 @@
 
 				location_status.set(LocationStatus.Denied);
 			},
-			// 1 minute
-			{ maximumAge: 60 * 1000 }
+			// 30 sec
+			{ maximumAge: 30 }
 		);
 	}
 
