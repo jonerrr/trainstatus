@@ -39,7 +39,7 @@ tower-http = { version = "0.5.2", features = [
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.9.1", features = ["serde", "v5", "v7"] }
-zip = "2.1.3"
+zip = "2.1.5"
 
 [build-dependencies]
 prost-build = "0.13.1"
