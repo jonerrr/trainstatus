@@ -10,6 +10,7 @@
 	import Transfer from '$lib/components/Stop/Transfer.svelte';
 
 	export let stop_id: string;
+	export let show_previous: boolean = false;
 
 	const stop = derived(stops, ($stops) => {
 		return $stops.find((s) => s.id === stop_id);
@@ -58,10 +59,10 @@
 
 	<div use:melt={$root} class="flex flex-col shadow-2xl text-indigo-400">
 		<div use:melt={$content('northbound')}>
-			<TripList stop={$stop} direction={Direction.North} />
+			<TripList bind:show_previous stop={$stop} direction={Direction.North} />
 		</div>
 		<div use:melt={$content('southbound')}>
-			<TripList stop={$stop} direction={Direction.South} />
+			<TripList bind:show_previous stop={$stop} direction={Direction.South} />
 		</div>
 		<div
 			use:melt={$list}

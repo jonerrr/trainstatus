@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices, History } from 'lucide-svelte';
 	import { writable, type Writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { pushState, replaceState } from '$app/navigation';
@@ -75,6 +75,17 @@
 				});
 			}
 		});
+
+		// // Watch for escape key
+		// node.addEventListener('keydown', (e) => {
+		// 	if (e.key === 'Escape') {
+		// 		pushState('', {
+		// 			dialog_open: false,
+		// 			dialog_id: '',
+		// 			dialog_type: ''
+		// 		});
+		// 	}
+		// });
 	}
 
 	let copied = false;
@@ -175,7 +186,7 @@
 		}
 	});
 
-	let checked = writable(false);
+	let show_previous = false;
 </script>
 
 <!-- TODO: figure out transitions -->
@@ -190,9 +201,9 @@
 	{#key item_id}
 		{#if item_id !== 'error'}
 			{#if $page.state.dialog_type === 'stop' && typeof item_id === 'string'}
-				<StopContent bind:stop_id={item_id} />
+				<StopContent bind:show_previous bind:stop_id={item_id} />
 			{:else if $page.state.dialog_type === 'trip' && typeof item_id === 'string'}
-				<TripContent bind:trip_id={item_id} />
+				<TripContent bind:show_previous bind:trip_id={item_id} />
 			{:else if $page.state.dialog_type === 'route_alert' && typeof item_id === 'string'}
 				<RouteAlertContent bind:route_id={item_id} />
 			{:else if $page.state.dialog_type === 'bus_stop' && typeof item_id === 'number'}
@@ -216,11 +227,19 @@
 					<CircleX />
 				</button>
 
-				<!-- {#if $page.state.dialog_type === 'trip'}
-					<PastStops bind:checked />
-				{/if} -->
-
 				<div class="flex gap-1 items-center">
+					{#if $page.state.dialog_type === 'trip' || $page.state.dialog_type === 'stop'}
+						<button
+							class={`appearance-none h-8 w-8 flex ${show_previous ? 'text-indigo-600' : ''}`}
+							aria-label="Share"
+							on:click={() => {
+								show_previous = !show_previous;
+							}}
+						>
+							<History class="h-6 w-6" />
+						</button>
+					{/if}
+
 					{#if !copied}
 						<button class="appearance-none h-8 w-8 flex" aria-label="Share" on:click={share}>
 							<Share class="h-6 w-6" />

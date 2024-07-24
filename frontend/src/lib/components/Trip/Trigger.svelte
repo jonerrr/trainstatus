@@ -38,9 +38,15 @@
 			link={false}
 			name={stop_time.route_id}
 		/>
-		<div class={`${!$trip?.assigned ? 'italic' : ''}`}>
-			{stop_time.eta?.toFixed(0)}m
-		</div>
+		{#if stop_time.eta && stop_time.eta > 0}
+			<div class={`${!$trip?.assigned ? 'italic' : ''}`}>
+				{stop_time.eta?.toFixed(0)}m
+			</div>
+		{:else}
+			<div class={`${!$trip?.assigned ? 'italic' : ''} text-neutral-400`}>
+				{stop_time.arrival.toLocaleTimeString()}
+			</div>
+		{/if}
 
 		<!-- {#if stops_away > 0}
 					<div class="text-indigo-200 text-xs">

@@ -7,13 +7,16 @@
 
 	export let stop: Stop;
 	export let direction: Direction;
+	export let show_previous: boolean = false;
 
-	const stop_times = derived(stop_time_store, ($stop_time_store) => {
+	$: stop_times = derived(stop_time_store, ($stop_time_store) => {
 		const now = $data_at ?? new Date();
 
-		const st = $stop_time_store.filter(
-			(st) => st.stop_id === stop.id && st.direction === direction && st.arrival > now
-		);
+		const st = show_previous
+			? $stop_time_store.filter((st) => st.stop_id === stop.id && st.direction === direction)
+			: $stop_time_store.filter(
+					(st) => st.stop_id === stop.id && st.direction === direction && st.arrival > now
+				);
 
 		return st.map((st) => {
 			const arrival = st.arrival.getTime();
