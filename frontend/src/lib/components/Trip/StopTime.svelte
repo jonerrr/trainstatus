@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { slide } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
-	import { pushState } from '$app/navigation';
 	import { TrainStatus, type StopTime } from '$lib/api';
 	import { stops } from '$lib/stores';
 	import TriggerButton from '$lib/components/TriggerButton.svelte';
@@ -34,7 +31,13 @@
 			</span>
 		{/if}
 	</div>
-	<div class="text-right">
-		{stop_time.arrival.toLocaleTimeString()}
-	</div>
+	{#if stop_time.arrival > new Date()}
+		<div class={`text-right`}>
+			{stop_time.arrival.toLocaleTimeString()}
+		</div>
+	{:else}
+		<div class={`text-right text-neutral-400`}>
+			{stop_time.arrival.toLocaleTimeString()}
+		</div>
+	{/if}
 </TriggerButton>

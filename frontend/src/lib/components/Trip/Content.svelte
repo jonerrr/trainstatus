@@ -7,6 +7,7 @@
 	import List from '$lib/components/ContentList.svelte';
 
 	export let trip_id: string;
+	export let show_previous: boolean = false;
 	// export let actions_width: number;
 
 	$: trip = derived(trips, ($trips) => {
@@ -14,9 +15,10 @@
 	});
 
 	$: trip_stop_times = derived(stop_times, ($stop_times) => {
-		return $stop_times.filter(
-			(st) => st.trip_id === trip_id && st.arrival > ($data_at ?? new Date())
-		);
+		const st = show_previous
+			? $stop_times.filter((st) => st.trip_id === trip_id)
+			: $stop_times.filter((st) => st.trip_id === trip_id && st.arrival > ($data_at ?? new Date()));
+		return st;
 	});
 
 	$: last_stop = $trip_stop_times
