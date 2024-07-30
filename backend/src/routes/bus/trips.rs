@@ -86,8 +86,6 @@ WHERE
     Ok(Json(trips))
 }
 
-//
-
 #[derive(FromRow, Serialize)]
 pub struct BusTripData {
     id: Uuid,
