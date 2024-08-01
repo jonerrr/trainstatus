@@ -1,13 +1,15 @@
+use crate::feed::trip_update::StopTimeUpdate;
 use crate::feed::{self, TripDescriptor};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use once_cell::sync::Lazy;
 use prost::{DecodeError, Message};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
 use std::env::var;
-use std::str::FromStr;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::fs::{create_dir, remove_file, write};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::span;
 use uuid::Uuid;
@@ -26,14 +28,11 @@ const ENDPOINTS: [&str; 8] = ["-ace", "-bdfm", "-g", "-jz", "-nqrw", "-l", "", "
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
 // Thanks MTA for that
 // Shout out to N12 for being included in the static gtfs data even though its not a real stop (The lat/long point to Stillwell ave station)
-const FAKE_STOP_IDS: [&str; 29] = [
+const FAKE_STOP_IDS: [&str; 28] = [
     "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
-    "R65", "M07", "X22", "R60", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24",
-    "S0M", "S12", "S10",
+    "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
+    "S12", "S10",
 ];
-
-#[derive(Debug)]
-struct StopUpdate(Uuid, String, Option<DateTime<Utc>>, Option<DateTime<Utc>>);
 
 // TODO: remove unwraps and handle errors
 
@@ -55,19 +54,22 @@ pub enum DecodeFeedError {
     IntoTripError(#[from] IntoTripError),
 }
 
+// Store json of trip response
+static STOP_TIMES_RESPONSE: Lazy<Mutex<Vec<Trip>>> = Lazy::new(|| Mutex::new(vec![]));
+
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            // let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
-            // let _ = futures::future::join_all(futures).await;
-            for endpoint in ENDPOINTS.iter() {
-                match decode_feed(&pool, endpoint).await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        tracing::error!("Error importing data: {:?}", e);
-                    }
-                }
-            }
+            let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
+            let _ = futures::future::join_all(futures).await;
+            // for endpoint in ENDPOINTS.iter() {
+            //     match decode_feed(&pool, endpoint).await {
+            //         Ok(_) => (),
+            //         Err(e) => {
+            //             tracing::error!("Error importing data: {:?}", e);
+            //         }
+            //     }
+            // }
             sleep(Duration::from_secs(15)).await;
         }
     });
@@ -110,6 +112,8 @@ pub enum IntoTripError {
     StartTime(String),
     #[error("Start date not found\n{0}")]
     StartDate(String),
+    #[error("Stop ID not found in stop time update")]
+    StopId,
 }
 
 impl TripDescriptor {
@@ -199,9 +203,9 @@ impl Trip {
         match res {
             Some(t) => {
                 self.id = t.id;
-                self.assigned = t.assigned;
-                self.route_id = t.route_id;
-                self.express = t.express;
+                // self.assigned = t.assigned;
+                // self.route_id = t.route_id;
+                // self.express = t.express;
                 Ok(true)
             }
             None => Ok(false),
@@ -290,6 +294,77 @@ impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
     }
 }
 
+impl StopTimeUpdate {
+    pub fn direction(&self) -> Option<i16> {
+        let mut stop_id = self.stop_id.as_ref().unwrap().to_owned();
+        match stop_id.pop() {
+            Some('N') => Some(1),
+            Some('S') => Some(0),
+            _ => unreachable!(),
+        }
+
+        // if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+        //     return None;
+        // }
+    }
+
+    pub fn into(self, trip: &Trip) -> Option<StopTime> {
+        let stop_id = match self.stop_id {
+            Some(s) => {
+                let mut stop_id = s.to_owned();
+                stop_id.pop();
+                stop_id
+            }
+            _ => return None,
+        };
+
+        if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+            return None;
+        }
+
+        let arrival = match &self.arrival {
+            Some(a) => match convert_timestamp(a.time) {
+                Some(t) => t,
+                _ => return None,
+            },
+            // Arrival is null for first stop in trips, so we set to created_at
+            _ => trip.created_at,
+        };
+        let departure = match &self.departure {
+            Some(d) => match convert_timestamp(d.time) {
+                Some(t) => t,
+                _ => return None,
+            },
+            // Departure is null for last stop in trips, so we set to arrival
+            _ => arrival,
+        };
+
+        Some(StopTime {
+            trip_id: trip.id,
+            stop_id,
+            arrival,
+            departure,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct Position {
+    trip_id: Uuid,
+    stop_id: String,
+    train_status: Option<i16>,
+    current_stop_sequence: Option<i16>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug)]
+pub struct StopTime {
+    trip_id: Uuid,
+    stop_id: String,
+    arrival: DateTime<Utc>,
+    departure: DateTime<Utc>,
+}
+
 pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedError> {
     let data = reqwest::Client::new()
         .get(format!(
@@ -310,6 +385,10 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             .await
             .unwrap();
     }
+
+    let mut trips: Vec<Trip> = Vec::new();
+    let mut stop_times: Vec<StopTime> = Vec::new();
+    let mut positions: Vec<Position> = Vec::new();
 
     for entity in feed.entity {
         if let Some(trip_update) = entity.trip_update {
@@ -334,125 +413,36 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             match trip.direction {
                 Some(_) => (),
                 None => {
-                    let mut first_stop_id = match trip_update.stop_time_update.first() {
-                        Some(stop_time) => match stop_time.stop_id.as_ref() {
-                            Some(id) => id.clone(),
-                            None => {
-                                tracing::debug!(
-                                    "Skipping trip without stop_id in stop_time_update {}",
-                                    endpoint
-                                );
-                                continue;
-                            }
-                        },
+                    // let first_stop_id = trip_update
+                    //     .stop_time_update
+                    //     .first()
+                    //     .ok_or(IntoTripError::StopId)?;
+                    // trip.direction = first_stop_id.direction();
+                    match trip_update.stop_time_update.first() {
+                        Some(st) => {
+                            trip.direction = st.direction();
+                        }
                         None => {
-                            tracing::debug!(
-                                "Skipping trip without any stop times endpoint: {}",
-                                endpoint
-                            );
+                            // tracing::error!("No stop times for trip");
                             continue;
                         }
-                    };
-                    trip.direction = match first_stop_id.pop() {
-                        Some('N') => Some(1),
-                        Some('S') => Some(0),
-                        _ => unreachable!(),
-                    };
+                    }
                 }
             }
 
             // Check if trip already exists
             trip.find(pool).await?;
 
-            let stop_updates = trip_update
+            let mut trip_stop_times = trip_update
                 .stop_time_update
-                .par_iter()
-                .filter_map(|stop_time| {
-                    let mut stop_id = stop_time.stop_id.as_ref().unwrap().to_owned();
-
-                    // remove direction from stop_id
-                    stop_id.pop();
-
-                    // TODO: instead of checking for fake stop id, handle postgres foreign key constraint (code 23503)  error
-                    if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-                        return None;
-                    }
-
-                    let mut arrival = match &stop_time.arrival {
-                        Some(a) => convert_timestamp(a.time),
-                        _ => None,
-                    };
-                    let mut departure = match &stop_time.departure {
-                        Some(d) => convert_timestamp(d.time),
-                        _ => None,
-                    };
-                    if arrival.is_none() {
-                        tracing::debug!(
-                            "Setting arrival time to start time for first stop in trip"
-                        );
-                        arrival = Some(trip.created_at);
-                    }
-                    if departure.is_none() {
-                        tracing::debug!(
-                            "Setting departure time to arrival time for last stop in trip"
-                        );
-                        match arrival {
-                            Some(a) => {
-                                departure = Some(a);
-                            }
-                            None => {
-                                tracing::debug!(
-                                    "Missing arrival time for {} in trip {}",
-                                    &stop_id,
-                                    &trip.id
-                                );
-                            }
-                        }
-                    }
-
-                    // if arrival != departure {
-                    //     match (arrival, departure) {
-                    //         (Some(arrival_time), Some(departure_time)) => {
-                    //             let dif = departure_time.signed_duration_since(arrival_time);
-                    //             println!(
-                    //                 "arrival: {} departure: {} dif: {}",
-                    //                 arrival_time, departure_time, dif
-                    //             );
-                    //         }
-                    //         _ => {
-                    //             tracing::warn!(
-                    //                 "Missing arrival or departure time for {}",
-                    //                 &trip_id
-                    //             );
-                    //         }
-                    //     };
-                    // };
-
-                    Some(StopUpdate(trip.id, stop_id.clone(), arrival, departure))
-                })
+                .into_par_iter()
+                .filter_map(|st| st.into(&trip))
                 .collect::<Vec<_>>();
 
-            if stop_updates.is_empty() {
-                tracing::debug!("no stop_updates for endpoint {}", endpoint);
-                continue;
-            }
+            stop_times.append(&mut trip_stop_times);
 
-            trip.insert(pool).await?;
-
-            // dbg!(stop_updates.len(), endpoint);
-
-            // insert stop times
-            let mut query_builder =
-                QueryBuilder::new("INSERT INTO stop_times (trip_id, stop_id, arrival, departure) ");
-            query_builder.push_values(stop_updates, |mut b, stop_update| {
-                b.push_bind(stop_update.0)
-                    .push_bind(stop_update.1)
-                    .push_bind(stop_update.2)
-                    .push_bind(stop_update.3);
-            });
-            query_builder.push(" ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure");
-            let query = query_builder.build();
-            query.execute(pool).await?;
+            // trip.insert(pool).await?;
+            trips.push(trip);
         }
 
         if let Some(vehicle) = entity.vehicle {
@@ -509,14 +499,59 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 continue;
             }
 
-            sqlx::query!("
-                INSERT INTO positions (trip_id, stop_id, train_status, current_stop_sequence, updated_at)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (trip_id)
-                DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at",
-                trip.id, stop_id, train_status, current_stop_sequence, updated_at).execute(pool).await?;
+            positions.push(Position {
+                trip_id: trip.id,
+                stop_id,
+                train_status,
+                current_stop_sequence,
+                updated_at,
+            });
         }
     }
+
+    // Insert trips
+    let mut query_builder = QueryBuilder::new("INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction, express) ");
+    query_builder.push_values(trips, |mut b, trip| {
+        b.push_bind(trip.id)
+            .push_bind(trip.mta_id)
+            .push_bind(trip.train_id)
+            .push_bind(trip.route_id)
+            .push_bind(trip.created_at)
+            .push_bind(trip.assigned)
+            .push_bind(trip.direction)
+            .push_bind(trip.express);
+    });
+    // (mta_id, train_id, created_at, direction) DO UPDATE SET assigned = EXCLUDED.assigned RETURNING id
+    query_builder.push(" ON CONFLICT (mta_id, train_id, created_at, direction) DO UPDATE SET assigned = EXCLUDED.assigned");
+    let query = query_builder.build();
+    query.execute(pool).await?;
+
+    // insert stop times
+    let mut query_builder =
+        QueryBuilder::new("INSERT INTO stop_times (trip_id, stop_id, arrival, departure) ");
+    query_builder.push_values(stop_times, |mut b, stop_update| {
+        b.push_bind(stop_update.trip_id)
+            .push_bind(stop_update.stop_id)
+            .push_bind(stop_update.arrival)
+            .push_bind(stop_update.departure);
+    });
+    query_builder.push(" ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure");
+    let query = query_builder.build();
+    query.execute(pool).await?;
+
+    // insert positions
+    let mut query_builder = QueryBuilder::new("INSERT INTO positions (trip_id, stop_id, train_status, current_stop_sequence, updated_at) ");
+    query_builder.push_values(positions, |mut b, position| {
+        b.push_bind(position.trip_id)
+            .push_bind(position.stop_id)
+            .push_bind(position.train_status)
+            .push_bind(position.current_stop_sequence)
+            .push_bind(position.updated_at);
+    });
+    query_builder.push(" ON CONFLICT (trip_id) DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at");
+    let query = query_builder.build();
+    query.execute(pool).await?;
+    // dbg!(endpoint);
 
     Ok(())
 }
