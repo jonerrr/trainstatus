@@ -2,8 +2,8 @@
 	import List from '$lib/components/RouteAlert/List.svelte';
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
 	<title>Trainstat.us | Alerts</title>
-</svelte:head>
+</svelte:head> -->
 
 <List manage_height={false} />

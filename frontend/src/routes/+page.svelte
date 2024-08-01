@@ -92,10 +92,9 @@
 	// maybe in the future use https://melt-ui.com/docs/builders/tooltip for interactive tutorial
 </script>
 
-<svelte:head>
-	<title>TrainStat.us | Home</title>
-	<!-- TODO: show rt delays in embed -->
-</svelte:head>
+<!-- <svelte:head>
+	<title>Trainstat.us | Home</title>
+</svelte:head> -->
 
 <div class="text-indigo-200 text-sm flex flex-col max-h-[calc(100dvh-8rem)]">
 	{#if $pinned_trips.length || $pinned_bus_trips.length}

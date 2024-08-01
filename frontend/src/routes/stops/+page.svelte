@@ -7,9 +7,9 @@
 	$: bus_stop_ids = writable<number[]>($bus_stops.slice(0, 15).map((s) => s.id));
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
 	<title>Trainstat.us | Stop Times</title>
-</svelte:head>
+</svelte:head> -->
 
 <List
 	{stop_ids}
