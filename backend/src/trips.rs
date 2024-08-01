@@ -1,5 +1,5 @@
-use crate::feed::trip_update::StopTimeUpdate;
-use crate::feed::{self, TripDescriptor};
+use crate::feed::{self, trip_update::StopTimeUpdate, TripDescriptor};
+use crate::routes::trips::Trip as TripRow;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use once_cell::sync::Lazy;
 use prost::{DecodeError, Message};
@@ -34,8 +34,6 @@ const FAKE_STOP_IDS: [&str; 28] = [
     "S12", "S10",
 ];
 
-// TODO: remove unwraps and handle errors
-
 #[derive(Error, Debug)]
 pub enum DecodeFeedError {
     #[error("sqlx error: {0}")]
@@ -55,13 +53,14 @@ pub enum DecodeFeedError {
 }
 
 // Store json of trip response
-static STOP_TIMES_RESPONSE: Lazy<Mutex<Vec<Trip>>> = Lazy::new(|| Mutex::new(vec![]));
+pub static STOP_TIMES_RESPONSE: Lazy<Mutex<Vec<TripRow>>> = Lazy::new(|| Mutex::new(vec![]));
 
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
             let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
             let _ = futures::future::join_all(futures).await;
+            cache_stop_times(&pool).await.unwrap();
             // for endpoint in ENDPOINTS.iter() {
             //     match decode_feed(&pool, endpoint).await {
             //         Ok(_) => (),
@@ -73,6 +72,46 @@ pub async fn import(pool: PgPool) {
             sleep(Duration::from_secs(15)).await;
         }
     });
+}
+
+pub async fn cache_stop_times(pool: &PgPool) -> Result<(), DecodeFeedError> {
+    let trips = sqlx::query_as!(
+        TripRow,
+        // Need the `?` to make the joined columns optional, otherwise it errors out
+        r#"SELECT
+            t.id,
+            t.route_id,
+            t.express,
+            t.direction,
+            t.assigned,
+            t.created_at,
+            p.stop_id AS "stop_id?",
+            p.train_status AS "train_status?",
+            p.current_stop_sequence AS "current_stop_sequence?",
+            p.updated_at AS "updated_at?"
+        FROM
+            trips t
+        LEFT JOIN positions p ON
+            p.trip_id = t.id
+        WHERE
+            t.id = ANY(
+                SELECT
+                    t.id
+                FROM
+                    trips t
+                LEFT JOIN stop_times st ON
+                    st.trip_id = t.id
+                WHERE
+                    st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+            )"#
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut lock = STOP_TIMES_RESPONSE.lock().await;
+    *lock = trips;
+    // drop(lock);
+
+    Ok(())
 }
 
 fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
@@ -139,37 +178,6 @@ impl TripDescriptor {
 }
 
 impl Trip {
-    pub async fn insert(&mut self, pool: &PgPool) -> Result<(), sqlx::Error> {
-        let res =  sqlx::query!(
-            r#"
-            INSERT INTO trips (id, mta_id, train_id, route_id, created_at, assigned, direction, express)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (mta_id, train_id, created_at, direction) DO UPDATE SET assigned = EXCLUDED.assigned RETURNING id
-            "#,
-            self.id,
-            &self.mta_id,
-            &self.train_id,
-            &self.route_id,
-            &self.created_at,
-            &self.assigned,
-            self.direction,
-           &self.express
-        )
-        .fetch_one(pool)
-        .await?;
-        self.id = res.id;
-
-        // if &self.mta_id == "107650_6..N01R" {
-        //     println!("{:#?}", &self);
-        // }
-
-        // if &self.id == &Uuid::from_str("0190b343-d063-7141-b9e7-15d503993f11").unwrap() {
-        //     println!("{:#?}", &self);
-        // }
-
-        Ok(())
-    }
-
     // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
     pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
         let res = sqlx::query_as!(
@@ -441,7 +449,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
 
             stop_times.append(&mut trip_stop_times);
 
-            // trip.insert(pool).await?;
             trips.push(trip);
         }
 
