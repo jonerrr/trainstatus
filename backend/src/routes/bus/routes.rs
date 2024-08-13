@@ -1,10 +1,37 @@
-use crate::{bus::static_data::Route, routes::errors::ServerError};
-use axum::{extract::State, response::IntoResponse, Json};
+use crate::routes::errors::ServerError;
+use axum::{
+    extract::{Query, State},
+    response::IntoResponse,
+    Json,
+};
 use http::HeaderMap;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
-pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
-    let routes = sqlx::query_as!(Route, "SELECT * FROM bus_routes")
+#[derive(Serialize)]
+pub struct Route {
+    pub id: String,
+    pub long_name: String,
+    pub short_name: String,
+    pub color: String,
+    pub shuttle: bool,
+    // pub geom: Option<serde_json::Value>,
+}
+
+fn no_geom() -> bool {
+    false
+}
+#[derive(Deserialize)]
+pub struct Parameters {
+    #[serde(default = "no_geom")]
+    geom: bool,
+}
+
+pub async fn get(
+    State(pool): State<PgPool>,
+    params: Query<Parameters>,
+) -> Result<impl IntoResponse, ServerError> {
+    let routes = sqlx::query_as!(Route, r#"SELECT * FROM bus_routes"#)
         .fetch_all(&pool)
         .await?;
 

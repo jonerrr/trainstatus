@@ -1,22 +1,13 @@
 use super::api_key;
+use geo::{LineString, MultiLineString};
 use indicatif::{ProgressBar, ProgressStyle};
+use polyline::decode_polyline;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
+use wkt::ToWkt;
 
-// pub async fn should_update(pool: &PgPool) -> bool {
-//     let count = sqlx::query!("SELECT COUNT(*) FROM bus_route_stops as count")
-//         .fetch_one(pool)
-//         .await
-//         .unwrap()
-//         .count
-//         .unwrap();
-//     // this is the correct route stop count
-//     count != 24690
-// }
-
-// id, long_name, short_name, color, route_type
 #[derive(Serialize)]
 pub struct Route {
     pub id: String,
@@ -26,11 +17,13 @@ pub struct Route {
     pub shuttle: bool,
 }
 
-// id, name, direction, lat, lon
-struct Stop(i32, String, String, f32, f32);
-
-//  route id, stop id, sequence
-// struct RouteStop(String, i32, i32, i32);
+struct Stop {
+    id: i32,
+    name: String,
+    direction: String,
+    lat: f32,
+    lon: f32,
+}
 
 struct RouteStop {
     route_id: String,
@@ -38,6 +31,7 @@ struct RouteStop {
     stop_sequence: i32,
     headsign: String,
     direction: i32,
+    geom: String,
 }
 
 // could hypothetically use transactions to prevent conflicts
@@ -57,7 +51,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .unwrap(),
     );
 
-    // TODO: dont convert to tuple and just use struct
     for mut route in all_routes.into_iter() {
         // get the stops for the route
         let r_stops: RouteStops = RouteStops::get(&route.id).await;
@@ -92,7 +85,13 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .references
             .stops
             .into_par_iter()
-            .map(|s| Stop(s.code, s.name, s.direction, s.lat, s.lon))
+            .map(|s| Stop {
+                id: s.code,
+                name: s.name,
+                direction: s.direction,
+                lat: s.lat,
+                lon: s.lon,
+            })
             .collect::<Vec<Stop>>();
         // let s_names = stops_n.iter().map(|s| s.1.clone()).collect::<Vec<String>>();
         // println!("{:?}", s_names);
@@ -104,6 +103,13 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .par_iter()
             .map(|rs| {
                 let route_id = &route.id;
+                // Combine all the polylines into one MultiLineString
+                let route_geom = MultiLineString::new(
+                    rs.polylines
+                        .iter()
+                        .map(|p| p.points.clone())
+                        .collect::<Vec<LineString>>(),
+                );
 
                 rs.stop_ids
                     .par_iter()
@@ -114,6 +120,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
                         stop_sequence: sequence as i32,
                         headsign: rs.name.name.clone(),
                         direction: rs.id,
+                        geom: route_geom.to_wkt().to_string(),
                     })
                     .collect::<Vec<_>>()
             })
@@ -125,13 +132,12 @@ pub async fn stops_and_routes(pool: &PgPool) {
     }
 
     // remove duplicates
-    stops.sort_by(|a, b| a.0.cmp(&b.0));
-    stops.dedup_by(|a, b| a.0 == b.0);
+    stops.sort_by(|a, b| a.id.cmp(&b.id));
+    stops.dedup_by(|a, b| a.id == b.id);
 
     pb.finish_with_message("Finished parsing bus data");
 
     // insert routes into db
-
     let mut query_builder =
         QueryBuilder::new("INSERT INTO bus_routes (id, long_name, short_name, color, shuttle)");
     query_builder.push_values(routes, |mut b, route| {
@@ -151,11 +157,11 @@ pub async fn stops_and_routes(pool: &PgPool) {
         let mut query_builder =
             QueryBuilder::new("INSERT INTO bus_stops (id, name, direction, lat, lon)");
         query_builder.push_values(chunk, |mut b, route| {
-            b.push_bind(route.0)
-                .push_bind(route.1.clone())
-                .push_bind(route.2.clone())
-                .push_bind(route.3)
-                .push_bind(route.4);
+            b.push_bind(route.id)
+                .push_bind(&route.name)
+                .push_bind(&route.direction)
+                .push_bind(route.lat)
+                .push_bind(route.lon);
         });
         query_builder.push("ON CONFLICT DO NOTHING");
         let query = query_builder.build();
@@ -164,14 +170,15 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     for chunk in route_stops.chunks(chunk_size) {
         let mut query_builder = QueryBuilder::new(
-            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction)",
+            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction, geom)",
         );
         query_builder.push_values(chunk, |mut b, route| {
             b.push_bind(&route.route_id)
                 .push_bind(route.stop_id)
                 .push_bind(route.stop_sequence)
                 .push_bind(&route.headsign)
-                .push_bind(route.direction);
+                .push_bind(route.direction)
+                .push_bind(&route.geom);
         });
         query_builder.push("ON CONFLICT DO NOTHING");
         let query = query_builder.build();
@@ -186,7 +193,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 #[derive(Deserialize, Clone, Debug)]
 pub struct AgencyRoute {
     pub color: String,
-    pub description: String,
+    // pub description: String,
     pub id: String,
     #[serde(rename = "longName")]
     pub long_name: String,
@@ -254,7 +261,6 @@ fn de_get_id<'de, D>(deserializer: D) -> Result<Vec<i32>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    //TODO: remove unwraps
     let ids = Vec::<String>::deserialize(deserializer)?;
     Ok(ids
         .into_iter()
@@ -267,7 +273,6 @@ where
 }
 
 // fix stop capitalization by capitalizing only the first letter of each word
-// could probably use regex for this
 fn de_stop_name<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -308,12 +313,28 @@ pub struct StopGroup {
     name: StopName,
     #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
+    polylines: Vec<PolyLine>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct StopName {
     #[serde(deserialize_with = "de_stop_name")]
     name: String,
+}
+
+fn de_polyline<'de, D>(deserializer: D) -> Result<LineString, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let polyline = String::deserialize(deserializer)?;
+    Ok(decode_polyline(&polyline, 5).map_err(serde::de::Error::custom)?)
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct PolyLine {
+    // length: i32,
+    #[serde(deserialize_with = "de_polyline")]
+    points: LineString,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -349,18 +370,13 @@ impl RouteStops {
                 "https://bustime.mta.info/api/where/stops-for-route/{}.json",
                 route_id
             ))
-            .query(&[
-                ("key", api_key()),
-                ("version", "2"),
-                ("includePolyliines", "false"),
-            ])
+            .query(&[("key", api_key()), ("version", "2")])
             .send()
             .await
             .unwrap()
             .json::<serde_json::Value>()
             .await
             .unwrap();
-        // dbg!(&route_stops["data"].as_object().unwrap()["entry"]);
 
         serde_json::from_value(route_stops["data"].to_owned()).unwrap()
     }
