@@ -9,10 +9,24 @@ services:
       - POSTGRES_PASSWORD=trains
       - POSTGRES_DB=trains
     volumes:
-      - ./container_postgres-data:/var/lib/postgresql/data:z
+      - trainstatus-db:/var/lib/postgresql/data:z
   # ts-backend:
   #   environment:
   #     - DATABASE_URL=postgres://trains:trains@localhost:5432/trains
   #     - API_KEY=mta api key
   #   build: .
   #   network_mode: host
+  # ts-database:
+  #   image: timescale/timescaledb:latest-pg16
+  #   container_name: timescale-ts
+  #   ports:
+  #     - 5432:5432
+  #   environment:
+  #     - POSTGRES_USER=trains
+  #     - POSTGRES_PASSWORD=trains
+  #     - POSTGRES_DB=trains
+  #   volumes:
+  #     - trainstatus-db:/var/lib/postgresql/data:z
+
+volumes:
+  trainstatus-db:

@@ -165,6 +165,7 @@ impl TripDescriptor {
                 let mut route_id = id.to_owned();
                 if route_id == "SS" {
                     route_id = "SI".to_string();
+                    // TODO: set express to true for SS
                 };
 
                 let mut express = false;
@@ -218,8 +219,6 @@ impl Trip {
             }
             None => Ok(false),
         }
-
-        // Ok(res)
     }
 }
 
@@ -400,15 +399,15 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
 
     for entity in feed.entity {
         if let Some(trip_update) = entity.trip_update {
-            let trip_span = span!(
-                tracing::Level::TRACE,
-                "trip_update",
-                trip_id = trip_update.trip.trip_id,
-                start_date = trip_update.trip.start_date,
-                start_time = trip_update.trip.start_time,
-                nyct_trip_descriptor = format!("{:#?}", trip_update.trip.nyct_trip_descriptor)
-            );
-            let _enter = trip_span.enter();
+            // let trip_span = span!(
+            //     tracing::Level::TRACE,
+            //     "trip_update",
+            //     trip_id = trip_update.trip.trip_id,
+            //     start_date = trip_update.trip.start_date,
+            //     start_time = trip_update.trip.start_time,
+            //     nyct_trip_descriptor = format!("{:#?}", trip_update.trip.nyct_trip_descriptor)
+            // );
+            // let _enter = trip_span.enter();
 
             let mut trip = match trip_update.trip.clone().into() {
                 Ok(t) => t,
@@ -421,11 +420,6 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             match trip.direction {
                 Some(_) => (),
                 None => {
-                    // let first_stop_id = trip_update
-                    //     .stop_time_update
-                    //     .first()
-                    //     .ok_or(IntoTripError::StopId)?;
-                    // trip.direction = first_stop_id.direction();
                     match trip_update.stop_time_update.first() {
                         Some(st) => {
                             trip.direction = st.direction();

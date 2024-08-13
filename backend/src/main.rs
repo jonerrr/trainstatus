@@ -57,38 +57,41 @@ async fn main() {
                 .await
                 .unwrap();
 
-            let should_update = match last_updated {
-                Some(last_updated) => {
-                    let now = Utc::now();
-                    let days = Days::new(3);
+            // If user wants to FORCE_UPDATE, then don't check for last updated
+            if var("FORCE_UPDATE").is_err() {
+                // Data should be refreshed every 3 days
+                if let Some(last_updated) = last_updated {
+                    tracing::info!("Last updated at: {}", last_updated.update_at);
 
-                    // tracing::info!("Updating data. Last updated at: {}", last_updated.update_at);
+                    let duration_since_last_update =
+                        Utc::now().signed_duration_since(last_updated.update_at);
 
-                    last_updated.update_at < now.checked_sub_days(days).unwrap()
+                    // Check if the data is older than 3 days
+                    if duration_since_last_update.num_days() <= 3 {
+                        // Sleep until it has been 3 days, take into account the time since last update
+                        let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
+                            .checked_sub(duration_since_last_update.to_std().unwrap())
+                            .unwrap();
+                        tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
+                        sleep(sleep_time).await;
+                    }
                 }
-                None => true,
-            };
-
-            if should_update || var("FORCE_UPDATE").is_ok() {
-                // update_transfers(&s_pool).await;
-
-                // tracing::info!("Updating bus stops and routes");
-                bus::static_data::stops_and_routes(&s_pool).await;
-                // tracing::info!("Updating train stops and routes");
-                static_data::stops_and_routes(&s_pool).await;
-
-                // remove old update_ats
-                sqlx::query!("DELETE FROM last_update")
-                    .execute(&s_pool)
-                    .await
-                    .unwrap();
-                sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
-                    .execute(&s_pool)
-                    .await
-                    .unwrap();
             }
+            tracing::info!("Updating stops and trips");
 
-            sleep(Duration::from_secs(60 * 60)).await;
+            bus::static_data::stops_and_routes(&s_pool).await;
+            static_data::stops_and_routes(&s_pool).await;
+
+            // remove old update_ats
+            sqlx::query!("DELETE FROM last_update")
+                .execute(&s_pool)
+                .await
+                .unwrap();
+            sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+                .execute(&s_pool)
+                .await
+                .unwrap();
+            tracing::info!("Data updated");
         }
     });
 

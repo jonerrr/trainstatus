@@ -9,14 +9,6 @@ use uuid::Uuid;
 
 // use std::io::Write;
 
-struct StopTime {
-    trip_id: Uuid,
-    stop_id: i32,
-    arrival: DateTime<Utc>,
-    departure: DateTime<Utc>,
-    stop_sequence: i16,
-}
-
 // TODO: remove unwraps and handle errors
 
 pub async fn import(pool: PgPool) {
@@ -47,9 +39,30 @@ fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
     }
 }
 
+pub struct BusTrip {
+    pub id: Uuid,
+    pub mta_id: String,
+    pub vehicle_id: i32,
+    pub start_date: chrono::NaiveDate,
+    pub created_at: DateTime<Utc>,
+    pub direction: i16,
+    pub deviation: Option<i32>,
+    pub route_id: String,
+}
+
+struct StopTime {
+    trip_id: Uuid,
+    stop_id: i32,
+    arrival: DateTime<Utc>,
+    departure: DateTime<Utc>,
+    stop_sequence: i16,
+}
+
 pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
+    // after 30 seconds the obanyc api will return its own timeout error
     let data = reqwest::Client::new()
         .get("https://gtfsrt.prod.obanyc.com/tripUpdates")
+        .timeout(Duration::from_secs(29))
         .send()
         .await?
         .bytes()

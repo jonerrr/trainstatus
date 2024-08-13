@@ -28,3 +28,9 @@ CREATE TABLE IF NOT EXISTS stop_times (
     departure TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (trip_id, stop_id)
 );
+
+CREATE INDEX idx_trips_created_at ON trips (created_at);
+
+CREATE INDEX idx_positions_updated_at ON positions (updated_at);
+
+CREATE INDEX idx_stop_times_arrival ON stop_times (arrival);
