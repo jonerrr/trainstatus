@@ -1,11 +1,9 @@
 -- maybe should we instead put bus trips in same table as trains (call it vehicles)
 CREATE TABLE IF NOT EXISTS bus_trips (
-    -- generate uuid from mta trip id, route id, direction, vehicle
     id UUID PRIMARY KEY,
     mta_id VARCHAR NOT NULL,
     vehicle_id INTEGER NOT NULL,
     start_date DATE NOT NULL,
-    -- get from start_date, number in id, or first stop update, or lastly when inserted
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     -- 0 = south, 1 = north
     direction SMALLINT NOT NULL,

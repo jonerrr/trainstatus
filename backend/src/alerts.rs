@@ -82,7 +82,6 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
 
     // let mut msgs = Vec::new();
     // write!(msgs, "{:#?}", feed).unwrap();
-    // tokio::fs::remove_file("./alerts.txt").await.ok();
     // tokio::fs::write("./alerts.txt", msgs).await.unwrap();
 
     let mut in_feed_ids = vec![];

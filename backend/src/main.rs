@@ -1,5 +1,5 @@
 use axum::{body::Body, response::Response, routing::get, Router};
-use chrono::{Days, Utc};
+use chrono::Utc;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var, time::Duration};
 use tokio::time::sleep;
