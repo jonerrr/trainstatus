@@ -4,18 +4,6 @@ use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
 use std::io::Cursor;
 
-// pub async fn should_update(pool: &PgPool) -> bool {
-//     let stop_count = sqlx::query!("SELECT COUNT(*) FROM stops as count")
-//         .fetch_one(pool)
-//         .await
-//         .unwrap()
-//         .count
-//         .unwrap();
-
-//     // the amount of stops that should be in the database
-//     stop_count != 496
-// }
-
 // convert strings to numbers
 pub fn de_str_to_i16<'de, D>(deserializer: D) -> Result<i16, D::Error>
 where
@@ -69,8 +57,8 @@ where
 
 #[derive(Deserialize, Clone)]
 pub struct Station {
-    #[serde(deserialize_with = "de_remove_prefix", rename = "routeId")]
-    pub route_id: String,
+    // #[serde(deserialize_with = "de_remove_prefix", rename = "routeId")]
+    // pub route_id: String,
     #[serde(deserialize_with = "de_str_to_i16", rename = "stopSequence")]
     pub stop_sequence: i16,
     #[serde(deserialize_with = "de_remove_prefix", rename = "stopId")]
@@ -107,7 +95,7 @@ pub struct NearbyGroup {
 pub struct NearbyStop {
     #[serde(deserialize_with = "de_remove_prefix")]
     pub id: String,
-    pub name: String,
+    // pub name: String,
     // not used currently
     pub lat: f32,
     pub lon: f32,

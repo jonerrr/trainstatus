@@ -18,14 +18,6 @@ pub mod feed {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// fn stop_list(pool: &PgPool) -> Vec<String> {
-//     let stops = sqlx::query!("select id from stops")
-//         .fetch_all(pool)
-//         .await
-//         .unwrap();
-//     stops.iter().map(|s| s.id.clone()).collect()
-// }
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
