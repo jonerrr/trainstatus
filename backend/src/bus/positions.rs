@@ -64,7 +64,6 @@ pub async fn decode_feed(pool: PgPool) -> Result<(), DecodeFeedError> {
 
     // let mut msgs = Vec::new();
     // write!(msgs, "{:#?}", feed).unwrap();
-    // tokio::fs::remove_file("./positions.txt").await.ok();
     // tokio::fs::write("./positions.txt", msgs).await.unwrap();
 
     // let stop_ids = sqlx::query!("SELECT id FROM bus_stops")

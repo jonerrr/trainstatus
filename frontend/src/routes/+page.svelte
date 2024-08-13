@@ -74,9 +74,7 @@
 				console.error('Error getting location', e);
 
 				location_status.set(LocationStatus.Denied);
-			},
-			// 30 sec
-			{ maximumAge: 30 }
+			}
 		);
 	}
 

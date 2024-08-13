@@ -8,10 +8,9 @@ use sqlx::{PgPool, QueryBuilder};
 use std::env::var;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::fs::{create_dir, remove_file, write};
+use tokio::fs::{create_dir, write};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use tracing::span;
 use uuid::Uuid;
 
 // A C E https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace
@@ -114,13 +113,6 @@ pub async fn cache_stop_times(pool: &PgPool) -> Result<(), DecodeFeedError> {
     Ok(())
 }
 
-fn convert_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
-    match timestamp {
-        Some(t) => DateTime::from_timestamp(t, 0),
-        _ => None,
-    }
-}
-
 #[derive(Debug)]
 pub struct Trip {
     id: Uuid,
@@ -145,8 +137,8 @@ pub enum IntoTripError {
     NyctTripDescriptor(String),
     #[error("Train ID not found")]
     TrainId,
-    #[error("Direction not found\n{0}")]
-    Direction(String),
+    #[error("Direction not found")]
+    Direction,
     #[error("Start time not found\n{0}")]
     StartTime(String),
     #[error("Start date not found\n{0}")]
@@ -178,60 +170,18 @@ impl TripDescriptor {
     }
 }
 
-impl Trip {
-    // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
-    pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
-        let res = sqlx::query_as!(
-            Self,
-            r#"
-            SELECT
-                id,
-                mta_id,
-                train_id,
-                created_at,
-                assigned,
-                direction,
-                route_id,
-                express
-            FROM
-                trips
-            WHERE
-                mta_id = $1
-                AND train_id = $2
-                AND created_at = $3
-                AND direction = $4
-            "#,
-            self.mta_id,
-            self.train_id,
-            self.created_at,
-            self.direction
-        )
-        .fetch_optional(pool)
-        .await?;
+impl TryFrom<TripDescriptor> for Trip {
+    type Error = IntoTripError;
 
-        match res {
-            Some(t) => {
-                self.id = t.id;
-                // self.assigned = t.assigned;
-                // self.route_id = t.route_id;
-                // self.express = t.express;
-                Ok(true)
-            }
-            None => Ok(false),
-        }
-    }
-}
+    fn try_from(value: TripDescriptor) -> Result<Self, Self::Error> {
+        let trip_id = value.trip_id.as_ref().ok_or(IntoTripError::TripId)?;
+        let (route_id, express) = value.parse_route_id()?;
 
-impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
-    fn into(self) -> Result<Trip, IntoTripError> {
-        let trip_id = self.trip_id.as_ref().ok_or(IntoTripError::TripId)?;
-        let (route_id, express) = self.parse_route_id()?;
-
-        let nyct_trip = self
+        let nyct_trip = value
             .nyct_trip_descriptor
             .as_ref()
-            // testing debug information by formatting self
-            .ok_or(IntoTripError::NyctTripDescriptor(format!("{:#?}", &self)))?;
+            // testing debug information by formatting value
+            .ok_or(IntoTripError::NyctTripDescriptor(format!("{:#?}", &value)))?;
         let train_id = nyct_trip.train_id.as_ref().ok_or(IntoTripError::TrainId)?;
         let assigned = nyct_trip.is_assigned.unwrap_or(false);
 
@@ -247,13 +197,13 @@ impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
             None => None,
         };
 
-        let start_date = self
+        let start_date = value
             .start_date
             .as_ref()
-            .ok_or(IntoTripError::StartDate(format!("{:#?}", &self)))?
+            .ok_or(IntoTripError::StartDate(format!("{:#?}", &value)))?
             .to_owned();
 
-        let start_time = match self.start_time.as_ref() {
+        let start_time = match value.start_time.as_ref() {
             Some(time) => time.to_owned(),
             None => {
                 // This is how you parse the origin time according to MTA's gtfs docs
@@ -301,57 +251,97 @@ impl Into<Result<Trip, IntoTripError>> for TripDescriptor {
     }
 }
 
-impl StopTimeUpdate {
-    pub fn direction(&self) -> Option<i16> {
-        let mut stop_id = self.stop_id.as_ref().unwrap().to_owned();
-        match stop_id.pop() {
-            Some('N') => Some(1),
-            Some('S') => Some(0),
-            _ => unreachable!(),
-        }
+impl Trip {
+    // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
+    pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query!(
+            r#"
+            SELECT
+                id
+            FROM
+                trips
+            WHERE
+                mta_id = $1
+                AND train_id = $2
+                AND created_at = $3
+                AND direction = $4
+            "#,
+            self.mta_id,
+            self.train_id,
+            self.created_at,
+            self.direction
+        )
+        .fetch_optional(pool)
+        .await?;
 
-        // if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-        //     return None;
-        // }
-    }
-
-    pub fn into(self, trip: &Trip) -> Option<StopTime> {
-        let stop_id = match self.stop_id {
-            Some(s) => {
-                let mut stop_id = s.to_owned();
-                stop_id.pop();
-                stop_id
+        match res {
+            Some(t) => {
+                self.id = t.id;
+                // self.assigned = t.assigned;
+                // self.route_id = t.route_id;
+                // self.express = t.express;
+                Ok(true)
             }
-            _ => return None,
-        };
+            None => Ok(false),
+        }
+    }
+}
 
+#[derive(Debug)]
+pub enum IntoStopTimeError {
+    StopId,
+    Arrival,
+    Departure,
+    FakeStop,
+    StopSequence,
+}
+
+// Generic so bus and train can use the same struct (and maybe more in the future)
+pub struct StopTimeUpdateWithTrip<'a, T> {
+    pub stop_time: StopTimeUpdate,
+    pub trip: &'a T,
+}
+
+impl<'a> TryFrom<StopTimeUpdateWithTrip<'a, Trip>> for StopTime {
+    type Error = IntoStopTimeError;
+
+    fn try_from(value: StopTimeUpdateWithTrip<'a, Trip>) -> Result<Self, Self::Error> {
+        let mut stop_id = value.stop_time.stop_id.ok_or(IntoStopTimeError::StopId)?;
+        // Remove direction from stop id
+        stop_id.pop();
         if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-            return None;
+            return Err(IntoStopTimeError::FakeStop);
         }
 
-        let arrival = match &self.arrival {
-            Some(a) => match convert_timestamp(a.time) {
-                Some(t) => t,
-                _ => return None,
-            },
-            // Arrival is null for first stop in trips, so we set to created_at
-            _ => trip.created_at,
-        };
-        let departure = match &self.departure {
-            Some(d) => match convert_timestamp(d.time) {
-                Some(t) => t,
-                _ => return None,
-            },
-            // Departure is null for last stop in trips, so we set to arrival
-            _ => arrival,
-        };
+        let arrival = value
+            .stop_time
+            .arrival
+            .ok_or(IntoStopTimeError::Arrival)?
+            .time
+            .and_then(|t| DateTime::from_timestamp(t, 0))
+            .ok_or(IntoStopTimeError::Arrival)?;
+        let departure = value
+            .stop_time
+            .departure
+            .ok_or(IntoStopTimeError::Departure)?
+            .time
+            .and_then(|t| DateTime::from_timestamp(t, 0))
+            .ok_or(IntoStopTimeError::Departure)?;
 
-        Some(StopTime {
-            trip_id: trip.id,
+        Ok(StopTime {
+            trip_id: value.trip.id,
             stop_id,
             arrival,
             departure,
         })
+    }
+}
+
+fn direction_from_stop_id(stop_id: &str) -> Option<i16> {
+    match stop_id.chars().last() {
+        Some('N') => Some(1),
+        Some('S') => Some(0),
+        _ => None,
     }
 }
 
@@ -387,8 +377,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
     if var("DEBUG_GTFS").is_ok() {
         let msgs = format!("{:#?}", feed);
         create_dir("./gtfs").await.ok();
-        remove_file(format!("./gtfs/e{}.txt", &endpoint)).await.ok();
-        write(format!("./gtfs/e{}.txt", &endpoint), msgs)
+        write(format!("./gtfs/trains{}.txt", &endpoint), msgs)
             .await
             .unwrap();
     }
@@ -409,7 +398,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
             // );
             // let _enter = trip_span.enter();
 
-            let mut trip = match trip_update.trip.clone().into() {
+            let mut trip: Trip = match trip_update.trip.try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error parsing trip: {:?}", e);
@@ -422,7 +411,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 None => {
                     match trip_update.stop_time_update.first() {
                         Some(st) => {
-                            trip.direction = st.direction();
+                            trip.direction = direction_from_stop_id(st.stop_id.as_ref().unwrap())
                         }
                         None => {
                             // tracing::error!("No stop times for trip");
@@ -432,20 +421,27 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 }
             }
 
-            // Check if trip already exists
+            // Check if trip already exists. This will update the trip id if it does
             trip.find(pool).await?;
 
             let mut trip_stop_times = trip_update
                 .stop_time_update
                 .into_par_iter()
-                .filter_map(|st| st.into(&trip))
-                .collect::<Vec<_>>();
+                .filter_map(|st| {
+                    StopTimeUpdateWithTrip {
+                        stop_time: st,
+                        trip: &trip,
+                    }
+                    .try_into()
+                    .ok()
+                })
+                .collect::<Vec<StopTime>>();
 
             stop_times.append(&mut trip_stop_times);
-
             trips.push(trip);
         }
 
+        // TODO: maybe to impl try from for vehicle too
         if let Some(vehicle) = entity.vehicle {
             let Some(trip) = vehicle.trip else {
                 tracing::error!("No trip for vehicle");
@@ -464,7 +460,7 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 continue;
             };
 
-            let mut trip = match trip.into() {
+            let mut trip: Trip = match trip.try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error parsing trip: {:?}", e);
@@ -476,22 +472,15 @@ pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeed
                 tracing::error!("No stop_id for vehicle");
                 continue;
             };
-            // remove direction from stop_id, used for determining direction if needed
-            let stop_direction = stop_id.pop();
-
-            if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-                continue;
-            }
 
             match trip.direction {
                 Some(_) => (),
-                None => {
-                    trip.direction = match stop_direction {
-                        Some('N') => Some(1),
-                        Some('S') => Some(0),
-                        _ => unreachable!(),
-                    };
-                }
+                None => trip.direction = direction_from_stop_id(&stop_id),
+            }
+
+            stop_id.pop();
+            if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+                continue;
             }
 
             let trip_found = trip.find(pool).await?;
