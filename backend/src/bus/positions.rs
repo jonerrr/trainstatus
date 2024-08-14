@@ -39,12 +39,18 @@ pub async fn import(pool: PgPool) {
         loop {
             match parse_siri(pool.clone()).await {
                 Ok(_) => (),
-                Err(e) => {
-                    tracing::error!("Error importing SIRI bus data: {:?}", e);
-                }
-            }
+                Err(e) => match e {
+                    DecodeFeedError::Reqwest(e) => {
+                        // Decode errors happen bc the SIRI api occasionally times out, so I am ignoring those errors.
+                        if !e.is_decode() {
+                            tracing::error!("Error importing SIRI bus data: {:?}", e);
+                        }
+                    }
+                    e => tracing::error!("Error importing SIRI bus data: {:?}", e),
+                },
+            };
 
-            sleep(Duration::from_secs(40)).await;
+            sleep(Duration::from_secs(35)).await;
         }
     });
 }
@@ -55,13 +61,6 @@ pub async fn parse_gtfs(pool: PgPool) -> Result<(), DecodeFeedError> {
         "buspositions",
     )
     .await?;
-
-    // let stop_ids = sqlx::query!("SELECT id FROM bus_stops")
-    //     .fetch_all(&pool)
-    //     .await?
-    //     .into_iter()
-    //     .map(|s| s.id)
-    //     .collect::<Vec<i32>>();
 
     let positions = feed
         .entity
@@ -93,23 +92,6 @@ pub async fn parse_gtfs(pool: PgPool) -> Result<(), DecodeFeedError> {
                     return None;
                 }
             };
-
-
-            // if !stop_ids.contains(&stop_id) {
-            //     println!("Skipping stop_id: {}", stop_id);
-            //     return None;
-            // }
-
-            // let id_name = trip_id.to_owned()
-            //     + &route_id
-            //     + " "
-            //     + &direction.to_string()
-            //     + " "
-            //     + start_date
-            //     + " "
-            //     + &vehicle_id.to_string();
-            // let id = Uuid::new_v5(&Uuid::NAMESPACE_OID, id_name.as_bytes());
-            // let start_date = chrono::NaiveDate::parse_from_str(start_date, "%Y%m%d").unwrap();
 
             let Some(position) = vehicle.position else {
                 tracing::debug!(target: "bus_positions", "Skipping vehicle without position");
@@ -266,7 +248,6 @@ struct Capacities {
 pub async fn parse_siri(pool: PgPool) -> Result<(), DecodeFeedError> {
     let siri_res = reqwest::Client::new()
         .get("https://api.prod.obanyc.com/api/siri/vehicle-monitoring.json")
-        .timeout(Duration::from_secs(29))
         .query(&[
             ("key", api_key()),
             ("version", "2"),
