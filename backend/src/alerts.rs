@@ -15,11 +15,12 @@ pub async fn import(pool: PgPool) {
             if let Err(e) = parse_gtfs(&pool).await {
                 tracing::error!("Failed to decode feed: {:?}", e);
             }
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(15)).await;
         }
     });
 }
 
+#[derive(Debug)]
 pub struct Alert {
     pub id: Uuid,
     pub mta_id: String,
@@ -87,6 +88,7 @@ impl Alert {
     }
 }
 
+#[derive(Debug)]
 pub struct ActivePeriod {
     pub alert_id: Uuid,
     pub start_time: DateTime<Utc>,
@@ -109,7 +111,8 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     .await?;
 
     let mut in_feed_ids = vec![];
-    let mut cloned_ids: Vec<String> = vec![];
+    let mut cloned_ids: Vec<Uuid> = vec![];
+    let mut cloned_mta_ids: Vec<String> = vec![];
 
     let mut alerts: Vec<Alert> = vec![];
     let mut active_periods: Vec<ActivePeriod> = vec![];
@@ -126,10 +129,6 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             tracing::debug!("No mercury alert (likely elevator outage)");
             continue;
         };
-
-        if let Some(clone_id) = mercury_alert.clone_id {
-            cloned_ids.push(clone_id);
-        }
 
         // first in vec is plain text, second is html
         let headers = feed_alert
@@ -167,8 +166,21 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             updated_at,
             display_before_active,
         };
-        alert.find(pool).await?;
+        let alert_exists = alert.find(pool).await?;
+        // There could be duplicate alerts in the feed so I need to remove them
+        if alert_exists && alerts.iter().any(|a| a.id == alert.id) {
+            tracing::debug!("Skipping duplicate alert in feed");
+            continue;
+        }
+
         in_feed_ids.push(alert.id);
+
+        // Check if this was cloned. If it was we will remove the old one from the DB
+        // TODO: test this
+        if let Some(clone_id) = mercury_alert.clone_id {
+            cloned_mta_ids.push(clone_id);
+            // cloned_ids.push(alert.id);
+        }
 
         let mut alert_active_periods = feed_alert
             .active_period
@@ -195,29 +207,25 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
                     && entity.agency_id != Some("LI".to_string())
             })
             .map(|entity| {
-                let route_id = entity
-                    .route_id
-                    .clone()
-                    .map(|r: String| {
-                        if r.ends_with('X') {
-                            r[..r.len() - 1].to_string()
-                        } else if r == "SS" {
-                            "SI".to_owned()
-                        } else {
-                            r
-                        }
-                    })
-                    .and_then(|r| {
-                        if ROUTES.contains(&r.as_str()) {
-                            Some(r)
-                        } else {
-                            None
-                        }
-                    });
+                let route_id = entity.route_id.as_ref().and_then(|r| {
+                    // Standardize route id
+                    let route_id = if r.ends_with('X') {
+                        r[..r.len() - 1].to_string()
+                    } else if r == "SS" {
+                        "SI".to_owned()
+                    } else {
+                        r.to_string()
+                    };
 
-                // check if route_id is in ROUTES, otherwise its a bus route
-                // TODO: improve this
+                    // Check if it is a train route
+                    if ROUTES.contains(&route_id.as_str()) {
+                        Some(route_id)
+                    } else {
+                        None
+                    }
+                });
 
+                // If it isn't a train route id, it must be a bus route id
                 let bus_route_id = if route_id.is_none() {
                     entity.route_id.clone()
                 } else {
@@ -258,25 +266,90 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     .execute(pool)
     .await?;
     // delete cloned ids
-    sqlx::query!("DELETE FROM alerts WHERE mta_id = ANY($1)", &cloned_ids)
+    sqlx::query!("DELETE FROM alerts WHERE mta_id = ANY($1)", &cloned_mta_ids)
         .execute(pool)
         .await?;
+
+    let start = Utc::now();
+    // Filter out cloned ids from alerts, active periods, and affected entities. There is probably a more elegant way to remove cloned ids
+    // let alerts: Vec<Alert> = alerts
+    //     .into_par_iter()
+    //     .filter(|a| !cloned_mta_ids.contains(&a.mta_id))
+    //     .collect();
+    // let active_periods: Vec<ActivePeriod> = active_periods
+    //     .into_par_iter()
+    //     .filter(|ap| !cloned_ids.contains(&ap.alert_id))
+    //     .collect();
+    // let affected_entities: Vec<AffectedEntity> = affected_entities
+    //     .into_par_iter()
+    //     .filter(|ae| !cloned_ids.contains(&ae.alert_id))
+    //     .collect();
+
+    let mut cloned_ids = vec![];
+
+    alerts.retain(|a| {
+        if cloned_mta_ids.contains(&a.mta_id) {
+            cloned_ids.push(a.id);
+            false
+        } else {
+            true
+        }
+    });
+    // dbg!(&cloned_ids);
+    active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
+    affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
+    // dbg!(&alerts.len());
+
+    // let end = Utc::now();
+    // let duration = end - start;
+    // println!("took {} ms", duration.num_milliseconds());
+
+    // Test for duplicate ids
+    // let mut duplicate_ids = vec![];
+    // for alert in &alerts {
+    //     let mut count = 0;
+    //     alerts.iter().for_each(|a| {
+    //         if a.id == alert.id {
+    //             count += 1;
+    //         }
+    //     });
+    //     if count > 1 {
+    //         duplicate_ids.push(alert)
+    //     }
+    // }
+    // dbg!(duplicate_ids);
+    // Test for missing alerts
+    // let missing_ap_ids = active_periods
+    //     .iter()
+    //     .filter_map(|ap| {
+    //         if !alerts.iter().any(|a| a.id == ap.alert_id) {
+    //             Some(ap.alert_id)
+    //         } else {
+    //             None
+    //         }
+    //     })
+    //     .collect::<Vec<_>>();
+    // let missing_ap_alerts = alerts
+    //     .iter()
+    //     .filter(|a| missing_ap_ids.contains(&a.id))
+    //     .collect::<Vec<_>>();
+    // dbg!(&missing_ap_alerts);
 
     // TODO: Use transaction https://github.com/launchbadge/sqlx/blob/main/examples/postgres/transaction/src/main.rs
     // TODO: figure out what to do about old active periods that are now incorrect. Maybe delete all active periods and entities for alerts we are updating?
     let mut query_builder =
     QueryBuilder::new("INSERT INTO alerts (id, mta_id, alert_type, header_plain, header_html, description_plain, description_html, created_at, updated_at, display_before_active) ");
-    query_builder.push_values(alerts, |mut b, active_period| {
-        b.push_bind(active_period.id)
-            .push_bind(active_period.mta_id)
-            .push_bind(active_period.alert_type)
-            .push_bind(active_period.header_plain)
-            .push_bind(active_period.header_html)
-            .push_bind(active_period.description_plain)
-            .push_bind(active_period.description_html)
-            .push_bind(active_period.created_at)
-            .push_bind(active_period.updated_at)
-            .push_bind(active_period.display_before_active);
+    query_builder.push_values(alerts, |mut b, alert| {
+        b.push_bind(alert.id)
+            .push_bind(alert.mta_id)
+            .push_bind(alert.alert_type)
+            .push_bind(alert.header_plain)
+            .push_bind(alert.header_html)
+            .push_bind(alert.description_plain)
+            .push_bind(alert.description_html)
+            .push_bind(alert.created_at)
+            .push_bind(alert.updated_at)
+            .push_bind(alert.display_before_active);
     });
     // TODO: test if this prevents duplicates
     query_builder
