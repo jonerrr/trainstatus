@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS bus_routes (
     long_name VARCHAR NOT NULL,
     short_name VARCHAR NOT NULL,
     color VARCHAR NOT NULL,
-    shuttle BOOLEAN NOT NULL
+    shuttle BOOLEAN NOT NULL,
+    wkt VARCHAR NOT NULL
 );

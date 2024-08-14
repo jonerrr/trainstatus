@@ -1,7 +1,11 @@
 use axum::{body::Body, response::Response, routing::get, Router};
 use chrono::Utc;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{convert::Infallible, env::var, time::Duration};
+use std::{
+    convert::Infallible,
+    env::{remove_var, var},
+    time::Duration,
+};
 use tokio::time::sleep;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -68,6 +72,9 @@ async fn main() {
                         sleep(sleep_time).await;
                     }
                 }
+            } else {
+                // Remove the FORCE_UPDATE env variable so it doesn't keep updating
+                remove_var("FORCE_UPDATE");
             }
             tracing::info!("Updating stops and trips");
 

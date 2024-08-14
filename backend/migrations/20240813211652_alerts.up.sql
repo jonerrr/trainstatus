@@ -15,16 +15,19 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE TABLE IF NOT EXISTS active_periods(
     alert_id UUID NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_time TIMESTAMP WITH TIME ZONE
+    end_time TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (alert_id, start_time)
 );
 
 CREATE TABLE IF NOT EXISTS affected_entities(
     alert_id UUID NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
     route_id VARCHAR REFERENCES routes(id),
     stop_id VARCHAR REFERENCES stops(id),
-    sort_order INTEGER NOT NULL
+    bus_route_id VARCHAR REFERENCES bus_routes(id),
+    sort_order INTEGER NOT NULL,
+    UNIQUE (alert_id, route_id, stop_id, bus_route_id)
 );
 
--- CREATE INDEX idx_alerts_id ON alerts (id);
--- CREATE INDEX idx_active_periods_alert_id_start_time_end_time ON active_periods (alert_id, start_time, end_time);
--- CREATE INDEX idx_affected_entities_alert_id_route_id ON affected_entities (alert_id, route_id);
+CREATE INDEX idx_active_periods_alert_id_start_time_end_time ON active_periods (alert_id, start_time, end_time);
+
+CREATE INDEX idx_affected_entities_alert_id_route_id ON affected_entities (alert_id, route_id);
