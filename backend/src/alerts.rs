@@ -269,23 +269,9 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
         .execute(pool)
         .await?;
 
-    // let start = Utc::now();
-    // Filter out cloned ids from alerts, active periods, and affected entities. There is probably a more elegant way to remove cloned ids
-    // let alerts: Vec<Alert> = alerts
-    //     .into_par_iter()
-    //     .filter(|a| !cloned_mta_ids.contains(&a.mta_id))
-    //     .collect();
-    // let active_periods: Vec<ActivePeriod> = active_periods
-    //     .into_par_iter()
-    //     .filter(|ap| !cloned_ids.contains(&ap.alert_id))
-    //     .collect();
-    // let affected_entities: Vec<AffectedEntity> = affected_entities
-    //     .into_par_iter()
-    //     .filter(|ae| !cloned_ids.contains(&ae.alert_id))
-    //     .collect();
-
+    // Remove duplicate alerts and their active periods and affected entities
+    // TODO: check if this is required still
     let mut cloned_ids = vec![];
-
     alerts.retain(|a| {
         if cloned_mta_ids.contains(&a.mta_id) {
             cloned_ids.push(a.id);
@@ -294,48 +280,11 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             true
         }
     });
-    // dbg!(&cloned_ids);
     active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
     affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
-    // dbg!(&alerts.len());
-
-    // let end = Utc::now();
-    // let duration = end - start;
-    // println!("took {} ms", duration.num_milliseconds());
-
-    // Test for duplicate ids
-    // let mut duplicate_ids = vec![];
-    // for alert in &alerts {
-    //     let mut count = 0;
-    //     alerts.iter().for_each(|a| {
-    //         if a.id == alert.id {
-    //             count += 1;
-    //         }
-    //     });
-    //     if count > 1 {
-    //         duplicate_ids.push(alert)
-    //     }
-    // }
-    // dbg!(duplicate_ids);
-    // Test for missing alerts
-    // let missing_ap_ids = active_periods
-    //     .iter()
-    //     .filter_map(|ap| {
-    //         if !alerts.iter().any(|a| a.id == ap.alert_id) {
-    //             Some(ap.alert_id)
-    //         } else {
-    //             None
-    //         }
-    //     })
-    //     .collect::<Vec<_>>();
-    // let missing_ap_alerts = alerts
-    //     .iter()
-    //     .filter(|a| missing_ap_ids.contains(&a.id))
-    //     .collect::<Vec<_>>();
-    // dbg!(&missing_ap_alerts);
 
     // TODO: Use transaction https://github.com/launchbadge/sqlx/blob/main/examples/postgres/transaction/src/main.rs
-    // TODO: figure out what to do about old active periods that are now incorrect. Maybe delete all active periods and entities for alerts we are updating?
+    // TODO: remove old active periods and affected entities
     let mut query_builder =
     QueryBuilder::new("INSERT INTO alerts (id, mta_id, alert_type, header_plain, header_html, description_plain, description_html, created_at, updated_at, display_before_active) ");
     query_builder.push_values(alerts, |mut b, alert| {
@@ -350,7 +299,6 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             .push_bind(alert.updated_at)
             .push_bind(alert.display_before_active);
     });
-    // TODO: test if this prevents duplicates
     query_builder
         .push("ON CONFLICT (id) DO UPDATE SET alert_type = EXCLUDED.alert_type, header_plain = EXCLUDED.header_plain, header_html = EXCLUDED.header_html, description_plain = EXCLUDED.description_plain, description_html = EXCLUDED.description_html, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, display_before_active = EXCLUDED.display_before_active");
     let query = query_builder.build();
@@ -363,7 +311,6 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             .push_bind(active_period.start_time)
             .push_bind(active_period.end_time);
     });
-    // TODO: test if this prevents duplicates
     query_builder
         .push("ON CONFLICT (alert_id, start_time) DO UPDATE SET end_time = EXCLUDED.end_time");
     let query = query_builder.build();

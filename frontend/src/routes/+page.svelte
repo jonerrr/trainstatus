@@ -11,7 +11,8 @@
 		bus_stops,
 		pinned_bus_stops,
 		pinned_trips,
-		pinned_bus_trips
+		pinned_bus_trips,
+		pinned_bus_routes
 	} from '$lib/stores';
 	import StopList from '$lib/components/Stop/List.svelte';
 	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
@@ -104,8 +105,13 @@
 		/>
 	{/if}
 
-	{#if $pinned_routes.length}
-		<RouteAlertList manage_height={true} title="Pinned Routes" bind:route_ids={$pinned_routes} />
+	{#if $pinned_routes.length || $pinned_bus_routes.length}
+		<RouteAlertList
+			manage_height={true}
+			title="Pinned Routes"
+			bind:route_ids={$pinned_routes}
+			bind:bus_route_ids={$pinned_bus_routes}
+		/>
 	{/if}
 
 	{#if $pinned_stops.length || $pinned_bus_stops.length}

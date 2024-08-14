@@ -2,25 +2,39 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { derived } from 'svelte/store';
-	import { pinned_routes, alerts } from '$lib/stores';
+	import { pinned_routes, alerts, bus_routes, pinned_bus_routes } from '$lib/stores';
 	import Icon from '$lib/components/Icon.svelte';
 	import Pin from '$lib/components/Pin.svelte';
 	import TriggerButton from '$lib/components/TriggerButton.svelte';
+	import BusIcon from '../BusIcon.svelte';
 
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
+	export let route_type: 'route_alert' | 'bus_route_alert';
 
 	// idk if i need derived
 	const route_alerts = derived(alerts, ($alerts) => {
-		return $alerts
-			.filter((a) => a.entities && a.entities.some((e) => e.route_id === route_id))
-			.sort((a, b) => {
-				return (
-					b.entities.find((e) => e.route_id === route_id)!.sort_order -
-					a.entities.find((e) => e.route_id === route_id)!.sort_order
-				);
-			});
+		switch (route_type) {
+			case 'route_alert':
+				return $alerts
+					.filter((a) => a.entities && a.entities.some((e) => e.route_id === route_id))
+					.sort((a, b) => {
+						return (
+							b.entities.find((e) => e.route_id === route_id)!.sort_order -
+							a.entities.find((e) => e.route_id === route_id)!.sort_order
+						);
+					});
+			case 'bus_route_alert':
+				return $alerts
+					.filter((a) => a.entities && a.entities.some((e) => e.bus_route_id === route_id))
+					.sort((a, b) => {
+						return (
+							b.entities.find((e) => e.bus_route_id === route_id)!.sort_order -
+							a.entities.find((e) => e.bus_route_id === route_id)!.sort_order
+						);
+					});
+		}
 	});
 </script>
 
@@ -28,11 +42,19 @@
 	state={{
 		dialog_open: true,
 		dialog_id: route_id,
-		dialog_type: 'route_alert'
+		dialog_type: route_type
 	}}
 >
 	<div class="flex gap-2 items-center">
-		<Icon width="2rem" height="2rem" name={route_id} />
+		{#if route_type === 'route_alert'}
+			<Icon width="2rem" height="2rem" name={route_id} />
+		{:else}
+			<!-- TODO: simplify -->
+			{@const route = $bus_routes.find((r) => r.id === route_id)}
+			{#if route}
+				<BusIcon {route} />
+			{/if}
+		{/if}
 
 		{#if $route_alerts.length}
 			<div class="font-semibold flex gap-2 items-center">
@@ -51,6 +73,9 @@
 	</div>
 
 	<div>
-		<Pin item_id={route_id} store={pinned_routes} />
+		<Pin
+			item_id={route_id}
+			store={route_type === 'route_alert' ? pinned_routes : pinned_bus_routes}
+		/>
 	</div>
 </TriggerButton>
