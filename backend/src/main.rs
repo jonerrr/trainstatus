@@ -1,5 +1,12 @@
-use axum::{body::Body, response::Response, routing::get, Router};
+use axum::{
+    body::Body,
+    extract::Request,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router, ServiceExt,
+};
 use chrono::Utc;
+use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
@@ -7,14 +14,17 @@ use std::{
     time::Duration,
 };
 use tokio::time::sleep;
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use tower::Layer;
+use tower_http::{
+    compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
 mod bus;
+mod gtfs;
 mod routes;
-mod static_data;
-mod trips;
+mod train;
 
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
@@ -37,13 +47,15 @@ async fn main() {
         .expect("DATABASE_URL env not set")
         .parse()
         .unwrap();
-    // pg_connect_option = pg_connect_option.disable_statement_logging();
     let pool = PgPoolOptions::new()
         .max_connections(100)
         .connect_with(pg_connect_option)
         .await
-        .unwrap();
-    sqlx::migrate!().run(&pool).await.unwrap();
+        .expect("Failed to create postgres pool");
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .expect("Failed to run database migrations");
 
     let s_pool = pool.clone();
     tokio::spawn(async move {
@@ -79,7 +91,7 @@ async fn main() {
             tracing::info!("Updating stops and trips");
 
             bus::static_data::stops_and_routes(&s_pool).await;
-            static_data::stops_and_routes(&s_pool).await;
+            train::static_data::stops_and_routes(&s_pool).await;
 
             // remove old update_ats
             sqlx::query!("DELETE FROM last_update")
@@ -94,10 +106,9 @@ async fn main() {
         }
     });
 
+    train::trips::import(pool.clone()).await;
     bus::trips::import(pool.clone()).await;
     bus::positions::import(pool.clone()).await;
-
-    trips::import(pool.clone()).await;
     alerts::import(pool.clone()).await;
 
     let app = Router::new()
@@ -109,25 +120,39 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
+        // trains
         .route("/stops", get(routes::stops::get))
         .route("/stops/times", get(routes::stops::times))
         .route("/trips", get(routes::trips::get))
         .route("/trips/:id", get(routes::trips::by_id))
-        .route("/alerts", get(routes::alerts::get))
         // bus stuff
         .route("/bus/stops", get(routes::bus::stops::get))
         .route("/bus/stops/times", get(routes::bus::stops::times))
         .route("/bus/trips", get(routes::bus::trips::get))
         .route("/bus/trips/:id", get(routes::bus::trips::by_id))
         .route("/bus/routes", get(routes::bus::routes::get))
+        // alerts
+        .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
-        .with_state(pool);
+        .with_state(pool)
+        .fallback(handler_404);
+
+    // Need to specify normalize path layer like this so it runs before routing
+    let app = NormalizePathLayer::trim_trailing_slash().layer(app);
+
     let listener =
-        tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "0.0.0.0:3055".into()))
+        tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "127.0.0.1:3055".into()))
             .await
             .unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await.unwrap();
+    // https://github.com/tokio-rs/axum/discussions/2377 need to specify types bc of normalize path layer
+    axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
+        .await
+        .unwrap();
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "not found")
 }

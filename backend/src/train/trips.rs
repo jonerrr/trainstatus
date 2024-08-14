@@ -1,14 +1,15 @@
-use crate::feed::{self, trip_update::StopTimeUpdate, TripDescriptor};
-use crate::routes::trips::Trip as TripRow;
+use crate::{
+    feed::{trip_update::StopTimeUpdate, TripDescriptor},
+    gtfs::decode,
+    routes::trips::Trip as TripRow,
+};
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use once_cell::sync::Lazy;
-use prost::{DecodeError, Message};
+use prost::DecodeError;
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
-use std::env::var;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::fs::{create_dir, write};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -57,11 +58,11 @@ pub static STOP_TIMES_RESPONSE: Lazy<Mutex<Vec<TripRow>>> = Lazy::new(|| Mutex::
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            let futures = (0..ENDPOINTS.len()).map(|i| decode_feed(&pool, ENDPOINTS[i]));
+            let futures = (0..ENDPOINTS.len()).map(|i| parse_gtfs(&pool, ENDPOINTS[i]));
             let _ = futures::future::join_all(futures).await;
             cache_stop_times(&pool).await.unwrap();
             // for endpoint in ENDPOINTS.iter() {
-            //     match decode_feed(&pool, endpoint).await {
+            //     match parse_gtfs(&pool, endpoint).await {
             //         Ok(_) => (),
             //         Err(e) => {
             //             tracing::error!("Error importing data: {:?}", e);
@@ -147,29 +148,6 @@ pub enum IntoTripError {
     StopId,
 }
 
-impl TripDescriptor {
-    // result is (route_id, express)
-    pub fn parse_route_id(&self) -> Result<(String, bool), IntoTripError> {
-        self.route_id
-            .as_ref()
-            .ok_or(IntoTripError::RouteId)
-            .map(|id| {
-                let mut route_id = id.to_owned();
-                if route_id == "SS" {
-                    route_id = "SI".to_string();
-                    // TODO: set express to true for SS
-                };
-
-                let mut express = false;
-                if route_id.ends_with('X') {
-                    route_id.pop();
-                    express = true;
-                }
-                (route_id, express)
-            })
-    }
-}
-
 impl TryFrom<TripDescriptor> for Trip {
     type Error = IntoTripError;
 
@@ -248,6 +226,29 @@ impl TryFrom<TripDescriptor> for Trip {
             route_id,
             express,
         })
+    }
+}
+
+impl TripDescriptor {
+    // result is (route_id, express)
+    pub fn parse_route_id(&self) -> Result<(String, bool), IntoTripError> {
+        self.route_id
+            .as_ref()
+            .ok_or(IntoTripError::RouteId)
+            .map(|id| {
+                let mut route_id = id.to_owned();
+                if route_id == "SS" {
+                    route_id = "SI".to_string();
+                    // TODO: set express to true for SS
+                };
+
+                let mut express = false;
+                if route_id.ends_with('X') {
+                    route_id.pop();
+                    express = true;
+                }
+                (route_id, express)
+            })
     }
 }
 
@@ -362,25 +363,15 @@ pub struct StopTime {
     departure: DateTime<Utc>,
 }
 
-pub async fn decode_feed(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedError> {
-    let data = reqwest::Client::new()
-        .get(format!(
+pub async fn parse_gtfs(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedError> {
+    let feed = decode(
+        &format!(
             "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs{}",
             endpoint
-        ))
-        .send()
-        .await?
-        .bytes()
-        .await?;
-
-    let feed = feed::FeedMessage::decode(data)?;
-    if var("DEBUG_GTFS").is_ok() {
-        let msgs = format!("{:#?}", feed);
-        create_dir("./gtfs").await.ok();
-        write(format!("./gtfs/trains{}.txt", &endpoint), msgs)
-            .await
-            .unwrap();
-    }
+        ),
+        &format!("train{}", endpoint),
+    )
+    .await?;
 
     let mut trips: Vec<Trip> = Vec::new();
     let mut stop_times: Vec<StopTime> = Vec::new();

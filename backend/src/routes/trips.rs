@@ -1,6 +1,6 @@
 use crate::{
     routes::{errors::ServerError, parse_list, CurrentTime},
-    trips::STOP_TIMES_RESPONSE,
+    train::trips::STOP_TIMES_RESPONSE,
 };
 use axum::{
     extract::{Path, State},

@@ -156,9 +156,8 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
 
-    // prevent issues with query being too big
-    let chunk_size = 1000;
-    for chunk in stops.chunks(chunk_size) {
+    // Chunk to the maximum amount of parameters allowed
+    for chunk in stops.chunks(65534 / 5) {
         let mut query_builder =
             QueryBuilder::new("INSERT INTO bus_stops (id, name, direction, lat, lon)");
         query_builder.push_values(chunk, |mut b, route| {
@@ -173,7 +172,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
         query.execute(pool).await.unwrap();
     }
 
-    for chunk in route_stops.chunks(chunk_size) {
+    for chunk in route_stops.chunks(65534 / 5) {
         let mut query_builder = QueryBuilder::new(
             "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction)",
         );
@@ -331,7 +330,7 @@ where
     D: Deserializer<'de>,
 {
     let polyline = String::deserialize(deserializer)?;
-    Ok(decode_polyline(&polyline, 5).map_err(serde::de::Error::custom)?)
+    decode_polyline(&polyline, 5).map_err(serde::de::Error::custom)
 }
 
 #[derive(Deserialize, Clone, Debug)]

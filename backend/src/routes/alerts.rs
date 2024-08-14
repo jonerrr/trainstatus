@@ -32,7 +32,7 @@ pub async fn get(
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     // query is different depending on if they are asking for live data
-
+    // TODO: allow specifying route ids and bus route ids
     let alerts = {
         if time.1 {
             sqlx::query_as!(
