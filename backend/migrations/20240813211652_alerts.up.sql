@@ -25,7 +25,13 @@ CREATE TABLE IF NOT EXISTS affected_entities(
     stop_id VARCHAR REFERENCES stops(id),
     bus_route_id VARCHAR REFERENCES bus_routes(id),
     sort_order INTEGER NOT NULL,
-    UNIQUE (alert_id, route_id, stop_id, bus_route_id)
+    UNIQUE (
+        alert_id,
+        route_id,
+        stop_id,
+        bus_route_id,
+        sort_order
+    )
 );
 
 CREATE INDEX idx_active_periods_alert_id_start_time_end_time ON active_periods (alert_id, start_time, end_time);

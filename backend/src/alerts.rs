@@ -111,7 +111,6 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     .await?;
 
     let mut in_feed_ids = vec![];
-    let mut cloned_ids: Vec<Uuid> = vec![];
     let mut cloned_mta_ids: Vec<String> = vec![];
 
     let mut alerts: Vec<Alert> = vec![];
@@ -270,7 +269,7 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
         .execute(pool)
         .await?;
 
-    let start = Utc::now();
+    // let start = Utc::now();
     // Filter out cloned ids from alerts, active periods, and affected entities. There is probably a more elegant way to remove cloned ids
     // let alerts: Vec<Alert> = alerts
     //     .into_par_iter()
@@ -380,9 +379,10 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
             .push_bind(affected_entity.stop_id)
             .push_bind(affected_entity.sort_order);
     });
-    query_builder.push(
-        "ON CONFLICT (alert_id, route_id, bus_route_id, stop_id) DO UPDATE SET sort_order = EXCLUDED.sort_order",
-    );
+    // query_builder.push(
+    //     "ON CONFLICT (alert_id, route_id, bus_route_id, stop_id, sort_order) DO UPDATE SET sort_order = EXCLUDED.sort_order",
+    // );
+    query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await?;
 
