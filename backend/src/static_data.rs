@@ -108,7 +108,7 @@ pub struct StationTime {
 }
 
 // all the routes in the NYC subway system, will sadly need to be updated manually
-const ROUTES: [&str; 26] = [
+pub const ROUTES: [&str; 26] = [
     "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
     "Q", "R", "W", "H", "FS", "GS", "SI",
 ];

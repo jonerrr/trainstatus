@@ -14,14 +14,5 @@ CREATE TABLE IF NOT EXISTS bus_route_stops (
     -- can be 1 or 0
     -- each route has two directions with separate stops
     direction INTEGER NOT NULL,
-    geom VARCHAR NOT NULL,
     PRIMARY KEY (route_id, stop_id, stop_sequence)
 );
-
--- CREATE TABLE IF NOT EXISTS bus_stop_groups (
---     route_id VARCHAR REFERENCES bus_routes(id),
---     -- same direction as the route stops
---     direction INTEGER NOT NULL,
---     headsign VARCHAR NOT NULL,
---     PRIMARY KEY (route_id, direction)
--- );

@@ -15,6 +15,7 @@ pub struct Route {
     pub short_name: String,
     pub color: String,
     pub shuttle: bool,
+    pub wkt: String,
 }
 
 struct Stop {
@@ -31,7 +32,6 @@ struct RouteStop {
     stop_sequence: i32,
     headsign: String,
     direction: i32,
-    geom: String,
 }
 
 // could hypothetically use transactions to prevent conflicts
@@ -65,6 +65,16 @@ pub async fn stops_and_routes(pool: &PgPool) {
         // tracing::debug!("fetched route {}", route.id);
         let shuttle = route.route_type == 711;
 
+        // Combine all the polylines into one MultiLineString
+        let route_geom = MultiLineString::new(
+            r_stops
+                .entry
+                .polylines
+                .iter()
+                .map(|p| p.points.clone())
+                .collect::<Vec<LineString>>(),
+        );
+
         // add routes to the routes vector that gets inserted to db
         routes.push(Route {
             id: route.id.clone(),
@@ -72,6 +82,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
             short_name: route.short_name,
             color: route.color,
             shuttle,
+            wkt: route_geom.to_wkt().to_string(),
         });
 
         // they are always ordered
@@ -103,13 +114,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .par_iter()
             .map(|rs| {
                 let route_id = &route.id;
-                // Combine all the polylines into one MultiLineString
-                let route_geom = MultiLineString::new(
-                    rs.polylines
-                        .iter()
-                        .map(|p| p.points.clone())
-                        .collect::<Vec<LineString>>(),
-                );
 
                 rs.stop_ids
                     .par_iter()
@@ -120,7 +124,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
                         stop_sequence: sequence as i32,
                         headsign: rs.name.name.clone(),
                         direction: rs.id,
-                        geom: route_geom.to_wkt().to_string(),
                     })
                     .collect::<Vec<_>>()
             })
@@ -138,14 +141,16 @@ pub async fn stops_and_routes(pool: &PgPool) {
     pb.finish_with_message("Finished parsing bus data");
 
     // insert routes into db
-    let mut query_builder =
-        QueryBuilder::new("INSERT INTO bus_routes (id, long_name, short_name, color, shuttle)");
+    let mut query_builder = QueryBuilder::new(
+        "INSERT INTO bus_routes (id, long_name, short_name, color, shuttle, wkt)",
+    );
     query_builder.push_values(routes, |mut b, route| {
         b.push_bind(route.id)
             .push_bind(route.long_name)
             .push_bind(route.short_name)
             .push_bind(route.color)
-            .push_bind(route.shuttle);
+            .push_bind(route.shuttle)
+            .push_bind(route.wkt);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
@@ -170,15 +175,14 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     for chunk in route_stops.chunks(chunk_size) {
         let mut query_builder = QueryBuilder::new(
-            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction, geom)",
+            "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction)",
         );
         query_builder.push_values(chunk, |mut b, route| {
             b.push_bind(&route.route_id)
                 .push_bind(route.stop_id)
                 .push_bind(route.stop_sequence)
                 .push_bind(&route.headsign)
-                .push_bind(route.direction)
-                .push_bind(&route.geom);
+                .push_bind(route.direction);
         });
         query_builder.push("ON CONFLICT DO NOTHING");
         let query = query_builder.build();
@@ -247,6 +251,7 @@ pub struct RouteStops {
 pub struct Entry {
     #[serde(rename = "stopGroupings")]
     stop_groupings: Vec<StopGrouping>,
+    polylines: Vec<PolyLine>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -313,7 +318,6 @@ pub struct StopGroup {
     name: StopName,
     #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
-    polylines: Vec<PolyLine>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

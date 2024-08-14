@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        *\n                    FROM\n                        bus_routes;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "long_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "short_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "shuttle",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "wkt",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e11299882c2a1f6403dace39d90163b5f30fefbf9d0b6554918ba9c004a892c9"
+}
