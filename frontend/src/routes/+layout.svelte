@@ -42,11 +42,13 @@
 
 			// Interval for update_bus_data
 			bus_interval = setInterval(async () => {
-				//TODO: maybe add a check to make sure length is greater than 0
-				await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, null);
+				// Make sure that there are monitored routes
+				if (last_monitored_routes.length) {
+					await update_bus_data(fetch, bus_trips, bus_stop_times, last_monitored_routes, null);
 
-				// remove from pinned trips if it no longer exists
-				$pinned_bus_trips = $pinned_bus_trips.filter((p) => $bus_trips.find((t) => t.id === p));
+					// remove from pinned trips if it no longer exists
+					$pinned_bus_trips = $pinned_bus_trips.filter((p) => $bus_trips.find((t) => t.id === p));
+				}
 			}, 30000);
 		} else {
 			await update_data(fetch, trips, stop_times, alerts, time);
@@ -86,14 +88,6 @@
 		clearInterval(interval);
 		clearInterval(bus_interval);
 	});
-
-	// preserve at query string
-	// beforeNavigate(({ from, to, cancel }) => {
-	// 	if (from?.url.searchParams.has('at') && !to?.url.searchParams.has('at')) {
-	// 		cancel();
-	// 		goto(to?.url.pathname + `?at=${from.url.searchParams.get('at')}`);
-	// 	}
-	// });
 
 	// register swiper.js for alert carousel
 	register();

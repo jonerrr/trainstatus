@@ -9,7 +9,15 @@ declare global {
 			dialog_open: boolean;
 			dialog_id: string | number;
 			// blank is not open
-			dialog_type: 'stop' | 'trip' | 'route_alert' | 'route' | 'bus_stop' | 'bus_trip' | '';
+			dialog_type:
+				| 'stop'
+				| 'trip'
+				| 'route_alert'
+				| 'bus_route_alert'
+				| 'route'
+				| 'bus_stop'
+				| 'bus_trip'
+				| '';
 			// list of bus routes to monitor
 			// monitor_routes?: string[];
 		}

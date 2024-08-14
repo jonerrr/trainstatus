@@ -2,26 +2,49 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import type { Swiper } from 'swiper/types';
-	import { alerts } from '$lib/stores';
-	import Icon from '$lib/components/Icon.svelte';
 	import { derived } from 'svelte/store';
 	import { onMount } from 'svelte';
+	import { alerts, bus_routes } from '$lib/stores';
+	import Icon from '$lib/components/Icon.svelte';
+	import BusIcon from '$lib/components/BusIcon.svelte';
 	dayjs.extend(relativeTime);
 
 	export let route_id: string;
+	export let route_type: 'route_alert' | 'bus_route_alert';
 
+	// const route_alerts = derived(alerts, ($alerts) => {
+	// 	const route_alerts = $alerts
+	// 		.filter((a) => a.entities.some((e) => e.route_id === route_id))
+	// 		.sort((a, b) => {
+	// 			return (
+	// 				b.entities.find((e) => e.route_id === route_id)!.sort_order -
+	// 				a.entities.find((e) => e.route_id === route_id)!.sort_order
+	// 			);
+	// 		});
+	// 	return route_alerts;
+	// });
 	const route_alerts = derived(alerts, ($alerts) => {
-		const route_alerts = $alerts
-			.filter((a) => a.entities.some((e) => e.route_id === route_id))
-			.sort((a, b) => {
-				return (
-					b.entities.find((e) => e.route_id === route_id)!.sort_order -
-					a.entities.find((e) => e.route_id === route_id)!.sort_order
-				);
-			});
-		return route_alerts;
+		switch (route_type) {
+			case 'route_alert':
+				return $alerts
+					.filter((a) => a.entities && a.entities.some((e) => e.route_id === route_id))
+					.sort((a, b) => {
+						return (
+							b.entities.find((e) => e.route_id === route_id)!.sort_order -
+							a.entities.find((e) => e.route_id === route_id)!.sort_order
+						);
+					});
+			case 'bus_route_alert':
+				return $alerts
+					.filter((a) => a.entities && a.entities.some((e) => e.bus_route_id === route_id))
+					.sort((a, b) => {
+						return (
+							b.entities.find((e) => e.bus_route_id === route_id)!.sort_order -
+							a.entities.find((e) => e.bus_route_id === route_id)!.sort_order
+						);
+					});
+		}
 	});
-	// console.log($route_alerts);
 
 	function fix_swiper({ detail }: { detail: [Swiper] }) {
 		const swiper = detail[0];
@@ -66,7 +89,11 @@
 			<swiper-slide class="bg-neutral-900">
 				<div class="relative flex flex-col max-h-[80dvh]">
 					<h2 class="sticky top-0 font-bold flex items-center gap-2 text-indigo-300 p-1">
-						<Icon link={false} width="2rem" height="2rem" name={route_id} />
+						{#if route_type === 'route_alert'}
+							<Icon link={false} width="2rem" height="2rem" name={route_id} />
+						{:else if route_type === 'bus_route_alert'}
+							<BusIcon link={false} route={$bus_routes.find((r) => r.id === route_id)} />
+						{/if}
 						{alert.alert_type}
 					</h2>
 
@@ -93,7 +120,11 @@
 	</swiper-container>
 {:else}
 	<div class="flex items-center gap-2 p-2">
-		<Icon width="2rem" height="2rem" name={route_id} />
+		{#if route_type === 'route_alert'}
+			<Icon link={false} width="2rem" height="2rem" name={route_id} />
+		{:else if route_type === 'bus_route_alert'}
+			<BusIcon link={false} route={$bus_routes.find((r) => r.id === route_id)} />
+		{/if}
 		<div class="text-neutral-200">No alerts</div>
 	</div>
 {/if}

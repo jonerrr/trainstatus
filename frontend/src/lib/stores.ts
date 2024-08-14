@@ -18,9 +18,13 @@ export const stop_times = writable<StopTime[]>([]);
 export const alerts = writable<Alert[]>([]);
 
 export const pinned_routes = persisted('pinned_routes', ['J']);
+export const pinned_bus_routes = writable<string[]>([]);
 // which of the pin lists have accordion open
 export const pinned_stops = persisted('pinned_stops', ['220']);
+export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
 export const pinned_trips = persisted<string[]>('pinned_trips', []);
+// format is route id _ trip id
+export const pinned_bus_trips = persisted<string[]>('pinned_bus_trips', []);
 // the amount of elements to show in pinned routes list before scroll is required
 // export const pinned_routes_shown = persisted('pinned_routes_shown', 1);
 export const location_status = persisted<LocationStatus>(
@@ -40,16 +44,6 @@ export const bus_routes = writable<BusRoute[]>([]);
 export const bus_stops = writable<BusStop[]>([]);
 export const bus_trips = writable<BusTrip[]>([]);
 export const bus_stop_times = writable<BusStopTime[]>([]);
-
-// export const pinned_bus_routes = persisted('pinned_bus_routes', ['B44']);
-export const pinned_bus_stops = persisted<number[]>('pinned_bus_stops', []);
-
-// export interface PinnedBusTrip {
-// 	id: string;
-// 	routes: string[];
-// }
-// format is route id _ trip id
-export const pinned_bus_trips = persisted<string[]>('pinned_bus_trips', []);
 
 // stores the time of data they want, null = current time
 export const data_at = writable<Date | null>(null);

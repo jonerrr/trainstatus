@@ -200,6 +200,7 @@ export interface Alert {
 export interface Entity {
 	alert_id: string;
 	route_id: string | null;
+	bus_route_id: string | null;
 	stop_id: string | null;
 	sort_order: number;
 }

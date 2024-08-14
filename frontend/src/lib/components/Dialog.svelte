@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices, History } from 'lucide-svelte';
-	import { writable, type Writable } from 'svelte/store';
+	import { type Writable } from 'svelte/store';
 	import { page } from '$app/stores';
 	import { pushState, replaceState } from '$app/navigation';
 	import { all_route_ids } from '$lib/api';
@@ -8,10 +8,12 @@
 		trips,
 		stops,
 		bus_stops,
+		bus_routes,
 		bus_trips,
 		pinned_bus_stops,
 		pinned_bus_trips,
 		pinned_routes,
+		pinned_bus_routes,
 		pinned_stops,
 		pinned_trips,
 		monitored_routes
@@ -22,7 +24,7 @@
 	import BusStopContent from '$lib/components/Stop/BusContent.svelte';
 	import BusTripContent from '$lib/components/Trip/BusContent.svelte';
 	import Pin from '$lib/components/Pin.svelte';
-	import PastStops from '$lib/components/Trip/PastStops.svelte';
+	// import PastStops from '$lib/components/Trip/PastStops.svelte';
 
 	// detect if user is swiping back and disable close on outside click
 
@@ -43,7 +45,7 @@
 			} else {
 				node.close();
 				document.body.style.overflow = 'auto';
-				document.title = 'Trainstat.us | Home';
+				document.title = 'Trainstat.us';
 			}
 		});
 
@@ -144,6 +146,12 @@
 					replaceState('', { ...p.state, dialog_id: 'error' });
 				}
 				break;
+			case 'bus_route_alert':
+				pin_store = pinned_bus_routes;
+				if (!$bus_routes.some((r) => r.id === (p.state.dialog_id as string))) {
+					replaceState('', { ...p.state, dialog_id: 'error' });
+				}
+				break;
 			case 'bus_stop':
 				pin_store = pinned_bus_stops;
 
@@ -204,8 +212,8 @@
 				<StopContent bind:show_previous bind:stop_id={item_id} />
 			{:else if $page.state.dialog_type === 'trip' && typeof item_id === 'string'}
 				<TripContent bind:show_previous bind:trip_id={item_id} />
-			{:else if $page.state.dialog_type === 'route_alert' && typeof item_id === 'string'}
-				<RouteAlertContent bind:route_id={item_id} />
+			{:else if ($page.state.dialog_type === 'route_alert' || $page.state.dialog_type === 'bus_route_alert') && typeof item_id === 'string'}
+				<RouteAlertContent bind:route_id={item_id} bind:route_type={$page.state.dialog_type} />
 			{:else if $page.state.dialog_type === 'bus_stop' && typeof item_id === 'number'}
 				<BusStopContent bind:stop_id={item_id} />
 			{:else if $page.state.dialog_type === 'bus_trip' && typeof item_id === 'string'}

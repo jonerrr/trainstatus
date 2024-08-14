@@ -46,7 +46,14 @@ pub async fn get(
             a.updated_at,
             ap.start_time,
             ap.end_time,
-            jsonb_agg(DISTINCT ae) AS entities
+            jsonb_agg(DISTINCT jsonb_build_object('bus_route_id',
+                ae.bus_route_id,
+                'route_id',
+                ae.route_id,
+                'stop_id',
+                ae.stop_id,
+                'sort_order',
+                ae.sort_order)) AS entities
         FROM
             alerts a
         LEFT JOIN active_periods ap ON
@@ -54,7 +61,7 @@ pub async fn get(
         LEFT JOIN affected_entities ae ON
             a.id = ae.alert_id
         WHERE
-            ae.route_id IS NOT NULL
+            (ae.route_id IS NOT NULL OR ae.bus_route_id IS NOT NULL)
             AND ap.start_time BETWEEN ($1::timestamptz - INTERVAL '24 hours') AND $1
             AND (ap.end_time < $1)
         GROUP BY
@@ -69,31 +76,38 @@ pub async fn get(
             sqlx::query_as!(
                 Alert,
                 "SELECT
-            a.id,
-            a.alert_type,
-            a.header_html,
-            a.description_html,
-            a.created_at,
-            a.updated_at,
-            ap.start_time,
-            ap.end_time,
-            jsonb_agg(DISTINCT ae) AS entities
-        FROM
-            alerts a
-        LEFT JOIN active_periods ap ON
-            a.id = ap.alert_id
-        LEFT JOIN affected_entities ae ON
-            a.id = ae.alert_id
-        WHERE
-            a.in_feed IS TRUE
-            AND ae.route_id IS NOT NULL
-            AND ap.start_time < $1
-            AND (ap.end_time > $1
-                OR ap.end_time IS NULL)
-        GROUP BY
-            a.id,
-            ap.start_time,
-            ap.end_time",
+                a.id,
+                a.alert_type,
+                a.header_html,
+                a.description_html,
+                a.created_at,
+                a.updated_at,
+                ap.start_time,
+                ap.end_time,
+                jsonb_agg(DISTINCT jsonb_build_object('bus_route_id',
+                ae.bus_route_id,
+                'route_id',
+                ae.route_id,
+                'stop_id',
+                ae.stop_id,
+                'sort_order',
+                ae.sort_order)) AS entities
+            FROM
+                alerts a
+            LEFT JOIN active_periods ap ON
+                a.id = ap.alert_id
+            LEFT JOIN affected_entities ae ON
+                a.id = ae.alert_id
+            WHERE
+                a.in_feed IS TRUE
+                AND (ae.route_id IS NOT NULL OR ae.bus_route_id IS NOT NULL)
+                AND ap.start_time < $1
+                AND (ap.end_time > $1
+                    OR ap.end_time IS NULL)
+            GROUP BY
+                a.id,
+                ap.start_time,
+                ap.end_time",
                 time.0
             )
             .fetch_all(&pool)
