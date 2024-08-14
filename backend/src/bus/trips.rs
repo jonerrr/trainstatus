@@ -1,25 +1,19 @@
 use crate::{
-    feed::{self, TripUpdate},
-    trips::{DecodeFeedError, IntoStopTimeError, StopTimeUpdateWithTrip},
+    feed::TripUpdate,
+    gtfs::decode,
+    train::trips::{DecodeFeedError, IntoStopTimeError, StopTimeUpdateWithTrip},
 };
 use chrono::{DateTime, Utc};
-use prost::Message;
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
-use std::env::var;
 use std::time::Duration;
-use tokio::{
-    fs::{create_dir, write},
-    time::sleep,
-};
+use tokio::time::sleep;
 use uuid::Uuid;
-
-// TODO: remove unwraps and handle errors
 
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            match decode_feed(&pool).await {
+            match parse_gtfs(&pool).await {
                 Ok(_) => (),
                 Err(e) => {
                     tracing::error!("Error importing bus trip data: {:?}", e);
@@ -153,24 +147,10 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a, Trip>> for StopTime {
     }
 }
 
-pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
+pub async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     // after 30 seconds the obanyc api will return its own timeout error
     // TODO: fix decode error that shows up once in a while
-    let data = reqwest::Client::new()
-        .get("https://gtfsrt.prod.obanyc.com/tripUpdates")
-        .timeout(Duration::from_secs(29))
-        .send()
-        .await?
-        .bytes()
-        .await?;
-
-    let feed = feed::FeedMessage::decode(data)?;
-
-    if var("DEBUG_GTFS").is_ok() {
-        let msgs = format!("{:#?}", feed);
-        create_dir("./gtfs").await.ok();
-        write("./gtfs/bus-trips.txt", msgs).await.unwrap();
-    }
+    let feed = decode("https://gtfsrt.prod.obanyc.com/tripUpdates", "bustrips").await?;
 
     let mut trips: Vec<Trip> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
@@ -258,8 +238,9 @@ pub async fn decode_feed(pool: &PgPool) -> Result<(), DecodeFeedError> {
     let query = query_builder.build();
     query.execute(pool).await?;
 
-    // Insert stop times. Need to chunk otherwise its too big for a single query
-    for chunk in stop_times.chunks(1000) {
+    // The maximum bind parameters for postgres is 65534 and we have 5 parameters for each stop time.
+    // https://docs.rs/sqlx/latest/sqlx/struct.QueryBuilder.html#method.push_bind
+    for chunk in stop_times.chunks(65534 / 5) {
         let mut query_builder = QueryBuilder::new(
             "INSERT INTO bus_stop_times (trip_id, stop_id, arrival, departure, stop_sequence) ",
         );

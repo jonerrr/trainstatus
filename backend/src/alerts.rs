@@ -1,23 +1,18 @@
 use crate::{
-    feed::{self},
-    static_data::ROUTES,
-    trips::DecodeFeedError,
+    gtfs::decode,
+    train::{static_data::ROUTES, trips::DecodeFeedError},
 };
 use chrono::{DateTime, Utc};
-use prost::Message;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
-use std::{env::var, time::Duration};
-use tokio::{
-    fs::{create_dir, write},
-    time::sleep,
-};
+use std::time::Duration;
+use tokio::time::sleep;
 use uuid::Uuid;
 
 pub async fn import(pool: PgPool) {
     tokio::spawn(async move {
         loop {
-            if let Err(e) = decode(&pool).await {
+            if let Err(e) = parse_gtfs(&pool).await {
                 tracing::error!("Failed to decode feed: {:?}", e);
             }
             sleep(Duration::from_secs(10)).await;
@@ -106,20 +101,12 @@ pub struct AffectedEntity {
     pub sort_order: i32,
 }
 
-async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
-    let data = reqwest::Client::new()
-        .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fall-alerts")
-        .send()
-        .await?
-        .bytes()
-        .await?;
-    let feed = feed::FeedMessage::decode(data)?;
-
-    if var("DEBUG_GTFS").is_ok() {
-        let msgs = format!("{:#?}", feed);
-        create_dir("./gtfs").await.ok();
-        write("./gtfs/alerts.txt", msgs).await.unwrap();
-    }
+async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
+    let feed = decode(
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fall-alerts",
+        "alerts",
+    )
+    .await?;
 
     let mut in_feed_ids = vec![];
     let mut cloned_ids: Vec<String> = vec![];
@@ -220,14 +207,13 @@ async fn decode(pool: &PgPool) -> Result<(), DecodeFeedError> {
                             r
                         }
                     })
-                    .map(|r| {
+                    .and_then(|r| {
                         if ROUTES.contains(&r.as_str()) {
                             Some(r)
                         } else {
                             None
                         }
-                    })
-                    .flatten();
+                    });
 
                 // check if route_id is in ROUTES, otherwise its a bus route
                 // TODO: improve this
