@@ -148,8 +148,6 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a, Trip>> for StopTime {
 }
 
 pub async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
-    // after 30 seconds the obanyc api will return its own timeout error
-    // TODO: fix decode error that shows up once in a while
     let feed = decode("https://gtfsrt.prod.obanyc.com/tripUpdates", "bustrips").await?;
 
     let mut trips: Vec<Trip> = vec![];
