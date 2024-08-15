@@ -39,7 +39,9 @@ pub async fn get(
                     SELECT
                         *
                     FROM
-                        bus_routes;"#
+                        bus_routes
+                    ORDER BY 
+                        id;"#
             )
             .fetch_all(&pool)
             .await?
@@ -57,6 +59,8 @@ pub async fn get(
                         NULL as "wkt: String"
                     FROM
                         bus_routes br
+                    ORDER BY
+                        id;
                 "#
             )
             .fetch_all(&pool)

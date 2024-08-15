@@ -12,4 +12,5 @@
 	route_ids={all_route_ids}
 	bus_route_ids={$bus_routes.map((r) => r.id)}
 	manage_height={false}
+	show_search
 />
