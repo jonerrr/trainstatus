@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                    SELECT\n                        *\n                    FROM\n                        bus_routes\n                    ORDER BY \n                        id;",
+  "query": "\n            SELECT\n                *\n            FROM\n                bus_routes\n            ORDER BY \n                id;",
   "describe": {
     "columns": [
       {
@@ -30,8 +30,8 @@
       },
       {
         "ordinal": 5,
-        "name": "wkt",
-        "type_info": "Varchar"
+        "name": "geom",
+        "type_info": "Json"
       }
     ],
     "parameters": {
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "823c9dec0d52d1ae26f6bc5ca5e16fd92f4f8d931ba88b7b2533b7201500e7c3"
+  "hash": "c88cfdc7fa34eb92ae2496c83fb20b22bda777b13fa9412615fce159b63614ea"
 }

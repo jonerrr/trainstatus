@@ -20,7 +20,7 @@
 <List
 	bind:this={list_el}
 	bind:tab_value
-	class={$$props.class ?? 'max-h-[calc(100dvh-7.5rem)]'}
+	class={$$props.class ?? undefined}
 	bind:manage_height
 	bind:title
 >
@@ -30,7 +30,7 @@
 		{/each}
 	</div>
 
-	<div slot="bus">
+	<div slot="bus" class="divide-y divide-neutral-800">
 		{#each shown_bus_route_ids as route_id (route_id)}
 			<Trigger {route_id} route_type="bus_route_alert" />
 		{/each}

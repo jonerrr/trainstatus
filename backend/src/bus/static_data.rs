@@ -6,7 +6,6 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
-use wkt::ToWkt;
 
 #[derive(Serialize)]
 pub struct Route {
@@ -15,7 +14,7 @@ pub struct Route {
     pub short_name: String,
     pub color: String,
     pub shuttle: bool,
-    pub wkt: String,
+    pub geom: serde_json::Value,
 }
 
 struct Stop {
@@ -82,7 +81,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
             short_name: route.short_name,
             color: route.color,
             shuttle,
-            wkt: route_geom.to_wkt().to_string(),
+            geom: serde_json::to_value(route_geom).unwrap(),
         });
 
         // they are always ordered
@@ -142,7 +141,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 
     // insert routes into db
     let mut query_builder = QueryBuilder::new(
-        "INSERT INTO bus_routes (id, long_name, short_name, color, shuttle, wkt)",
+        "INSERT INTO bus_routes (id, long_name, short_name, color, shuttle, geom)",
     );
     query_builder.push_values(routes, |mut b, route| {
         b.push_bind(route.id)
@@ -150,7 +149,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
             .push_bind(route.short_name)
             .push_bind(route.color)
             .push_bind(route.shuttle)
-            .push_bind(route.wkt);
+            .push_bind(route.geom);
     });
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();

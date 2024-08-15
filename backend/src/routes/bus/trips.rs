@@ -6,6 +6,8 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use geojson::{feature::Id, Feature, FeatureCollection, Geometry, JsonObject, Value};
+use rayon::prelude::*;
 use serde::Serialize;
 use sqlx::{types::JsonValue, FromRow, PgPool};
 use uuid::Uuid;
@@ -147,4 +149,93 @@ GROUP BY
         Some(trip) => Ok(Json(trip)),
         None => Err(ServerError::NotFound),
     }
+}
+
+pub async fn geojson(
+    State(pool): State<PgPool>,
+    // params: Query<Parameters>,
+    // time: CurrentTime,
+) -> Result<impl IntoResponse, ServerError> {
+    // params.route_id must be supplied unlike train data bc bus data is too large
+
+    // return trips without stop_times
+    let trips = sqlx::query_as!(
+        BusTrip,
+        r#"
+		SELECT
+		t.id,
+		t.route_id,
+		t.direction,
+		t.vehicle_id,
+		t.created_at,
+		t.deviation,
+		bp.lat,
+		bp.lon,
+		bp.progress_status,
+		bp.passengers,
+		bp.capacity,
+		bp.stop_id,
+		(
+		SELECT
+			brs.headsign
+		FROM
+			bus_route_stops brs
+		WHERE
+			brs.route_id = t.route_id
+			AND brs.direction = t.direction
+		LIMIT 1) AS headsign
+	FROM
+		bus_trips t
+	LEFT JOIN bus_positions bp ON
+		bp.vehicle_id = t.vehicle_id
+		AND bp.mta_id = t.mta_id
+		AND t.id = ANY(
+		SELECT
+			t.id
+		FROM
+			bus_trips t
+		LEFT JOIN bus_stop_times st ON
+			st.trip_id = t.id
+		WHERE
+			st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours'))
+	WHERE
+		bp.lat IS NOT NULL
+		AND bp.lon IS NOT NULL"#
+    )
+    .fetch_all(&pool)
+    .await?;
+
+    let features = trips
+        .into_par_iter()
+        .map(|t| {
+            let mut properties = JsonObject::new();
+            let id = t.id.to_string();
+            properties.insert("id".to_string(), id.clone().into());
+            properties.insert("route_id".to_string(), t.route_id.to_string().into());
+            properties.insert("direction".to_string(), t.direction.into());
+            properties.insert("passengers".to_string(), t.passengers.into());
+            properties.insert("capacity".to_string(), t.capacity.into());
+            properties.insert("stop_id".to_string(), t.stop_id.into());
+
+            Feature {
+                geometry: Some(Geometry {
+                    value: Value::Point(vec![t.lon.unwrap() as f64, t.lat.unwrap() as f64]),
+                    bbox: None,
+                    foreign_members: None,
+                }),
+                id: Some(Id::String(id)),
+                bbox: None,
+                properties: Some(properties),
+                foreign_members: None,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let geojson = FeatureCollection {
+        features,
+        foreign_members: None,
+        bbox: None,
+    };
+
+    Ok(Json(geojson))
 }

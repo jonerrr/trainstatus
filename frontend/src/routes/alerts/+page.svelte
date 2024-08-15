@@ -13,4 +13,5 @@
 	bus_route_ids={$bus_routes.map((r) => r.id)}
 	manage_height={false}
 	show_search
+	class="max-h-[calc(100dvh-7.5rem)] overflow-auto"
 />

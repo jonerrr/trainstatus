@@ -110,8 +110,12 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     )
     .await?;
 
+    // This is used to set alerts not in feed to false
     let mut in_feed_ids = vec![];
+    // This will be used to delete the cloned alerts
     let mut cloned_mta_ids: Vec<String> = vec![];
+    // This is used to delete existing active periods and affected entities for alerts that already exist. Otherwise there may be duplicates
+    let mut existing_alert_ids: Vec<Uuid> = vec![];
 
     let mut alerts: Vec<Alert> = vec![];
     let mut active_periods: Vec<ActivePeriod> = vec![];
@@ -170,6 +174,9 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
         if alert_exists && alerts.iter().any(|a| a.id == alert.id) {
             tracing::debug!("Skipping duplicate alert in feed");
             continue;
+        }
+        if alert_exists {
+            existing_alert_ids.push(alert.id);
         }
 
         in_feed_ids.push(alert.id);
@@ -257,18 +264,6 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
         affected_entities.append(&mut alert_affected_entities);
     }
 
-    // set in_feed to false for alerts not in feed
-    sqlx::query!(
-        "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
-        &in_feed_ids
-    )
-    .execute(pool)
-    .await?;
-    // delete cloned ids
-    sqlx::query!("DELETE FROM alerts WHERE mta_id = ANY($1)", &cloned_mta_ids)
-        .execute(pool)
-        .await?;
-
     // Remove duplicate alerts and their active periods and affected entities
     // TODO: check if this is required still
     let mut cloned_ids = vec![];
@@ -283,8 +278,35 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
     affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
 
-    // TODO: Use transaction https://github.com/launchbadge/sqlx/blob/main/examples/postgres/transaction/src/main.rs
     // TODO: remove old active periods and affected entities
+    let mut transaction = pool.begin().await?;
+
+    // set in_feed to false for alerts not in feed
+    sqlx::query!(
+        "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
+        &in_feed_ids
+    )
+    .execute(&mut *transaction)
+    .await?;
+    // delete cloned ids
+    sqlx::query!("DELETE FROM alerts WHERE mta_id = ANY($1)", &cloned_mta_ids)
+        .execute(&mut *transaction)
+        .await?;
+
+    // Delete existing active periods and affected entities
+    sqlx::query!(
+        "DELETE FROM affected_entities WHERE alert_id = ANY($1)",
+        &existing_alert_ids
+    )
+    .execute(&mut *transaction)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM active_periods WHERE alert_id = ANY($1)",
+        &existing_alert_ids
+    )
+    .execute(&mut *transaction)
+    .await?;
+
     let mut query_builder =
     QueryBuilder::new("INSERT INTO alerts (id, mta_id, alert_type, header_plain, header_html, description_plain, description_html, created_at, updated_at, display_before_active) ");
     query_builder.push_values(alerts, |mut b, alert| {
@@ -302,7 +324,7 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     query_builder
         .push("ON CONFLICT (id) DO UPDATE SET alert_type = EXCLUDED.alert_type, header_plain = EXCLUDED.header_plain, header_html = EXCLUDED.header_html, description_plain = EXCLUDED.description_plain, description_html = EXCLUDED.description_html, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, display_before_active = EXCLUDED.display_before_active");
     let query = query_builder.build();
-    query.execute(pool).await?;
+    query.execute(&mut *transaction).await?;
 
     let mut query_builder =
         QueryBuilder::new("INSERT INTO active_periods (alert_id, start_time, end_time) ");
@@ -314,7 +336,7 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     query_builder
         .push("ON CONFLICT (alert_id, start_time) DO UPDATE SET end_time = EXCLUDED.end_time");
     let query = query_builder.build();
-    query.execute(pool).await?;
+    query.execute(&mut *transaction).await?;
 
     let mut query_builder = QueryBuilder::new(
         "INSERT INTO affected_entities (alert_id, route_id, bus_route_id, stop_id, sort_order) ",
@@ -331,7 +353,9 @@ async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     // );
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
-    query.execute(pool).await?;
+    query.execute(&mut *transaction).await?;
+
+    transaction.commit().await?;
 
     Ok(())
 }

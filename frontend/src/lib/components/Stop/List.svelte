@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CircleX } from 'lucide-svelte';
-	import { onMount } from 'svelte';
 	import { persisted } from 'svelte-persisted-store';
+	import { onMount } from 'svelte';
 	import { derived, writable, type Writable } from 'svelte/store';
 	import SearchWorker from '$lib/search_worker?worker';
 	import { type Stop } from '$lib/api';
