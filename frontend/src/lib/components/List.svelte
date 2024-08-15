@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { persisted } from 'svelte-persisted-store';
-	import { onDestroy, onMount, tick } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { createTabs, melt } from '@melt-ui/svelte';
 

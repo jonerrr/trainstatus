@@ -30,7 +30,7 @@
 				{#if $trip.passengers && $trip.capacity}
 					<BusCapacity passengers={$trip.passengers} capacity={$trip.capacity} />
 				{/if}
-				<BusIcon {route} />
+				<BusIcon {route} link={false} />
 			</div>
 
 			<div class="flex flex-col">

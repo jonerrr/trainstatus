@@ -214,6 +214,7 @@ dependencies = [
  "csv",
  "futures",
  "geo",
+ "geojson",
  "http",
  "indicatif",
  "itertools 0.13.0",
@@ -234,7 +235,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "wkt",
  "zip",
 ]
 
@@ -864,6 +864,7 @@ dependencies = [
  "num-traits",
  "robust",
  "rstar",
+ "serde",
  "spade",
 ]
 
@@ -886,6 +887,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e5ed84f8089c70234b0a8e0aedb6dc733671612ddc0d37c6066052f9781960"
 dependencies = [
  "libm",
+]
+
+[[package]]
+name = "geojson"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d728c1df1fbf328d74151efe6cb0586f79ee813346ea981add69bd22c9241b"
+dependencies = [
+ "geo-types",
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -3236,18 +3250,6 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "wkt"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "296937617013271141d1145d9c05861f5ed3b1bc4297e81c692aa3cff9270a9c"
-dependencies = [
- "geo-types",
- "log",
- "num-traits",
- "thiserror",
 ]
 
 [[package]]

@@ -4,5 +4,5 @@ CREATE TABLE IF NOT EXISTS bus_routes (
     short_name VARCHAR NOT NULL,
     color VARCHAR NOT NULL,
     shuttle BOOLEAN NOT NULL,
-    wkt VARCHAR NOT NULL
+    geom JSON NOT NULL
 );

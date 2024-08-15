@@ -126,11 +126,13 @@ async fn main() {
         .route("/trips", get(routes::trips::get))
         .route("/trips/:id", get(routes::trips::by_id))
         // bus stuff
+        .route("/bus/routes", get(routes::bus::routes::get))
+        .route("/bus/routes/geojson", get(routes::bus::routes::geojson))
         .route("/bus/stops", get(routes::bus::stops::get))
         .route("/bus/stops/times", get(routes::bus::stops::times))
         .route("/bus/trips", get(routes::bus::trips::get))
+        .route("/bus/trips/geojson", get(routes::bus::trips::geojson))
         .route("/bus/trips/:id", get(routes::bus::trips::by_id))
-        .route("/bus/routes", get(routes::bus::routes::get))
         // alerts
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
