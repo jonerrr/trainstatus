@@ -33,7 +33,7 @@ pub async fn get(
 ) -> Result<impl IntoResponse, ServerError> {
     // query is different depending on if they are asking for live data
     // TODO: allow specifying route ids and bus route ids
-    let alerts = {
+    let mut alerts = {
         if time.1 {
             sqlx::query_as!(
                 Alert,
@@ -114,6 +114,10 @@ pub async fn get(
             .await?
         }
     };
+
+    // Remove duplicate alerts by id. TODO: this is a hack, fix it
+    alerts.sort_by(|a, b| a.id.cmp(&b.id));
+    alerts.dedup_by(|a, b| a.id == b.id);
 
     Ok(Json(alerts))
 }

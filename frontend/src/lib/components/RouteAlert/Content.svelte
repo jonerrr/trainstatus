@@ -12,17 +12,6 @@
 	export let route_id: string;
 	export let route_type: 'route_alert' | 'bus_route_alert';
 
-	// const route_alerts = derived(alerts, ($alerts) => {
-	// 	const route_alerts = $alerts
-	// 		.filter((a) => a.entities.some((e) => e.route_id === route_id))
-	// 		.sort((a, b) => {
-	// 			return (
-	// 				b.entities.find((e) => e.route_id === route_id)!.sort_order -
-	// 				a.entities.find((e) => e.route_id === route_id)!.sort_order
-	// 			);
-	// 		});
-	// 	return route_alerts;
-	// });
 	const route_alerts = derived(alerts, ($alerts) => {
 		switch (route_type) {
 			case 'route_alert':
@@ -56,7 +45,7 @@
 	}
 
 	onMount(() => {
-		// remove href from all links in alert-text id
+		// remove href from all links in alert-text id. I don't want people leaving my website ):<
 		document
 			.getElementById('alert-text')
 			?.querySelectorAll('a')

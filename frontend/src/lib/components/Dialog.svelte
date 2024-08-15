@@ -201,7 +201,7 @@
 <dialog
 	id="content-dialog"
 	use:manage_dialog
-	class="backdrop:bg-black/50 rounded max-h-[85dvh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
+	class="backdrop:bg-black/50 rounded max-h-[90dvh] w-[90vw] max-w-[500px] shadow-lg bg-neutral-800 text-indigo-300"
 	bind:this={dialog_el}
 >
 	<!-- use key to make sure dialog reloads even if only dialog_id has changed -->

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                    SELECT\n                        *\n                    FROM\n                        bus_routes;",
+  "query": "\n                    SELECT\n                        *\n                    FROM\n                        bus_routes\n                    ORDER BY \n                        id;",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "e11299882c2a1f6403dace39d90163b5f30fefbf9d0b6554918ba9c004a892c9"
+  "hash": "823c9dec0d52d1ae26f6bc5ca5e16fd92f4f8d931ba88b7b2533b7201500e7c3"
 }

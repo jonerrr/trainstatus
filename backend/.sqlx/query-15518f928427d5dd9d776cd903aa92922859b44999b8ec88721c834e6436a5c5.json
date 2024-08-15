@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                    SELECT\n                        br.id,\n                        br.long_name,\n                        br.short_name,\n                        br.color,\n                        br.shuttle,\n                        NULL as \"wkt: String\"\n                    FROM\n                        bus_routes br\n                ",
+  "query": "\n                    SELECT\n                        br.id,\n                        br.long_name,\n                        br.short_name,\n                        br.color,\n                        br.shuttle,\n                        NULL as \"wkt: String\"\n                    FROM\n                        bus_routes br\n                    ORDER BY\n                        id;\n                ",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       null
     ]
   },
-  "hash": "4c44db4621c510682fe7ba28d46f3cc09502e0cb38357555f35ef693f39e29f1"
+  "hash": "15518f928427d5dd9d776cd903aa92922859b44999b8ec88721c834e6436a5c5"
 }
