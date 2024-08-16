@@ -316,8 +316,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
     query_builder.push("ON CONFLICT DO NOTHING");
     let query = query_builder.build();
     query.execute(pool).await.unwrap();
-
-    tracing::info!("Finished updating train stops and routes");
 }
 
 #[derive(Debug, Deserialize)]
@@ -356,12 +354,4 @@ async fn get_transfers() -> Vec<Transfer> {
     transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
 
     transfers
-    // let mut query_builder: QueryBuilder<sqlx::Postgres> = QueryBuilder::new("INSERT INTO transfers (from_stop_id, to_stop_id)");
-    // query_builder.push_values(transfers, |mut b, transfer| {
-    //     b.push_bind(transfer.from_stop_id)
-    //         .push_bind(transfer.to_stop_id);
-    // });
-    // query_builder.push("ON CONFLICT DO NOTHING");
-    // let query = query_builder.build();
-    // query.execute(pool).await.unwrap();
 }
