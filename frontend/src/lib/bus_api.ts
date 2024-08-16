@@ -12,7 +12,8 @@ export async function update_bus_data(
 	time: number | null
 ) {
 	try {
-		const route_l = routes.join(',');
+		// Need to encode as URI component otherwise bc routes can have + sign
+		const route_l = encodeURIComponent(routes.join(','));
 		const [tripsResponse, stopTimesResponse] = await Promise.all([
 			fetch(`/api/bus/trips?route_ids=${route_l}${time ? `&at=${time}` : ''}`),
 			fetch(`/api/bus/stops/times?route_ids=${route_l}${time ? `&at=${time}` : ''}`)

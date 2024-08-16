@@ -35,7 +35,6 @@ pub async fn get(
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     // params.route_id must be supplied unlike train data bc bus data is too large
-
     // return trips without stop_times
     let trips = sqlx::query_as!(
         BusTrip,
