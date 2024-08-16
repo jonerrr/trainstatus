@@ -1,11 +1,11 @@
-use crate::AppState;
-
-use super::CurrentTime;
 use super::{errors::ServerError, trips::Parameters};
+use super::{json_headers, CurrentTime};
+use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
 use http::HeaderMap;
+use redis::AsyncCommands;
 use serde::Serialize;
 use sqlx::types::JsonValue;
 use sqlx::FromRow;
@@ -73,7 +73,6 @@ GROUP BY
     .fetch_all(&state.pg_pool)
     .await?;
 
-    // TODO: make static
     let mut headers = HeaderMap::new();
     // cache for a week
     headers.insert("cache-control", "public, max-age=604800".parse().unwrap());
@@ -81,7 +80,7 @@ GROUP BY
     Ok((headers, Json(stops)))
 }
 
-#[derive(FromRow, Serialize)]
+#[derive(Serialize)]
 pub struct StopTime {
     pub stop_id: String,
     pub arrival: Option<DateTime<Utc>>,
@@ -98,11 +97,10 @@ pub async fn times(
     params: Query<Parameters>,
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    let stop_times = {
-        if params.stop_ids.is_empty() {
-            sqlx::query_as!(
-                StopTime,
-                "SELECT
+    if params.stop_ids.is_empty() {
+        let stop_times = sqlx::query_as!(
+            StopTime,
+            "SELECT
                 st.stop_id,
                 st.arrival,
                 st.departure,
@@ -124,38 +122,15 @@ pub async fn times(
             )
             ORDER BY
                 st.arrival",
-                time.0
-            )
-            .fetch_all(&state.pg_pool)
-            .await?
-        } else {
-            sqlx::query_as!(
-                StopTime,
-                "SELECT
-                st.stop_id,
-                st.arrival,
-                st.departure,
-                t.route_id,
-                t.direction,
-                t.assigned,
-                t.id AS trip_id
-            FROM
-                stop_times st
-            LEFT JOIN trips t 
-                ON
-                t.id = st.trip_id
-            WHERE
-                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                AND st.stop_id = ANY($2)
-            ORDER BY
-                st.arrival",
-                time.0,
-                &params.stop_ids
-            )
-            .fetch_all(&state.pg_pool)
-            .await?
-        }
-    };
+            time.0
+        )
+        .fetch_all(&state.pg_pool)
+        .await?;
+        Ok(Json(stop_times).into_response())
+    } else {
+        let mut conn = state.redis_pool.get().await.unwrap();
+        let stop_times: String = conn.get("stop_times").await?;
 
-    Ok(Json(stop_times))
+        Ok((json_headers().clone(), stop_times).into_response())
+    }
 }

@@ -581,7 +581,6 @@ pub async fn parse_gtfs(pool: &PgPool, endpoint: &str) -> Result<(), DecodeFeedE
     query_builder.push(" ON CONFLICT (trip_id) DO UPDATE SET stop_id = EXCLUDED.stop_id, train_status = EXCLUDED.train_status, current_stop_sequence = EXCLUDED.current_stop_sequence, updated_at = EXCLUDED.updated_at");
     let query = query_builder.build();
     query.execute(pool).await?;
-    // dbg!(endpoint);
 
     Ok(())
 }

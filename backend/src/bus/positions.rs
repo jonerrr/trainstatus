@@ -21,7 +21,7 @@ struct Position {
     // capacity: i32,
 }
 
-pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) {
+pub async fn import(pool: PgPool) {
     let pool1 = pool.clone();
     tokio::spawn(async move {
         loop {

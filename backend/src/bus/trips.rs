@@ -1,11 +1,13 @@
 use crate::{
     feed::TripUpdate,
     gtfs::decode,
+    routes::bus::{stops::StopTime as StopTimeRow, trips::BusTrip as TripRow},
     train::trips::{DecodeFeedError, IntoStopTimeError, StopTimeUpdateWithTrip},
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
+use redis::AsyncCommands;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -20,6 +22,79 @@ pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>)
                     tracing::error!("Error importing bus trip data: {:?}", e);
                 }
             }
+
+            let trips = sqlx::query_as!(
+                TripRow,
+                // Need the `?` to make the joined columns optional, otherwise it errors out
+                r#"SELECT
+                t.id,
+                t.route_id,
+                t.direction,
+                t.vehicle_id,
+                t.created_at,
+                t.deviation,
+                bp.lat,
+                bp.lon,
+                bp.progress_status,
+                bp.passengers,
+                bp.capacity,
+                bp.stop_id,
+                (
+                SELECT
+                    brs.headsign
+                FROM
+                    bus_route_stops brs
+                WHERE
+                    brs.route_id = t.route_id
+                    AND brs.direction = t.direction
+                LIMIT 1) AS headsign
+            FROM
+                bus_trips t
+            LEFT JOIN bus_positions bp ON
+                bp.vehicle_id = t.vehicle_id
+                AND bp.mta_id = t.mta_id
+                AND t.id = ANY(
+                SELECT
+                    t.id
+                FROM
+                    bus_trips t
+                LEFT JOIN bus_stop_times st ON
+                    st.trip_id = t.id
+                WHERE
+                    st.arrival >= now())"#
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+            let stop_times = sqlx::query_as!(
+                StopTimeRow,
+                r#"SELECT
+                bst.*, bt.route_id
+            FROM
+                bus_stop_times bst
+            LEFT JOIN bus_trips bt ON
+                bt.id = bst.trip_id
+            WHERE
+                bst.arrival >= now()
+            ORDER BY
+                bst.arrival"#
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+            let Ok(trips_str) = serde_json::to_string(&trips) else {
+                tracing::error!("Failed to convert bus trips to string");
+                continue;
+            };
+            let Ok(stop_times_str) = serde_json::to_string(&stop_times) else {
+                tracing::error!("Failed to convert bus stop times to string");
+                continue;
+            };
+            let items = [("bus_trips", trips_str), ("bus_stop_times", stop_times_str)];
+            let mut conn = redis_pool.get().await.unwrap();
+            let _: () = conn.mset(&items).await.unwrap();
 
             sleep(Duration::from_secs(15)).await;
         }
