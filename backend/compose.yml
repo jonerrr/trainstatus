@@ -9,14 +9,14 @@ services:
       - POSTGRES_DB=trains
     volumes:
       - trainstatus-db:/var/lib/postgresql/data:z
-  ts-backend:
-    environment:
-      - DATABASE_URL=postgres://trains:trains@trainstatus-postgres:5432/trains
-      - ADDRESS=0.0.0.0:3055
-      - API_KEY=bus api key
-    build: .
-    ports:
-      - 3055:3055
+  # ts-backend:
+  #   environment:
+  #     - DATABASE_URL=postgres://trains:trains@trainstatus-postgres:5432/trains
+  #     - ADDRESS=0.0.0.0:3055
+  #     - API_KEY=bus api key
+  #   build: .
+  #   ports:
+  #     - 3055:3055
 
 volumes:
   trainstatus-db:
