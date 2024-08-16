@@ -105,8 +105,8 @@
 
 		// dialog type + id
 		let url = window.location.origin + `/?dt=${$page.state.dialog_type}&id=${id}`;
-
-		if (!navigator.share) {
+		// Only use share api if on mobile and supported
+		if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
 			navigator.clipboard.writeText(url);
 			copied = true;
 			setTimeout(() => {

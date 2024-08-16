@@ -1,20 +1,72 @@
 use crate::{
     gtfs::decode,
+    routes::alerts::Alert as AlertRow,
     train::{static_data::ROUTES, trips::DecodeFeedError},
 };
+use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
+use redis::AsyncCommands;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
 
-pub async fn import(pool: PgPool) {
+pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) {
     tokio::spawn(async move {
         loop {
             if let Err(e) = parse_gtfs(&pool).await {
                 tracing::error!("Failed to decode feed: {:?}", e);
             }
+
+            let mut alerts = sqlx::query_as!(
+                AlertRow,
+                "SELECT
+                a.id,
+                a.alert_type,
+                a.header_html,
+                a.description_html,
+                a.created_at,
+                a.updated_at,
+                ap.start_time,
+                ap.end_time,
+                jsonb_agg(DISTINCT jsonb_build_object('bus_route_id',
+                ae.bus_route_id,
+                'route_id',
+                ae.route_id,
+                'stop_id',
+                ae.stop_id,
+                'sort_order',
+                ae.sort_order)) AS entities
+            FROM
+                alerts a
+            LEFT JOIN active_periods ap ON
+                a.id = ap.alert_id
+            LEFT JOIN affected_entities ae ON
+                a.id = ae.alert_id
+            WHERE
+                a.in_feed IS TRUE
+                AND (ae.route_id IS NOT NULL OR ae.bus_route_id IS NOT NULL)
+                AND ap.start_time < now()
+                AND (ap.end_time > now()
+                    OR ap.end_time IS NULL)
+            GROUP BY
+                a.id,
+                ap.start_time,
+                ap.end_time"
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            alerts.sort_by(|a, b| a.id.cmp(&b.id));
+            alerts.dedup_by(|a, b| a.id == b.id);
+            let Ok(alerts_str) = serde_json::to_string(&alerts) else {
+                tracing::error!("Failed to convert alerts to string");
+                continue;
+            };
+            let mut conn = redis_pool.get().await.unwrap();
+            let _: () = conn.set("alerts", alerts_str).await.unwrap();
+
             sleep(Duration::from_secs(15)).await;
         }
     });

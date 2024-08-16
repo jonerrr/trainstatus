@@ -5,6 +5,7 @@ use axum::{
     routing::get,
     Router, ServiceExt,
 };
+use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
 use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -32,6 +33,12 @@ pub mod feed {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Clone)]
+struct AppState {
+    pg_pool: sqlx::PgPool,
+    redis_pool: bb8::Pool<RedisConnectionManager>,
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
@@ -47,17 +54,32 @@ async fn main() {
         .expect("DATABASE_URL env not set")
         .parse()
         .unwrap();
-    let pool = PgPoolOptions::new()
+    let pg_pool = PgPoolOptions::new()
         .max_connections(100)
         .connect_with(pg_connect_option)
         .await
         .expect("Failed to create postgres pool");
     sqlx::migrate!()
-        .run(&pool)
+        .run(&pg_pool)
         .await
         .expect("Failed to run database migrations");
 
-    let s_pool = pool.clone();
+    // Connect to redis and create a pool
+    let manager =
+        RedisConnectionManager::new(var("REDIS_URL").expect("Missing REDIS_URL")).unwrap();
+    let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
+
+    // Test Redis connection
+    let mut conn = redis_pool.get_owned().await.unwrap();
+    let s = conn.send_packed_command(&redis::cmd("PING")).await.unwrap();
+    match s {
+        redis::Value::SimpleString(s) => {
+            assert_eq!(s, "PONG");
+        }
+        _ => panic!("Failed to ping redis"),
+    }
+
+    let s_pool = pg_pool.clone();
     tokio::spawn(async move {
         loop {
             let last_updated = sqlx::query!("SELECT update_at FROM last_update")
@@ -106,10 +128,10 @@ async fn main() {
         }
     });
 
-    train::trips::import(pool.clone()).await;
-    bus::trips::import(pool.clone()).await;
-    bus::positions::import(pool.clone()).await;
-    alerts::import(pool.clone()).await;
+    train::trips::import(pg_pool.clone(), redis_pool.clone()).await;
+    bus::trips::import(pg_pool.clone(), redis_pool.clone()).await;
+    bus::positions::import(pg_pool.clone(), redis_pool.clone()).await;
+    alerts::import(pg_pool.clone(), redis_pool.clone()).await;
 
     let app = Router::new()
         .route(
@@ -137,7 +159,10 @@ async fn main() {
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
-        .with_state(pool)
+        .with_state(AppState {
+            pg_pool,
+            redis_pool,
+        })
         .fallback(handler_404);
 
     // Need to specify normalize path layer like this so it runs before routing

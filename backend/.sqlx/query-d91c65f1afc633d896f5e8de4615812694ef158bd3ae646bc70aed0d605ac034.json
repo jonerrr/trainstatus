@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n                a.id,\n                a.alert_type,\n                a.header_html,\n                a.description_html,\n                a.created_at,\n                a.updated_at,\n                ap.start_time,\n                ap.end_time,\n                jsonb_agg(DISTINCT jsonb_build_object('bus_route_id',\n                ae.bus_route_id,\n                'route_id',\n                ae.route_id,\n                'stop_id',\n                ae.stop_id,\n                'sort_order',\n                ae.sort_order)) AS entities\n            FROM\n                alerts a\n            LEFT JOIN active_periods ap ON\n                a.id = ap.alert_id\n            LEFT JOIN affected_entities ae ON\n                a.id = ae.alert_id\n            WHERE\n                a.in_feed IS TRUE\n                AND (ae.route_id IS NOT NULL OR ae.bus_route_id IS NOT NULL)\n                AND ap.start_time < now()\n                AND (ap.end_time > now()\n                    OR ap.end_time IS NULL)\n            GROUP BY\n                a.id,\n                ap.start_time,\n                ap.end_time",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "alert_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "header_html",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description_html",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "start_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "end_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "entities",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "d91c65f1afc633d896f5e8de4615812694ef158bd3ae646bc70aed0d605ac034"
+}

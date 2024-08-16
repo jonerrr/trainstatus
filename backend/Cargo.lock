@@ -110,6 +110,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
 name = "async-compression"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -209,6 +215,8 @@ name = "backend"
 version = "0.5.0"
 dependencies = [
  "axum",
+ "bb8",
+ "bb8-redis",
  "chrono",
  "chrono-tz",
  "csv",
@@ -218,11 +226,11 @@ dependencies = [
  "http",
  "indicatif",
  "itertools 0.13.0",
- "once_cell",
  "polyline",
  "prost",
  "prost-build",
  "rayon",
+ "redis",
  "regex",
  "reqwest",
  "serde",
@@ -270,6 +278,29 @@ name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+
+[[package]]
+name = "bb8"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b10cf871f3ff2ce56432fddc2615ac7acc3aa22ca321f8fea800846fbb32f188"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "parking_lot",
+ "tokio",
+]
+
+[[package]]
+name = "bb8-redis"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c6910977c026bb1d0a6b523508d1a893d6d4c2ba216355e9569d8181d92ccbe"
+dependencies = [
+ "async-trait",
+ "bb8",
+ "redis",
+]
 
 [[package]]
 name = "bitflags"
@@ -417,6 +448,20 @@ checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
  "crypto-common",
  "inout",
+]
+
+[[package]]
+name = "combine"
+version = "4.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1389,6 +1434,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint-dig"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1851,6 +1906,29 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "redis"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e902a69d09078829137b4a5d9d082e0490393537badd7c91a3d69d14639e115f"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "bytes",
+ "combine",
+ "futures-util",
+ "itoa",
+ "num-bigint",
+ "percent-encoding",
+ "pin-project-lite",
+ "ryu",
+ "sha1_smol",
+ "socket2",
+ "tokio",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]

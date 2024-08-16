@@ -31,7 +31,7 @@
       {
         "ordinal": 5,
         "name": "geom",
-        "type_info": "Json"
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {

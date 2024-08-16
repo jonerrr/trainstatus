@@ -1,4 +1,5 @@
 use crate::{bus::api_key, gtfs::decode, train::trips::DecodeFeedError};
+use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
@@ -20,7 +21,7 @@ struct Position {
     // capacity: i32,
 }
 
-pub async fn import(pool: PgPool) {
+pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) {
     let pool1 = pool.clone();
     tokio::spawn(async move {
         loop {

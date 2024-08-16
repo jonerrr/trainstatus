@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n\tt.id,\n\tt.route_id,\n\tt.direction,\n\tt.vehicle_id,\n\tt.created_at,\n\tt.deviation,\n\tbp.lat,\n\tbp.lon,\n\tbp.progress_status,\n\tbp.passengers,\n\tbp.capacity,\n\tbp.stop_id,\n\t(\n\tSELECT\n\t\tbrs.headsign\n\tFROM\n\t\tbus_route_stops brs\n\tWHERE\n\t\tbrs.route_id = t.route_id\n\t\tAND brs.direction = t.direction\n\tLIMIT 1) AS headsign\nFROM\n\tbus_trips t\nLEFT JOIN bus_positions bp ON\n\tbp.vehicle_id = t.vehicle_id\n\tAND bp.mta_id = t.mta_id\n\tAND t.id = ANY(\n\tSELECT\n\t\tt.id\n\tFROM\n\t\tbus_trips t\n\tLEFT JOIN bus_stop_times st ON\n\t\tst.trip_id = t.id\n\tWHERE\n\t\tst.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))\nWHERE\n\tt.route_id = ANY($2)",
+  "query": "\nSELECT\n\tt.id,\n\tt.route_id,\n\tt.direction,\n\tt.vehicle_id,\n\tt.created_at,\n\tt.deviation,\n\tbp.lat,\n\tbp.lon,\n\tbp.progress_status,\n\tbp.passengers,\n\tbp.capacity,\n\tbp.stop_id,\n\t(\n\tSELECT\n\t\tbrs.headsign\n\tFROM\n\t\tbus_route_stops brs\n\tWHERE\n\t\tbrs.route_id = t.route_id\n\t\tAND brs.direction = t.direction\n\tLIMIT 1) AS headsign\nFROM\n\tbus_trips t\nLEFT JOIN bus_positions bp ON\n\tbp.vehicle_id = t.vehicle_id\n\tAND bp.mta_id = t.mta_id\n\tAND t.id = ANY(\n\tSELECT\n\t\tt.id\n\tFROM\n\t\tbus_trips t\n\tLEFT JOIN bus_stop_times st ON\n\t\tst.trip_id = t.id\n\tWHERE\n\t\tst.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))",
   "describe": {
     "columns": [
       {
@@ -71,8 +71,7 @@
     ],
     "parameters": {
       "Left": [
-        "Timestamptz",
-        "TextArray"
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -91,5 +90,5 @@
       null
     ]
   },
-  "hash": "55b899a28eb7a2e0704fd924540055c8dafe7fc42781892df4a795ec3786021d"
+  "hash": "13f7306bb46eca7cf79d7d0d99e5f9a18d377c6259830575233197f4831716f9"
 }

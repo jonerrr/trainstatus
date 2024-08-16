@@ -1,6 +1,6 @@
 use crate::{
     routes::{errors::ServerError, parse_list, CurrentTime},
-    train::trips::STOP_TIMES_RESPONSE,
+    AppState,
 };
 use axum::{
     extract::{Path, State},
@@ -8,9 +8,12 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use sqlx::{types::JsonValue, FromRow, PgPool};
+use sqlx::{types::JsonValue, FromRow};
 use uuid::Uuid;
+
+use super::json_headers;
 
 #[derive(FromRow, Serialize, Clone)]
 pub struct Trip {
@@ -37,13 +40,13 @@ pub struct Parameters {
 }
 
 pub async fn get(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    let trips = match time.1 {
+    match time.1 {
         true => {
             // if user specified time
-            sqlx::query_as!(
+            let trips = sqlx::query_as!(
                 Trip,
                 // Need the `?` to make the joined columns optional, otherwise it errors out
                 r#"SELECT
@@ -74,16 +77,19 @@ pub async fn get(
         )"#,
                 time.0
             )
-            .fetch_all(&pool)
-            .await?
+            .fetch_all(&state.pg_pool)
+            .await?;
+
+            Ok(Json(trips).into_response())
         }
         false => {
             // if user didn't specify time we can use cache
-            STOP_TIMES_RESPONSE.lock().await.to_owned()
-        }
-    };
+            let mut conn = state.redis_pool.get().await.unwrap();
+            let trips: String = conn.get("trips").await?;
 
-    Ok(Json(trips))
+            Ok((json_headers().clone(), trips).into_response())
+        }
+    }
 }
 
 #[derive(FromRow, Serialize)]
@@ -100,7 +106,7 @@ pub struct TripData {
 }
 
 pub async fn by_id(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ServerError> {
     let trip = sqlx::query_as!(
@@ -125,7 +131,7 @@ pub async fn by_id(
 		t.id"#,
         id
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pg_pool)
     .await?;
 
     match trip {

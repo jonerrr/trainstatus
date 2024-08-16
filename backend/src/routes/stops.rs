@@ -1,3 +1,5 @@
+use crate::AppState;
+
 use super::CurrentTime;
 use super::{errors::ServerError, trips::Parameters};
 use axum::extract::Query;
@@ -6,7 +8,7 @@ use chrono::{DateTime, Utc};
 use http::HeaderMap;
 use serde::Serialize;
 use sqlx::types::JsonValue;
-use sqlx::{FromRow, PgPool};
+use sqlx::FromRow;
 use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
@@ -50,7 +52,7 @@ pub struct Stop {
 //     departure: chrono::DateTime<Utc>,
 // }
 
-pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+pub async fn get(State(state): State<AppState>) -> Result<impl IntoResponse, ServerError> {
     let stops = sqlx::query_as!(
         Stop,
         "SELECT
@@ -68,7 +70,7 @@ LEFT JOIN route_stops rs ON
 GROUP BY
 	s.id",
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     // TODO: make static
@@ -80,19 +82,19 @@ GROUP BY
 }
 
 #[derive(FromRow, Serialize)]
-struct StopTime {
-    stop_id: String,
-    arrival: Option<DateTime<Utc>>,
-    departure: Option<DateTime<Utc>>,
-    route_id: Option<String>,
-    direction: Option<i16>,
-    assigned: Option<bool>,
-    trip_id: Option<Uuid>,
+pub struct StopTime {
+    pub stop_id: String,
+    pub arrival: Option<DateTime<Utc>>,
+    pub departure: Option<DateTime<Utc>>,
+    pub route_id: Option<String>,
+    pub direction: Option<i16>,
+    pub assigned: Option<bool>,
+    pub trip_id: Option<Uuid>,
     // created_at: Option<DateTime<Utc>>,
 }
 
 pub async fn times(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     params: Query<Parameters>,
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
@@ -121,11 +123,10 @@ pub async fn times(
                 WHERE arrival > $1
             )
             ORDER BY
-                st.arrival
-        ",
+                st.arrival",
                 time.0
             )
-            .fetch_all(&pool)
+            .fetch_all(&state.pg_pool)
             .await?
         } else {
             sqlx::query_as!(
@@ -151,7 +152,7 @@ pub async fn times(
                 time.0,
                 &params.stop_ids
             )
-            .fetch_all(&pool)
+            .fetch_all(&state.pg_pool)
             .await?
         }
     };
