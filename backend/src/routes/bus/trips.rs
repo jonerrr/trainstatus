@@ -15,21 +15,21 @@ use serde::Serialize;
 use sqlx::{types::JsonValue, FromRow};
 use uuid::Uuid;
 
-#[derive(FromRow, Serialize)]
+#[derive(Serialize)]
 pub struct BusTrip {
-    id: Uuid,
-    route_id: String,
-    direction: i16,
-    vehicle_id: i32,
-    deviation: Option<i32>,
-    created_at: chrono::DateTime<Utc>,
-    lat: Option<f32>,
-    lon: Option<f32>,
-    progress_status: Option<String>,
-    passengers: Option<i32>,
-    capacity: Option<i32>,
-    stop_id: Option<i32>,
-    headsign: Option<String>,
+    pub id: Uuid,
+    pub route_id: String,
+    pub direction: i16,
+    pub vehicle_id: i32,
+    pub deviation: Option<i32>,
+    pub created_at: chrono::DateTime<Utc>,
+    pub lat: Option<f32>,
+    pub lon: Option<f32>,
+    pub progress_status: Option<String>,
+    pub passengers: Option<i32>,
+    pub capacity: Option<i32>,
+    pub stop_id: Option<i32>,
+    pub headsign: Option<String>,
 }
 
 pub async fn get(
@@ -77,13 +77,13 @@ LEFT JOIN bus_positions bp ON
 	LEFT JOIN bus_stop_times st ON
 		st.trip_id = t.id
 	WHERE
-		st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))"#,
-        time.0
+		st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))
+		WHERE t.route_id = ANY($2)"#,
+        time.0,
+        &params.route_ids
     )
     .fetch_all(&state.pg_pool)
     .await?;
-    // WHERE
-    // t.route_id = ANY($2)
 
     Ok(Json(trips))
 }

@@ -12,6 +12,7 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
     env::{remove_var, var},
+    // process::exit,
     time::Duration,
 };
 use tokio::time::sleep;
@@ -129,8 +130,9 @@ async fn main() {
     });
 
     train::trips::import(pg_pool.clone(), redis_pool.clone()).await;
+    // Only reloading cache after bus trips
     bus::trips::import(pg_pool.clone(), redis_pool.clone()).await;
-    bus::positions::import(pg_pool.clone(), redis_pool.clone()).await;
+    bus::positions::import(pg_pool.clone()).await;
     alerts::import(pg_pool.clone(), redis_pool.clone()).await;
 
     let app = Router::new()
@@ -175,6 +177,13 @@ async fn main() {
     tracing::info!("listening on {}", listener.local_addr().unwrap());
 
     // https://github.com/tokio-rs/axum/discussions/2377 need to specify types bc of normalize path layer
+    // tokio::select! {
+    //  biased;
+    //  _ = signal::ctrl_c() => {}
+    //  _ = axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
+    //  .await
+    //  .unwrap() => {}
+    // }
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .await
         .unwrap();
