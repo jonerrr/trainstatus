@@ -4,14 +4,25 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, TimeZone, Utc};
-use http::request::Parts;
+use http::{request::Parts, HeaderMap};
 use serde::{Deserialize, Deserializer};
+use std::sync::OnceLock;
 
 pub mod alerts;
 pub mod bus;
 pub mod errors;
 pub mod stops;
 pub mod trips;
+
+// not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
+pub fn json_headers() -> &'static HeaderMap {
+    static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
+    HEADERS.get_or_init(|| {
+        let mut headers = HeaderMap::new();
+        headers.insert("content-type", "application/json".parse().unwrap());
+        headers
+    })
+}
 
 pub fn parse_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
@@ -26,7 +37,7 @@ where
 }
 
 // this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct CurrentTime(pub DateTime<Utc>, pub bool);
 
 #[derive(Deserialize, Debug)]

@@ -3,6 +3,7 @@ use crate::{
     gtfs::decode,
     train::trips::{DecodeFeedError, IntoStopTimeError, StopTimeUpdateWithTrip},
 };
+use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
 use sqlx::{PgPool, QueryBuilder};
@@ -10,7 +11,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
 
-pub async fn import(pool: PgPool) {
+pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) {
     tokio::spawn(async move {
         loop {
             match parse_gtfs(&pool).await {

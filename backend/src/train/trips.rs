@@ -1,16 +1,17 @@
 use crate::{
     feed::{trip_update::StopTimeUpdate, TripDescriptor},
     gtfs::decode,
+    routes::stops::StopTime as StopTimeRow,
     routes::trips::Trip as TripRow,
 };
+use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use once_cell::sync::Lazy;
 use prost::DecodeError;
 use rayon::prelude::*;
+use redis::AsyncCommands;
 use sqlx::{PgPool, QueryBuilder};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -52,66 +53,90 @@ pub enum DecodeFeedError {
     IntoTripError(#[from] IntoTripError),
 }
 
-// Store json of trip response
-pub static STOP_TIMES_RESPONSE: Lazy<Mutex<Vec<TripRow>>> = Lazy::new(|| Mutex::new(vec![]));
-
-pub async fn import(pool: PgPool) {
+pub async fn import(pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) {
     tokio::spawn(async move {
         loop {
             let futures = (0..ENDPOINTS.len()).map(|i| parse_gtfs(&pool, ENDPOINTS[i]));
             let _ = futures::future::join_all(futures).await;
-            cache_stop_times(&pool).await.unwrap();
-            // for endpoint in ENDPOINTS.iter() {
-            //     match parse_gtfs(&pool, endpoint).await {
-            //         Ok(_) => (),
-            //         Err(e) => {
-            //             tracing::error!("Error importing data: {:?}", e);
-            //         }
-            //     }
-            // }
+
+            let trips = sqlx::query_as!(
+                TripRow,
+                // Need the `?` to make the joined columns optional, otherwise it errors out
+                r#"SELECT
+                    t.id,
+                    t.route_id,
+                    t.express,
+                    t.direction,
+                    t.assigned,
+                    t.created_at,
+                    p.stop_id AS "stop_id?",
+                    p.train_status AS "train_status?",
+                    p.current_stop_sequence AS "current_stop_sequence?",
+                    p.updated_at AS "updated_at?"
+                FROM
+                    trips t
+                LEFT JOIN positions p ON
+                    p.trip_id = t.id
+                WHERE
+                    t.id = ANY(
+                        SELECT
+                            t.id
+                        FROM
+                            trips t
+                        LEFT JOIN stop_times st ON
+                            st.trip_id = t.id
+                        WHERE
+                            st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+                    )"#
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+            let stop_times = sqlx::query_as!(
+                StopTimeRow,
+                r#"SELECT
+                st.stop_id,
+                st.arrival,
+                st.departure,
+                t.route_id,
+                t.direction,
+                t.assigned,
+                t.id AS trip_id
+            FROM
+                stop_times st
+            LEFT JOIN trips t 
+                ON
+                t.id = st.trip_id
+            WHERE
+                st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+            OR t.id IN (
+                SELECT DISTINCT trip_id
+                FROM stop_times
+                WHERE arrival > now()
+            )
+            ORDER BY
+                st.arrival"#
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+            let Ok(trips_str) = serde_json::to_string(&trips) else {
+                tracing::error!("Failed to convert trips to string");
+                continue;
+            };
+            let Ok(stop_times_str) = serde_json::to_string(&stop_times) else {
+                tracing::error!("Failed to convert stop times to string");
+                continue;
+            };
+            let items = [("trips", trips_str), ("stop_times", stop_times_str)];
+            let mut conn = redis_pool.get().await.unwrap();
+            let _: () = conn.mset(&items).await.unwrap();
+
             sleep(Duration::from_secs(15)).await;
         }
     });
-}
-
-pub async fn cache_stop_times(pool: &PgPool) -> Result<(), DecodeFeedError> {
-    let trips = sqlx::query_as!(
-        TripRow,
-        // Need the `?` to make the joined columns optional, otherwise it errors out
-        r#"SELECT
-            t.id,
-            t.route_id,
-            t.express,
-            t.direction,
-            t.assigned,
-            t.created_at,
-            p.stop_id AS "stop_id?",
-            p.train_status AS "train_status?",
-            p.current_stop_sequence AS "current_stop_sequence?",
-            p.updated_at AS "updated_at?"
-        FROM
-            trips t
-        LEFT JOIN positions p ON
-            p.trip_id = t.id
-        WHERE
-            t.id = ANY(
-                SELECT
-                    t.id
-                FROM
-                    trips t
-                LEFT JOIN stop_times st ON
-                    st.trip_id = t.id
-                WHERE
-                    st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
-            )"#
-    )
-    .fetch_all(pool)
-    .await?;
-    let mut lock = STOP_TIMES_RESPONSE.lock().await;
-    *lock = trips;
-    // drop(lock);
-
-    Ok(())
 }
 
 #[derive(Debug)]
@@ -314,20 +339,44 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a, Trip>> for StopTime {
             return Err(IntoStopTimeError::FakeStop);
         }
 
-        let arrival = value
-            .stop_time
-            .arrival
-            .ok_or(IntoStopTimeError::Arrival)?
-            .time
-            .and_then(|t| DateTime::from_timestamp(t, 0))
-            .ok_or(IntoStopTimeError::Arrival)?;
-        let departure = value
-            .stop_time
-            .departure
-            .ok_or(IntoStopTimeError::Departure)?
-            .time
-            .and_then(|t| DateTime::from_timestamp(t, 0))
-            .ok_or(IntoStopTimeError::Departure)?;
+        let arrival = match value.stop_time.arrival {
+            Some(a) => a.time,
+            // arrival is none for first stop of trip, so we put the departure instead
+            None => match value.stop_time.departure {
+                Some(d) => d.time,
+                None => return Err(IntoStopTimeError::Arrival),
+            },
+        }
+        .ok_or(IntoStopTimeError::Arrival)?;
+
+        let departure = match value.stop_time.departure {
+            Some(d) => d.time,
+            // departure is none for last stop of trip
+            None => match value.stop_time.arrival {
+                Some(a) => a.time,
+                None => return Err(IntoStopTimeError::Departure),
+            },
+        }
+        .ok_or(IntoStopTimeError::Departure)?;
+
+        let arrival = DateTime::from_timestamp(arrival, 0).ok_or(IntoStopTimeError::Arrival)?;
+        let departure =
+            DateTime::from_timestamp(departure, 0).ok_or(IntoStopTimeError::Departure)?;
+
+        // let arrival = value
+        //     .stop_time
+        //     .arrival
+        //     .or(value.stop_time.departure)
+        //     .time
+        //     .and_then(|t| DateTime::from_timestamp(t, 0))
+        //     .ok_or(IntoStopTimeError::Arrival)?;
+        // let departure = value
+        //     .stop_time
+        //     .departure
+        //     .ok_or(IntoStopTimeError::Departure)?
+        //     .time
+        //     .and_then(|t| DateTime::from_timestamp(t, 0))
+        //     .ok_or(IntoStopTimeError::Departure)?;
 
         Ok(StopTime {
             trip_id: value.trip.id,
@@ -346,7 +395,7 @@ fn direction_from_stop_id(stop_id: &str) -> Option<i16> {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Position {
     trip_id: Uuid,
     stop_id: String,
@@ -355,7 +404,7 @@ pub struct Position {
     updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct StopTime {
     trip_id: Uuid,
     stop_id: String,

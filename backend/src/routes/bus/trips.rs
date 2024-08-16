@@ -1,5 +1,8 @@
 use super::stops::Parameters;
-use crate::routes::{errors::ServerError, CurrentTime};
+use crate::{
+    routes::{errors::ServerError, CurrentTime},
+    AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
@@ -9,7 +12,7 @@ use chrono::Utc;
 use geojson::{feature::Id, Feature, FeatureCollection, Geometry, JsonObject, Value};
 use rayon::prelude::*;
 use serde::Serialize;
-use sqlx::{types::JsonValue, FromRow, PgPool};
+use sqlx::{types::JsonValue, FromRow};
 use uuid::Uuid;
 
 #[derive(FromRow, Serialize)]
@@ -30,7 +33,7 @@ pub struct BusTrip {
 }
 
 pub async fn get(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     params: Query<Parameters>,
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
@@ -74,15 +77,13 @@ LEFT JOIN bus_positions bp ON
 	LEFT JOIN bus_stop_times st ON
 		st.trip_id = t.id
 	WHERE
-		st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))
-WHERE
-	t.route_id = ANY($2)"#,
-        time.0,
-        &params.route_ids
+		st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours'))"#,
+        time.0
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
-    //  AND bp.mta_id = t.mta_id
+    // WHERE
+    // t.route_id = ANY($2)
 
     Ok(Json(trips))
 }
@@ -100,7 +101,7 @@ pub struct BusTripData {
 }
 
 pub async fn by_id(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ServerError> {
     let trip = sqlx::query_as!(
@@ -141,7 +142,7 @@ GROUP BY
 	t.id"#,
         id
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pg_pool)
     .await?;
 
     match trip {
@@ -151,7 +152,7 @@ GROUP BY
 }
 
 pub async fn geojson(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     // params: Query<Parameters>,
     // time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
@@ -201,7 +202,7 @@ pub async fn geojson(
 		bp.lat IS NOT NULL
 		AND bp.lon IS NOT NULL"#
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     let features = trips

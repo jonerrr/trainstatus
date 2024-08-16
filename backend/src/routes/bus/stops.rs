@@ -1,4 +1,7 @@
-use crate::routes::{errors::ServerError, parse_list, CurrentTime};
+use crate::{
+    routes::{errors::ServerError, parse_list, CurrentTime},
+    AppState,
+};
 use axum::{
     extract::{Query, State},
     response::IntoResponse,
@@ -7,7 +10,6 @@ use axum::{
 use chrono::{DateTime, Utc};
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
@@ -20,7 +22,7 @@ pub struct Stop {
     pub routes: Option<serde_json::Value>,
 }
 
-pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+pub async fn get(State(state): State<AppState>) -> Result<impl IntoResponse, ServerError> {
     let stops = sqlx::query_as!(
         Stop,
         "SELECT
@@ -41,7 +43,7 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
     GROUP BY
         s.id;"
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     let mut headers = HeaderMap::new();
@@ -68,7 +70,7 @@ pub struct StopTime {
 }
 
 pub async fn times(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     params: Query<Parameters>,
     time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
@@ -88,7 +90,7 @@ pub async fn times(
         &params.route_ids,
         time.0
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     Ok(Json(stop_times))

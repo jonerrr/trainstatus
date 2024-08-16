@@ -1,11 +1,10 @@
-use crate::routes::errors::ServerError;
+use crate::{routes::errors::ServerError, AppState};
 use axum::{extract::State, response::IntoResponse, Json};
 use geo::MultiLineString;
 use geojson::{feature::Id, Feature, FeatureCollection, Geometry, JsonObject, Value};
 use http::HeaderMap;
 use rayon::prelude::*;
 use serde::Serialize;
-use sqlx::PgPool;
 
 #[derive(Serialize)]
 pub struct Route {
@@ -16,7 +15,7 @@ pub struct Route {
     pub shuttle: bool,
 }
 
-pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+pub async fn get(State(state): State<AppState>) -> Result<impl IntoResponse, ServerError> {
     let routes = sqlx::query_as!(
         Route,
         r#"
@@ -32,7 +31,7 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
             id;
     "#
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     let mut headers = HeaderMap::new();
@@ -42,7 +41,7 @@ pub async fn get(State(pool): State<PgPool>) -> Result<impl IntoResponse, Server
     Ok((headers, Json(routes)))
 }
 
-pub async fn geojson(State(pool): State<PgPool>) -> Result<impl IntoResponse, ServerError> {
+pub async fn geojson(State(state): State<AppState>) -> Result<impl IntoResponse, ServerError> {
     let routes = sqlx::query!(
         r#"
             SELECT
@@ -52,7 +51,7 @@ pub async fn geojson(State(pool): State<PgPool>) -> Result<impl IntoResponse, Se
             ORDER BY 
                 id;"#
     )
-    .fetch_all(&pool)
+    .fetch_all(&state.pg_pool)
     .await?;
 
     let features = routes

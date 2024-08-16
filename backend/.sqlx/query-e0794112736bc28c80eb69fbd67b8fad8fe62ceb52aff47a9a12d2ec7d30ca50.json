@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.id AS trip_id\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')\n            OR t.id IN (\n                SELECT DISTINCT trip_id\n                FROM stop_times\n                WHERE arrival > $1\n            )\n            ORDER BY\n                st.arrival\n        ",
+  "query": "SELECT\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                t.direction,\n                t.assigned,\n                t.id AS trip_id\n            FROM\n                stop_times st\n            LEFT JOIN trips t \n                ON\n                t.id = st.trip_id\n            WHERE\n                st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')\n            OR t.id IN (\n                SELECT DISTINCT trip_id\n                FROM stop_times\n                WHERE arrival > now()\n            )\n            ORDER BY\n                st.arrival",
   "describe": {
     "columns": [
       {
@@ -40,9 +40,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Timestamptz"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -54,5 +52,5 @@
       false
     ]
   },
-  "hash": "876fcae8f64a825ea1eaf6b147a05f4cc628e666bc4b2266b0ff1452a81595fe"
+  "hash": "e0794112736bc28c80eb69fbd67b8fad8fe62ceb52aff47a9a12d2ec7d30ca50"
 }
