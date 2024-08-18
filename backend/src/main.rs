@@ -7,7 +7,7 @@ use axum::{
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
-use http::StatusCode;
+use http::{HeaderValue, Method, StatusCode};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
@@ -18,7 +18,8 @@ use std::{
 use tokio::time::sleep;
 use tower::Layer;
 use tower_http::{
-    compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
+    compression::CompressionLayer, cors::CorsLayer, normalize_path::NormalizePathLayer,
+    trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -135,6 +136,10 @@ async fn main() {
     bus::positions::import(pg_pool.clone()).await;
     alerts::import(pg_pool.clone(), redis_pool.clone()).await;
 
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET])
+        .allow_origin("https://*.trainstat.us".parse::<HeaderValue>().unwrap());
+
     let app = Router::new()
         .route(
             "/",
@@ -153,6 +158,7 @@ async fn main() {
         .route("/bus/routes", get(routes::bus::routes::get))
         .route("/bus/routes/geojson", get(routes::bus::routes::geojson))
         .route("/bus/stops", get(routes::bus::stops::get))
+        .route("/bus/stops/geojson", get(routes::bus::stops::geojson))
         .route("/bus/stops/times", get(routes::bus::stops::times))
         .route("/bus/trips", get(routes::bus::trips::get))
         .route("/bus/trips/geojson", get(routes::bus::trips::geojson))
@@ -161,6 +167,7 @@ async fn main() {
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
+        .layer(cors)
         .with_state(AppState {
             pg_pool,
             redis_pool,
