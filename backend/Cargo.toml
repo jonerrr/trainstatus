@@ -1,6 +1,6 @@
 [package]
 name = "backend"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 
 
@@ -42,6 +42,7 @@ tower-http = { version = "0.5.2", features = [
     "timeout",
     "compression-gzip",
     "compression-br",
+    "cors",
     "normalize-path",
 ] }
 tracing = "0.1.40"
