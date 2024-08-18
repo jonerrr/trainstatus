@@ -7,7 +7,7 @@ use axum::{
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
-use http::{HeaderValue, Method, StatusCode};
+use http::{request::Parts, HeaderValue, Method, StatusCode};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
@@ -18,7 +18,9 @@ use std::{
 use tokio::time::sleep;
 use tower::Layer;
 use tower_http::{
-    compression::CompressionLayer, cors::CorsLayer, normalize_path::NormalizePathLayer,
+    compression::CompressionLayer,
+    cors::{AllowOrigin, CorsLayer},
+    normalize_path::NormalizePathLayer,
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -136,9 +138,14 @@ async fn main() {
     bus::positions::import(pg_pool.clone()).await;
     alerts::import(pg_pool.clone(), redis_pool.clone()).await;
 
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET])
-        .allow_origin("https://*.trainstat.us".parse::<HeaderValue>().unwrap());
+    let cors_layer =
+        CorsLayer::new()
+            .allow_methods([Method::GET])
+            .allow_origin(AllowOrigin::predicate(
+                |origin: &HeaderValue, _request_parts: &Parts| {
+                    origin.as_bytes().ends_with(b".trainstat.us")
+                },
+            ));
 
     let app = Router::new()
         .route(
@@ -167,7 +174,7 @@ async fn main() {
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
-        .layer(cors)
+        .layer(cors_layer)
         .with_state(AppState {
             pg_pool,
             redis_pool,
