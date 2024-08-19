@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS route;
+
+DROP TYPE IF EXISTS route_type;

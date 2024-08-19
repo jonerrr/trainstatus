@@ -39,7 +39,6 @@ pub async fn stops_and_routes(pool: &PgPool) {
     let mut routes: Vec<Route> = Vec::new();
     let mut stops: Vec<Stop> = Vec::new();
     let mut route_stops: Vec<RouteStop> = Vec::new();
-    // let mut stop_groups: Vec<RouteStopGroup> = Vec::new();
 
     let all_routes = AgencyRoute::get_all().await;
     let pb = ProgressBar::new(all_routes.len() as u64);
@@ -193,6 +192,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 // parsing api requests code below
 
 #[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "PascalCase")]
 pub struct AgencyRoute {
     pub color: String,
     // pub description: String,
