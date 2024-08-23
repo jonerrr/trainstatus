@@ -24,10 +24,20 @@ pub async fn import(pool: &PgPool) {
     //     .collect::<Result<Vec<Transfer>, csv::Error>>()
     //     .unwrap();
 
-    let train_routes = route::Route::get_train(archive.by_name("routes.txt").unwrap()).await;
-    let train_stops = stop::Stop::get_train(
-        train_routes.iter().map(|r| r.id.clone()).collect(),
+    let mut routes = route::Route::get_train(archive.by_name("routes.txt").unwrap()).await;
+    let (mut stops, mut route_stops) = stop::Stop::get_train(
+        routes.iter().map(|r| r.id.clone()).collect(),
         archive.by_name("transfers.txt").unwrap(),
     )
     .await;
+    let (bus_routes, bus_stops, bus_route_stops) = route::Route::get_bus().await;
+    routes.append(&mut bus_routes);
+    stops.append(&mut bus_stops);
+    route_stops.append(&mut bus_route_stops);
+
+    route::Route::insert(routes, pool).await;
+    stop::Stop::insert(stops, pool).await;
+    stop::RouteStop::insert(route_stops, pool).await;
+
+    // dbg!(train_stops.len(), train_route_stops.len());
 }

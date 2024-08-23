@@ -1,3 +1,5 @@
 DROP TABLE IF EXISTS stop;
 
 DROP TYPE IF EXISTS borough;
+
+DROP TYPE IF EXISTS stop_type;

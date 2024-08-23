@@ -1,18 +1,19 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
+use sqlx::{PgPool, QueryBuilder};
 use zip::read::ZipFile;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Stop {
     //    Bus stops are already numbers, but train stop ids are converted to numbers by their unicode value
-    id: i32,
-    name: String,
-    lat: f32,
-    lon: f32,
-    data: StopData,
+    pub id: i32,
+    pub name: String,
+    pub lat: f32,
+    pub lon: f32,
+    pub data: StopData,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub enum StopData {
     Train {
         ada: bool,
@@ -27,30 +28,8 @@ pub enum StopData {
     },
 }
 
-pub struct RouteStop {
-    route_id: String,
-    stop_id: i32,
-    stop_sequence: i16,
-    data: RouteStopData,
-}
-
-pub enum RouteStopData {
-    Train { stop_type: StopType },
-    Bus { headsign: String, direction: i16 },
-}
-
 #[derive(sqlx::Type)]
-#[sqlx(type_name = "route_type", rename_all = "snake_case")]
-pub enum StopType {
-    FullTime,
-    PartTime,
-    LateNight,
-    RushHourOneDirection,
-    RushHour,
-}
-
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "route_type", rename_all = "snake_case")]
+#[sqlx(type_name = "borough", rename_all = "snake_case")]
 pub enum Borough {
     Brooklyn,
     Queens,
@@ -59,117 +38,76 @@ pub enum Borough {
     Manhattan,
 }
 
-pub async fn get_train(routes: Vec<String>) -> (Vec<Stop>, Vec<RouteStop>) {
-    let mut stations: Vec<StationResponse> = vec![];
-    let mut route_stops: Vec<RouteStop> = vec![];
+pub struct RouteStop {
+    pub route_id: String,
+    pub stop_id: i32,
+    pub stop_sequence: i16,
+    pub data: RouteStopData,
+}
 
-    for route in routes.iter() {
-        let mut route_stations: Vec<StationResponse> = reqwest::Client::new()
-        .get(format!("https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP&routeId=MTASBWY:{}", route))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+pub enum RouteStopData {
+    Train { stop_type: StopType },
+    Bus { headsign: String, direction: i16 },
+}
 
-        route_stops.extend(route_stations.clone().into_iter().map(|s| s.into()));
-
-        stations.append(&mut route_stations);
-
-        // let route_stops = route_stations
-        //     .into_iter()
-        //     .map(|s| s.into())
-        //     .collect::<Vec<RouteStop>>();
-    }
-
-    stations.sort_by_key(|s| (s.stop_id.clone()));
-    stations.dedup_by(|a, b| a.stop_id == b.stop_id);
-
-    let stop_ids = stations
-        .par_iter()
-        .map(|s| "MTASBWY:".to_owned() + &s.stop_id)
-        .collect::<Vec<String>>()
-        .join(",");
-
-    // another internal endpoint I found on the mta website. I would love to not use this but the MTA's public api is bad
-    let nearby_stations: Vec<NearbyStation> = reqwest::Client::new()
-        .get(format!("https://otp-mta-prod.camsys-apps.com/otp/routers/default/nearby?apikey=Z276E3rCeTzOQEoBPPN4JCEc6GfvdnYE&stops={}", stop_ids))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-
-    // get all of the station headsigns
-    let stop_data = nearby_stations
-        .into_par_iter()
-        .map(|station| {
-            // because the order of groups is different for each stop (thanks mta), we need to find the first group that has a stop time with a N or S to find the headsigns
-            let north_headsign = station
-                .groups
-                .par_iter()
-                .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('N')))
-                .map(|group| group.headsign.clone());
-
-            let south_headsign = station
-                .groups
-                .par_iter()
-                .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('S')))
-                .map(|group| group.headsign.clone());
-
-            let station_data = stations
-                .par_iter()
-                .find_first(|s| s.stop_id == station.stop.id)
-                .unwrap();
-
-            Stop {
-                id: convert_train_id(station.stop.id.clone()),
-                name: station_data.stop_name.to_owned(),
-                lat: station.stop.lat,
-                lon: station.stop.lon,
-                data: StopData::Train {
-                    ada: station_data.ada,
-                    north_headsign: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
-                    south_headsign: south_headsign.unwrap_or_else(|| "Southbound".to_string()),
-                    transfers: vec![],
-                    notes: station_data.notes.clone(),
-                    borough: match station_data.borough.as_ref() {
-                        "Brooklyn" => Borough::Brooklyn,
-                        "Queens" => Borough::Queens,
-                        "Staten Island" => Borough::StatenIsland,
-                        "Manhattan" => Borough::Manhattan,
-                        "Bronx" => Borough::Bronx,
-                        _ => unreachable!(),
-                    },
-                },
-            }
-        })
-        .collect::<Vec<_>>();
-    // for stop in stop_data.iter() {
-    //     let mut dupes = vec![];
-    //     for t_stop in stop_data.iter() {
-    //         if stop.id == t_stop.id {
-    //             dupes.push(stop);
-    //         }
-    //     }
-    //     if dupes.len() > 1 {
-    //         dbg!("duplicate: ", dupes);
-    //     }
-    // }
-
-    dbg!(stop_data.len());
-    (stop_data, route_stops)
-    // todo!("return train stops")
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "stop_type", rename_all = "snake_case")]
+pub enum StopType {
+    FullTime,
+    PartTime,
+    LateNight,
+    RushHourOneDirection,
+    RushHour,
 }
 
 impl Stop {
-    // pub async fn insert(values: Vec<Self>) {
+    pub async fn insert(values: Vec<Self>, pool: &PgPool) {
+        let mut query_builder = QueryBuilder::new(
+            "INSERT INTO stop (id, name, lat, lon, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
+        );
+        query_builder.push_values(values, |mut b, stop| {
+            b.push_bind(stop.id)
+                .push_bind(stop.name)
+                .push_bind(stop.lat)
+                .push_bind(stop.lon);
 
-    // }
+            match stop.data {
+                StopData::Bus { direction } => {
+                    b.push_bind(None::<bool>)
+                        .push_bind(None::<String>)
+                        .push_bind(None::<String>)
+                        .push_bind(None::<String>)
+                        .push_bind(None::<String>)
+                        .push_bind(None::<String>)
+                        .push_bind(direction);
+                }
+                StopData::Train {
+                    ada,
+                    north_headsign,
+                    south_headsign,
+                    transfers,
+                    notes,
+                    borough,
+                } => {
+                    b.push_bind(ada)
+                        .push_bind(north_headsign)
+                        .push_bind(south_headsign)
+                        .push_bind(transfers)
+                        .push_bind(notes)
+                        .push_bind(borough)
+                        .push_bind(None::<String>);
+                }
+            }
+        });
+        query_builder.push("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, lat = EXCLUDED.lat, lon = EXCLUDED.lon, ada = EXCLUDED.ada, north_headsign = EXCLUDED.north_headsign, south_headsign = EXCLUDED.south_headsign, transfers = EXCLUDED.transfers, notes = EXCLUDED.notes, borough = EXCLUDED.borough, direction = EXCLUDED.direction");
+        let query = query_builder.build();
+        query.execute(pool).await.unwrap();
+    }
 
-    pub async fn get_train(routes: Vec<String>, transfers_file: ZipFile<'_>) -> Vec<Stop> {
+    pub async fn get_train(
+        routes: Vec<String>,
+        transfers_file: ZipFile<'_>,
+    ) -> (Vec<Stop>, Vec<RouteStop>) {
         let mut stations: Vec<StationResponse> = vec![];
         let mut route_stops: Vec<RouteStop> = vec![];
 
@@ -229,7 +167,7 @@ impl Stop {
             .collect::<Vec<_>>();
 
         // get all of the station headsigns
-        let stop_data = nearby_stations
+        let stops = nearby_stations
             .into_par_iter()
             .map(|station| {
                 // because the order of groups is different for each stop (thanks mta), we need to find the first group that has a stop time with a N or S to find the headsigns
@@ -283,9 +221,9 @@ impl Stop {
                 }
             })
             .collect::<Vec<_>>();
-        // for stop in stop_data.iter() {
+        // for stop in stops.iter() {
         //     let mut dupes = vec![];
-        //     for t_stop in stop_data.iter() {
+        //     for t_stop in stops.iter() {
         //         if stop.id == t_stop.id {
         //             dupes.push(stop);
         //         }
@@ -295,13 +233,46 @@ impl Stop {
         //     }
         // }
 
-        dbg!(stop_data.len());
+        // dbg!(stops.len());
 
-        todo!("return train stops")
+        (stops, route_stops)
+        // todo!("return train stops")
     }
 
     pub async fn get_bus(routes: &[&str]) -> Vec<Stop> {
         todo!("return bus stops")
+    }
+}
+
+impl RouteStop {
+    pub async fn insert(values: Vec<Self>, pool: &PgPool) {
+        let mut query_builder = QueryBuilder::new(
+                "INSERT INTO route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
+            );
+        query_builder.push_values(values, |mut b, stop| {
+            b.push_bind(stop.route_id)
+                .push_bind(stop.stop_id)
+                .push_bind(stop.stop_sequence);
+
+            match stop.data {
+                RouteStopData::Bus {
+                    headsign,
+                    direction,
+                } => {
+                    b.push_bind(None::<StopType>)
+                        .push_bind(headsign)
+                        .push_bind(direction);
+                }
+                RouteStopData::Train { stop_type } => {
+                    b.push_bind(stop_type)
+                        .push_bind(None::<String>)
+                        .push_bind(None::<i16>);
+                }
+            }
+        });
+        query_builder.push("ON CONFLICT (route_id, stop_id) DO UPDATE SET stop_sequence = EXCLUDED.stop_sequence, stop_type = EXCLUDED.stop_type, headsign = EXCLUDED.headsign, direction = EXCLUDED.direction");
+        let query = query_builder.build();
+        query.execute(pool).await.unwrap();
     }
 }
 
