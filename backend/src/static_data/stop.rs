@@ -62,46 +62,48 @@ pub enum StopType {
 
 impl Stop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        let mut query_builder = QueryBuilder::new(
+        for chunk in values.chunks(65534 / 11) {
+            let mut query_builder = QueryBuilder::new(
             "INSERT INTO stop (id, name, lat, lon, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
         );
-        query_builder.push_values(values, |mut b, stop| {
-            b.push_bind(stop.id)
-                .push_bind(stop.name)
-                .push_bind(stop.lat)
-                .push_bind(stop.lon);
+            query_builder.push_values(chunk, |mut b, stop| {
+                b.push_bind(stop.id)
+                    .push_bind(stop.name.clone())
+                    .push_bind(stop.lat)
+                    .push_bind(stop.lon);
 
-            match stop.data {
-                StopData::Bus { direction } => {
-                    b.push_bind(None::<bool>)
-                        .push_bind(None::<String>)
-                        .push_bind(None::<String>)
-                        .push_bind(None::<String>)
-                        .push_bind(None::<String>)
-                        .push_bind(None::<String>)
-                        .push_bind(direction);
+                match &stop.data {
+                    StopData::Bus { direction } => {
+                        b.push_bind(None::<bool>)
+                            .push_bind(None::<String>)
+                            .push_bind(None::<String>)
+                            .push_bind(None::<String>)
+                            .push_bind(None::<String>)
+                            .push_bind(None::<String>)
+                            .push_bind(direction);
+                    }
+                    StopData::Train {
+                        ada,
+                        north_headsign,
+                        south_headsign,
+                        transfers,
+                        notes,
+                        borough,
+                    } => {
+                        b.push_bind(ada)
+                            .push_bind(north_headsign)
+                            .push_bind(south_headsign)
+                            .push_bind(transfers)
+                            .push_bind(notes)
+                            .push_bind(borough)
+                            .push_bind(None::<String>);
+                    }
                 }
-                StopData::Train {
-                    ada,
-                    north_headsign,
-                    south_headsign,
-                    transfers,
-                    notes,
-                    borough,
-                } => {
-                    b.push_bind(ada)
-                        .push_bind(north_headsign)
-                        .push_bind(south_headsign)
-                        .push_bind(transfers)
-                        .push_bind(notes)
-                        .push_bind(borough)
-                        .push_bind(None::<String>);
-                }
-            }
-        });
-        query_builder.push("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, lat = EXCLUDED.lat, lon = EXCLUDED.lon, ada = EXCLUDED.ada, north_headsign = EXCLUDED.north_headsign, south_headsign = EXCLUDED.south_headsign, transfers = EXCLUDED.transfers, notes = EXCLUDED.notes, borough = EXCLUDED.borough, direction = EXCLUDED.direction");
-        let query = query_builder.build();
-        query.execute(pool).await.unwrap();
+            });
+            query_builder.push("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, lat = EXCLUDED.lat, lon = EXCLUDED.lon, ada = EXCLUDED.ada, north_headsign = EXCLUDED.north_headsign, south_headsign = EXCLUDED.south_headsign, transfers = EXCLUDED.transfers, notes = EXCLUDED.notes, borough = EXCLUDED.borough, direction = EXCLUDED.direction");
+            let query = query_builder.build();
+            query.execute(pool).await.unwrap();
+        }
     }
 
     pub async fn get_train(

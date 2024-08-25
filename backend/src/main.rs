@@ -85,8 +85,8 @@ async fn main() {
         _ => panic!("Failed to ping redis"),
     }
 
-    static_data::import(&pg_pool).await;
-    panic!();
+    // static_data::import(&pg_pool).await;
+    // panic!();
 
     let s_pool = pg_pool.clone();
     tokio::spawn(async move {
