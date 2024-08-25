@@ -30,7 +30,7 @@ pub async fn import(pool: &PgPool) {
         archive.by_name("transfers.txt").unwrap(),
     )
     .await;
-    let (bus_routes, bus_stops, bus_route_stops) = route::Route::get_bus().await;
+    let (mut bus_routes, mut bus_stops, mut bus_route_stops) = route::Route::get_bus().await;
     routes.append(&mut bus_routes);
     stops.append(&mut bus_stops);
     route_stops.append(&mut bus_route_stops);

@@ -78,7 +78,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
             id: route.id.clone(),
             long_name: route.long_name,
             short_name: route.short_name,
-            color: route.color,
+            color: route.text_color,
             shuttle,
             geom: serde_json::to_value(route_geom).unwrap(),
         });
@@ -192,14 +192,14 @@ pub async fn stops_and_routes(pool: &PgPool) {
 // parsing api requests code below
 
 #[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "camelCase")]
 pub struct AgencyRoute {
-    pub color: String,
+    pub text_color: String,
     // pub description: String,
     pub id: String,
-    #[serde(rename = "longName")]
+    // #[serde(rename = "longName")]
     pub long_name: String,
-    #[serde(rename = "shortName")]
+    // #[serde(rename = "shortName")]
     pub short_name: String,
     #[serde(rename = "type")]
     // 3 = bus, 711 = shuttle
