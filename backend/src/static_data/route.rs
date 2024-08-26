@@ -2,6 +2,7 @@ use crate::{
     bus::api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
 };
+use axum::body::Bytes;
 use geo::{LineString, MultiLineString};
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
@@ -11,7 +12,7 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_json::json;
 use sqlx::{PgPool, QueryBuilder};
-use zip::read::ZipFile;
+use std::io::Cursor;
 
 pub struct Route {
     pub id: String,
@@ -49,13 +50,17 @@ impl Route {
         query.execute(pool).await.unwrap();
     }
 
-    pub async fn get_train(routes_file: ZipFile<'_>) -> Vec<Self> {
-        let mut rdr = csv::Reader::from_reader(routes_file);
-        let routes = rdr
-            .deserialize()
-            .collect::<Result<Vec<GtfsRoute>, csv::Error>>()
-            .unwrap();
-        routes
+    pub fn get_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
+        // let reader = Cursor::new(gtfs);
+        // let mut archive = zip::ZipArchive::new(reader).unwrap();
+
+        // let routes_file = archive.by_name("routes.txt").unwrap();
+        // let mut rdr = csv::Reader::from_reader(routes_file);
+        // let routes = rdr
+        //     .deserialize()
+        //     .collect::<Result<Vec<GtfsRoute>, csv::Error>>()
+        //     .unwrap();
+        gtfs_routes
             .into_iter()
             .filter_map(|r| {
                 // filter out express routes

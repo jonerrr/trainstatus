@@ -12,10 +12,10 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
     env::{remove_var, var},
-    // process::exit,
+    sync::Arc,
     time::Duration,
 };
-use tokio::time::sleep;
+use tokio::{sync::Notify, time::sleep};
 use tower::Layer;
 use tower_http::{
     compression::CompressionLayer,
@@ -29,9 +29,9 @@ mod alerts;
 mod bus;
 mod gtfs;
 mod routes;
+mod rt_data;
 mod static_data;
 mod train;
-mod trip;
 
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
@@ -85,8 +85,13 @@ async fn main() {
         _ => panic!("Failed to ping redis"),
     }
 
-    // static_data::import(&pg_pool).await;
-    // panic!();
+    let notify = Arc::new(Notify::new());
+    let notify2 = notify.clone();
+
+    static_data::import(pg_pool.clone(), notify).await;
+    notify2.notified().await;
+    println!("notified");
+    panic!();
 
     let s_pool = pg_pool.clone();
     tokio::spawn(async move {
