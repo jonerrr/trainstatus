@@ -1,7 +1,8 @@
+use axum::body::Bytes;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
-use zip::read::ZipFile;
+use std::io::{Cursor, Read};
 
 // #[derive(Debug)]
 pub struct Stop {
@@ -62,13 +63,13 @@ pub enum StopType {
 
 impl Stop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        for chunk in values.chunks(65534 / 11) {
+        for chunk in values.chunks(65534 / 12) {
             let mut query_builder = QueryBuilder::new(
             "INSERT INTO stop (id, name, lat, lon, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
         );
             query_builder.push_values(chunk, |mut b, stop| {
                 b.push_bind(stop.id)
-                    .push_bind(stop.name.clone())
+                    .push_bind(&stop.name)
                     .push_bind(stop.lat)
                     .push_bind(stop.lon);
 
@@ -77,9 +78,9 @@ impl Stop {
                         b.push_bind(None::<bool>)
                             .push_bind(None::<String>)
                             .push_bind(None::<String>)
+                            .push_bind(None::<Vec<i32>>)
                             .push_bind(None::<String>)
-                            .push_bind(None::<String>)
-                            .push_bind(None::<String>)
+                            .push_bind(None::<Borough>)
                             .push_bind(direction);
                     }
                     StopData::Train {
@@ -108,10 +109,21 @@ impl Stop {
 
     pub async fn get_train(
         routes: Vec<String>,
-        transfers_file: ZipFile<'_>,
+        mut transfers: Vec<Transfer<String>>,
     ) -> (Vec<Stop>, Vec<RouteStop>) {
         let mut stations: Vec<StationResponse> = vec![];
         let mut route_stops: Vec<RouteStop> = vec![];
+
+        transfers.retain(|t| t.to_stop_id != t.from_stop_id);
+        // keep the records that aren't the fake south ferry loop stop
+        transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
+        let transfers = transfers
+            .into_iter()
+            .map(|t| Transfer {
+                to_stop_id: convert_train_id(t.to_stop_id),
+                from_stop_id: convert_train_id(t.from_stop_id),
+            })
+            .collect::<Vec<_>>();
 
         for route in routes.iter() {
             let mut route_stations: Vec<StationResponse> = reqwest::Client::new()
@@ -151,22 +163,6 @@ impl Stop {
             .json()
             .await
             .unwrap();
-
-        let mut rdr = csv::Reader::from_reader(transfers_file);
-        let mut transfers = rdr
-            .deserialize()
-            .collect::<Result<Vec<Transfer<String>>, csv::Error>>()
-            .unwrap();
-        transfers.retain(|t| t.to_stop_id != t.from_stop_id);
-        // keep the records that aren't the fake south ferry loop stop
-        transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
-        let transfers = transfers
-            .into_iter()
-            .map(|t| Transfer {
-                to_stop_id: convert_train_id(t.to_stop_id),
-                from_stop_id: convert_train_id(t.from_stop_id),
-            })
-            .collect::<Vec<_>>();
 
         // get all of the station headsigns
         let stops = nearby_stations
@@ -248,33 +244,35 @@ impl Stop {
 
 impl RouteStop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        let mut query_builder = QueryBuilder::new(
+        for chunk in values.chunks(65534 / 6) {
+            let mut query_builder = QueryBuilder::new(
                 "INSERT INTO route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
             );
-        query_builder.push_values(values, |mut b, stop| {
-            b.push_bind(stop.route_id)
-                .push_bind(stop.stop_id)
-                .push_bind(stop.stop_sequence);
+            query_builder.push_values(chunk, |mut b, stop| {
+                b.push_bind(&stop.route_id)
+                    .push_bind(stop.stop_id)
+                    .push_bind(stop.stop_sequence);
 
-            match stop.data {
-                RouteStopData::Bus {
-                    headsign,
-                    direction,
-                } => {
-                    b.push_bind(None::<StopType>)
-                        .push_bind(headsign)
-                        .push_bind(direction);
+                match &stop.data {
+                    RouteStopData::Bus {
+                        headsign,
+                        direction,
+                    } => {
+                        b.push_bind(None::<StopType>)
+                            .push_bind(headsign)
+                            .push_bind(direction);
+                    }
+                    RouteStopData::Train { stop_type } => {
+                        b.push_bind(stop_type)
+                            .push_bind(None::<String>)
+                            .push_bind(None::<i16>);
+                    }
                 }
-                RouteStopData::Train { stop_type } => {
-                    b.push_bind(stop_type)
-                        .push_bind(None::<String>)
-                        .push_bind(None::<i16>);
-                }
-            }
-        });
-        query_builder.push("ON CONFLICT (route_id, stop_id) DO UPDATE SET stop_sequence = EXCLUDED.stop_sequence, stop_type = EXCLUDED.stop_type, headsign = EXCLUDED.headsign, direction = EXCLUDED.direction");
-        let query = query_builder.build();
-        query.execute(pool).await.unwrap();
+            });
+            query_builder.push("ON CONFLICT (route_id, stop_id) DO UPDATE SET stop_sequence = EXCLUDED.stop_sequence, stop_type = EXCLUDED.stop_type, headsign = EXCLUDED.headsign, direction = EXCLUDED.direction");
+            let query = query_builder.build();
+            query.execute(pool).await.unwrap();
+        }
     }
 }
 
@@ -439,7 +437,7 @@ pub struct StationTime {
 }
 
 #[derive(Debug, Deserialize)]
-struct Transfer<T> {
+pub struct Transfer<T> {
     from_stop_id: T,
     to_stop_id: T,
     // transfer_type: i16,
