@@ -155,7 +155,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
     query.execute(pool).await.unwrap();
 
     // Chunk to the maximum amount of parameters allowed
-    for chunk in stops.chunks(65534 / 5) {
+    for chunk in stops.chunks(32000 / 5) {
         let mut query_builder =
             QueryBuilder::new("INSERT INTO bus_stops (id, name, direction, lat, lon)");
         query_builder.push_values(chunk, |mut b, route| {
@@ -170,7 +170,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
         query.execute(pool).await.unwrap();
     }
 
-    for chunk in route_stops.chunks(65534 / 5) {
+    for chunk in route_stops.chunks(32000 / 5) {
         let mut query_builder = QueryBuilder::new(
             "INSERT INTO bus_route_stops (route_id, stop_id, stop_sequence, headsign, direction)",
         );

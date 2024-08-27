@@ -15,7 +15,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{sync::Notify, time::sleep};
+use tokio::{signal, sync::Notify, time::sleep};
 use tower::Layer;
 use tower_http::{
     compression::CompressionLayer,
@@ -85,13 +85,13 @@ async fn main() {
         _ => panic!("Failed to ping redis"),
     }
 
-    let notify = Arc::new(Notify::new());
-    let notify2 = notify.clone();
+    // let notify = Arc::new(Notify::new());
+    // let notify2 = notify.clone();
 
-    static_data::import(pg_pool.clone(), notify).await;
-    notify2.notified().await;
-    println!("notified");
-    panic!();
+    // static_data::import(pg_pool.clone(), notify).await;
+    // notify2.notified().await;
+    // println!("notified");
+    // panic!();
 
     let s_pool = pg_pool.clone();
     tokio::spawn(async move {
@@ -209,10 +209,36 @@ async fn main() {
     //  .unwrap() => {}
     // }
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 }
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "not found")
+}
+
+// from https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }

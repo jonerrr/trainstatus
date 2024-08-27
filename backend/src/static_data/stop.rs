@@ -63,7 +63,7 @@ pub enum StopType {
 
 impl Stop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        for chunk in values.chunks(65534 / 12) {
+        for chunk in values.chunks(32000 / 12) {
             let mut query_builder = QueryBuilder::new(
             "INSERT INTO stop (id, name, lat, lon, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
         );
@@ -120,8 +120,8 @@ impl Stop {
         let transfers = transfers
             .into_iter()
             .map(|t| Transfer {
-                to_stop_id: convert_train_id(t.to_stop_id),
-                from_stop_id: convert_train_id(t.from_stop_id),
+                to_stop_id: convert_stop_id(t.to_stop_id),
+                from_stop_id: convert_stop_id(t.from_stop_id),
             })
             .collect::<Vec<_>>();
 
@@ -185,7 +185,7 @@ impl Stop {
                     .par_iter()
                     .find_first(|s| s.stop_id == station.stop.id)
                     .unwrap();
-                let stop_id = convert_train_id(station.stop.id.clone());
+                let stop_id = convert_stop_id(station.stop.id.clone());
 
                 Stop {
                     id: stop_id,
@@ -244,7 +244,7 @@ impl Stop {
 
 impl RouteStop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        for chunk in values.chunks(65534 / 6) {
+        for chunk in values.chunks(32000 / 6) {
             let mut query_builder = QueryBuilder::new(
                 "INSERT INTO route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
             );
@@ -351,7 +351,7 @@ pub struct StationResponse {
     pub borough: String,
 }
 
-pub fn convert_train_id(stop_id: String) -> i32 {
+pub fn convert_stop_id(stop_id: String) -> i32 {
     let stop_id_nums = stop_id
         .chars()
         .map(|c| {
@@ -397,11 +397,11 @@ impl From<StationResponse> for RouteStop {
         //         }
         //     })
         //     .collect::<String>();
-        // let stop_id = convert_train_id(value.stop_id.clone());
+        // let stop_id = convert_stop_id(value.stop_id.clone());
         // dbg!(&stop_id);
         RouteStop {
             route_id: value.route_id,
-            stop_id: convert_train_id(value.stop_id),
+            stop_id: convert_stop_id(value.stop_id),
             stop_sequence: value.stop_sequence,
             data: RouteStopData::Train { stop_type },
         }

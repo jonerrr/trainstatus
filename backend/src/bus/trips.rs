@@ -295,26 +295,28 @@ pub async fn parse_gtfs(pool: &PgPool) -> Result<(), DecodeFeedError> {
     // dbg!(&duplicate_trips);
 
     // Insert trips
-    let mut query_builder = QueryBuilder::new(
+    for chunk in trips.chunks(32000 / 8) {
+        let mut query_builder = QueryBuilder::new(
         "INSERT INTO bus_trips (id, mta_id, vehicle_id, start_date, created_at, direction, deviation, route_id) ",
     );
-    query_builder.push_values(trips, |mut b, trip| {
-        b.push_bind(trip.id)
-            .push_bind(trip.mta_id)
-            .push_bind(trip.vehicle_id)
-            .push_bind(trip.start_date)
-            .push_bind(trip.created_at)
-            .push_bind(trip.direction)
-            .push_bind(trip.deviation)
-            .push_bind(trip.route_id);
-    });
-    query_builder.push(" ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation");
-    let query = query_builder.build();
-    query.execute(pool).await?;
+        query_builder.push_values(chunk, |mut b, trip| {
+            b.push_bind(trip.id)
+                .push_bind(&trip.mta_id)
+                .push_bind(trip.vehicle_id)
+                .push_bind(trip.start_date)
+                .push_bind(trip.created_at)
+                .push_bind(trip.direction)
+                .push_bind(trip.deviation)
+                .push_bind(&trip.route_id);
+        });
+        query_builder.push(" ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation");
+        let query = query_builder.build();
+        query.execute(pool).await?;
+    }
 
     // The maximum bind parameters for postgres is 65534 and we have 5 parameters for each stop time.
     // https://docs.rs/sqlx/latest/sqlx/struct.QueryBuilder.html#method.push_bind
-    for chunk in stop_times.chunks(65534 / 5) {
+    for chunk in stop_times.chunks(32000 / 5) {
         let mut query_builder = QueryBuilder::new(
             "INSERT INTO bus_stop_times (trip_id, stop_id, arrival, departure, stop_sequence) ",
         );
