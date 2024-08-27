@@ -2,7 +2,10 @@ use super::{
     stop_time::StopTime,
     trip::{Trip, TripData},
 };
-use crate::feed::{trip_update::StopTimeUpdate, TripDescriptor};
+use crate::{
+    feed::{trip_update::StopTimeUpdate, TripDescriptor},
+    static_data::stop::convert_stop_id,
+};
 use chrono::{DateTime, NaiveDateTime, NaiveTime};
 use thiserror::Error;
 use uuid::Uuid;
@@ -189,7 +192,7 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a, Trip>> for StopTime {
 
         Ok(StopTime {
             trip_id: value.trip.id,
-            stop_id,
+            stop_id: convert_stop_id(stop_id),
             arrival,
             departure,
         })
