@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "0.6.4"
+version = "0.6.5"
 dependencies = [
  "axum",
  "bb8",
@@ -2969,7 +2969,6 @@ checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
 dependencies = [
  "getrandom",
  "serde",
- "sha1_smol",
 ]
 
 [[package]]
