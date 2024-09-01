@@ -78,7 +78,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
             id: route.id.clone(),
             long_name: route.long_name,
             short_name: route.short_name,
-            color: route.text_color,
+            color: route.color,
             shuttle,
             geom: serde_json::to_value(route_geom).unwrap(),
         });
@@ -194,7 +194,7 @@ pub async fn stops_and_routes(pool: &PgPool) {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AgencyRoute {
-    pub text_color: String,
+    pub color: String,
     // pub description: String,
     pub id: String,
     // #[serde(rename = "longName")]
