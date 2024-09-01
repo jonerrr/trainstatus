@@ -52,7 +52,7 @@
 	use:melt={$root}
 	bind:this={list_el}
 	style={manage_height ? `min-height: ${list_height}px; max-height: ${list_height}px;` : ''}
-	class={`relative flex flex-col text-indigo-200 overflow-auto overscroll-nonebg-neutral-900 ${$$props.class} ?? ''}`}
+	class={`relative flex flex-col text-indigo-200 overflow-auto overscroll-none bg-neutral-900 ${$$props.class} ?? ''}`}
 >
 	<div
 		id="list-item"
@@ -72,13 +72,13 @@
 		>
 			<button
 				use:melt={$trigger('Train')}
-				class="trigger p-1 px-2 rounded-l relative border-neutral-400 border-r data-[state=active]:bg-indigo-800"
+				class="trigger p-1 px-2 rounded-l relative border-2 border-transparent data-[state=active]:bg-indigo-800 data-[state=active]:border-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg"
 			>
 				<TrainFront />
 			</button>
 			<button
 				use:melt={$trigger('Bus')}
-				class="trigger p-1 px-2 rounded-r relative border-neutral-400 border-l data-[state=active]:bg-indigo-800"
+				class="trigger p-1 px-2 rounded-r relative border-2 border-transparent data-[state=active]:bg-indigo-800 data-[state=active]:border-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg"
 			>
 				<BusFront />
 			</button>
