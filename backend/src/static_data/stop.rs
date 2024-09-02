@@ -1,8 +1,6 @@
-use axum::body::Bytes;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
 use sqlx::{PgPool, QueryBuilder};
-use std::io::{Cursor, Read};
 
 // #[derive(Debug)]
 pub struct Stop {
@@ -12,6 +10,32 @@ pub struct Stop {
     pub lat: f32,
     pub lon: f32,
     pub data: StopData,
+}
+
+// pub enum StopId {
+//     Train(i32),
+//     Bus(i32),
+// }
+
+// impl
+
+// This takes train stop_id and converts it to a number by converting the unicode value of each character to a number
+pub fn convert_stop_id(stop_id: String) -> i32 {
+    let stop_id_nums = stop_id
+        .chars()
+        .map(|c| {
+            if c.is_numeric() {
+                c.to_digit(10).unwrap()
+            } else {
+                c as u32
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut stop_id = String::new();
+    for num in stop_id_nums {
+        stop_id.push_str(&num.to_string());
+    }
+    stop_id.parse().unwrap()
 }
 
 // #[derive(Debug)]
@@ -244,6 +268,21 @@ impl Stop {
 
 impl RouteStop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
+        for v in values.iter() {
+            let mut dupes = vec![];
+
+            for t_stop in values.iter() {
+                if v.route_id == t_stop.route_id && v.stop_id == t_stop.stop_id {
+                    dupes.push((t_stop.stop_id, &t_stop.route_id));
+                }
+            }
+            if dupes.len() > 1 {
+                dbg!("duplicate: ", dupes);
+            }
+
+            // dbg!(&v.route_id, &v.stop_id);
+        }
+
         for chunk in values.chunks(32000 / 6) {
             let mut query_builder = QueryBuilder::new(
                 "INSERT INTO route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
@@ -349,30 +388,6 @@ pub struct StationResponse {
     #[serde(deserialize_with = "de_str_opt")]
     pub notes: Option<String>,
     pub borough: String,
-}
-
-pub fn convert_stop_id(stop_id: String) -> i32 {
-    let stop_id_nums = stop_id
-        .chars()
-        .map(|c| {
-            if c.is_numeric() {
-                c.to_digit(10).unwrap()
-            } else {
-                // dbg!(&c, &stop_id);
-
-                // let c_num = c.to_ascii_lowercase().to_digit(16).unwrap();
-                // dbg!(&c_num);
-                // c_num
-                c as u32
-                // std::char::from_digit(c.to_lowercase() as u32 - '0' as u32, 10).unwrap()
-            }
-        })
-        .collect::<Vec<_>>();
-    let mut stop_id = String::new();
-    for num in stop_id_nums {
-        stop_id.push_str(&num.to_string());
-    }
-    stop_id.parse().unwrap()
 }
 
 impl From<StationResponse> for RouteStop {
