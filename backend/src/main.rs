@@ -89,9 +89,9 @@ async fn main() {
     // let notify2 = notify.clone();
 
     // static_data::import(pg_pool.clone(), notify).await;
+    // // Wait for static data to be loaded
     // notify2.notified().await;
-    // println!("notified");
-    // panic!();
+    // panic!("test");
 
     let s_pool = pg_pool.clone();
     tokio::spawn(async move {

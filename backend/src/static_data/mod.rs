@@ -23,9 +23,10 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
             if var("FORCE_UPDATE").is_err() {
                 // Data should be refreshed every 3 days
                 if let Some(last_updated) = last_updated {
+                    tracing::info!("Last updated at: {}", last_updated.update_at);
+
                     // if there is a last updated that means theres already data and the rest of the app can start
                     notify.notify_one();
-                    tracing::info!("Last updated at: {}", last_updated.update_at);
 
                     let duration_since_last_update =
                         Utc::now().signed_duration_since(last_updated.update_at);
@@ -86,14 +87,18 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
                 gtfs_transfers,
             )
             .await;
-            // let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
-            //     route::Route::get_bus().await;
-            // routes.append(&mut bus_routes);
-            // stops.append(&mut bus_stops);
+            let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
+                route::Route::get_bus().await;
+            routes.append(&mut bus_routes);
+            stops.append(&mut bus_stops);
             // route_stops.append(&mut bus_route_stops);
 
+            // print all route_stops with
+            dbg!(bus_route_stops.len());
             route::Route::insert(routes, &pool).await;
             stop::Stop::insert(stops, &pool).await;
+            // TODO: figure out why i cant combine train and bus without getting pg duplicate conflict error
+            stop::RouteStop::insert(route_stops, &pool).await;
             // stop::RouteStop::insert(bus_route_stops, &pool).await;
 
             // remove old update_ats
