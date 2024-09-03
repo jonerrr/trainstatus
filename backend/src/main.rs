@@ -12,7 +12,7 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
     env::{remove_var, var},
-    sync::Arc,
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 use tokio::{signal, sync::Notify, time::sleep};
@@ -35,6 +35,13 @@ mod train;
 
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
+}
+
+// https://stackoverflow.com/a/77249700
+pub fn api_key() -> &'static str {
+    // you need bustime api key to run this
+    static API_KEY: OnceLock<String> = OnceLock::new();
+    API_KEY.get_or_init(|| var("API_KEY").unwrap())
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -85,68 +92,71 @@ async fn main() {
         _ => panic!("Failed to ping redis"),
     }
 
-    // let notify = Arc::new(Notify::new());
-    // let notify2 = notify.clone();
+    let notify = Arc::new(Notify::new());
+    let notify2 = notify.clone();
 
-    // static_data::import(pg_pool.clone(), notify).await;
-    // // Wait for static data to be loaded
-    // notify2.notified().await;
+    static_data::import(pg_pool.clone(), notify).await;
+    // Wait for static data to be loaded
+    notify2.notified().await;
+
+    rt_data::import(pg_pool.clone()).await;
+
     // panic!("test");
 
-    let s_pool = pg_pool.clone();
-    tokio::spawn(async move {
-        loop {
-            let last_updated = sqlx::query!("SELECT update_at FROM last_update")
-                .fetch_optional(&s_pool)
-                .await
-                .unwrap();
+    // let s_pool = pg_pool.clone();
+    // tokio::spawn(async move {
+    //     loop {
+    //         let last_updated = sqlx::query!("SELECT update_at FROM last_update")
+    //             .fetch_optional(&s_pool)
+    //             .await
+    //             .unwrap();
 
-            // If user wants to FORCE_UPDATE, then don't check for last updated
-            if var("FORCE_UPDATE").is_err() {
-                // Data should be refreshed every 3 days
-                if let Some(last_updated) = last_updated {
-                    tracing::info!("Last updated at: {}", last_updated.update_at);
+    //         // If user wants to FORCE_UPDATE, then don't check for last updated
+    //         if var("FORCE_UPDATE").is_err() {
+    //             // Data should be refreshed every 3 days
+    //             if let Some(last_updated) = last_updated {
+    //                 tracing::info!("Last updated at: {}", last_updated.update_at);
 
-                    let duration_since_last_update =
-                        Utc::now().signed_duration_since(last_updated.update_at);
+    //                 let duration_since_last_update =
+    //                     Utc::now().signed_duration_since(last_updated.update_at);
 
-                    // Check if the data is older than 3 days
-                    if duration_since_last_update.num_days() <= 3 {
-                        // Sleep until it has been 3 days, take into account the time since last update
-                        let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
-                            .checked_sub(duration_since_last_update.to_std().unwrap())
-                            .unwrap();
-                        tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
-                        sleep(sleep_time).await;
-                    }
-                }
-            } else {
-                // Remove the FORCE_UPDATE env variable so it doesn't keep updating
-                remove_var("FORCE_UPDATE");
-            }
-            tracing::info!("Updating stops and trips");
+    //                 // Check if the data is older than 3 days
+    //                 if duration_since_last_update.num_days() <= 3 {
+    //                     // Sleep until it has been 3 days, take into account the time since last update
+    //                     let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
+    //                         .checked_sub(duration_since_last_update.to_std().unwrap())
+    //                         .unwrap();
+    //                     tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
+    //                     sleep(sleep_time).await;
+    //                 }
+    //             }
+    //         } else {
+    //             // Remove the FORCE_UPDATE env variable so it doesn't keep updating
+    //             remove_var("FORCE_UPDATE");
+    //         }
+    //         tracing::info!("Updating stops and trips");
 
-            bus::static_data::stops_and_routes(&s_pool).await;
-            train::static_data::stops_and_routes(&s_pool).await;
+    //         bus::static_data::stops_and_routes(&s_pool).await;
+    //         train::static_data::stops_and_routes(&s_pool).await;
 
-            // remove old update_ats
-            sqlx::query!("DELETE FROM last_update")
-                .execute(&s_pool)
-                .await
-                .unwrap();
-            sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
-                .execute(&s_pool)
-                .await
-                .unwrap();
-            tracing::info!("Data updated");
-        }
-    });
+    //         // remove old update_ats
+    //         sqlx::query!("DELETE FROM last_update")
+    //             .execute(&s_pool)
+    //             .await
+    //             .unwrap();
+    //         sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+    //             .execute(&s_pool)
+    //             .await
+    //             .unwrap();
+    //         tracing::info!("Data updated");
+    //     }
+    // });
 
-    train::trips::import(pg_pool.clone(), redis_pool.clone()).await;
-    // Only reloading cache after bus trips
-    bus::trips::import(pg_pool.clone(), redis_pool.clone()).await;
-    bus::positions::import(pg_pool.clone()).await;
-    alerts::import(pg_pool.clone(), redis_pool.clone()).await;
+    // train::trips::import(pg_pool.clone(), redis_pool.clone()).await;
+    // // Only reloading cache after bus trips
+    // bus::trips::import(pg_pool.clone(), redis_pool.clone()).await;
+    // bus::positions::import(pg_pool.clone()).await;
+    // alerts::import(pg_pool.clone(), redis_pool.clone()).await;
 
     let cors_layer =
         CorsLayer::new()

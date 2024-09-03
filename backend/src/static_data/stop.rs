@@ -19,8 +19,22 @@ pub struct Stop {
 
 // impl
 
+// There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
+// Thanks MTA for that
+// Shout out to N12 for being included in the static gtfs data even though its not a real stop (The lat/long point to Stillwell ave station)
+const FAKE_STOP_IDS: [&str; 28] = [
+    "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
+    "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
+    "S12", "S10",
+];
+
 // This takes train stop_id and converts it to a number by converting the unicode value of each character to a number
-pub fn convert_stop_id(stop_id: String) -> i32 {
+// returns none if stop_id is invalid
+pub fn convert_stop_id(stop_id: String) -> Option<i32> {
+    if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+        return None;
+    }
+
     let stop_id_nums = stop_id
         .chars()
         .map(|c| {
@@ -35,7 +49,7 @@ pub fn convert_stop_id(stop_id: String) -> i32 {
     for num in stop_id_nums {
         stop_id.push_str(&num.to_string());
     }
-    stop_id.parse().unwrap()
+    Some(stop_id.parse().unwrap())
 }
 
 // #[derive(Debug)]
@@ -144,8 +158,8 @@ impl Stop {
         let transfers = transfers
             .into_iter()
             .map(|t| Transfer {
-                to_stop_id: convert_stop_id(t.to_stop_id),
-                from_stop_id: convert_stop_id(t.from_stop_id),
+                to_stop_id: convert_stop_id(t.to_stop_id).unwrap(),
+                from_stop_id: convert_stop_id(t.from_stop_id).unwrap(),
             })
             .collect::<Vec<_>>();
 
@@ -209,7 +223,7 @@ impl Stop {
                     .par_iter()
                     .find_first(|s| s.stop_id == station.stop.id)
                     .unwrap();
-                let stop_id = convert_stop_id(station.stop.id.clone());
+                let stop_id = convert_stop_id(station.stop.id.clone()).unwrap();
 
                 Stop {
                     id: stop_id,
@@ -416,7 +430,7 @@ impl From<StationResponse> for RouteStop {
         // dbg!(&stop_id);
         RouteStop {
             route_id: value.route_id,
-            stop_id: convert_stop_id(value.stop_id),
+            stop_id: convert_stop_id(value.stop_id).unwrap(),
             stop_sequence: value.stop_sequence,
             data: RouteStopData::Train { stop_type },
         }

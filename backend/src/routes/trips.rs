@@ -1,3 +1,4 @@
+use super::json_headers;
 use crate::{
     routes::{errors::ServerError, parse_list, CurrentTime},
     AppState,
@@ -12,8 +13,6 @@ use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::JsonValue, FromRow};
 use uuid::Uuid;
-
-use super::json_headers;
 
 #[derive(FromRow, Serialize, Clone)]
 pub struct Trip {
