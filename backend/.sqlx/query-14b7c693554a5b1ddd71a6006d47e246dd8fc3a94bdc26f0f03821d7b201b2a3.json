@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, deviation)\n                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::integer[])\n                    ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Int2Array",
+        "TimestamptzArray",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14b7c693554a5b1ddd71a6006d47e246dd8fc3a94bdc26f0f03821d7b201b2a3"
+}

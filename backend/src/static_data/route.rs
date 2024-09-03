@@ -1,8 +1,7 @@
 use crate::{
-    bus::api_key,
+    api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
 };
-use axum::body::Bytes;
 use geo::{LineString, MultiLineString};
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
@@ -12,7 +11,6 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_json::json;
 use sqlx::{PgPool, QueryBuilder};
-use std::io::Cursor;
 
 pub struct Route {
     pub id: String,

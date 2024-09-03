@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO active_periods (\n                alert_id,\n                start_time,\n                end_time\n            )\n            SELECT\n                unnest($1::uuid[]),\n                unnest($2::timestamptz[]),\n                unnest($3::timestamptz[])\n            ON CONFLICT (alert_id, start_time) DO UPDATE SET end_time = EXCLUDED.end_time\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TimestamptzArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "af6b9fe3be0b052bf66e8c09f00d9704daead509b8e45df0e9b5017737e79607"
+}

@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH updated_values AS (\n                SELECT \n                    unnest($1::text[]) AS vehicle_id,\n                    unnest($2::text[]) AS mta_id,\n                    unnest($3::status[]) AS status,\n                    unnest($4::int[]) AS passengers,\n                    unnest($5::int[]) AS capacity\n            )\n            UPDATE position\n            SET \n                status = updated_values.status,\n                passengers = updated_values.passengers,\n                capacity = updated_values.capacity\n            FROM updated_values\n            WHERE position.vehicle_id = updated_values.vehicle_id\n              AND position.mta_id = updated_values.mta_id\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "status[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "status",
+                  "kind": {
+                    "Enum": [
+                      "none",
+                      "incoming",
+                      "at_stop",
+                      "in_transit_to",
+                      "spooking",
+                      "layover",
+                      "no_progress"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Int4Array",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "16a234f6766f3bb29504b4dadda931f0a1f99964a45fa45b96116e3cc4807c10"
+}
