@@ -120,14 +120,18 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     && entity.agency_id != Some("LI".to_string())
             })
             .map(|entity| {
-                let route_id = entity.route_id.clone().map(|r| {
+                let route_id = entity.route_id.clone().and_then(|r| {
                     // Standardize route id
                     if r.ends_with('X') {
-                        r[..r.len() - 1].to_string()
+                        Some(r[..r.len() - 1].to_string())
                     } else if r == "SS" {
-                        "SI".to_owned()
+                        Some("SI".to_owned())
+                        // X80 is in the alert api but not anywhere else so it causes a foreign key constraint error
+                        // see: https://groups.google.com/g/mtadeveloperresources/c/ZFnhNRrTlr8/m/K8oNzFrBAgAJ
+                    } else if r == "X80" {
+                        None
                     } else {
-                        r.to_string()
+                        Some(r.to_string())
                     }
 
                     // Check if it is a train route
@@ -145,11 +149,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 //     None
                 // };
 
-                let stop_id = &entity
-                    .stop_id
-                    .clone()
-                    .map(|id| convert_stop_id(id))
-                    .flatten();
+                let stop_id = &entity.stop_id.clone().and_then(convert_stop_id);
                 let sort_order = match &entity.mercury_entity_selector {
                     Some(entity_selector) => entity_selector
                         .sort_order
@@ -163,7 +163,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 AffectedEntity {
                     alert_id: alert.id,
                     route_id,
-                    stop_id: stop_id.clone(),
+                    stop_id: *stop_id,
                     sort_order,
                 }
             })
@@ -191,26 +191,32 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let mut transaction = pool.begin().await?;
 
     // set in_feed to false for alerts not in feed
+    // sqlx::query!(
+    //     "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
+    //     &in_feed_ids
+    // )
+    // .execute(&mut *transaction)
+    // .await?;
+    // Set end time for active periods that are no longer active
     sqlx::query!(
-        "UPDATE alerts SET in_feed = false WHERE NOT id = ANY($1)",
+        "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_periods WHERE alert_id = ANY($1))",
         &in_feed_ids
-    )
-    .execute(&mut *transaction)
-    .await?;
+    ).execute(&mut *transaction).await?;
+
     // delete cloned ids
-    sqlx::query!("DELETE FROM alerts WHERE mta_id = ANY($1)", &cloned_mta_ids)
+    sqlx::query!("DELETE FROM alert WHERE mta_id = ANY($1)", &cloned_mta_ids)
         .execute(&mut *transaction)
         .await?;
 
     // Delete existing active periods and affected entities
     sqlx::query!(
-        "DELETE FROM affected_entities WHERE alert_id = ANY($1)",
+        "DELETE FROM affected_entity WHERE alert_id = ANY($1)",
         &existing_alert_ids
     )
     .execute(&mut *transaction)
     .await?;
     sqlx::query!(
-        "DELETE FROM active_periods WHERE alert_id = ANY($1)",
+        "DELETE FROM active_period WHERE alert_id = ANY($1)",
         &existing_alert_ids
     )
     .execute(&mut *transaction)
@@ -346,6 +352,8 @@ impl Alert {
             None => Ok(false),
         }
     }
+
+    // pub async fn cache()
 }
 
 // #[derive(Debug)]
@@ -409,10 +417,7 @@ impl AffectedEntity {
         //     .iter()
         //     .map(|ae| ae.bus_route_id.clone())
         //     .collect::<Vec<_>>();
-        let stop_ids = values
-            .iter()
-            .map(|ae| ae.stop_id.clone())
-            .collect::<Vec<_>>();
+        let stop_ids = values.iter().map(|ae| ae.stop_id).collect::<Vec<_>>();
         let sort_orders = values.iter().map(|ae| ae.sort_order).collect::<Vec<_>>();
 
         sqlx::query!(

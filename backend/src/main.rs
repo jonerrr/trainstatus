@@ -7,6 +7,7 @@ use axum::{
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
+// use crossbeam::channel::{Receiver, Sender};
 use http::{request::Parts, HeaderValue, Method, StatusCode};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
@@ -15,7 +16,14 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
-use tokio::{signal, sync::Notify, time::sleep};
+use tokio::{
+    signal,
+    sync::{
+        broadcast::{self, Sender},
+        mpsc, Mutex, Notify,
+    },
+    time::sleep,
+};
 use tower::Layer;
 use tower_http::{
     compression::CompressionLayer,
@@ -26,10 +34,11 @@ use tower_http::{
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod alerts;
+mod api;
 mod bus;
 mod gtfs;
+mod realtime;
 mod routes;
-mod rt_data;
 mod static_data;
 mod train;
 
@@ -50,6 +59,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 struct AppState {
     pg_pool: sqlx::PgPool,
     redis_pool: bb8::Pool<RedisConnectionManager>,
+    // updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>>,
+    // rx: Arc<Mutex<broadcast::Receiver<String>>>,
+    tx: Sender<realtime::trip::Trip>,
+    shutdown_tx: Sender<()>,
 }
 
 #[tokio::main]
@@ -99,7 +112,40 @@ async fn main() {
     // Wait for static data to be loaded
     notify2.notified().await;
 
-    rt_data::import(pg_pool.clone()).await;
+    let updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>> = Arc::new(Mutex::new(vec![]));
+
+    // let (tx, rx): (Sender<String>, Receiver<String>) = unbounded();
+
+    let (tx, rx) = broadcast::channel::<realtime::trip::Trip>(100);
+
+    // let (tx, rx) = mpsc::channel(100);
+    // let rx = Arc::new(Mutex::new(rx));
+    let tx_clone = tx.clone();
+
+    // Spawn a task to send messages to the broadcast channel
+    tokio::spawn(async move {
+        loop {
+            if let Err(_) = tx_clone.send(realtime::trip::Trip {
+                id: uuid::Uuid::now_v7(),
+                mta_id: "123".to_string(),
+                vehicle_id: "456".to_string(),
+                route_id: "789".to_string(),
+                direction: Some(1),
+                created_at: chrono::Utc::now(),
+                deviation: Some(0),
+                data: realtime::trip::TripData::Train {
+                    express: false,
+                    assigned: false,
+                },
+            }) {
+                println!("receiver dropped");
+                return;
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    });
+
+    realtime::import(pg_pool.clone(), updated_trips.clone()).await;
 
     // panic!("test");
 
@@ -167,6 +213,8 @@ async fn main() {
                 },
             ));
 
+    let (shutdown_tx, mut shutdown_rx) = broadcast::channel::<()>(1);
+
     let app = Router::new()
         .route(
             "/",
@@ -176,6 +224,8 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
+        // sse testing
+        .route("/sse", get(api::sse::sse_handler))
         // trains
         .route("/stops", get(routes::stops::get))
         .route("/stops/times", get(routes::stops::times))
@@ -198,6 +248,9 @@ async fn main() {
         .with_state(AppState {
             pg_pool,
             redis_pool,
+            // updated_trips,
+            tx,
+            shutdown_tx: shutdown_tx.clone(),
         })
         .fallback(handler_404);
 
@@ -211,15 +264,8 @@ async fn main() {
     tracing::info!("listening on {}", listener.local_addr().unwrap());
 
     // https://github.com/tokio-rs/axum/discussions/2377 need to specify types bc of normalize path layer
-    // tokio::select! {
-    //  biased;
-    //  _ = signal::ctrl_c() => {}
-    //  _ = axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-    //  .await
-    //  .unwrap() => {}
-    // }
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(shutdown_tx))
         .await
         .unwrap();
 }
@@ -229,7 +275,7 @@ async fn handler_404() -> impl IntoResponse {
 }
 
 // from https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs
-async fn shutdown_signal() {
+async fn shutdown_signal(shutdown_tx: Sender<()>) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -248,7 +294,11 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        _ = ctrl_c => {
+            shutdown_tx.send(()).expect("shutdown_tx send failed");
+        },
+        _ = terminate => {
+            shutdown_tx.send(()).expect("shutdown_tx send failed");
+        },
     }
 }

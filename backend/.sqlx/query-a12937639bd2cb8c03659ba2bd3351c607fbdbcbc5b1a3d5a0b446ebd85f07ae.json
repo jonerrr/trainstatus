@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM affected_entity WHERE alert_id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a12937639bd2cb8c03659ba2bd3351c607fbdbcbc5b1a3d5a0b446ebd85f07ae"
+}
