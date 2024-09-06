@@ -46,7 +46,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
             if trip.vehicle_id == "deleted" {
                 trip.delete(pool).await.unwrap_or_else(|e| {
-                    tracing::error!("Error deleting trip: {:?}", e);
+                    tracing::error!("Error deleting cancelled trip: {:?}", e);
                 });
                 continue;
             }

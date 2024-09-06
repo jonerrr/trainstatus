@@ -45,7 +45,7 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
                 // Remove the FORCE_UPDATE env variable so it doesn't keep updating
                 remove_var("FORCE_UPDATE");
             }
-            tracing::info!("Updating stops and trips");
+            tracing::info!("Updating static data");
 
             let gtfs = reqwest::Client::new()
                 .get("http://web.mta.info/developers/data/nyct/subway/google_transit.zip")

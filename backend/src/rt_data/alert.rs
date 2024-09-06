@@ -1,6 +1,5 @@
-use crate::feed::alert;
-
 use super::{decode, ImportError};
+use crate::static_data::stop::convert_stop_id;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
 use sqlx::PgPool;
@@ -16,8 +15,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fall-alerts",
         "alerts",
     )
-    .await
-    .unwrap();
+    .await?;
 
     // This is used to set alerts not in feed to false
     let mut in_feed_ids = vec![];
@@ -122,32 +120,36 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     && entity.agency_id != Some("LI".to_string())
             })
             .map(|entity| {
-                let route_id = entity.route_id.as_ref().and_then(|r| {
+                let route_id = entity.route_id.clone().map(|r| {
                     // Standardize route id
-                    let route_id = if r.ends_with('X') {
+                    if r.ends_with('X') {
                         r[..r.len() - 1].to_string()
                     } else if r == "SS" {
                         "SI".to_owned()
                     } else {
                         r.to_string()
-                    };
+                    }
 
                     // Check if it is a train route
-                    if ROUTES.contains(&route_id.as_str()) {
-                        Some(route_id)
-                    } else {
-                        None
-                    }
+                    // if ROUTES.contains(&route_id.as_str()) {
+                    //     Some(route_id)
+                    // } else {
+                    //     None
+                    // }
                 });
 
                 // If it isn't a train route id, it must be a bus route id
-                let bus_route_id = if route_id.is_none() {
-                    entity.route_id.clone()
-                } else {
-                    None
-                };
+                // let bus_route_id = if route_id.is_none() {
+                //     entity.route_id.clone()
+                // } else {
+                //     None
+                // };
 
-                let stop_id = &entity.stop_id;
+                let stop_id = &entity
+                    .stop_id
+                    .clone()
+                    .map(|id| convert_stop_id(id))
+                    .flatten();
                 let sort_order = match &entity.mercury_entity_selector {
                     Some(entity_selector) => entity_selector
                         .sort_order
@@ -161,7 +163,6 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 AffectedEntity {
                     alert_id: alert.id,
                     route_id,
-                    bus_route_id,
                     stop_id: stop_id.clone(),
                     sort_order,
                 }
@@ -276,7 +277,7 @@ impl Alert {
             .collect::<Vec<_>>();
 
         sqlx::query!(r#"
-        INSERT INTO alerts (
+        INSERT INTO alert (
             id,
             mta_id,
             alert_type,
@@ -365,7 +366,7 @@ impl ActivePeriod {
 
         sqlx::query!(
             r#"
-            INSERT INTO active_periods (
+            INSERT INTO active_period (
                 alert_id,
                 start_time,
                 end_time
@@ -390,8 +391,7 @@ impl ActivePeriod {
 pub struct AffectedEntity {
     pub alert_id: Uuid,
     pub route_id: Option<String>,
-    pub bus_route_id: Option<String>,
-    pub stop_id: Option<String>,
+    pub stop_id: Option<i32>,
     pub sort_order: i32,
 }
 
@@ -405,10 +405,10 @@ impl AffectedEntity {
             .iter()
             .map(|ae| ae.route_id.clone())
             .collect::<Vec<_>>();
-        let bus_route_ids = values
-            .iter()
-            .map(|ae| ae.bus_route_id.clone())
-            .collect::<Vec<_>>();
+        // let bus_route_ids = values
+        //     .iter()
+        //     .map(|ae| ae.bus_route_id.clone())
+        //     .collect::<Vec<_>>();
         let stop_ids = values
             .iter()
             .map(|ae| ae.stop_id.clone())
@@ -417,25 +417,22 @@ impl AffectedEntity {
 
         sqlx::query!(
             r#"
-            INSERT INTO affected_entities (
+            INSERT INTO affected_entity (
                 alert_id,
                 route_id,
-                bus_route_id,
                 stop_id,
                 sort_order
             )
             SELECT
                 unnest($1::uuid[]),
                 unnest($2::text[]),
-                unnest($3::text[]),
-                unnest($4::text[]),
-                unnest($5::int[])
+                unnest($3::int[]),
+                unnest($4::int[])
             ON CONFLICT DO NOTHING
             "#,
             &alert_ids,
             &route_ids as &[Option<String>],
-            &bus_route_ids as &[Option<String>],
-            &stop_ids as &[Option<String>],
+            &stop_ids as &[Option<i32>],
             &sort_orders
         )
         .execute(&mut **tx)
