@@ -47,6 +47,8 @@ pub enum ImportError {
     Sqlx(#[from] sqlx::Error),
     #[error("SIRI decode error: {0}")]
     SiriDecode(#[from] siri::DecodeSiriError),
+    #[error("decode error: {0}")]
+    DecodeFeed(#[from] DecodeFeedError),
 }
 
 pub async fn import(pool: PgPool) {

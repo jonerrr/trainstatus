@@ -9,16 +9,17 @@ services:
       - POSTGRES_DB=trains
     volumes:
       - trainstatus-db:/var/lib/postgresql/data:z
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:z
+
   valkey:
     image: valkey/valkey:7.2-alpine3.19
     container_name: valkey
     ports:
       - 6379:6379
-    # volumes:
-    #   - ./container_redis-data:/data:z
   # ts-backend:
   #   environment:
   #     - DATABASE_URL=postgres://trains:trains@trainstatus-postgres:5432/trains
+  #     - REDIS_URL=redis://valkey:6379
   #     - ADDRESS=0.0.0.0:3055
   #     - API_KEY=bus api key
   #   build: .
