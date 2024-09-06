@@ -13,13 +13,16 @@ use rayon::prelude::*;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-const ENDPOINTS: [&str; 2] = [
-    "https://gtfsrt.prod.obanyc.com/tripUpdates",
-    "https://gtfsrt.prod.obanyc.com/vehiclePositions",
+const ENDPOINTS: [(&str, &str); 2] = [
+    ("https://gtfsrt.prod.obanyc.com/tripUpdates", "bus_trips"),
+    (
+        "https://gtfsrt.prod.obanyc.com/vehiclePositions",
+        "bus_vehicles",
+    ),
 ];
 
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
-    let futures = ENDPOINTS.iter().map(|e| decode(e, e));
+    let futures = ENDPOINTS.iter().map(|e| decode(e.0, e.1));
     let feeds = futures::future::join_all(futures)
         .await
         .into_iter()
@@ -51,7 +54,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 continue;
             }
 
-            trip.find(&pool).await.unwrap_or_else(|e| {
+            trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
                 false
             });
@@ -89,9 +92,9 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         }
     }
 
-    Trip::insert(trips, &pool).await?;
-    StopTime::insert(stop_times, &pool).await?;
-    Position::insert(positions, &pool).await?;
+    Trip::insert(trips, pool).await?;
+    StopTime::insert(stop_times, pool).await?;
+    Position::insert(positions, pool).await?;
 
     Ok(())
 }

@@ -1,8 +1,10 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
+#[derive(Clone, Serialize)]
 pub struct Trip {
     pub id: Uuid,
     pub mta_id: String,
@@ -17,6 +19,7 @@ pub struct Trip {
     pub data: TripData,
 }
 
+#[derive(Serialize, Clone)]
 pub enum TripData {
     Train { express: bool, assigned: bool },
     Bus,

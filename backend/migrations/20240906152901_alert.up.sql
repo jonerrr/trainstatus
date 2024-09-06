@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS alert (
     description_plain VARCHAR,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    display_before_active INTEGER,
-    in_feed BOOLEAN NOT NULL DEFAULT TRUE
+    display_before_active INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS active_period(

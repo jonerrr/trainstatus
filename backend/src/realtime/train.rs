@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{
     decode,
     position::{IntoPositionError, Position, PositionData, Status},
@@ -12,21 +14,49 @@ use crate::{
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const ENDPOINTS: [&str; 8] = [
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si",
+const ENDPOINTS: [(&str, &str); 8] = [
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
+        "ace",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
+        "bdfm",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g",
+        "g",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz",
+        "jz",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw",
+        "nqrw",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l",
+        "l",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
+        "1234567",
+    ),
+    (
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si",
+        "sir",
+    ),
 ];
 
-pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
-    let futures = ENDPOINTS.iter().map(|e| decode(e, e));
+pub async fn import(
+    pool: &PgPool,
+    updated_trips_global: Arc<Mutex<Vec<Trip>>>,
+) -> Result<(), ImportError> {
+    let futures = ENDPOINTS.iter().map(|e| decode(e.0, e.1));
     let feeds = futures::future::join_all(futures)
         .await
         .into_iter()
@@ -37,7 +67,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         .flat_map(|f| f.entity.into_iter())
         .collect::<Vec<_>>();
 
-    let mut trips: Vec<Trip> = vec![];
+    // (trip, updated or new)
+    let mut trips: Vec<(Trip, bool)> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
@@ -68,7 +99,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     }
                 }
             }
-            trip.find(&pool).await.unwrap_or_else(|e| {
+            let found = trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
                 false
             });
@@ -86,7 +117,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 })
                 .collect::<Vec<StopTime>>();
             stop_times.append(&mut trip_stop_times);
-            trips.push(trip);
+            trips.push((trip, found));
         }
 
         if let Some(vehicle) = entity.vehicle {
@@ -100,6 +131,12 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             positions.push(position);
         }
     }
+
+    // let updated_trips = trips.iter().filter(|t| t.1).map(|t| t.0.clone()).collect();
+    // let updated_trips = updated_trips_global.lock().await;
+
+    // TODO: remove if not needed
+    let trips = trips.into_par_iter().map(|t| t.0).collect::<Vec<Trip>>();
 
     Trip::insert(trips, pool).await?;
     StopTime::insert(stop_times, pool).await?;

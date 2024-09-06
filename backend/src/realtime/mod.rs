@@ -1,9 +1,10 @@
 use crate::{feed::FeedMessage, train::trips::DecodeFeedError};
 use prost::Message;
 use sqlx::PgPool;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::{env::var, time::Duration};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tokio::{
     fs::{create_dir, write},
     time::sleep,
@@ -51,7 +52,7 @@ pub enum ImportError {
     DecodeFeed(#[from] DecodeFeedError),
 }
 
-pub async fn import(pool: PgPool) {
+pub async fn import(pool: PgPool, updated_trips: Arc<Mutex<Vec<trip::Trip>>>) {
     let t_pool = pool.clone();
     let b_pool = pool.clone();
     let s_pool = pool.clone();
@@ -67,7 +68,7 @@ pub async fn import(pool: PgPool) {
 
     tokio::spawn(async move {
         loop {
-            let _ = train::import(&t_pool)
+            let _ = train::import(&t_pool, updated_trips.clone())
                 .await
                 .inspect_err(|e| tracing::error!("train::import: {}", e));
             sleep(Duration::from_secs(30)).await;
