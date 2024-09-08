@@ -81,20 +81,19 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
             .await
             .unwrap();
 
-            let mut routes = route::Route::get_train(gtfs_routes);
-            let (mut stops, mut route_stops) = stop::Stop::get_train(
+            let mut routes = route::Route::parse_train(gtfs_routes);
+            let (mut stops, mut route_stops) = stop::Stop::parse_train(
                 routes.iter().map(|r| r.id.clone()).collect(),
                 gtfs_transfers,
             )
             .await;
             let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
-                route::Route::get_bus().await;
+                route::Route::parse_bus().await;
             routes.append(&mut bus_routes);
             stops.append(&mut bus_stops);
             // route_stops.append(&mut bus_route_stops);
 
-            // print all route_stops with
-            dbg!(bus_route_stops.len());
+            // dbg!(bus_route_stops.len());
             route::Route::insert(routes, &pool).await;
             stop::Stop::insert(stops, &pool).await;
             // TODO: figure out why i cant combine train and bus without getting pg duplicate conflict error

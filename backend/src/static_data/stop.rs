@@ -1,8 +1,8 @@
 use rayon::prelude::*;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 
-// #[derive(Debug)]
+#[derive(Serialize)]
 pub struct Stop {
     //    Bus stops are already numbers, but train stop ids are converted to numbers by their unicode value
     pub id: i32,
@@ -12,12 +12,53 @@ pub struct Stop {
     pub data: StopData,
 }
 
-// pub enum StopId {
-//     Train(i32),
-//     Bus(i32),
-// }
+#[derive(Serialize)]
+#[serde(tag = "t", content = "c")]
+pub enum StopData {
+    Train {
+        ada: bool,
+        north_headsign: String,
+        south_headsign: String,
+        transfers: Vec<i32>,
+        notes: Option<String>,
+        borough: Borough,
+    },
+    Bus {
+        direction: String,
+    },
+}
 
-// impl
+#[derive(sqlx::Type, Serialize)]
+#[sqlx(type_name = "borough", rename_all = "snake_case")]
+pub enum Borough {
+    Brooklyn,
+    Queens,
+    Bronx,
+    StatenIsland,
+    Manhattan,
+}
+
+pub struct RouteStop {
+    pub route_id: String,
+    pub stop_id: i32,
+    pub stop_sequence: i16,
+    pub data: RouteStopData,
+}
+
+pub enum RouteStopData {
+    Train { stop_type: StopType },
+    Bus { headsign: String, direction: i16 },
+}
+
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "stop_type", rename_all = "snake_case")]
+pub enum StopType {
+    FullTime,
+    PartTime,
+    LateNight,
+    RushHourOneDirection,
+    RushHour,
+}
 
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
 // Thanks MTA for that
@@ -50,53 +91,6 @@ pub fn convert_stop_id(stop_id: String) -> Option<i32> {
         stop_id.push_str(&num.to_string());
     }
     Some(stop_id.parse().unwrap())
-}
-
-// #[derive(Debug)]
-pub enum StopData {
-    Train {
-        ada: bool,
-        north_headsign: String,
-        south_headsign: String,
-        transfers: Vec<i32>,
-        notes: Option<String>,
-        borough: Borough,
-    },
-    Bus {
-        direction: String,
-    },
-}
-
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "borough", rename_all = "snake_case")]
-pub enum Borough {
-    Brooklyn,
-    Queens,
-    Bronx,
-    StatenIsland,
-    Manhattan,
-}
-
-pub struct RouteStop {
-    pub route_id: String,
-    pub stop_id: i32,
-    pub stop_sequence: i16,
-    pub data: RouteStopData,
-}
-
-pub enum RouteStopData {
-    Train { stop_type: StopType },
-    Bus { headsign: String, direction: i16 },
-}
-
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "stop_type", rename_all = "snake_case")]
-pub enum StopType {
-    FullTime,
-    PartTime,
-    LateNight,
-    RushHourOneDirection,
-    RushHour,
 }
 
 impl Stop {
@@ -145,7 +139,7 @@ impl Stop {
         }
     }
 
-    pub async fn get_train(
+    pub async fn parse_train(
         routes: Vec<String>,
         mut transfers: Vec<Transfer<String>>,
     ) -> (Vec<Stop>, Vec<RouteStop>) {
@@ -275,7 +269,7 @@ impl Stop {
         // todo!("return train stops")
     }
 
-    pub async fn get_bus(routes: &[&str]) -> Vec<Stop> {
+    pub async fn parse_bus(routes: &[&str]) -> Vec<Stop> {
         todo!("return bus stops")
     }
 }
