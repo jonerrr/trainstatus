@@ -107,6 +107,66 @@ impl Trip {
         Ok(())
     }
 
+    pub async fn get_all(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
+        let trips: (serde_json::Value,) = sqlx::query_as(
+            r#"
+            SELECT json_agg(result) FROM
+            (SELECT
+                t.id,
+                t.mta_id,
+                t.vehicle_id,
+                t.route_id,
+                t.direction,
+                t.created_at,
+                p.vehicle_id,
+                p.stop_id,
+                p.updated_at,
+                p.status,
+                CASE
+                    WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
+                    'express',
+                    t.express,
+                    'assigned',
+                    t.assigned,
+                    'stop_id',
+                    p.stop_id 
+                )
+                    ELSE jsonb_build_object(
+                    'lat',
+                    p.lat,
+                    'lon',
+                    p.lon,
+                    'bearing',
+                    p.bearing,
+                    'passengers',
+                    p.passengers,
+                    'capacity',
+                    p.capacity 
+                )
+                END AS DATA
+            FROM
+                trip t
+            LEFT JOIN "position" p ON
+                t.vehicle_id = p.vehicle_id
+            WHERE
+                t.id = ANY(
+                SELECT
+                    t.id
+                FROM
+                    trip t
+                LEFT JOIN stop_time st ON
+                    st.trip_id = t.id
+                WHERE
+                    st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+                    )) AS result
+                    "#,
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(trips.0)
+    }
+
     // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
     pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
         let res = sqlx::query!(

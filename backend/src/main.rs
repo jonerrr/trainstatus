@@ -123,27 +123,27 @@ async fn main() {
     let tx_clone = tx.clone();
 
     // Spawn a task to send messages to the broadcast channel
-    tokio::spawn(async move {
-        loop {
-            if let Err(_) = tx_clone.send(realtime::trip::Trip {
-                id: uuid::Uuid::now_v7(),
-                mta_id: "123".to_string(),
-                vehicle_id: "456".to_string(),
-                route_id: "789".to_string(),
-                direction: Some(1),
-                created_at: chrono::Utc::now(),
-                deviation: Some(0),
-                data: realtime::trip::TripData::Train {
-                    express: false,
-                    assigned: false,
-                },
-            }) {
-                println!("receiver dropped");
-                return;
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    });
+    // tokio::spawn(async move {
+    //     loop {
+    //         if let Err(_) = tx_clone.send(realtime::trip::Trip {
+    //             id: uuid::Uuid::now_v7(),
+    //             mta_id: "123".to_string(),
+    //             vehicle_id: "456".to_string(),
+    //             route_id: "789".to_string(),
+    //             direction: Some(1),
+    //             created_at: chrono::Utc::now(),
+    //             deviation: Some(0),
+    //             data: realtime::trip::TripData::Train {
+    //                 express: false,
+    //                 assigned: false,
+    //             },
+    //         }) {
+    //             println!("receiver dropped");
+    //             return;
+    //         }
+    //         tokio::time::sleep(Duration::from_secs(1)).await;
+    //     }
+    // });
 
     realtime::import(pg_pool.clone(), updated_trips.clone()).await;
 
@@ -213,7 +213,7 @@ async fn main() {
                 },
             ));
 
-    let (shutdown_tx, mut shutdown_rx) = broadcast::channel::<()>(1);
+    let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
     let app = Router::new()
         .route(
@@ -226,8 +226,10 @@ async fn main() {
         )
         // sse testing
         .route("/sse", get(api::sse::sse_handler))
+        .route("/routes", get(api::static_data::routes_handler))
+        .route("/stops", get(api::static_data::stops_handler))
         // trains
-        .route("/stops", get(routes::stops::get))
+        // .route("/stops", get(routes::stops::get))
         .route("/stops/times", get(routes::stops::times))
         .route("/trips", get(routes::trips::get))
         .route("/trips/:id", get(routes::trips::by_id))

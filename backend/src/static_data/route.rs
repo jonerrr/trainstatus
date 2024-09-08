@@ -8,21 +8,23 @@ use indicatif::ProgressStyle;
 use polyline::decode_polyline;
 use rayon::prelude::*;
 use regex::Regex;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use sqlx::{PgPool, QueryBuilder};
 
+#[derive(Serialize, sqlx::FromRow)]
 pub struct Route {
     pub id: String,
     pub long_name: String,
     pub short_name: String,
     pub color: String,
     pub shuttle: bool,
-    pub geom: serde_json::Value,
+    // optional for api response
+    pub geom: Option<serde_json::Value>,
     pub route_type: RouteType,
 }
 
-#[derive(sqlx::Type)]
+#[derive(sqlx::Type, Serialize, Deserialize, Debug)]
 #[sqlx(type_name = "route_type", rename_all = "snake_case")]
 pub enum RouteType {
     Train,
@@ -48,16 +50,31 @@ impl Route {
         query.execute(pool).await.unwrap();
     }
 
-    pub fn get_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
-        // let reader = Cursor::new(gtfs);
-        // let mut archive = zip::ZipArchive::new(reader).unwrap();
+    pub async fn get_all(
+        pool: &PgPool,
+        route_type: Option<&RouteType>,
+        geom: bool,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let mut query =
+            QueryBuilder::new("SELECT id, long_name, short_name, color, shuttle, route_type, ");
 
-        // let routes_file = archive.by_name("routes.txt").unwrap();
-        // let mut rdr = csv::Reader::from_reader(routes_file);
-        // let routes = rdr
-        //     .deserialize()
-        //     .collect::<Result<Vec<GtfsRoute>, csv::Error>>()
-        //     .unwrap();
+        if geom {
+            query.push("geom");
+        } else {
+            query.push(r#"NULL AS geom"#);
+        }
+
+        query.push(" FROM route");
+
+        if let Some(route_type) = route_type {
+            query.push(" WHERE route_type = ");
+            query.push_bind(route_type as &RouteType);
+        }
+
+        query.build_query_as().fetch_all(pool).await
+    }
+
+    pub fn parse_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
         gtfs_routes
             .into_iter()
             .filter_map(|r| {
@@ -71,7 +88,7 @@ impl Route {
             .collect::<Vec<Route>>()
     }
 
-    pub async fn get_bus() -> (Vec<Self>, Vec<Stop>, Vec<RouteStop>) {
+    pub async fn parse_bus() -> (Vec<Self>, Vec<Stop>, Vec<RouteStop>) {
         // It wouldn't make sense to get bus routes and stops at different times bc they are all from the same API
         let mut routes: Vec<Route> = Vec::new();
         let mut stops: Vec<Stop> = Vec::new();
@@ -119,7 +136,7 @@ impl Route {
                 short_name: route.short_name,
                 color: route.color,
                 shuttle,
-                geom: serde_json::to_value(route_geom).unwrap(),
+                geom: Some(serde_json::to_value(route_geom).unwrap()),
                 route_type: RouteType::Bus,
             });
 
@@ -208,7 +225,7 @@ impl From<GtfsRoute> for Route {
             short_name: value.route_short_name,
             color: value.route_color,
             shuttle: false,
-            geom: json!({}),
+            geom: Some(json!({})),
             route_type: RouteType::Train,
         }
     }
