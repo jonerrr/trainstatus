@@ -9,6 +9,7 @@ use serde::{Deserialize, Deserializer};
 use std::sync::OnceLock;
 
 pub mod errors;
+pub mod realtime;
 pub mod sse;
 pub mod static_data;
 

@@ -56,7 +56,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
             trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
-                false
+                (false, true)
             });
 
             let mut trip_stop_times = trip_update

@@ -1,5 +1,8 @@
 use super::errors::ServerError;
-use crate::{realtime::trip::Trip, AppState};
+use crate::{
+    realtime::{alert::Alert, stop_time::StopTime, trip::Trip},
+    AppState,
+};
 use axum::{
     extract::{Query, State},
     response::{
@@ -7,8 +10,10 @@ use axum::{
         IntoResponse,
     },
 };
+use chrono::Utc;
 use futures::stream::{self, Stream};
 use serde::Deserialize;
+use serde_json::json;
 use std::time::Duration;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
 
@@ -36,9 +41,19 @@ pub async fn sse_handler(
     let mut shutdown_rx = state.shutdown_tx.subscribe();
     let rx = state.tx.subscribe();
 
-    let current_trips = Trip::get_all(&state.pg_pool).await?;
+    // TODO: fetch at same time
+    let current_trips = Trip::get_all(&state.pg_pool, Utc::now()).await?;
+    let stop_times = StopTime::get_all(&state.pg_pool, Utc::now()).await?;
+    let alerts = Alert::get_all(&state.pg_pool, Utc::now()).await?;
+
+    let data = json!({
+        "trips": current_trips,
+        "alerts": alerts,
+        "stop_times": stop_times,
+    });
+
     let initial_event = Event::default()
-        .json_data(current_trips)
+        .json_data(data)
         .map_err(ServerError::Axum)?;
     let initial_stream = stream::once(async { Ok::<_, ServerError>(initial_event) });
 
