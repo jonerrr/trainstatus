@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, PartialEq)]
 pub struct Trip {
     pub id: Uuid,
     pub mta_id: String,
@@ -19,7 +19,7 @@ pub struct Trip {
     pub data: TripData,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq)]
 pub enum TripData {
     Train { express: bool, assigned: bool },
     Bus,
@@ -107,7 +107,10 @@ impl Trip {
         Ok(())
     }
 
-    pub async fn get_all(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
+    pub async fn get_all(
+        pool: &PgPool,
+        at: DateTime<Utc>,
+    ) -> Result<serde_json::Value, sqlx::Error> {
         let trips: (serde_json::Value,) = sqlx::query_as(
             r#"
             SELECT json_agg(result) FROM
@@ -157,22 +160,23 @@ impl Trip {
                 LEFT JOIN stop_time st ON
                     st.trip_id = t.id
                 WHERE
-                    st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+                    st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
                     )) AS result
                     "#,
         )
+        .bind(at)
         .fetch_one(pool)
         .await?;
 
         Ok(trips.0)
     }
 
-    // finds trip in db by matching mta_id, train_id, created_at, and direction, returns true if found
-    pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
+    // finds trip in db by matching mta_id, train_id, created_at, and direction, returns tuple of (found, changed) indicating if trip was found and if it is different than current trip in db
+    pub async fn find(&mut self, pool: &PgPool) -> Result<(bool, bool), sqlx::Error> {
         let res = sqlx::query!(
             r#"
             SELECT
-                id
+                *
             FROM
                 trip
             WHERE
@@ -197,9 +201,27 @@ impl Trip {
         match res {
             Some(t) => {
                 self.id = t.id;
-                Ok(true)
+
+                let changed = match &self.data {
+                    TripData::Train { express, assigned } => {
+                        if t.express != Some(*express) || t.assigned != Some(*assigned) {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    TripData::Bus => {
+                        if t.deviation != self.deviation {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                };
+
+                Ok((true, changed))
             }
-            None => Ok(false),
+            None => Ok((false, true)),
         }
     }
 

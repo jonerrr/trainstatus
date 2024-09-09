@@ -68,7 +68,8 @@ pub async fn import(
         .collect::<Vec<_>>();
 
     // (trip, updated or new)
-    let mut trips: Vec<(Trip, bool)> = vec![];
+    // let mut trips: Vec<(Trip, bool)> = vec![];
+    let mut trips: Vec<Trip> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
@@ -99,9 +100,9 @@ pub async fn import(
                     }
                 }
             }
-            let found = trip.find(pool).await.unwrap_or_else(|e| {
+            let (found, changed) = trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
-                false
+                (false, true)
             });
 
             let mut trip_stop_times = trip_update
@@ -116,8 +117,13 @@ pub async fn import(
                     .ok()
                 })
                 .collect::<Vec<StopTime>>();
+
+            // if found {
+            //     trip_stop_times.sor
+            // }
+
             stop_times.append(&mut trip_stop_times);
-            trips.push((trip, found));
+            trips.push(trip);
         }
 
         if let Some(vehicle) = entity.vehicle {
@@ -136,7 +142,7 @@ pub async fn import(
     // let updated_trips = updated_trips_global.lock().await;
 
     // TODO: remove if not needed
-    let trips = trips.into_par_iter().map(|t| t.0).collect::<Vec<Trip>>();
+    // let trips = trips.into_par_iter().map(|t| t.0).collect::<Vec<Trip>>();
 
     Trip::insert(trips, pool).await?;
     StopTime::insert(stop_times, pool).await?;

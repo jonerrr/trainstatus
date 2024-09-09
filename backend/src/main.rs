@@ -61,7 +61,7 @@ struct AppState {
     redis_pool: bb8::Pool<RedisConnectionManager>,
     // updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>>,
     // rx: Arc<Mutex<broadcast::Receiver<String>>>,
-    tx: Sender<realtime::trip::Trip>,
+    tx: Sender<serde_json::Value>,
     shutdown_tx: Sender<()>,
 }
 
@@ -116,7 +116,7 @@ async fn main() {
 
     // let (tx, rx): (Sender<String>, Receiver<String>) = unbounded();
 
-    let (tx, rx) = broadcast::channel::<realtime::trip::Trip>(100);
+    let (tx, rx) = broadcast::channel::<serde_json::Value>(100);
 
     // let (tx, rx) = mpsc::channel(100);
     // let rx = Arc::new(Mutex::new(rx));
@@ -145,7 +145,7 @@ async fn main() {
     //     }
     // });
 
-    realtime::import(pg_pool.clone(), updated_trips.clone()).await;
+    realtime::import(pg_pool.clone(), updated_trips.clone(), tx_clone).await;
 
     // panic!("test");
 

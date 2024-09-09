@@ -324,22 +324,70 @@ impl Alert {
         Ok(())
     }
 
+    pub async fn get_all(
+        pool: &PgPool,
+        at: DateTime<Utc>,
+    ) -> Result<serde_json::Value, sqlx::Error> {
+        let alerts: (serde_json::Value,) = sqlx::query_as(
+            r#"
+            SELECT json_agg(result) FROM
+            (SELECT
+                a.id,
+                a.alert_type,
+                a.header_html,
+                a.description_html,
+                a.created_at,
+                a.updated_at,
+                ap.start_time,
+                ap.end_time,
+                json_agg(DISTINCT jsonb_build_object(
+                'route_id',
+                ae.route_id,
+                'stop_id',
+                ae.stop_id,
+                'sort_order',
+                ae.sort_order)) AS entities
+            FROM
+                alert a
+            LEFT JOIN active_period ap ON
+                a.id = ap.alert_id
+            LEFT JOIN affected_entity ae ON
+                a.id = ae.alert_id
+            WHERE
+                ae.route_id IS NOT NULL
+                AND ap.start_time <= now()
+                AND (ap.end_time >= now()
+                    OR ap.end_time IS NULL)
+            GROUP BY
+                a.id,
+                ap.start_time,
+                ap.end_time
+            ) AS result"#,
+        )
+        .bind(at)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(alerts.0)
+    }
+
     pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {
         let res = sqlx::query!(
             "
             SELECT
                 id
             FROM
-                alerts
+                alert
             WHERE
                 (mta_id = $1
                     OR header_plain = $2
                     OR (description_plain IS NOT NULL
                         AND description_plain = $3))
-                AND created_at::date = CURRENT_DATE",
+                AND created_at::date = $4",
             self.mta_id,
             self.header_plain,
-            self.description_plain
+            self.description_plain,
+            self.created_at.date_naive()
         )
         .fetch_optional(pool)
         .await?;

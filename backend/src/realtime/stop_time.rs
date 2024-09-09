@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+#[derive(PartialEq, Serialize, Hash, Eq)]
 pub struct StopTime {
     pub trip_id: Uuid,
     pub stop_id: i32,
@@ -10,6 +12,38 @@ pub struct StopTime {
 }
 
 impl StopTime {
+    pub async fn get(pool: &PgPool, trip_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+        let stop_times = sqlx::query_as!(
+            StopTime,
+            r#"
+            SELECT *
+            FROM stop_time
+            WHERE trip_id = $1
+            "#,
+            trip_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(stop_times)
+    }
+
+    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
+        let stop_times = sqlx::query_as!(
+            StopTime,
+            r#"
+            SELECT *
+            FROM stop_time
+            WHERE arrival >= $1
+            "#,
+            at
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(stop_times)
+    }
+
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         let trip_ids = values.iter().map(|v| v.trip_id).collect::<Vec<_>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
