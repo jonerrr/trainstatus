@@ -1,28 +1,29 @@
+use api::realtime::{Clients, Update};
 use axum::{
     body::Body,
     extract::Request,
     response::{IntoResponse, Response},
     routing::get,
-    Router, ServiceExt,
+    Extension, Router, ServiceExt,
 };
 use bb8_redis::RedisConnectionManager;
-use chrono::Utc;
+use crossbeam::channel::unbounded;
 // use crossbeam::channel::{Receiver, Sender};
 use http::{request::Parts, HeaderValue, Method, StatusCode};
+use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
+    collections::{HashMap, HashSet},
     convert::Infallible,
-    env::{remove_var, var},
+    env::var,
     sync::{Arc, OnceLock},
-    time::Duration,
 };
 use tokio::{
     signal,
     sync::{
         broadcast::{self, Sender},
-        mpsc, Mutex, Notify,
+        Mutex, Notify,
     },
-    time::sleep,
 };
 use tower::Layer;
 use tower_http::{
@@ -59,10 +60,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 struct AppState {
     pg_pool: sqlx::PgPool,
     redis_pool: bb8::Pool<RedisConnectionManager>,
-    // updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>>,
     // rx: Arc<Mutex<broadcast::Receiver<String>>>,
-    tx: Sender<serde_json::Value>,
-    shutdown_tx: Sender<()>,
+    rx: crossbeam::channel::Receiver<Vec<Update>>,
+    clients: Clients,
+    // tx: Sender<serde_json::Value>,
+    // shutdown_tx: Sender<()>,
+    initial_data: Arc<Mutex<serde_json::Value>>,
 }
 
 #[tokio::main]
@@ -112,15 +115,27 @@ async fn main() {
     // Wait for static data to be loaded
     notify2.notified().await;
 
+    // TODO: remove this
     let updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>> = Arc::new(Mutex::new(vec![]));
 
-    // let (tx, rx): (Sender<String>, Receiver<String>) = unbounded();
+    // This will store alerts and trips for initial websocket load
+    let initial_data: Arc<Mutex<serde_json::Value>> = Arc::new(Mutex::new(json!(null)));
 
-    let (tx, rx) = broadcast::channel::<serde_json::Value>(100);
+    let (tx, rx) = unbounded::<Vec<Update>>();
+
+    realtime::import(
+        pg_pool.clone(),
+        updated_trips.clone(),
+        tx,
+        initial_data.clone(),
+    )
+    .await;
+
+    // let (tx, rx) = broadcast::channel::<Update>(100);
 
     // let (tx, rx) = mpsc::channel(100);
     // let rx = Arc::new(Mutex::new(rx));
-    let tx_clone = tx.clone();
+    // let tx_clone = tx.clone();
 
     // Spawn a task to send messages to the broadcast channel
     // tokio::spawn(async move {
@@ -144,8 +159,6 @@ async fn main() {
     //         tokio::time::sleep(Duration::from_secs(1)).await;
     //     }
     // });
-
-    realtime::import(pg_pool.clone(), updated_trips.clone(), tx_clone).await;
 
     // panic!("test");
 
@@ -215,6 +228,8 @@ async fn main() {
 
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
+    let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
+
     let app = Router::new()
         .route(
             "/",
@@ -225,7 +240,8 @@ async fn main() {
             }),
         )
         // sse testing
-        .route("/sse", get(api::sse::sse_handler))
+        // .route("/sse", get(api::sse::sse_handler))
+        .route("/realtime", get(api::realtime::realtime_handler))
         .route("/routes", get(api::static_data::routes_handler))
         .route("/stops", get(api::static_data::stops_handler))
         // trains
@@ -251,9 +267,14 @@ async fn main() {
             pg_pool,
             redis_pool,
             // updated_trips,
-            tx,
-            shutdown_tx: shutdown_tx.clone(),
+            // tx,
+            rx,
+            clients: ws_clients,
+            // shutdown_tx: shutdown_tx.clone(),
+            initial_data,
         })
+        // .layer(Extension(tx1))
+        // .layer(Extension(ws_clients))
         .fallback(handler_404);
 
     // Need to specify normalize path layer like this so it runs before routing

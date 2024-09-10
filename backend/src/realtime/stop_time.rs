@@ -1,15 +1,30 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
+use sqlx::{prelude::FromRow, PgPool, QueryBuilder};
 use uuid::Uuid;
 
-#[derive(PartialEq, Serialize, Hash, Eq)]
+#[derive(PartialEq, Serialize, Hash, Eq, FromRow)]
 pub struct StopTime {
     pub trip_id: Uuid,
     pub stop_id: i32,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
 }
+
+#[derive(PartialEq, Serialize, Hash, Eq, FromRow)]
+pub struct StopTimeWithType {
+    pub trip_id: Uuid,
+    pub route_id: String,
+    pub stop_id: i32,
+    pub arrival: DateTime<Utc>,
+    pub departure: DateTime<Utc>,
+    pub trip_type: String,
+}
+
+// pub enum TripType {
+//     Train,
+//     Bus,
+// }
 
 impl StopTime {
     pub async fn get(pool: &PgPool, trip_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
@@ -28,18 +43,67 @@ impl StopTime {
         Ok(stop_times)
     }
 
-    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn get_all(
+        pool: &PgPool,
+        at: DateTime<Utc>,
+        // trip_type: Option<TripType>,
+    ) -> Result<Vec<StopTimeWithType>, sqlx::Error> {
         let stop_times = sqlx::query_as!(
-            StopTime,
+            StopTimeWithType,
             r#"
-            SELECT *
-            FROM stop_time
-            WHERE arrival >= $1
+            SELECT
+                st.trip_id,
+                st.stop_id,
+                st.arrival,
+                st.departure,
+                t.route_id,
+                CASE
+                    WHEN t.assigned IS NOT NULL THEN 'train'
+                    ELSE 'bus'
+                END AS "trip_type!"
+            FROM
+                stop_time st
+            LEFT JOIN trip t ON
+                st.trip_id = t.id
+            WHERE
+                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+            ORDER BY
+                st.arrival
             "#,
             at
         )
         .fetch_all(pool)
         .await?;
+
+        // let mut query = QueryBuilder::new(
+        //     r#"
+        //     SELECT
+        //     st.trip_id,
+        //     st.stop_id,
+        //     st.arrival,
+        //     st.departure
+        // FROM
+        //     stop_time st "#,
+        // );
+
+        // if let Some(trip_type) = trip_type {
+        //     query.push(
+        //         "
+        // LEFT JOIN trip t ON
+        //     st.trip_id = t.id
+        // WHERE
+        // ",
+        //     );
+        //     match trip_type {
+        //         TripType::Train => query.push("t.assigned IS NOT NULL AND "),
+        //         TripType::Bus => query.push("t.assigned IS NULL AND "),
+        //     };
+        // }
+
+        // query.push("st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')");
+
+        // let stop_times: Vec<StopTime> =
+        //     query.push_bind(at).build_query_as().fetch_all(pool).await?;
 
         Ok(stop_times)
     }
