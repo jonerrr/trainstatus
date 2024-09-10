@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                st.trip_id,\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                t.route_id,\n                CASE\n                    WHEN t.assigned IS NOT NULL THEN 'train'\n                    ELSE 'bus'\n                END AS \"trip_type!\"\n            FROM\n                stop_time st\n            LEFT JOIN trip t ON\n                st.trip_id = t.id\n            WHERE\n                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')\n            ORDER BY\n                st.arrival\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "arrival",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "departure",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "trip_type!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "9af7f08592745991fcff4b2ea85af234aba0e65945733930d5ded5b47ceb5f87"
+}
