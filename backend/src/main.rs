@@ -1,10 +1,10 @@
-use api::realtime::{Clients, Update};
+use api::websocket::{Clients, Update};
 use axum::{
     body::Body,
     extract::Request,
     response::{IntoResponse, Response},
     routing::get,
-    Extension, Router, ServiceExt,
+    Router, ServiceExt,
 };
 use bb8_redis::RedisConnectionManager;
 use crossbeam::channel::unbounded;
@@ -22,7 +22,7 @@ use tokio::{
     signal,
     sync::{
         broadcast::{self, Sender},
-        Mutex, Notify,
+        Mutex, Notify, RwLock,
     },
 };
 use tower::Layer;
@@ -65,7 +65,7 @@ struct AppState {
     clients: Clients,
     // tx: Sender<serde_json::Value>,
     // shutdown_tx: Sender<()>,
-    initial_data: Arc<Mutex<serde_json::Value>>,
+    initial_data: Arc<RwLock<serde_json::Value>>,
 }
 
 #[tokio::main]
@@ -115,21 +115,12 @@ async fn main() {
     // Wait for static data to be loaded
     notify2.notified().await;
 
-    // TODO: remove this
-    let updated_trips: Arc<Mutex<Vec<realtime::trip::Trip>>> = Arc::new(Mutex::new(vec![]));
-
     // This will store alerts and trips for initial websocket load
-    let initial_data: Arc<Mutex<serde_json::Value>> = Arc::new(Mutex::new(json!(null)));
+    let initial_data: Arc<RwLock<serde_json::Value>> = Arc::new(RwLock::new(json!(null)));
 
     let (tx, rx) = unbounded::<Vec<Update>>();
 
-    realtime::import(
-        pg_pool.clone(),
-        updated_trips.clone(),
-        tx,
-        initial_data.clone(),
-    )
-    .await;
+    realtime::import(pg_pool.clone(), tx, initial_data.clone()).await;
 
     // let (tx, rx) = broadcast::channel::<Update>(100);
 
@@ -241,14 +232,16 @@ async fn main() {
         )
         // sse testing
         // .route("/sse", get(api::sse::sse_handler))
-        .route("/realtime", get(api::realtime::realtime_handler))
+        // .route("/realtime", get(api::realtime::realtime_handler))
         .route("/routes", get(api::static_data::routes_handler))
         .route("/stops", get(api::static_data::stops_handler))
+        .route("/trips", get(api::realtime::trips_handler))
+        .route("/stop_times", get(api::realtime::stop_times_handler))
         // trains
         // .route("/stops", get(routes::stops::get))
-        .route("/stops/times", get(routes::stops::times))
-        .route("/trips", get(routes::trips::get))
-        .route("/trips/:id", get(routes::trips::by_id))
+        // .route("/stops/times", get(routes::stops::times))
+        // .route("/trips", get(routes::trips::get))
+        // .route("/trips/:id", get(routes::trips::by_id))
         // bus stuff
         .route("/bus/routes", get(routes::bus::routes::get))
         .route("/bus/routes/geojson", get(routes::bus::routes::geojson))

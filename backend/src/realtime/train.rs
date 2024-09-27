@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::{
     decode,
     position::{IntoPositionError, Position, PositionData, Status},
@@ -14,8 +12,10 @@ use crate::{
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use uuid::Uuid;
+
+// pub
 
 const ENDPOINTS: [(&str, &str); 8] = [
     (
@@ -52,10 +52,7 @@ const ENDPOINTS: [(&str, &str); 8] = [
     ),
 ];
 
-pub async fn import(
-    pool: &PgPool,
-    updated_trips_global: Arc<Mutex<Vec<Trip>>>,
-) -> Result<(), ImportError> {
+pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let futures = ENDPOINTS.iter().map(|e| decode(e.0, e.1));
     let feeds = futures::future::join_all(futures)
         .await
@@ -338,6 +335,7 @@ impl TryFrom<VehiclePosition> for Position {
             updated_at,
             status,
             data: PositionData::Train,
+            vehicle_type: super::position::VehicleType::Train,
             // data: PositionData::Train {
             //     trip_id: trip.id,
             //     current_stop_sequence: current_stop_sequence.unwrap_or(0),

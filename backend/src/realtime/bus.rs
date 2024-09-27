@@ -237,6 +237,7 @@ impl TryFrom<BusVehiclePosition> for Position {
                 // passengers: None,
                 // capacity: None,
             },
+            vehicle_type: super::position::VehicleType::Bus,
             // data: PositionData::Train {
             //     trip_id: trip.id,
             //     current_stop_sequence: current_stop_sequence.unwrap_or(0),

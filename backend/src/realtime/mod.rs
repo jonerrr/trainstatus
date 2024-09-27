@@ -1,4 +1,4 @@
-use crate::api::realtime::Update;
+use crate::api::websocket::Update;
 use crate::{feed::FeedMessage, train::trips::DecodeFeedError};
 use chrono::Utc;
 use crossbeam::channel::Sender;
@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use std::{env::var, time::Duration};
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio::{
     fs::{create_dir, write},
     time::sleep,
@@ -58,11 +58,51 @@ pub enum ImportError {
     DecodeFeed(#[from] DecodeFeedError),
 }
 
+// pub struct RealtimeState {
+
+// }
+
+// trait RealtimeSource {}
+
+pub enum RealtimeSource {
+    GTFSAlert,
+    GTFSBus,
+    GTFSTrain,
+    SIRIBus,
+}
+
+pub struct Realtime {
+    pub source: RealtimeSource,
+    pub pool: PgPool,
+    pub tx: Sender<Vec<Update>>,
+    pub initial_data: Arc<RwLock<serde_json::Value>>,
+}
+
+pub trait RealtimeImport {
+    fn import(&self) -> Result<(), ImportError>;
+}
+
+// pub struct ImportUpdate {
+
+// }
+
+// pub struct
+
+impl Realtime {
+    pub async fn import(&self) -> Result<(), ImportError> {
+        match self.source {
+            RealtimeSource::GTFSAlert => alert::import(&self.pool).await,
+            RealtimeSource::GTFSBus => bus::import(&self.pool).await,
+            RealtimeSource::GTFSTrain => train::import(&self.pool).await,
+            RealtimeSource::SIRIBus => bus::import_siri(&self.pool).await,
+        }
+    }
+}
+
 pub async fn import(
     pool: PgPool,
-    updated_trips: Arc<Mutex<Vec<trip::Trip>>>,
     tx: Sender<Vec<Update>>,
-    initial_data: Arc<Mutex<serde_json::Value>>,
+    initial_data: Arc<RwLock<serde_json::Value>>,
 ) {
     let t_pool = pool.clone();
     let b_pool = pool.clone();
@@ -80,7 +120,7 @@ pub async fn import(
 
     tokio::spawn(async move {
         loop {
-            let _ = train::import(&t_pool, updated_trips.clone())
+            let _ = train::import(&t_pool)
                 .await
                 .inspect_err(|e| tracing::error!("train::import: {}", e));
             sleep(Duration::from_secs(35)).await;
@@ -109,99 +149,112 @@ pub async fn import(
     });
 
     // collect changed trip ids in arc mutex and then fetch the changes
-    tokio::spawn(async move {
-        // let last_stop_times = vec![];
-        let last_stop_times = stop_time::StopTime::get_all(&c_pool, Utc::now())
-            .await
-            .unwrap();
-        let mut last_stop_times_set: HashSet<_> =
-            HashSet::from_par_iter(last_stop_times.into_par_iter());
+    // tokio::spawn(async move {
+    //     // let last_stop_times = vec![];
 
-        loop {
-            let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await else {
-                tracing::error!("failed to get trips");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
+    //     // let
 
-            let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now()).await else {
-                tracing::error!("failed to get stop times");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
+    //     // // let last_stop_times = stop_time::StopTime::get_all(&c_pool, Utc::now())
+    //     // //     .await
+    //     // //     .unwrap();
+    //     // let mut last_stop_times_set: HashSet<_> =
+    //     //     HashSet::from_par_iter(last_stop_times.into_par_iter());
 
-            let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await else {
-                tracing::error!("failed to get alerts");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
+    //     // let mut last_alerts = HashSet::new();
+    //     // let mut last_trips = HashSet::new();
+    //     let mut last_stop_times_set = HashSet::new();
 
-            // update initial data
-            let mut initial_data = initial_data.lock().await;
-            *initial_data = json!({
-                "trips": trips,
-                "alerts": alerts,
-                "stop_times": stop_times.iter().filter(|st| st.trip_type == "train").collect::<Vec<_>>(),
-            });
-            drop(initial_data);
+    //     loop {
+    //         let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await else {
+    //             tracing::error!("failed to get trips");
+    //             sleep(Duration::from_secs(35)).await;
+    //             continue;
+    //         };
 
-            let stop_times_set: HashSet<_> = HashSet::from_par_iter(stop_times.into_par_iter());
+    //         let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now()).await else {
+    //             tracing::error!("failed to get stop times");
+    //             sleep(Duration::from_secs(35)).await;
+    //             continue;
+    //         };
 
-            // Get the changed stop times
-            let changed_stop_times: Vec<_> =
-                stop_times_set.difference(&last_stop_times_set).collect();
+    //         let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await else {
+    //             tracing::error!("failed to get alerts");
+    //             sleep(Duration::from_secs(35)).await;
+    //             continue;
+    //         };
 
-            // Get the removed stop times
-            let removed_stop_times: Vec<_> =
-                last_stop_times_set.difference(&stop_times_set).collect();
+    //         // update initial data
+    //         let mut initial_data = initial_data.write().await;
+    //         *initial_data = json!({
+    //             "trips": trips,
+    //             "alerts": alerts,
+    //             "stop_times": stop_times.iter().filter(|st| st.trip_type == "train").collect::<Vec<_>>(),
+    //         });
+    //         drop(initial_data);
 
-            // Broadcast changed and removed stop times if there are any
-            if !changed_stop_times.is_empty() || !removed_stop_times.is_empty() {
-                dbg!(changed_stop_times.len());
+    //         let stop_times_set: HashSet<_> = HashSet::from_par_iter(stop_times.into_par_iter());
 
-                // let data = json!({
-                //     "changed_stop_times": changed_stop_times,
-                //     "removed_stop_times": removed_stop_times,
-                // });
-                let updates = changed_stop_times
-                    .into_iter()
-                    .map(|st| Update {
-                        route_id: st.route_id.clone(),
-                        data_type: st.trip_type.clone(),
-                        data: serde_json::to_value(st).unwrap(),
-                    })
-                    .collect::<Vec<_>>();
+    //         // let changed_trips: Vec<_> = trips.difference(&last_trips).collect();
+    //         // let removed_trips: Vec<_> = last_trips.difference(&trips).collect();
 
-                let _ = tx.send(updates);
+    //         // let changed_alerts: Vec<_> = alerts.difference(&last_alerts).collect();
+    //         // let removed_alerts: Vec<_> = last_alerts.difference(&alerts).collect();
 
-                // Update the last stop times
-                last_stop_times_set = stop_times_set;
-            }
+    //         // Get the changed stop times
+    //         let changed_stop_times: Vec<_> =
+    //             stop_times_set.difference(&last_stop_times_set).collect();
 
-            // // update initial data
-            // let mut initial_data = initial_data.lock().await;
+    //         // Get the removed stop times
+    //         let removed_stop_times: Vec<_> =
+    //             last_stop_times_set.difference(&stop_times_set).collect();
 
-            // TODO: don't unwrap
-            // let current_trips = trip::Trip::get_all(&c_pool, Utc::now()).await.unwrap();
-            // let stop_times = stop_time::StopTime::get_all(&c_pool, Utc::now())
-            //     .await
-            //     .unwrap();
+    //         // Broadcast changed and removed stop times if there are any
+    //         if !changed_stop_times.is_empty() || !removed_stop_times.is_empty() {
+    //             dbg!(changed_stop_times.len());
 
-            // // get the changed stop times
-            // let changed_stop_times = stop_times
-            //     .par_iter()
-            //     .filter(|st| !last_stop_times.contains(st))
-            //     .collect::<Vec<_>>();
+    //             // let data = json!({
+    //             //     "changed_stop_times": changed_stop_times,
+    //             //     "removed_stop_times": removed_stop_times,
+    //             // });
+    //             let updates = changed_stop_times
+    //                 .into_iter()
+    //                 .map(|st| Update {
+    //                     route_id: st.route_id.clone(),
+    //                     data_type: st.trip_type.clone(),
+    //                     data: serde_json::to_value(st).unwrap(),
+    //                 })
+    //                 .collect::<Vec<_>>();
 
-            // // broadcast changed stop times
-            // if !changed_stop_times.is_empty() {
-            //     let data = serde_json::json!({
-            //         "stop_times": changed_stop_times,
-            //     });
-            //     let _ = tx.send(data);
-            // }
+    //             let _ = tx.send(updates);
 
-            sleep(Duration::from_secs(35)).await;
-        }
-    });
+    //             // Update the last stop times
+    //             last_stop_times_set = stop_times_set;
+    //         }
+
+    //         // // update initial data
+    //         // let mut initial_data = initial_data.lock().await;
+
+    //         // TODO: don't unwrap
+    //         // let current_trips = trip::Trip::get_all(&c_pool, Utc::now()).await.unwrap();
+    //         // let stop_times = stop_time::StopTime::get_all(&c_pool, Utc::now())
+    //         //     .await
+    //         //     .unwrap();
+
+    //         // // get the changed stop times
+    //         // let changed_stop_times = stop_times
+    //         //     .par_iter()
+    //         //     .filter(|st| !last_stop_times.contains(st))
+    //         //     .collect::<Vec<_>>();
+
+    //         // // broadcast changed stop times
+    //         // if !changed_stop_times.is_empty() {
+    //         //     let data = serde_json::json!({
+    //         //         "stop_times": changed_stop_times,
+    //         //     });
+    //         //     let _ = tx.send(data);
+    //         // }
+
+    //         sleep(Duration::from_secs(35)).await;
+    //     }
+    // });
 }
