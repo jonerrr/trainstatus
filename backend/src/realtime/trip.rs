@@ -19,6 +19,28 @@ pub struct Trip {
     pub data: TripData,
 }
 
+// Version of trip that includes position data and other things
+pub struct ApiTrip {
+    pub id: Uuid,
+    pub mta_id: String,
+    pub vehicle_id: String,
+    pub route_id: String,
+    pub direction: Option<i16>,
+    pub created_at: DateTime<Utc>,
+    pub data: serde_json::Value,
+}
+
+pub struct ApiTripData {
+    lat: Option<f64>,
+    lon: Option<f64>,
+    bearing: Option<f64>,
+    passengers: Option<i32>,
+    capacity: Option<i32>,
+    // train
+    express: Option<bool>,
+    assigned: Option<bool>,
+}
+
 #[derive(Serialize, Clone, PartialEq)]
 pub enum TripData {
     Train { express: bool, assigned: bool },
@@ -107,6 +129,7 @@ impl Trip {
         Ok(())
     }
 
+    // TODO: order by updated_at desc for everything
     pub async fn get_all(
         pool: &PgPool,
         at: DateTime<Utc>,
