@@ -43,6 +43,6 @@
 
 <style lang="postcss">
 	:global(body) {
-		@apply bg-neutral-900;
+		@apply bg-neutral-950;
 	}
 </style>

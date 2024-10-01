@@ -104,7 +104,7 @@
 	<button
 		onclick={get_nearby_stops}
 		aria-label="Nearby stops"
-		class="bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
+		class="bg-neutral-800 text-white rounded p-1 active:bg-neutral-700 hover:bg-neutral-700"
 	>
 		{#if location_status.value === 'denied'}
 			<LocateOff />
@@ -120,8 +120,8 @@
 
 <!-- {@const pin_rune = persisted_rune<number[]>('stop_pins', [])} -->
 
-{#snippet bus_tab()}
-	{#each bus_stops as stop}
+{#snippet bus_tab(stops: Stop<'bus'>[])}
+	{#each stops as stop}
 		<StopButton {stop} pin_rune={stop_pin_rune} />
 	{/each}
 {/snippet}
@@ -133,6 +133,6 @@
 	{/each}
 {/snippet}
 
-<List title="Nearby Stops" {bus_tab} {train_tab} {locate_button} />
+<List title="Pinned Stops" bus_tab={bus_tab(bus_stops)} {train_tab} min_items={2} />
 
-<!-- <List title="fart Stops" {bus_tab} {train_tab} {locate_button} /> -->
+<List title="Nearby Stops" {bus_tab} {train_tab} {locate_button} min_items={2} />

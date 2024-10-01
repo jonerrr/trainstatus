@@ -13,7 +13,7 @@
 	</a>
 {/snippet} -->
 
-<nav class="fixed bottom-0 h-16 w-full bg-neutral-800 z-40">
+<nav class="fixed bottom-0 h-16 w-full bg-neutral-900 z-40">
 	<div class="flex h-full justify-center">
 		<NavbarButton>
 			<Home class="m-auto h-full" />
