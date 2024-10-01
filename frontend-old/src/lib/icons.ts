@@ -160,7 +160,6 @@ const icons = [
             style="fill:#fff;fill-rule:nonzero;" />
     </g>`
 	},
-	// TODO: remove duplicate SI and SIR maybe
 	{
 		name: 'SI',
 		svg: `<g id="SIR">

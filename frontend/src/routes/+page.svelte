@@ -1,156 +1,138 @@
 <script lang="ts">
-	import { Locate, LocateFixed, LocateOff } from 'lucide-svelte';
-	import { onMount } from 'svelte';
-	import { writable } from 'svelte/store';
-	import {
-		pinned_stops,
-		pinned_routes,
-		location_status,
-		LocationStatus,
-		stops,
-		bus_stops,
-		pinned_bus_stops,
-		pinned_trips,
-		pinned_bus_trips,
-		pinned_bus_routes
-	} from '$lib/stores';
-	import StopList from '$lib/components/Stop/List.svelte';
-	import RouteAlertList from '$lib/components/RouteAlert/List.svelte';
-	import TripList from '$lib/components/Trip/List.svelte';
+	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
+	import { page } from '$app/stores';
+	import type { Stop } from '$lib/static';
+	import { persisted_rune, haversine } from '$lib/util.svelte';
+	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
+	import List from '$lib/List.svelte';
+	import StopButton from '$lib/Stop/Button.svelte';
+	import Icon from '$lib/Icon.svelte';
 
-	let stop_ids = writable<string[]>([]);
-	let bus_stop_ids = writable<number[]>([]);
+	let train_stops = $state<Stop<'train'>[]>([]);
+	let bus_stops = $state<Stop<'bus'>[]>([]);
 
-	// from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
-	function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-		// distance between latitudes
-		// and longitudes
-		let dLat = ((lat2 - lat1) * Math.PI) / 180.0;
-		let dLon = ((lon2 - lon1) * Math.PI) / 180.0;
+	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
+		'location_status',
+		'unknown'
+	);
 
-		// convert to radians
-		lat1 = (lat1 * Math.PI) / 180.0;
-		lat2 = (lat2 * Math.PI) / 180.0;
-
-		// apply formulae
-		let a =
-			Math.pow(Math.sin(dLat / 2), 2) +
-			Math.pow(Math.sin(dLon / 2), 2) * Math.cos(lat1) * Math.cos(lat2);
-		let rad = 6371;
-		let c = 2 * Math.asin(Math.sqrt(a));
-		return rad * c;
-	}
-
-	async function get_nearby_stops() {
-		location_status.set(LocationStatus.Loading);
+	function get_nearby_stops() {
+		location_status.value = 'loading';
 		navigator.geolocation.getCurrentPosition(
-			async (position) => {
-				const { coords } = position;
+			(position) => {
+				const {
+					all_bus_stops,
+					all_train_stops
+				}: { all_bus_stops: Stop<'bus'>[]; all_train_stops: Stop<'train'>[] } =
+					$page.data.stops.reduce(
+						(acc, stop) => {
+							if (stop.type === 'bus') {
+								acc.all_bus_stops.push(stop);
+							} else if (stop.type === 'train') {
+								acc.all_train_stops.push(stop);
+							}
+							return acc;
+						},
+						{ all_bus_stops: [], all_train_stops: [] }
+					);
 
-				const closest_stops = $stops
-					.map((stop) => {
-						const distance = haversine(coords.latitude, coords.longitude, stop.lat, stop.lon);
+				// console.log(all_bus_stops, all_train_stops, $page.data.stops);
+
+				train_stops = all_train_stops
+					.map((stop: Stop<'train'>) => {
+						const distance = haversine(
+							position.coords.latitude,
+							position.coords.longitude,
+							stop.lat,
+							stop.lon
+						);
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 15);
-				$stop_ids = closest_stops.map((stop) => stop.id);
+					.slice(0, 20);
 
-				const closest_bus_stops = $bus_stops
-					.map((stop) => {
-						const distance = haversine(coords.latitude, coords.longitude, stop.lat, stop.lon);
+				bus_stops = all_bus_stops
+					.map((stop: Stop<'bus'>) => {
+						const distance = haversine(
+							position.coords.latitude,
+							position.coords.longitude,
+							stop.lat,
+							stop.lon
+						);
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 15);
+					.slice(0, 20);
 
-				// const routes = closest_bus_stops.map((s) => s.routes.map((r) => r.id)).flat();
-				// console.log(routes);
-
-				$bus_stop_ids = closest_bus_stops.map((stop) => stop.id);
-
-				location_status.set(LocationStatus.Granted);
+				location_status.value = 'granted';
 			},
 			(e) => {
 				console.error('Error getting location', e);
-
-				location_status.set(LocationStatus.Denied);
+				location_status.value = 'denied';
 			}
 		);
 	}
 
-	onMount(() => {
-		if ($location_status === LocationStatus.Granted) {
-			get_nearby_stops();
-		} else if ($location_status === LocationStatus.Loading) {
-			// reset location status if stuck loading
-			location_status.set(LocationStatus.NeverAsked);
-		}
+	// $inspect(bus_stops, train_stops, $page.data.stops);
+
+	if (location_status.value === 'granted' || location_status.value === 'loading') {
+		get_nearby_stops();
+	}
+
+	$effect(() => {
+		// else if (location_status.value === 'loading') {
+		// 	get_nearby_stops();
+		// 	// TODO: reset to neverasked instead maybe
+		// }
 	});
 
-	// maybe in the future use https://melt-ui.com/docs/builders/tooltip for interactive tutorial
+	const stop_pin_rune = persisted_rune<number[]>('stop_pins', []);
 </script>
 
-<!-- <svelte:head>
-	<title>Trainstat.us | Home</title>
-</svelte:head> -->
+<!-- <button
+	class="text-indigo-100 bg-indigo-500 rounded"
+	onclick={() => {
+		const route = $page.data.routes[Math.floor(Math.random() * $page.data.routes.length)];
+		console.log(route);
+		monitored_routes.push(route.id);
 
-<div class="text-indigo-200 text-sm flex flex-col max-h-[calc(100dvh-8rem)]">
-	{#if $pinned_trips.length || $pinned_bus_trips.length}
-		<TripList
-			manage_height={true}
-			title="Pinned Trips"
-			trip_ids={pinned_trips}
-			bus_trip_ids={pinned_bus_trips}
-		/>
-	{/if}
+		// stop_times.monitor_route(route.route_id);
+	}}>add random bus route</button
+> -->
 
-	{#if $pinned_routes.length || $pinned_bus_routes.length}
-		<RouteAlertList
-			manage_height={true}
-			title="Pinned Routes"
-			bind:route_ids={$pinned_routes}
-			bind:bus_route_ids={$pinned_bus_routes}
-		/>
-	{/if}
-
-	{#if $pinned_stops.length || $pinned_bus_stops.length}
-		<StopList
-			manage_height={true}
-			bus_stop_ids={pinned_bus_stops}
-			stop_ids={pinned_stops}
-			title="Pinned Stops"
-		/>
-	{/if}
-
-	<!-- closest stops -->
-	<StopList
-		manage_height={false}
-		{bus_stop_ids}
-		{stop_ids}
-		title="Nearby Stops"
-		show_location={true}
+{#snippet locate_button()}
+	<button
+		onclick={get_nearby_stops}
+		aria-label="Nearby stops"
+		class="bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
 	>
-		<div slot="location">
-			{#if $location_status === LocationStatus.Loading}
-				<div class="text-white rounded p-1 bg-indigo-600">
-					<Locate class="animate-spin" />
-				</div>
-			{:else}
-				<button
-					aria-label="Nearby stops"
-					class="bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
-					on:click={get_nearby_stops}
-				>
-					{#if $location_status === LocationStatus.Denied}
-						<LocateOff />
-					{:else if $location_status === LocationStatus.Granted}
-						<LocateFixed />
-					{:else}
-						<Locate />
-					{/if}
-				</button>
-			{/if}
-		</div>
-	</StopList>
-</div>
+		{#if location_status.value === 'denied'}
+			<LocateOff />
+		{:else if location_status.value === 'granted'}
+			<LocateFixed />
+		{:else if location_status.value === 'loading'}
+			<Locate class="animate-spin" />
+		{:else}
+			<Locate />
+		{/if}
+	</button>
+{/snippet}
+
+<!-- {@const pin_rune = persisted_rune<number[]>('stop_pins', [])} -->
+
+{#snippet bus_tab()}
+	{#each bus_stops as stop}
+		<StopButton {stop} pin_rune={stop_pin_rune} />
+	{/each}
+{/snippet}
+
+{#snippet train_tab()}
+	<!-- {@const pin_rune = persisted_rune<number[]>('stop_pins', [])} -->
+	{#each train_stops as stop}
+		<StopButton {stop} pin_rune={stop_pin_rune} />
+	{/each}
+{/snippet}
+
+<List title="Nearby Stops" {bus_tab} {train_tab} {locate_button} />
+
+<!-- <List title="fart Stops" {bus_tab} {train_tab} {locate_button} /> -->
