@@ -27,8 +27,8 @@
 	aria-label={label}
 	{href}
 	class="grid h-full w-full grid-cols-1 text-center rounded-none text-sm"
-	class:text-fuchsia-700={href === $page.url.pathname}
-	class:text-indigo-700={href !== $page.url.pathname}
+	class:text-neutral-200={href === $page.url.pathname}
+	class:text-neutral-400={href !== $page.url.pathname}
 	class:underline={href === $page.url.pathname}
 >
 	{@render children()}

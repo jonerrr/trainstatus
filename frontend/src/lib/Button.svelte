@@ -18,7 +18,7 @@
 	} = $props();
 </script>
 
-<div class="relative w-full">
+<div id="list-item" class="relative w-full">
 	<button
 		class="w-full flex justify-between items-center py-1 px-1 hover:bg-neutral-950"
 		transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
@@ -35,10 +35,10 @@
 				? pin_rune.value.filter((id) => id !== state.dialog_id)
 				: [...pin_rune.value, state.dialog_id])}
 		aria-label="Pin to home screen"
-		class="absolute z-20 right-0 py-1 px-2 rounded-md text-indigo-300 hover:text-indigo-600 top-[50%] transform -translate-y-1/2"
+		class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-300 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
 	>
 		{#if pin_rune.value.includes(state.dialog_id)}
-			<Pin fill="#4f46e5" />
+			<Pin fill="#d4d4d4" />
 		{:else}
 			<Pin />
 		{/if}
