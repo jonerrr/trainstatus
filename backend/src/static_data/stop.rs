@@ -275,6 +275,7 @@ impl Stop {
 }
 
 impl RouteStop {
+    // TODO: use unnest instead of chunking
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
         for v in values.iter() {
             let mut dupes = vec![];

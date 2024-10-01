@@ -29,6 +29,7 @@ pub async fn routes_handler(
 pub async fn stops_handler(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ServerError> {
+    // TODO: maybe use jsonb instead of json
     let stops: (serde_json::Value,) = sqlx::query_as(
         r#"
         SELECT json_agg(result)
@@ -38,6 +39,10 @@ pub async fn stops_handler(
                 s.name,
                 s.lat,
                 s.lon,
+                CASE 
+                    WHEN s.borough IS NOT NULL THEN 'train'
+                    ELSE 'bus'
+                END AS type,
                 CASE
                     WHEN s.borough IS NOT NULL THEN jsonb_build_object(
                         'ada', s.ada,

@@ -67,7 +67,7 @@ impl Route {
         query.push(" FROM route");
 
         if let Some(route_type) = route_type {
-            query.push(" WHERE route_type = ");
+            query.push(" WHERE route_type = $1");
             query.push_bind(route_type as &RouteType);
         }
 
@@ -156,6 +156,7 @@ impl Route {
                     name: s.name,
                     lat: s.lat,
                     data: StopData::Bus {
+                        // this can be a blank string
                         direction: s.direction,
                     },
                     lon: s.lon,
@@ -190,13 +191,17 @@ impl Route {
                 .collect::<Vec<_>>();
             route_stops.extend(route_stops_g.into_iter().flatten());
 
-            pb.set_prefix(format!("Processing bus route {}", &route.id));
+            pb.set_prefix(format!("{}", &route.id));
             pb.inc(1);
         }
 
         // remove duplicates
         stops.sort_by(|a, b| a.id.cmp(&b.id));
         stops.dedup_by(|a, b| a.id == b.id);
+
+        // remove duplicate route stops (same stop id and route id)
+        route_stops.sort_by(|a, b| a.stop_id.cmp(&b.stop_id));
+        route_stops.dedup_by(|a, b| a.stop_id == b.stop_id && a.route_id == b.route_id);
 
         pb.finish();
 

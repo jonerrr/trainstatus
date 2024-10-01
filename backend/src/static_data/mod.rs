@@ -82,13 +82,12 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
             .unwrap();
 
             let mut routes = route::Route::parse_train(gtfs_routes);
-            let (mut stops, mut route_stops) = stop::Stop::parse_train(
+            let (mut stops, route_stops) = stop::Stop::parse_train(
                 routes.iter().map(|r| r.id.clone()).collect(),
                 gtfs_transfers,
             )
             .await;
-            let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
-                route::Route::parse_bus().await;
+            let (mut bus_routes, mut bus_stops, bus_route_stops) = route::Route::parse_bus().await;
             routes.append(&mut bus_routes);
             stops.append(&mut bus_stops);
             // route_stops.append(&mut bus_route_stops);
@@ -98,7 +97,7 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
             stop::Stop::insert(stops, &pool).await;
             // TODO: figure out why i cant combine train and bus without getting pg duplicate conflict error
             stop::RouteStop::insert(route_stops, &pool).await;
-            // stop::RouteStop::insert(bus_route_stops, &pool).await;
+            stop::RouteStop::insert(bus_route_stops, &pool).await;
 
             // remove old update_ats
             sqlx::query!("DELETE FROM last_update")

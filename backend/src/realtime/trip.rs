@@ -20,26 +20,26 @@ pub struct Trip {
 }
 
 // Version of trip that includes position data and other things
-pub struct ApiTrip {
-    pub id: Uuid,
-    pub mta_id: String,
-    pub vehicle_id: String,
-    pub route_id: String,
-    pub direction: Option<i16>,
-    pub created_at: DateTime<Utc>,
-    pub data: serde_json::Value,
-}
+// pub struct ApiTrip {
+//     pub id: Uuid,
+//     pub mta_id: String,
+//     pub vehicle_id: String,
+//     pub route_id: String,
+//     pub direction: Option<i16>,
+//     pub created_at: DateTime<Utc>,
+//     pub data: serde_json::Value,
+// }
 
-pub struct ApiTripData {
-    lat: Option<f64>,
-    lon: Option<f64>,
-    bearing: Option<f64>,
-    passengers: Option<i32>,
-    capacity: Option<i32>,
-    // train
-    express: Option<bool>,
-    assigned: Option<bool>,
-}
+// pub struct ApiTripData {
+//     lat: Option<f64>,
+//     lon: Option<f64>,
+//     bearing: Option<f64>,
+//     passengers: Option<i32>,
+//     capacity: Option<i32>,
+//     // train
+//     express: Option<bool>,
+//     assigned: Option<bool>,
+// }
 
 #[derive(Serialize, Clone, PartialEq)]
 pub enum TripData {
@@ -153,9 +153,7 @@ impl Trip {
                     'express',
                     t.express,
                     'assigned',
-                    t.assigned,
-                    'stop_id',
-                    p.stop_id 
+                    t.assigned
                 )
                     ELSE jsonb_build_object(
                     'lat',
@@ -184,7 +182,10 @@ impl Trip {
                     st.trip_id = t.id
                 WHERE
                     st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                    )) AS result
+                    )
+            ORDER BY
+                t.created_at DESC
+            ) AS result
                     "#,
         )
         .bind(at)
