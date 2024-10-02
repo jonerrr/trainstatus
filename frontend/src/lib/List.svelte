@@ -1,31 +1,52 @@
-<script lang="ts">
+<script lang="ts" generics="T | B">
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import { persisted_rune } from './util.svelte';
-	import type { Stop } from './static';
+	// import type { Stop } from './static';
 
-	interface ListProps {
+	// interface ListProps
+
+	let {
+		title,
+		// bus_tab,
+		// train_tab,
+		button,
+		bus_data,
+		train_data,
+		locate_button,
+		search,
+		min_items,
+		class: class_name
+	}: {
 		title: string;
 		locate_button?: Snippet;
 		search?: Snippet;
-		bus_tab: Snippet<[]>;
-		train_tab: Snippet;
+		button: Snippet<[T | B]>;
+		// bus_tab: Snippet<[B]>;
+		// train_tab: Snippet<[T]>;
+		bus_data: B[];
+		train_data: T[];
 		min_items?: number;
-	}
-
-	let { title, bus_tab, train_tab, locate_button, search, min_items }: ListProps = $props();
+		class?: string;
+	} = $props();
 
 	let list_div: HTMLDivElement;
 	let list_height = $state(0);
 
+	function item_heights() {
+		const list_items = Array.from(list_div.querySelectorAll('#list-item')).slice(0, min_items);
+		list_height = list_items.reduce((h, e) => e.offsetHeight + h, 0);
+	}
+
 	$effect(() => {
 		if (min_items) {
-			const observer = new MutationObserver((mutations) => {
+			// initial height check
+			item_heights();
+
+			const observer = new MutationObserver(() => {
 				// Callback function to handle mutations
 				console.log('mutation');
-				const list_items = Array.from(list_div.querySelectorAll('#list-item')).slice(0, min_items);
-				list_height = list_items.reduce((h, e) => e.offsetHeight + h, 0);
-
+				item_heights();
 				// mutations.forEach((mutation) => {
 				// 	if (mutation.type === 'childList') {
 				// 		console.log('Child nodes changed:', mutation.addedNodes);
@@ -40,12 +61,12 @@
 			observer.observe(list_div, config);
 		}
 	});
-
+	$inspect(list_height);
 	let tab = persisted_rune(`${title.toLowerCase()}_tab`, 'Train');
 </script>
 
-<div class="flex flex-col text-neutral-200 relative w-full">
-	<div class="flex text-neutral-300 fixed justify-between w-full z-30">
+<div class="flex flex-col text-neutral-200 relative w-full px-1 z-30">
+	<div class="flex text-neutral-300 justify-between w-full z-30">
 		<div class="flex gap-1 items-center font-bold text-lg">
 			{title}
 			{#if locate_button}
@@ -75,13 +96,17 @@
 
 	<div
 		bind:this={list_div}
-		style={`min-height: ${min_items ? list_height : 'auto'}px;`}
-		class="flex flex-col divide-y overflow-auto overscroll-none divide-neutral-800 text-base mb-16 mt-8"
+		style={`height: ${min_items ? list_height : 'auto'}px;`}
+		class={`flex flex-col divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
 	>
 		{#if tab.value === 'Train'}
-			{@render train_tab()}
+			{#each train_data as d}
+				{@render button(d)}
+			{/each}
 		{:else}
-			{@render bus_tab()}
+			{#each bus_data as d}
+				{@render button(d)}
+			{/each}
 		{/if}
 	</div>
 

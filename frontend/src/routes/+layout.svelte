@@ -4,6 +4,7 @@
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import Navbar from '$lib/Navbar.svelte';
+	import Header from '$lib/Header.svelte';
 
 	let { children } = $props();
 
@@ -36,6 +37,7 @@
 	});
 </script>
 
+<Header />
 <main class="md:w-[60%] m-auto">
 	{@render children()}
 </main>
