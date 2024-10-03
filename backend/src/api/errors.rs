@@ -14,6 +14,8 @@ pub enum ServerError {
     #[error("{0}")]
     Redis(#[from] redis::RedisError),
     #[error("{0}")]
+    RedisPool(#[from] bb8::RunError<redis::RedisError>),
+    #[error("{0}")]
     Axum(#[from] axum::Error),
     #[error("{0}")]
     Broadcast(#[from] BroadcastStreamRecvError),
@@ -29,7 +31,9 @@ impl IntoResponse for ServerError {
 
         let (status_code, message) = match self {
             ServerError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "database error"),
-            ServerError::Redis(_) => (StatusCode::INTERNAL_SERVER_ERROR, "cache error"),
+            ServerError::Redis(_) | ServerError::RedisPool(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "cache error")
+            }
             ServerError::NotFound => (StatusCode::NOT_FOUND, "not found"),
             ServerError::Broadcast(_) => (StatusCode::INTERNAL_SERVER_ERROR, "broadcast error"),
             ServerError::Axum(_) => (StatusCode::INTERNAL_SERVER_ERROR, "stream error"),
