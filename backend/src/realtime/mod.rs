@@ -1,16 +1,18 @@
-use crate::api::websocket::Update;
+// use crate::api::websocket::Update;
 use crate::{feed::FeedMessage, train::trips::DecodeFeedError};
+use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
-use crossbeam::channel::Sender;
+// use crossbeam::channel::Sender;
 use prost::Message;
-use rayon::prelude::*;
-use serde_json::json;
+// use rayon::prelude::*;
+use redis::AsyncCommands;
+// use serde_json::json;
 use sqlx::PgPool;
-use std::collections::HashSet;
+// use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use std::{env::var, time::Duration};
 use thiserror::Error;
-use tokio::sync::RwLock;
+// use tokio::sync::RwLock;
 use tokio::{
     fs::{create_dir, write},
     time::sleep,
@@ -64,45 +66,44 @@ pub enum ImportError {
 
 // trait RealtimeSource {}
 
-pub enum RealtimeSource {
-    GTFSAlert,
-    GTFSBus,
-    GTFSTrain,
-    SIRIBus,
-}
+// pub enum RealtimeSource {
+//     GTFSAlert,
+//     GTFSBus,
+//     GTFSTrain,
+//     SIRIBus,
+// }
 
-pub struct Realtime {
-    pub source: RealtimeSource,
-    pub pool: PgPool,
-    pub tx: Sender<Vec<Update>>,
-    pub initial_data: Arc<RwLock<serde_json::Value>>,
-}
+// pub struct Realtime {
+//     pub source: RealtimeSource,
+//     pub pool: PgPool,
+//     pub tx: Sender<Vec<Update>>,
+//     pub initial_data: Arc<RwLock<serde_json::Value>>,
+// }
 
-pub trait RealtimeImport {
-    fn import(&self) -> Result<(), ImportError>;
-}
+// pub trait RealtimeImport {
+//     fn import(&self) -> Result<(), ImportError>;
+// }
 
 // pub struct ImportUpdate {
 
 // }
 
-// pub struct
-
-impl Realtime {
-    pub async fn import(&self) -> Result<(), ImportError> {
-        match self.source {
-            RealtimeSource::GTFSAlert => alert::import(&self.pool).await,
-            RealtimeSource::GTFSBus => bus::import(&self.pool).await,
-            RealtimeSource::GTFSTrain => train::import(&self.pool).await,
-            RealtimeSource::SIRIBus => bus::import_siri(&self.pool).await,
-        }
-    }
-}
+// impl Realtime {
+//     pub async fn import(&self) -> Result<(), ImportError> {
+//         match self.source {
+//             RealtimeSource::GTFSAlert => alert::import(&self.pool).await,
+//             RealtimeSource::GTFSBus => bus::import(&self.pool).await,
+//             RealtimeSource::GTFSTrain => train::import(&self.pool).await,
+//             RealtimeSource::SIRIBus => bus::import_siri(&self.pool).await,
+//         }
+//     }
+// }
 
 pub async fn import(
     pool: PgPool,
-    tx: Sender<Vec<Update>>,
-    initial_data: Arc<RwLock<serde_json::Value>>,
+    redis_pool: bb8::Pool<RedisConnectionManager>,
+    // tx: Sender<Vec<Update>>,
+    // initial_data: Arc<RwLock<serde_json::Value>>,
 ) {
     let t_pool = pool.clone();
     let b_pool = pool.clone();
@@ -145,6 +146,40 @@ pub async fn import(
                 e => tracing::error!("bus::import_siri: {}", e),
             });
             sleep(Duration::from_secs(45)).await;
+        }
+    });
+
+    // cache data in redis
+    tokio::spawn(async move {
+        loop {
+            if let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await {
+                // TODO: don't unwrap
+                let mut conn = redis_pool.get().await.unwrap();
+                let _: () = conn
+                    .set("trips", serde_json::to_string(&trips).unwrap())
+                    .await
+                    .unwrap();
+            };
+
+            if let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
+                // TODO: don't unwrap
+                let mut conn = redis_pool.get().await.unwrap();
+                let _: () = conn
+                    .set("stop_times", serde_json::to_string(&stop_times).unwrap())
+                    .await
+                    .unwrap();
+            };
+
+            if let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await {
+                // TODO: don't unwrap
+                let mut conn = redis_pool.get().await.unwrap();
+                let _: () = conn
+                    .set("alerts", serde_json::to_string(&alerts).unwrap())
+                    .await
+                    .unwrap();
+            };
+
+            sleep(Duration::from_secs(30)).await;
         }
     });
 

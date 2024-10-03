@@ -22,13 +22,18 @@
 			.filter((st) => st.stop_id === stop.id)
 			.map((st) => {
 				const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
+				if (!trip) {
+					$inspect(st);
+				}
 				return {
 					...st,
 					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					direction: trip!.direction,
-					route_id: trip!.route_id
+					direction: trip?.direction,
+					route_id: trip?.route_id
 				};
-			});
+			})
+			// TODO: fix so we don't need to filter (maybe store trips in map)
+			.filter((st) => st.direction !== undefined) as StopTime<number, TripDirection, string>[];
 		// TODO: also get trips where current stop_id is this stop
 		// const trips = rt_trips.trips.filter((t) => arrivals.some((a) => a.trip_id === t.id));
 		return {
@@ -68,6 +73,7 @@
 								link={false}
 								route={$page.data.routes.find((r) => r.id === route_id) as Route}
 							/>
+							<!-- TODO: animation when eta changes -->
 							<div class="flex text-xs">
 								{#if route_stop_times.length}
 									{#each route_stop_times.slice(0, 2) as stop_time}

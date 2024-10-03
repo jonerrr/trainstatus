@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import '@fontsource/inter';
+	import { LoaderCircle } from 'lucide-svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import Navbar from '$lib/Navbar.svelte';
@@ -39,7 +40,13 @@
 
 <Header />
 <main class="md:w-[60%] m-auto">
-	{@render children()}
+	{#if stop_times.stop_times.length && trips.trips.length}
+		{@render children()}
+	{:else}
+		<div class="text-neutral-50 text-4xl flex justify-center">
+			<LoaderCircle size="4rem" class="animate-spin" />
+		</div>
+	{/if}
 </main>
 <Navbar />
 

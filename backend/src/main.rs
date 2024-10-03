@@ -119,94 +119,8 @@ async fn main() {
     let initial_data: Arc<RwLock<serde_json::Value>> = Arc::new(RwLock::new(json!(null)));
 
     let (tx, rx) = unbounded::<Vec<Update>>();
-
-    realtime::import(pg_pool.clone(), tx, initial_data.clone()).await;
-
-    // let (tx, rx) = broadcast::channel::<Update>(100);
-
-    // let (tx, rx) = mpsc::channel(100);
-    // let rx = Arc::new(Mutex::new(rx));
-    // let tx_clone = tx.clone();
-
-    // Spawn a task to send messages to the broadcast channel
-    // tokio::spawn(async move {
-    //     loop {
-    //         if let Err(_) = tx_clone.send(realtime::trip::Trip {
-    //             id: uuid::Uuid::now_v7(),
-    //             mta_id: "123".to_string(),
-    //             vehicle_id: "456".to_string(),
-    //             route_id: "789".to_string(),
-    //             direction: Some(1),
-    //             created_at: chrono::Utc::now(),
-    //             deviation: Some(0),
-    //             data: realtime::trip::TripData::Train {
-    //                 express: false,
-    //                 assigned: false,
-    //             },
-    //         }) {
-    //             println!("receiver dropped");
-    //             return;
-    //         }
-    //         tokio::time::sleep(Duration::from_secs(1)).await;
-    //     }
-    // });
-
-    // panic!("test");
-
-    // let s_pool = pg_pool.clone();
-    // tokio::spawn(async move {
-    //     loop {
-    //         let last_updated = sqlx::query!("SELECT update_at FROM last_update")
-    //             .fetch_optional(&s_pool)
-    //             .await
-    //             .unwrap();
-
-    //         // If user wants to FORCE_UPDATE, then don't check for last updated
-    //         if var("FORCE_UPDATE").is_err() {
-    //             // Data should be refreshed every 3 days
-    //             if let Some(last_updated) = last_updated {
-    //                 tracing::info!("Last updated at: {}", last_updated.update_at);
-
-    //                 let duration_since_last_update =
-    //                     Utc::now().signed_duration_since(last_updated.update_at);
-
-    //                 // Check if the data is older than 3 days
-    //                 if duration_since_last_update.num_days() <= 3 {
-    //                     // Sleep until it has been 3 days, take into account the time since last update
-    //                     let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
-    //                         .checked_sub(duration_since_last_update.to_std().unwrap())
-    //                         .unwrap();
-    //                     tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
-    //                     sleep(sleep_time).await;
-    //                 }
-    //             }
-    //         } else {
-    //             // Remove the FORCE_UPDATE env variable so it doesn't keep updating
-    //             remove_var("FORCE_UPDATE");
-    //         }
-    //         tracing::info!("Updating stops and trips");
-
-    //         bus::static_data::stops_and_routes(&s_pool).await;
-    //         train::static_data::stops_and_routes(&s_pool).await;
-
-    //         // remove old update_ats
-    //         sqlx::query!("DELETE FROM last_update")
-    //             .execute(&s_pool)
-    //             .await
-    //             .unwrap();
-    //         sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
-    //             .execute(&s_pool)
-    //             .await
-    //             .unwrap();
-    //         tracing::info!("Data updated");
-    //     }
-    // });
-
-    // train::trips::import(pg_pool.clone(), redis_pool.clone()).await;
-    // // Only reloading cache after bus trips
-    // bus::trips::import(pg_pool.clone(), redis_pool.clone()).await;
-    // bus::positions::import(pg_pool.clone()).await;
-    // alerts::import(pg_pool.clone(), redis_pool.clone()).await;
+    // tx, initial_data.clone()
+    realtime::import(pg_pool.clone(), redis_pool.clone()).await;
 
     let cors_layer =
         CorsLayer::new()
@@ -230,6 +144,7 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
+        // TODO: version this
         // sse testing
         // .route("/sse", get(api::sse::sse_handler))
         // .route("/realtime", get(api::realtime::realtime_handler))
@@ -237,20 +152,21 @@ async fn main() {
         .route("/stops", get(api::static_data::stops_handler))
         .route("/trips", get(api::realtime::trips_handler))
         .route("/stop_times", get(api::realtime::stop_times_handler))
+        .route("/alerts", get(api::realtime::alerts_handler))
         // trains
         // .route("/stops", get(routes::stops::get))
         // .route("/stops/times", get(routes::stops::times))
         // .route("/trips", get(routes::trips::get))
         // .route("/trips/:id", get(routes::trips::by_id))
         // bus stuff
-        .route("/bus/routes", get(routes::bus::routes::get))
-        .route("/bus/routes/geojson", get(routes::bus::routes::geojson))
-        .route("/bus/stops", get(routes::bus::stops::get))
-        .route("/bus/stops/geojson", get(routes::bus::stops::geojson))
-        .route("/bus/stops/times", get(routes::bus::stops::times))
-        .route("/bus/trips", get(routes::bus::trips::get))
-        .route("/bus/trips/geojson", get(routes::bus::trips::geojson))
-        .route("/bus/trips/:id", get(routes::bus::trips::by_id))
+        // .route("/bus/routes", get(routes::bus::routes::get))
+        // .route("/bus/routes/geojson", get(routes::bus::routes::geojson))
+        // .route("/bus/stops", get(routes::bus::stops::get))
+        // .route("/bus/stops/geojson", get(routes::bus::stops::geojson))
+        // .route("/bus/stops/times", get(routes::bus::stops::times))
+        // .route("/bus/trips", get(routes::bus::trips::get))
+        // .route("/bus/trips/geojson", get(routes::bus::trips::geojson))
+        // .route("/bus/trips/:id", get(routes::bus::trips::by_id))
         // alerts
         .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
