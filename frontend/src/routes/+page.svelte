@@ -102,7 +102,7 @@
 	<button
 		onclick={get_nearby_stops}
 		aria-label="Nearby stops"
-		class="bg-indigo-500 text-white rounded p-1 active:bg-indigo-600 hover:bg-indigo-600"
+		class="bg-neutral-700 text-white rounded p-1 active:bg-neutral-600 hover:bg-neutral-600"
 	>
 		{#if location_status.value === 'denied'}
 			<LocateOff />

@@ -66,7 +66,7 @@
 		}
 	});
 	$inspect(list_height);
-	let tab = persisted_rune(`${title.toLowerCase()}_tab`, 'Train');
+	let tab = persisted_rune<'Train' | 'Bus'>(`${title.toLowerCase()}_tab`, 'Train');
 </script>
 
 <div class="flex flex-col text-neutral-200 relative w-full px-1 z-30">
@@ -78,19 +78,20 @@
 			{/if}
 		</div>
 
-		<div class="grid grid-cols-2 bg-neutral-900 rounded text-indigo-100 border border-neutral-500">
+		<!-- TODO: make this a snippet -->
+		<div class="grid grid-cols-2 bg-neutral-700 rounded text-neutral-300 border border-neutral-600">
 			<button
-				class="p-1 px-2 rounded-l relative border-2 border-transparent hover:text-neutral-400"
-				class:bg-indigo-800={tab.value === 'Train'}
-				class:border-indigo-500={tab.value === 'Train'}
+				class="p-1 px-2 rounded-l relative m-0.5 border-transparent"
+				class:bg-neutral-900={tab.value === 'Train'}
+				class:text-neutral-100={tab.value === 'Train'}
 				onclick={() => (tab.value = 'Train')}
 			>
 				<TrainFront />
 			</button>
 			<button
-				class="p-1 px-2 rounded-r relative border-2 border-transparent hover:text-neutral-400"
-				class:bg-indigo-800={tab.value === 'Bus'}
-				class:border-indigo-500={tab.value === 'Bus'}
+				class="p-1 px-2 rounded-r relative m-0.5 border-transparent"
+				class:bg-neutral-900={tab.value === 'Bus'}
+				class:text-neutral-100={tab.value === 'Train'}
 				onclick={() => (tab.value = 'Bus')}
 			>
 				<BusFront />
