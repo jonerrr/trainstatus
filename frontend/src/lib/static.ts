@@ -55,6 +55,7 @@ export interface TrainStopData {
 	// borough: string
 }
 
+// TODO: replace enum with string literal type
 export interface BusStopData {
 	direction: BusStopDirection;
 }
@@ -83,12 +84,12 @@ export interface BusRouteStop {
 export interface TrainRouteStop {
 	id: string;
 	stop_sequence: number;
-	type: StopType | null;
+	type: 'rush_hour' | 'late_night' | 'full_time' | 'part_time' | null;
 }
 
-export enum StopType {
-	RushHour = 'rush_hour',
-	LateNight = 'late_night',
-	FullTime = 'full_time',
-	PartTime = 'part_time'
-}
+// export enum StopType {
+// 	RushHour = 'rush_hour',
+// 	LateNight = 'late_night',
+// 	FullTime = 'full_time',
+// 	PartTime = 'part_time'
+// }
