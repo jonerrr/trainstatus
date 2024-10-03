@@ -1,8 +1,11 @@
-export interface StopTime {
+export interface StopTime<T = never, D = never, R = never> {
 	trip_id: string;
 	stop_id: number;
 	arrival: Date;
 	departure: Date;
+	eta: T;
+	direction: D;
+	route_id: R;
 }
 
 export function createStopTimes() {
@@ -36,3 +39,7 @@ export function createStopTimes() {
 
 export const stop_times = createStopTimes();
 export const monitored_routes = $state<string[]>([]);
+
+export function stop_arrivals(times: StopTime[], stop_id: number) {
+	return times.filter((time) => time.stop_id === stop_id);
+}

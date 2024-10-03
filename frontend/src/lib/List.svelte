@@ -1,4 +1,4 @@
-<script lang="ts" generics="T | B">
+<script lang="ts" generics="T, B">
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import { persisted_rune } from './util.svelte';
@@ -34,7 +34,11 @@
 	let list_height = $state(0);
 
 	function item_heights() {
-		const list_items = Array.from(list_div.querySelectorAll('#list-item')).slice(0, min_items);
+		const list_items = Array.from(list_div.querySelectorAll('#list-item')).slice(
+			0,
+			min_items
+		) as HTMLDivElement[];
+
 		list_height = list_items.reduce((h, e) => e.offsetHeight + h, 0);
 	}
 

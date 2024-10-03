@@ -14,8 +14,8 @@
 		link: boolean;
 		express: boolean;
 		class?: string;
-		width: string;
-		height: string;
+		width?: string;
+		height?: string;
 	} = $props();
 
 	const icon_name = $derived.by(() => {
