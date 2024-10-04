@@ -58,7 +58,7 @@
 				};
 			})
 			// TODO: fix so we don't need to filter (maybe store trips in map)
-			.filter((st) => st.direction !== undefined && st.eta > 0) as StopTime<
+			.filter((st) => st.direction !== undefined && st.eta >= 0) as StopTime<
 			number,
 			TripDirection,
 			string
@@ -98,12 +98,11 @@
 			large: boolean
 		)}
 			<!-- <div class="flex flex-col mt-auto" style:width={large ? '' : '40%'}> -->
-			<div class="table-row">
+			<div class="table-row" class:mt-auto={!large} class:my-auto={large}>
 				<div
-					class="text-neutral-200 font-semibold table-cell"
+					class="text-neutral-200 font-semibold table-cell text-left"
 					class:text-xs={!large}
 					class:text-wrap={!large}
-					class:text-left={!large}
 				>
 					{headsign}
 				</div>
@@ -138,9 +137,15 @@
 			.map((r) => r.id)}
 		{@const other_routes = stop_times.map((st) => st.route_id)}
 		{@const all_routes = [...new Set([...base_routes, ...other_routes])]}
+
 		{#key large}
-			<div class="grid grid-cols-3 gap-1" in:fade={{ duration: 300 }}>
-				<div class="flex items-center text-left">
+			<div
+				class="grid gap-1 w-full"
+				class:grid-cols-1={large}
+				class:grid-cols-3={!large}
+				in:fade={{ duration: 300 }}
+			>
+				<div class="flex gap-1">
 					{#if large}
 						{#each all_routes as route_id}
 							<Icon
@@ -153,24 +158,24 @@
 						{/each}
 					{/if}
 
-					<div class="font-semibold my-auto">
+					<div class="font-medium my-auto text-left" class:text-lg={large}>
 						{stop.name}
 					</div>
 				</div>
-				<!-- <div class="col-span-2 flex justify-between items-center"> -->
-				{@render arrivals(
-					data.north_headsign,
-					all_routes,
-					stop_times.filter((st) => st.direction === TripDirection.North),
-					large
-				)}
-				{@render arrivals(
-					data.south_headsign,
-					all_routes,
-					stop_times.filter((st) => st.direction === TripDirection.South),
-					large
-				)}
-				<!-- </div> -->
+				<div class="grid grid-cols-2 gap-8">
+					{@render arrivals(
+						data.north_headsign,
+						all_routes,
+						stop_times.filter((st) => st.direction === TripDirection.North),
+						large
+					)}
+					{@render arrivals(
+						data.south_headsign,
+						all_routes,
+						stop_times.filter((st) => st.direction === TripDirection.South),
+						large
+					)}
+				</div>
 			</div>
 		{/key}
 	{:else}
