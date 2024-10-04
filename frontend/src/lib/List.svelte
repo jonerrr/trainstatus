@@ -1,10 +1,12 @@
 <script lang="ts" generics="T, B">
-	import { BusFront, TrainFront } from 'lucide-svelte';
-	import type { Snippet } from 'svelte';
+	import { BusFront, TrainFront, AArrowUp, AArrowDown } from 'lucide-svelte';
+	import type { Component, Snippet } from 'svelte';
+	import { slide } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 	import { persisted_rune } from './util.svelte';
+	import Icon from './Icon.svelte';
+	import type { Stop } from './static';
 	// import type { Stop } from './static';
-
-	// interface ListProps
 
 	let {
 		title,
@@ -14,14 +16,14 @@
 		bus_data,
 		train_data,
 		locate_button,
-		search,
+		search = false,
 		min_items,
 		class: class_name
 	}: {
 		title: string;
 		locate_button?: Snippet;
-		search?: Snippet;
-		button: Snippet<[T | B]>;
+		search?: boolean;
+		button: Snippet<[T | B, boolean]>;
 		// bus_tab: Snippet<[B]>;
 		// train_tab: Snippet<[T]>;
 		bus_data: B[];
@@ -49,7 +51,7 @@
 
 			const observer = new MutationObserver(() => {
 				// Callback function to handle mutations
-				console.log('mutation');
+				console.log('list mutation');
 				item_heights();
 				// mutations.forEach((mutation) => {
 				// 	if (mutation.type === 'childList') {
@@ -66,36 +68,56 @@
 		}
 	});
 	$inspect(list_height);
-	let tab = persisted_rune<'Train' | 'Bus'>(`${title.toLowerCase()}_tab`, 'Train');
+	let tab = persisted_rune<'train' | 'bus'>(`${title.toLowerCase()}_tab`, 'train');
+	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
+
+	const tab_icons = {
+		train: TrainFront,
+		bus: BusFront
+	};
 </script>
 
-<div class="flex flex-col text-neutral-200 relative w-full px-1 z-30">
-	<div class="flex text-neutral-300 justify-between w-full z-30">
+<!-- TODO: use calc() for getting height of list div -->
+<div
+	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }}
+	class="flex flex-col text-neutral-200 relative w-full px-1 z-30"
+>
+	<div class="flex text-neutral-50 justify-between w-full z-30">
 		<div class="flex gap-1 items-center font-bold text-lg">
 			{title}
 			{#if locate_button}
 				{@render locate_button()}
 			{/if}
+
+			<button
+				aria-label="Change font size"
+				class="text-white rounded p-1 active:bg-neutral-800 hover:bg-neutral-600"
+				class:bg-neutral-700={large.value}
+				onclick={() => (large.value = !large.value)}
+			>
+				{#if large.value}
+					<AArrowUp />
+				{:else}
+					<AArrowDown />
+				{/if}
+			</button>
 		</div>
 
-		<!-- TODO: make this a snippet -->
-		<div class="grid grid-cols-2 bg-neutral-700 rounded text-neutral-300 border border-neutral-600">
+		{#snippet tab_button(value: 'train' | 'bus')}
+			{@const Icon = tab_icons[value]}
 			<button
 				class="p-1 px-2 rounded-l relative m-0.5 border-transparent"
-				class:bg-neutral-900={tab.value === 'Train'}
-				class:text-neutral-100={tab.value === 'Train'}
-				onclick={() => (tab.value = 'Train')}
+				class:bg-neutral-900={tab.value === value}
+				class:text-neutral-100={tab.value === value}
+				onclick={() => (tab.value = value)}
 			>
-				<TrainFront />
+				<Icon />
 			</button>
-			<button
-				class="p-1 px-2 rounded-r relative m-0.5 border-transparent"
-				class:bg-neutral-900={tab.value === 'Bus'}
-				class:text-neutral-100={tab.value === 'Train'}
-				onclick={() => (tab.value = 'Bus')}
-			>
-				<BusFront />
-			</button>
+		{/snippet}
+
+		<div class="grid grid-cols-2 bg-neutral-700 rounded text-neutral-300 border border-neutral-600">
+			{@render tab_button('train')}
+			{@render tab_button('bus')}
 		</div>
 	</div>
 
@@ -104,13 +126,13 @@
 		style={`height: ${min_items ? list_height : 'auto'}px;`}
 		class={`flex flex-col divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
 	>
-		{#if tab.value === 'Train'}
+		{#if tab.value === 'train'}
 			{#each train_data as d}
-				{@render button(d)}
+				{@render button(d, large.value)}
 			{/each}
 		{:else}
 			{#each bus_data as d}
-				{@render button(d)}
+				{@render button(d, large.value)}
 			{/each}
 		{/if}
 	</div>

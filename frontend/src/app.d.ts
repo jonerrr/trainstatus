@@ -12,6 +12,7 @@ declare global {
 			routes: Route[];
 			stops: Stop[];
 		}
+		// TODO: maybe remove dialog_id
 		interface PageState<T extends string | number> {
 			dialog_open: boolean;
 			dialog_id: T;

@@ -1,16 +1,16 @@
+// import { persisted_rune } from './util.svelte';
+
+// export const stop_pins = persisted_rune<number[]>('stop_pins', []);
+// export const route_pins = persisted_rune<string[]>('route_pins', []);
+
 export interface Route {
 	id: string;
 	long_name: string;
 	short_name: string;
 	color: string;
 	shuttle: boolean;
-	route_type: RouteType;
+	route_type: 'bus' | 'train';
 	// geom
-}
-
-export enum RouteType {
-	Train,
-	Bus
 }
 
 type StopMapping = {
@@ -75,7 +75,7 @@ export enum BusStopDirection {
 // type RouteStop = BusRouteStop | TrainRouteStop;
 
 export interface BusRouteStop {
-	id: number;
+	id: string;
 	stop_sequence: number;
 	headsign: string;
 	direction: 0 | 1;

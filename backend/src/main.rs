@@ -34,14 +34,14 @@ use tower_http::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod alerts;
+// mod alerts;
 mod api;
-mod bus;
-mod gtfs;
+// mod bus;
+// mod gtfs;
 mod realtime;
-mod routes;
+// mod routes;
 mod static_data;
-mod train;
+// mod train;
 
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
@@ -70,6 +70,8 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    // let fart = (0..8).map(|_| api_key()).collect::<Vec<_>>();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -111,11 +113,17 @@ async fn main() {
     let notify = Arc::new(Notify::new());
     let notify2 = notify.clone();
 
-    static_data::import(pg_pool.clone(), notify).await;
+    static_data::import(pg_pool.clone(), notify, redis_pool.clone()).await;
     // Wait for static data to be loaded
     notify2.notified().await;
 
+    // cache static data. It will also cache after each refresh
+    static_data::cache_all(pg_pool.clone(), redis_pool.clone())
+        .await
+        .unwrap();
+
     // This will store alerts and trips for initial websocket load
+    // null in rust :explode:
     let initial_data: Arc<RwLock<serde_json::Value>> = Arc::new(RwLock::new(json!(null)));
 
     let (tx, rx) = unbounded::<Vec<Update>>();
@@ -168,7 +176,7 @@ async fn main() {
         // .route("/bus/trips/geojson", get(routes::bus::trips::geojson))
         // .route("/bus/trips/:id", get(routes::bus::trips::by_id))
         // alerts
-        .route("/alerts", get(routes::alerts::get))
+        // .route("/alerts", get(routes::alerts::get))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(cors_layer)

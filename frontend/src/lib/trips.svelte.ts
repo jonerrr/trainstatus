@@ -44,19 +44,30 @@ export enum TripDirection {
 }
 
 export function createTrips() {
-	let trips: Trip<TripData>[] = $state([]);
+	// let trips: Trip<TripData>[] = $state([]);
+	let trips = $state(new Map<string, Trip<TripData>>());
 
 	function update() {
 		fetch('/api/trips')
 			.then((res) => res.json())
 			.then(
 				(data) =>
-					// convert dates from strings to Date objects
-					(trips = data.map((trip: Trip<TripData>) => ({
-						...trip,
-						created_at: new Date(trip.created_at),
-						updated_at: new Date(trip.updated_at)
-					})))
+					// convert dates from strings to Date objects and put into map
+					(trips = new Map(
+						data.map((trip: Trip<TripData>) => [
+							trip.id,
+							{
+								...trip,
+								created_at: new Date(trip.created_at),
+								updated_at: new Date(trip.updated_at)
+							}
+						])
+					))
+				// (trips = data.map((trip: Trip<TripData>) => ({
+				// 	...trip,
+				// 	created_at: new Date(trip.created_at),
+				// 	updated_at: new Date(trip.updated_at)
+				// })))
 			);
 	}
 

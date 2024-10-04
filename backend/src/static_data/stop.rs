@@ -272,6 +272,62 @@ impl Stop {
     pub async fn parse_bus(routes: &[&str]) -> Vec<Stop> {
         todo!("return bus stops")
     }
+
+    pub async fn get_all(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
+        let stops: (serde_json::Value,) = sqlx::query_as(
+            r#"
+            SELECT json_agg(result)
+            FROM (
+                SELECT
+                    s.id,
+                    s.name,
+                    s.lat,
+                    s.lon,
+                    CASE 
+                        WHEN s.borough IS NOT NULL THEN 'train'
+                        ELSE 'bus'
+                    END AS type,
+                    CASE
+                        WHEN s.borough IS NOT NULL THEN jsonb_build_object(
+                            'ada', s.ada,
+                            'north_headsign', s.north_headsign,
+                            'south_headsign', s.south_headsign,
+                            'transfers', s.transfers,
+                            'notes', s.notes,
+                            'borough', s.borough
+                        )
+                        ELSE jsonb_build_object(
+                            'direction', s.direction
+                        )
+                    END AS data,
+                    json_agg(
+                        CASE
+                            WHEN s.borough IS NOT NULL THEN jsonb_build_object(
+                                'id', rs.route_id,
+                                'stop_sequence', rs.stop_sequence,
+                                'type', rs."stop_type"
+                            )
+                            ELSE jsonb_build_object(
+                                'id', rs.route_id,
+                                'stop_sequence', rs.stop_sequence,
+                                'headsign', rs.headsign,
+                                'direction', rs.direction
+                            )
+                        END
+                    ) AS routes
+                FROM
+                    stop s
+                LEFT JOIN route_stop rs ON
+                    s.id = rs.stop_id
+                GROUP BY
+                    s.id
+            ) AS result;"#,
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(stops.0)
+    }
 }
 
 impl RouteStop {

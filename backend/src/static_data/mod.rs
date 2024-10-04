@@ -1,4 +1,6 @@
+use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
+use redis::AsyncCommands;
 use sqlx::PgPool;
 use std::{
     env::{remove_var, var},
@@ -11,7 +13,11 @@ use tokio::{sync::Notify, time::sleep};
 pub mod route;
 pub mod stop;
 
-pub async fn import(pool: PgPool, notify: Arc<Notify>) {
+pub async fn import(
+    pool: PgPool,
+    notify: Arc<Notify>,
+    redis_pool: bb8::Pool<RedisConnectionManager>,
+) {
     tokio::spawn(async move {
         loop {
             let last_updated = sqlx::query!("SELECT update_at FROM last_update")
@@ -108,10 +114,34 @@ pub async fn import(pool: PgPool, notify: Arc<Notify>) {
                 .execute(&pool)
                 .await
                 .unwrap();
+
+            cache_all(pool.clone(), redis_pool.clone()).await.unwrap();
+
             tracing::info!("Data updated");
             notify.notify_one();
         }
     });
 
     // dbg!(train_stops.len(), train_route_stops.len());
+}
+
+pub async fn cache_all(
+    pool: PgPool,
+    redis_pool: bb8::Pool<RedisConnectionManager>,
+) -> Result<(), sqlx::Error> {
+    let stops = stop::Stop::get_all(&pool).await?;
+    let routes = route::Route::get_all(&pool, None, false).await?;
+
+    // TODO: don't unwrap
+    let mut conn = redis_pool.get().await.unwrap();
+    let _: () = conn
+        .set("stops", serde_json::to_string(&stops).unwrap())
+        .await
+        .unwrap();
+    let _: () = conn
+        .set("routes", serde_json::to_string(&routes).unwrap())
+        .await
+        .unwrap();
+
+    Ok(())
 }

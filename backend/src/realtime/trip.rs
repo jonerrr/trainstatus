@@ -73,11 +73,11 @@ impl Trip {
             .map(|v| v.deviation)
             .collect::<Vec<Option<i32>>>();
 
-        match values[0].data {
-            TripData::Train {
+        match values.first().map(|t| &t.data) {
+            Some(TripData::Train {
                 express: _,
                 assigned: _,
-            } => {
+            }) => {
                 // get express and assigned from each trip. If first one is train that means they all are
                 let (expresses, assigns): (Vec<bool>, Vec<bool>) = values
                     .iter()
@@ -106,7 +106,7 @@ impl Trip {
                 .execute(pool)
                 .await?;
             }
-            TripData::Bus => {
+            Some(TripData::Bus) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, deviation)
@@ -123,6 +123,9 @@ impl Trip {
                 )
                 .execute(pool)
                 .await?;
+            }
+            None => {
+                tracing::warn!("No trips in insert");
             }
         }
 

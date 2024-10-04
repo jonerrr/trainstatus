@@ -1,8 +1,4 @@
-use crate::{
-    gtfs::decode,
-    routes::alerts::Alert as AlertRow,
-    train::{static_data::ROUTES, trips::DecodeFeedError},
-};
+use crate::{routes::alerts::Alert as AlertRow, train::static_data::ROUTES};
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
