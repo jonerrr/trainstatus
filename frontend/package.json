@@ -35,6 +35,7 @@
 	"type": "module",
 	"dependencies": {
 		"@fontsource/inter": "^5.1.0",
+		"flexsearch": "^0.7.43",
 		"lucide-svelte": "^0.446.0"
 	}
 }

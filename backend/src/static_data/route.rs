@@ -26,6 +26,7 @@ pub struct Route {
 
 #[derive(sqlx::Type, Serialize, Deserialize, Debug)]
 #[sqlx(type_name = "route_type", rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum RouteType {
     Train,
     Bus,

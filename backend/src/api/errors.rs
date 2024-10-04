@@ -19,6 +19,8 @@ pub enum ServerError {
     Axum(#[from] axum::Error),
     #[error("{0}")]
     Broadcast(#[from] BroadcastStreamRecvError),
+    #[error("{0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Bad request")]
     BadRequest,
     #[error("Not found")]
@@ -34,6 +36,7 @@ impl IntoResponse for ServerError {
             ServerError::Redis(_) | ServerError::RedisPool(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "cache error")
             }
+            ServerError::SerdeJson(_) => (StatusCode::INTERNAL_SERVER_ERROR, "json error"),
             ServerError::NotFound => (StatusCode::NOT_FOUND, "not found"),
             ServerError::Broadcast(_) => (StatusCode::INTERNAL_SERVER_ERROR, "broadcast error"),
             ServerError::Axum(_) => (StatusCode::INTERNAL_SERVER_ERROR, "stream error"),

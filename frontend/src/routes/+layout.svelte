@@ -12,7 +12,9 @@
 	let last_update = $state<Date>();
 	let last_monitored_routes = $state<string>('');
 
-	// $inspect(monitored_routes);
+	$inspect(monitored_routes);
+
+	// TODO: check if monitored routes has more than like 20 and then remove oldest ones
 
 	$effect(() => {
 		if (monitored_routes.sort().toString() !== last_monitored_routes) {
@@ -36,11 +38,13 @@
 			clearInterval(interval);
 		};
 	});
+
+	// $inspect(trips.trips);
 </script>
 
 <Header />
 <main class="md:w-[60%] m-auto">
-	{#if stop_times.stop_times.length && trips.trips.length}
+	{#if stop_times.stop_times.length && trips.trips.size}
 		{@render children()}
 	{:else}
 		<div class="text-neutral-50 text-4xl flex justify-center">

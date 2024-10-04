@@ -1,5 +1,5 @@
 // use crate::api::websocket::Update;
-use crate::{feed::FeedMessage, train::trips::DecodeFeedError};
+use crate::feed::FeedMessage;
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
 // use crossbeam::channel::Sender;
@@ -32,7 +32,7 @@ pub fn debug_gtfs() -> &'static bool {
     DEBUG_GTFS.get_or_init(|| var("DEBUG_GTFS").is_ok())
 }
 
-pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, DecodeFeedError> {
+pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, ImportError> {
     let data = reqwest::Client::new()
         .get(url)
         .send()
@@ -56,8 +56,10 @@ pub enum ImportError {
     Sqlx(#[from] sqlx::Error),
     #[error("SIRI decode error: {0}")]
     SiriDecode(#[from] siri::DecodeSiriError),
-    #[error("decode error: {0}")]
-    DecodeFeed(#[from] DecodeFeedError),
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("protobuf decode error: {0}")]
+    Decode(#[from] prost::DecodeError),
 }
 
 // pub struct RealtimeState {
@@ -178,6 +180,8 @@ pub async fn import(
                     .await
                     .unwrap();
             };
+
+            // TODO: don't fetch this every 30 seconds bc
 
             sleep(Duration::from_secs(30)).await;
         }
