@@ -48,7 +48,7 @@
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 20);
+					.slice(0, 13);
 
 				nearby_bus_stops = all_bus_stops
 					.map((stop: Stop<'bus'>) => {
@@ -61,7 +61,7 @@
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 20);
+					.slice(0, 13);
 
 				location_status.value = 'granted';
 			},
