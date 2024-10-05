@@ -10,5 +10,11 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		routes_promise
 	]);
 
-	return { stops, routes };
+	// put routes into a map
+	const route_map = new Map<string, Route>();
+	for (const route of routes) {
+		route_map.set(route.id, route);
+	}
+
+	return { stops, routes: route_map };
 };

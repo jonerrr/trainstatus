@@ -2,7 +2,7 @@
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import type { Stop } from '$lib/static';
-	import { persisted_rune, haversine } from '$lib/util.svelte';
+	import { persisted_rune, haversine, stop_pins_rune } from '$lib/util.svelte';
 	// import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
@@ -85,11 +85,11 @@
 	// }
 	// });
 
-	const stop_pin_rune = persisted_rune<number[]>('stop_pins', []);
+	// const stop_pin_rune = persisted_rune<number[]>('stop_pins', []);
 
 	// const pinned_stops = $page.data.stops.filter(stop => stop_pin_rune.value.includes(stop.id));
 	const pinned_stops = $derived(
-		$page.data.stops.filter((stop) => stop_pin_rune.value.includes(stop.id))
+		$page.data.stops.filter((stop) => stop_pins_rune.value.includes(stop.id))
 	);
 	// use reduced to get pinned bus stops and train stops
 	const { pinned_bus_stops, pinned_train_stops } = $derived.by(() => {
@@ -110,7 +110,7 @@
 {#snippet locate_button()}
 	<button
 		onclick={get_nearby_stops}
-		class:bg-neutral-700={location_status.value === 'granted'}
+		class:bg-neutral-800={location_status.value === 'granted'}
 		aria-label="Nearby stops"
 		class=" text-white rounded p-1 active:bg-neutral-600 hover:bg-neutral-600"
 	>
@@ -129,7 +129,7 @@
 <!-- {@const pin_rune = persisted_rune<number[]>('stop_pins', [])} -->
 
 {#snippet stop_button(stop: Stop<'bus' | 'train'>, large: boolean)}
-	<StopButton {stop} pin_rune={stop_pin_rune} {large} />
+	<StopButton {stop} pin_rune={stop_pins_rune} {large} />
 {/snippet}
 
 {#if pinned_stops.length}

@@ -67,7 +67,7 @@
 			observer.observe(list_div, config);
 		}
 	});
-	$inspect(list_height);
+	// $inspect(list_height);
 	let tab = persisted_rune<'train' | 'bus'>(`${title.toLowerCase()}_tab`, 'train');
 	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
@@ -93,8 +93,10 @@
 
 			<button
 				aria-label="Change font size"
-				class="text-white rounded p-1 active:bg-neutral-700 hover:bg-neutral-600"
-				class:bg-neutral-700={large.value}
+				class="rounded p-1 active:bg-neutral-800 hover:bg-neutral-800"
+				class:bg-neutral-800={large.value}
+				class:text-neutral-300={!large.value}
+				class:text-white={large.value}
 				onclick={() => (large.value = !large.value)}
 			>
 				{#if large.value}

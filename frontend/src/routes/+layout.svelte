@@ -6,6 +6,7 @@
 	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
+	import Modal from '$lib/Modal.svelte';
 
 	let { children } = $props();
 
@@ -43,6 +44,7 @@
 </script>
 
 <Header />
+<Modal />
 <main class="md:w-[60%] m-auto">
 	{#if stop_times.stop_times.length && trips.trips.size}
 		{@render children()}

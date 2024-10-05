@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+// import { browser } from '$app/environment';
 // import { page } from '$app/stores';
 // import type { Stop } from './static';
 
@@ -13,7 +13,7 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	lat1 = (lat1 * Math.PI) / 180.0;
 	lat2 = (lat2 * Math.PI) / 180.0;
 
-	// apply formulae
+	// apply formula
 	const a =
 		Math.pow(Math.sin(dLat / 2), 2) +
 		Math.pow(Math.sin(dLon / 2), 2) * Math.cos(lat1) * Math.cos(lat2);
@@ -22,37 +22,68 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
-export class PersistedRune<T> {
-	value = $state<T>() as T;
-	#key = '';
+export interface PersistedRune<T> {
+	value: T;
+	reset: () => void;
+}
 
-	constructor(key: string, value: T) {
-		this.#key = key;
-		this.value = value;
+export function persisted_rune<T>(key: string, init_value: T) {
+	let storedValue: T;
 
-		if (browser) {
-			const item = localStorage.getItem(key);
-			if (item) this.value = this.deserialize(item);
+	try {
+		const item = localStorage.getItem(key);
+		storedValue = item ? JSON.parse(item) : init_value;
+	} catch (e) {
+		console.error(e);
+		storedValue = init_value;
+	}
+
+	let state = $state(storedValue);
+
+	function updateStorage(value: T) {
+		try {
+			localStorage.setItem(key, JSON.stringify(value));
+		} catch (e) {
+			console.error(e);
 		}
+	}
 
-		$effect(() => {
-			localStorage.setItem(this.key, this.serialize(this.value));
+	// listen for changes in other tabs
+	if (typeof window !== 'undefined') {
+		window.addEventListener('storage', (event) => {
+			if (event.key === key && event.storageArea === localStorage) {
+				try {
+					const newValue = event.newValue ? JSON.parse(event.newValue) : init_value;
+					state = newValue;
+				} catch (e) {
+					console.error(e);
+				}
+			}
 		});
 	}
 
-	serialize(value: T): string {
-		return JSON.stringify(value);
-	}
+	// this allows it to update without being in a component
+	$effect.root(() => {
+		$effect(() => {
+			updateStorage(state);
+		});
 
-	deserialize(item: string): T {
-		return JSON.parse(item);
-	}
+		return () => {};
+	});
 
-	get key() {
-		return this.#key;
-	}
+	return {
+		get value() {
+			return state;
+		},
+		set value(newValue: T) {
+			state = newValue;
+		},
+		reset() {
+			state = init_value;
+		}
+	};
 }
 
-export function persisted_rune<T>(key: string, value: T) {
-	return new PersistedRune(key, value);
-}
+export const stop_pins_rune = persisted_rune<number[]>('stop_pins', []);
+export const route_pins_rune = persisted_rune<string[]>('route_pins', []);
+export const trip_pins_rune = persisted_rune<string[]>('trip_pins', []);
