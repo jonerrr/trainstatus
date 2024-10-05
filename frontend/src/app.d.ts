@@ -9,14 +9,16 @@ declare global {
 		// interface Locals {}
 		// maybe this should be maps
 		interface PageData {
-			routes: Route[];
+			routes: Map<string, Route>;
 			stops: Stop[];
 		}
 		// TODO: maybe remove dialog_id
-		interface PageState<T extends string | number> {
-			dialog_open: boolean;
-			dialog_id: T;
-			dialog_type: 'stop' | 'trip' | 'route' | '';
+		// <T extends string | number>
+		interface PageState {
+			// dialog_open: boolean;
+			// dialog_id: T;
+			// null is not open
+			dialog_type: 'stop' | 'trip' | 'route' | null;
 			data?: Stop | Trip | Route;
 		}
 		// interface Platform {}

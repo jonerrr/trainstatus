@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { crossfade, fade } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import type {
 		BusRouteStop,
@@ -15,19 +15,18 @@
 		monitored_routes,
 		type StopTime
 	} from '$lib/stop_times.svelte';
-	import { trips as rt_trips } from '$lib/trips.svelte';
+	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
 	import Button from '$lib/Button.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
-	import { TripDirection } from '$lib/trips.svelte';
-	import { quintOut } from 'svelte/easing';
+	// import { quintOut } from 'svelte/easing';
 
 	interface ButtonProps {
 		stop: Stop<'train' | 'bus'>;
 		pin_rune: PersistedRune<number[]>;
 		large: boolean;
 	}
-	let { stop, pin_rune, large }: ButtonProps = $props();
+	let { stop, pin_rune = $bindable(), large }: ButtonProps = $props();
 
 	$effect.pre(() => {
 		if (stop.type === 'bus') {
@@ -39,7 +38,7 @@
 		}
 	});
 
-	let { stop_times } = $derived.by(() => {
+	let stop_times = $derived.by(() => {
 		// get arrival for stop and add eta
 		const stop_times = rt_stop_times.stop_times
 			.filter((st) => st.stop_id === stop.id)
@@ -65,10 +64,7 @@
 		>[];
 		// TODO: also get trips where current stop_id is this stop
 		// const trips = rt_trips.trips.filter((t) => arrivals.some((a) => a.trip_id === t.id));
-		return {
-			stop_times
-			// trips
-		};
+		return stop_times;
 	});
 </script>
 
@@ -83,17 +79,15 @@
 
 <Button
 	state={{
-		dialog_id: stop.id,
 		dialog_type: 'stop',
-		dialog_open: true,
 		data: stop
 	}}
-	{pin_rune}
+	bind:pin_rune
 >
 	{#if stop.type === 'train'}
 		{#snippet arrivals(
 			headsign: string,
-			route_ids: string[],
+			routes: Route[],
 			stop_times: StopTime<number, TripDirection, string>[],
 			large: boolean
 		)}
@@ -107,14 +101,10 @@
 					{headsign}
 				</div>
 				<div class="flex flex-col gap-1">
-					{#each route_ids as route_id}
-						{@const route_stop_times = stop_times.filter((st) => st.route_id === route_id)}
+					{#each routes as route}
+						{@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)}
 						<div class="flex gap-1">
-							<Icon
-								express={false}
-								link={false}
-								route={$page.data.routes.find((r) => r.id === route_id) as Route}
-							/>
+							<Icon express={false} link={false} {route} />
 							<div class="flex gap-1" class:text-xs={!large}>
 								{#if route_stop_times.length}
 									{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
@@ -136,7 +126,9 @@
 			.filter((r) => r.type === 'full_time' || r.type === 'part_time')
 			.map((r) => r.id)}
 		{@const other_routes = stop_times.map((st) => st.route_id)}
-		{@const all_routes = [...new Set([...base_routes, ...other_routes])]}
+		{@const all_routes = [...new Set([...base_routes, ...other_routes])].map(
+			(id) => $page.data.routes.get(id) as Route
+		)}
 
 		{#key large}
 			<div
@@ -147,13 +139,13 @@
 			>
 				<div class="flex gap-1">
 					{#if large}
-						{#each all_routes as route_id}
+						{#each all_routes as route}
 							<Icon
 								height={large ? '1.5rem' : '1rem'}
 								width={large ? '1.5rem' : '1rem'}
 								express={false}
 								link={false}
-								route={$page.data.routes.find((r) => r.id === route_id) as Route}
+								{route}
 							/>
 						{/each}
 					{/if}
@@ -198,7 +190,7 @@
 
 			<div class="flex flex-col">
 				{#each stop_routes as stop_route}
-					{@const route = $page.data.routes.find((r) => r.id === stop_route.id) as Route}
+					{@const route = $page.data.routes.get(stop_route.id) as Route}
 					{@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)}
 					<div class="flex gap-2 items-center text-xs text-wrap text-left rounded p-1">
 						<Icon {route} link={false} express={false} />
