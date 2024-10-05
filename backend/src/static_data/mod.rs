@@ -132,16 +132,23 @@ pub async fn cache_all(
     let stops = stop::Stop::get_all(&pool).await?;
     let routes = route::Route::get_all(&pool, None, false).await?;
 
+    let stops_json = serde_json::to_string(&stops).unwrap();
+    let routes_json = serde_json::to_string(&routes).unwrap();
+
+    // hash stops and routes so we can use them in an eTag
+    let stops_hash = blake3::hash(stops_json.as_bytes()).to_hex().to_string();
+    let routes_hash = blake3::hash(routes_json.as_bytes()).to_hex().to_string();
+
+    let items = [
+        ("stops", stops_json),
+        ("routes", routes_json),
+        ("stops_hash", format!(r#""{stops_hash}""#)),
+        ("routes_hash", format!(r#""{routes_hash}""#)),
+    ];
+
     // TODO: don't unwrap
     let mut conn = redis_pool.get().await.unwrap();
-    let _: () = conn
-        .set("stops", serde_json::to_string(&stops).unwrap())
-        .await
-        .unwrap();
-    let _: () = conn
-        .set("routes", serde_json::to_string(&routes).unwrap())
-        .await
-        .unwrap();
+    let _: () = conn.mset(&items).await.unwrap();
 
     Ok(())
 }

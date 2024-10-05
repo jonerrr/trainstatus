@@ -42,7 +42,7 @@ pub async fn stop_times_handler(
             Ok((json_headers().clone(), stop_times))
         }
         false => {
-            // TODO: improve this
+            // TODO: improve this (cache stop_times by route_id)
             let stop_times =
                 StopTime::get_all(&state.pg_pool, Utc::now(), Some(&params.bus_route_ids)).await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))

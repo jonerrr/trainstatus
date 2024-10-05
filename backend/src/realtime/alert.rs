@@ -5,10 +5,10 @@ use rayon::prelude::*;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-pub const ROUTES: [&str; 26] = [
-    "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
-    "Q", "R", "W", "H", "FS", "GS", "SI",
-];
+// pub const ROUTES: [&str; 26] = [
+//     "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
+//     "Q", "R", "W", "H", "FS", "GS", "SI",
+// ];
 
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let feed = decode(
