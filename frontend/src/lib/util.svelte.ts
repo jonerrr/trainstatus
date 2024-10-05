@@ -1,4 +1,4 @@
-// import { browser } from '$app/environment';
+import { browser } from '$app/environment';
 // import { page } from '$app/stores';
 // import type { Stop } from './static';
 
@@ -49,7 +49,7 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	}
 
 	// listen for changes in other tabs
-	if (typeof window !== 'undefined') {
+	if (browser) {
 		window.addEventListener('storage', (event) => {
 			if (event.key === key && event.storageArea === localStorage) {
 				try {

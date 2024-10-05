@@ -154,34 +154,55 @@ pub async fn import(
     // cache data in redis
     tokio::spawn(async move {
         loop {
-            if let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await {
-                // TODO: don't unwrap
-                let mut conn = redis_pool.get().await.unwrap();
-                let _: () = conn
-                    .set("trips", serde_json::to_string(&trips).unwrap())
-                    .await
-                    .unwrap();
-            };
+            // if let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await {
+            //     // TODO: don't unwrap
+            //     let mut conn = redis_pool.get().await.unwrap();
+            //     let _: () = conn
+            //         .set("trips", serde_json::to_string(&trips).unwrap())
+            //         .await
+            //         .unwrap();
+            // };
+            // if let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
+            //     // TODO: don't unwrap
+            //     let mut conn = redis_pool.get().await.unwrap();
+            //     let _: () = conn
+            //         .set("stop_times", serde_json::to_string(&stop_times).unwrap())
+            //         .await
+            //         .unwrap();
+            // };
 
-            if let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
-                // TODO: don't unwrap
-                let mut conn = redis_pool.get().await.unwrap();
-                let _: () = conn
-                    .set("stop_times", serde_json::to_string(&stop_times).unwrap())
-                    .await
-                    .unwrap();
-            };
+            // if let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await {
+            //     // TODO: don't unwrap
+            //     let mut conn = redis_pool.get().await.unwrap();
+            //     let _: () = conn
+            //         .set("alerts", serde_json::to_string(&alerts).unwrap())
+            //         .await
+            //         .unwrap();
+            // };
 
-            if let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await {
-                // TODO: don't unwrap
-                let mut conn = redis_pool.get().await.unwrap();
-                let _: () = conn
-                    .set("alerts", serde_json::to_string(&alerts).unwrap())
-                    .await
-                    .unwrap();
+            let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await else {
+                tracing::error!("failed to get trips");
+                sleep(Duration::from_secs(35)).await;
+                continue;
             };
-
-            // TODO: don't fetch this every 30 seconds bc
+            let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await
+            else {
+                tracing::error!("failed to get stop times");
+                sleep(Duration::from_secs(35)).await;
+                continue;
+            };
+            let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await else {
+                tracing::error!("failed to get alerts");
+                sleep(Duration::from_secs(35)).await;
+                continue;
+            };
+            let mut conn = redis_pool.get().await.unwrap();
+            let items = [
+                ("trips", serde_json::to_string(&trips).unwrap()),
+                ("stop_times", serde_json::to_string(&stop_times).unwrap()),
+                ("alerts", serde_json::to_string(&alerts).unwrap()),
+            ];
+            let _: () = conn.mset(&items).await.unwrap();
 
             sleep(Duration::from_secs(30)).await;
         }

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::{prelude::FromRow, PgPool, QueryBuilder};
+use sqlx::{prelude::FromRow, PgPool};
 use uuid::Uuid;
 
 #[derive(PartialEq, Serialize, Hash, Eq, FromRow)]
