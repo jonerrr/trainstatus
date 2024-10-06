@@ -3,7 +3,7 @@
 	import type { Component, Snippet } from 'svelte';
 	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut, quintOut } from 'svelte/easing';
-	import { persisted_rune } from './util.svelte';
+	import { persisted_rune, type PersistedRune } from './util.svelte';
 	import Icon from './Icon.svelte';
 	import type { Stop } from './static';
 	// import type { Stop } from './static';
@@ -16,13 +16,17 @@
 		bus_data,
 		train_data,
 		locate_button,
-		search = false,
+		selected_tab = $bindable(
+			persisted_rune<'train' | 'bus'>(`${title.toLocaleLowerCase()}_tab`, 'train')
+		),
+		// search = false,
 		min_items,
 		class: class_name
 	}: {
 		title: string;
 		locate_button?: Snippet;
-		search?: boolean;
+		selected_tab: PersistedRune<'train' | 'bus'>;
+		// search?: boolean;
 		button: Snippet<[T | B, boolean]>;
 		// bus_tab: Snippet<[B]>;
 		// train_tab: Snippet<[T]>;
@@ -68,7 +72,8 @@
 		}
 	});
 	// $inspect(list_height);
-	let tab = persisted_rune<'train' | 'bus'>(`${title.toLowerCase()}_tab`, 'train');
+	// let tab = persisted_rune<'train' | 'bus'>(`${title.toLowerCase()}_tab`, 'train');
+	// selected_tab = tab.value;
 	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
 	const tab_icons = {
@@ -115,12 +120,12 @@
 			{@const Icon = tab_icons[value]}
 			<button
 				class="p-1 px-2 rounded relative m-0.5 border-transparent"
-				class:text-neutral-100={tab.value === value}
-				onclick={() => (tab.value = value)}
+				class:text-neutral-100={selected_tab.value === value}
+				onclick={() => (selected_tab.value = value)}
 			>
 				<Icon class="relative z-10" />
 
-				{#if tab.value === value}
+				{#if selected_tab.value === value}
 					<div
 						in:send={{ key: 'tab' }}
 						out:receive={{ key: 'tab' }}
@@ -143,7 +148,7 @@
 		style:height={min_items ? `${list_height}px` : 'auto'}
 		class={`flex border-y border-neutral-800 flex-col divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
 	>
-		{#if tab.value === 'train'}
+		{#if selected_tab.value === 'train'}
 			{#each train_data as d}
 				{@render button(d, large.value)}
 			{/each}

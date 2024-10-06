@@ -10,8 +10,10 @@
 	let search_worker: Worker;
 	let search = $state<'loading' | 'ready'>('loading');
 
-	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 20));
-	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 20));
+	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
+	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 15));
+
+	let selected_tab = persisted_rune<'train' | 'bus'>('stops_tab', 'train');
 
 	$effect(() => {
 		search_worker = new SearchWorker();
@@ -32,35 +34,38 @@
 			}
 		});
 		// initialize when the component mounts
-		// search_worker.postMessage({
-		// 	type: 'load',
-		// 	payload: { bus_stops: [...bus_stops], train_stops: [...train_stops] }
-		// });
+		search_worker.postMessage({
+			type: 'load',
+			payload: {
+				bus_stops: JSON.parse(JSON.stringify($page.data.bus_stops)),
+				train_stops: JSON.parse(JSON.stringify($page.data.train_stops))
+			}
+		});
 	});
 
 	let search_el: HTMLInputElement;
 	let search_term: string = $state('');
 
-	function clearSearch() {
+	function clear_search() {
 		// reset stop ids
-		// $stop_ids = $stop_store.slice(0, 15).map((s) => s.id);
-		// $bus_stop_ids = $bus_stop_store.slice(0, 15).map((s) => s.id);
-		// search_el.value = '';
+		bus_stops = $page.data.bus_stops.slice(0, 15);
+		train_stops = $page.data.train_stops.slice(0, 15);
+
 		search_term = '';
 	}
 
-	function searchStops(e: { target: { value: string } }) {
+	function search_stops(e: { target: { value: string } }) {
 		// If search is empty, clear search and show all stops
 		if (e.target.value === '') {
-			clearSearch();
+			clear_search();
 			return;
 		}
 
-		search_term = e.target.value;
-		// searchWorker.postMessage({
-		// 	type: 'search',
-		// 	payload: { search_term, search_type: $tab_value }
-		// });
+		// search_term = e.target.value;
+		search_worker.postMessage({
+			type: 'search',
+			payload: { search_term, search_type: selected_tab.value }
+		});
 	}
 
 	// from https://www.okupter.com/blog/svelte-debounce
@@ -79,33 +84,32 @@
 	<StopButton {stop} pin_rune={stop_pins_rune} large />
 {/snippet}
 
-{#snippet search_bar()}
-	<div class="relative">
-		<input
-			bind:this={search_el}
-			bind:value={search_term}
-			oninput={debounce(search_term)}
-			type="search"
-			placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
-			class="search-stops text-indigo-200 max-w-[calc(100dvw)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
-		/>
-		<button
-			aria-label="Clear search"
-			class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
-			onclick={clearSearch}
-		>
-			<CircleX />
-		</button>
-	</div>
-{/snippet}
-
 <List
 	title="Stops"
 	button={stop_button}
 	bus_data={bus_stops}
 	train_data={train_stops}
-	class="mb-16"
+	class="max-h-[calc(100dvh-13rem)]"
+	bind:selected_tab
 />
+
+<div class="absolute bottom-16 w-full">
+	<input
+		bind:this={search_el}
+		bind:value={search_term}
+		oninput={debounce(search_stops)}
+		type="search"
+		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
+		class="search-stops h-12 text-neutral-200 pl-10 w-full rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-700 focus:ring-indigo-700 focus:border-indigo-700 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
+	/>
+	<button
+		aria-label="Clear search"
+		class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
+		onclick={clear_search}
+	>
+		<CircleX />
+	</button>
+</div>
 
 <style lang="postcss">
 	.search-stops {
