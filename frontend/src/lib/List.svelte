@@ -1,17 +1,13 @@
 <script lang="ts" generics="T, B">
 	import { BusFront, TrainFront, AArrowUp, AArrowDown } from 'lucide-svelte';
-	import type { Component, Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut, quintOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
-	import Icon from './Icon.svelte';
-	import type { Stop } from './static';
-	// import type { Stop } from './static';
+	// import type { Action } from 'svelte/action';
 
 	let {
 		title,
-		// bus_tab,
-		// train_tab,
 		button,
 		bus_data,
 		train_data,
@@ -19,28 +15,28 @@
 		selected_tab = $bindable(
 			persisted_rune<'train' | 'bus'>(`${title.toLocaleLowerCase()}_tab`, 'train')
 		),
-		// search = false,
 		min_items,
 		class: class_name
 	}: {
 		title: string;
 		locate_button?: Snippet;
-		selected_tab: PersistedRune<'train' | 'bus'>;
-		// search?: boolean;
+		selected_tab?: PersistedRune<'train' | 'bus'>;
 		button: Snippet<[T | B, boolean]>;
-		// bus_tab: Snippet<[B]>;
-		// train_tab: Snippet<[T]>;
 		bus_data: B[];
 		train_data: T[];
 		min_items?: number;
 		class?: string;
 	} = $props();
 
-	let list_div: HTMLDivElement;
 	let list_height = $state(0);
+	let list_div: HTMLDivElement | undefined = $state();
+
+	// export function scrollIntoView() {
+	// 	list_div.scrollIntoView({ behavior: 'smooth' });
+	// }
 
 	function item_heights() {
-		const list_items = Array.from(list_div.querySelectorAll('#list-item')).slice(
+		const list_items = Array.from(list_div!.querySelectorAll('#list-item')).slice(
 			0,
 			min_items
 		) as HTMLDivElement[];
@@ -49,10 +45,34 @@
 	}
 
 	$effect(() => {
-		if (min_items) {
+		if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
+			console.log('scrolling list into view');
+			list_div.scrollIntoView({ behavior: 'smooth' });
+		}
+	});
+
+	// const manage_scroll: Action<HTMLDivElement, [T[], B[]]> = (
+	// 	node,
+	// 	[train_data, bus_data]: [T[], B[]]
+	// ) => {
+	// 	if (bus_data.length < 8 || train_data.length < 8) {
+	// 		console.log('scrolling list into view');
+	// 		node.scrollIntoView({ behavior: 'smooth' });
+	// 	}
+
+	// 	// return {
+	// 	// 	destroy() {
+	// 	// 		// the node has been removed from the DOM
+	// 	// 	}
+	// 	// };
+	// };
+
+	$effect(() => {
+		if (min_items && list_div) {
 			// initial height check
 			item_heights();
 
+			// whenever list changes, recalculate height
 			const observer = new MutationObserver(() => {
 				// Callback function to handle mutations
 				console.log('list mutation');
@@ -63,7 +83,6 @@
 				// 		// mutation.addedNodes.forEach((node) => {
 				// 		//  if (node.id)
 				// 		// })
-				// 		// Add your custom logic here
 				// 	}
 				// });
 			});
@@ -71,9 +90,13 @@
 			observer.observe(list_div, config);
 		}
 	});
-	// $inspect(list_height);
-	// let tab = persisted_rune<'train' | 'bus'>(`${title.toLowerCase()}_tab`, 'train');
-	// selected_tab = tab.value;
+
+	// const scroll_into_view: Action = (node) => {
+	// 	// the node has been mounted in the DOM
+
+	// 	node.scrollIntoView({ behavior: 'smooth' });
+	// };
+
 	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
 	const tab_icons = {
@@ -87,7 +110,6 @@
 	});
 </script>
 
-<!-- TODO: use calc() for getting height of list div -->
 <div
 	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }}
 	class="flex flex-col text-neutral-200 relative w-full px-1 z-30"
@@ -158,7 +180,4 @@
 			{/each}
 		{/if}
 	</div>
-
-	<!-- {#if search}
-		{@render search()} -->
 </div>

@@ -13,7 +13,7 @@
 	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
 	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 15));
 
-	let selected_tab = persisted_rune<'train' | 'bus'>('stops_tab', 'train');
+	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
 	$effect(() => {
 		search_worker = new SearchWorker();
@@ -93,14 +93,14 @@
 	bind:selected_tab
 />
 
-<div class="absolute bottom-16 w-full">
+<div class="absolute bottom-0 w-full">
 	<input
 		bind:this={search_el}
 		bind:value={search_term}
 		oninput={debounce(search_stops)}
 		type="search"
 		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
-		class="search-stops h-12 text-neutral-200 pl-10 w-full rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-700 focus:ring-indigo-700 focus:border-indigo-700 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
+		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-700 focus:ring-indigo-700 focus:border-indigo-700 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
 	/>
 	<button
 		aria-label="Clear search"
