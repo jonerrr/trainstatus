@@ -1,3 +1,5 @@
+import type { Stop } from './static';
+
 export interface Trip<T extends TripData> {
 	id: string;
 	mta_id: string;
@@ -44,32 +46,45 @@ export enum TripDirection {
 	South = 0
 }
 
+type Fetch = typeof fetch;
+
 export function createTrips() {
 	// let trips: Trip<TripData>[] = $state([]);
 	let trips = $state(new Map<string, Trip<TripData>>());
 
-	function update() {
-		fetch('/api/trips')
-			.then((res) => res.json())
-			.then(
-				(data) =>
-					// convert dates from strings to Date objects and put into map
-					(trips = new Map(
-						data.map((trip: Trip<TripData>) => [
-							trip.id,
-							{
-								...trip,
-								created_at: new Date(trip.created_at),
-								updated_at: new Date(trip.updated_at)
-							}
-						])
-					))
-				// (trips = data.map((trip: Trip<TripData>) => ({
-				// 	...trip,
-				// 	created_at: new Date(trip.created_at),
-				// 	updated_at: new Date(trip.updated_at)
-				// })))
-			);
+	async function update(fetch: Fetch) {
+		const data: Trip<TripData>[] = await (await fetch('/api/trips')).json();
+
+		trips = new Map(
+			data.map((trip: Trip<TripData>) => [
+				trip.id,
+				{
+					...trip,
+					created_at: new Date(trip.created_at),
+					updated_at: new Date(trip.updated_at)
+				}
+			])
+		);
+		// .then((res) => res.json())
+		// .then(
+		// 	(data) =>
+		// 		// convert dates from strings to Date objects and put into map
+		// (trips = new Map(
+		// 	data.map((trip: Trip<TripData>) => [
+		// 		trip.id,
+		// 		{
+		// 			...trip,
+		// 			created_at: new Date(trip.created_at),
+		// 			updated_at: new Date(trip.updated_at)
+		// 		}
+		// 	])
+		// ))
+		// (trips = data.map((trip: Trip<TripData>) => ({
+		// 	...trip,
+		// 	created_at: new Date(trip.created_at),
+		// 	updated_at: new Date(trip.updated_at)
+		// })))
+		// );
 	}
 
 	return {
@@ -81,3 +96,18 @@ export function createTrips() {
 }
 
 export const trips = createTrips();
+
+// type guards for trips.
+export const is_bus = (
+	s: Stop<'bus' | 'train'>,
+	t: Trip<TrainTripData | BusTripData>
+): t is Trip<BusTripData> => {
+	return s.type === 'bus';
+};
+
+export const is_train = (
+	s: Stop<'bus' | 'train'>,
+	t: Trip<TrainTripData | BusTripData>
+): t is Trip<TrainTripData> => {
+	return s.type === 'train';
+};

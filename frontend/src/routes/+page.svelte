@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { page } from '$app/stores';
-	import { is_bus, is_train, type Stop } from '$lib/static';
-	import { persisted_rune, haversine, stop_pins_rune } from '$lib/util.svelte';
-	// import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
+	import { type Stop, is_bus, is_train } from '$lib/static';
+	import {
+		persisted_rune,
+		haversine,
+		stop_pins_rune,
+		trip_pins_rune,
+		route_pins_rune
+	} from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 
@@ -54,22 +59,14 @@
 		);
 	}
 
+	// $inspect($page.data);
+
 	// $inspect(bus_stops, train_stops, $page.data.stops);
 
 	if (location_status.value === 'granted' || location_status.value === 'loading') {
 		get_nearby_stops();
 	}
 
-	// $effect(() => {
-	// else if (location_status.value === 'loading') {
-	// 	get_nearby_stops();
-	// 	// TODO: reset to neverasked instead maybe
-	// }
-	// });
-
-	// const stop_pin_rune = persisted_rune<number[]>('stop_pins', []);
-
-	// const pinned_stops = $page.data.stops.filter(stop => stop_pin_rune.value.includes(stop.id));
 	const { pinned_bus_stops, pinned_train_stops } = $derived(
 		stop_pins_rune.value
 			.map((id) => $page.data.stops[id])
@@ -85,21 +82,9 @@
 				{ pinned_bus_stops: [], pinned_train_stops: [] }
 			)
 	);
-	// use reduced to get pinned bus stops and train stops
-	// const { pinned_bus_stops, pinned_train_stops } = $derived(
-	// 	pinned_stops.reduce(
-	// 		(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
-	// 			if (is_bus(stop)) {
-	// 				acc.pinned_bus_stops.push(stop);
-	// 			} else if (is_train(stop)) {
-	// 				acc.pinned_train_stops.push(stop);
-	// 			}
-	// 			return acc;
-	// 		},
-	// 		{ pinned_bus_stops: [], pinned_train_stops: [] }
-	// 	)
-	// );
 </script>
+
+<!-- TODO: better initial loading animation -->
 
 {#snippet locate_button()}
 	<button
@@ -119,8 +104,6 @@
 		{/if}
 	</button>
 {/snippet}
-
-<!-- {@const pin_rune = persisted_rune<number[]>('stop_pins', [])} -->
 
 {#snippet stop_button(stop: Stop<'bus' | 'train'>, large: boolean)}
 	<StopButton {stop} pin_rune={stop_pins_rune} {large} />

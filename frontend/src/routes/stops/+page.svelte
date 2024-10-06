@@ -90,6 +90,7 @@
 	bus_data={bus_stops}
 	train_data={train_stops}
 	class="max-h-[calc(100dvh-13rem)]"
+	auto_scroll
 	bind:selected_tab
 />
 

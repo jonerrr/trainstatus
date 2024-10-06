@@ -5,10 +5,18 @@
 		monitored_routes,
 		type StopTime
 	} from '$lib/stop_times.svelte';
-	import { is_bus, type Route, type Stop, type TrainStopData } from '$lib/static';
+	import {
+		type Route,
+		type Stop,
+		type TrainStopData,
+		is_train as is_train_stop,
+		is_bus as is_bus_stop
+	} from '$lib/static';
 	import {
 		trips as rt_trips,
 		TripDirection,
+		is_bus,
+		is_train,
 		type BusTripData,
 		type TrainTripData,
 		type Trip
@@ -27,13 +35,24 @@
 	// TODO: this probably doesn't needed to be binded
 	let { stop = $bindable(), show_previous = $bindable() }: ModalProps = $props();
 
+	// if stop is a bus stop, add all routes to monitored_routes
+	$effect.pre(() => {
+		if (is_bus_stop(stop)) {
+			for (const route of stop.routes) {
+				if (!monitored_routes.includes(route.id)) {
+					monitored_routes.push(route.id);
+				}
+			}
+		}
+	});
+
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TrainTripData | BusTripData>;
 		last_stop: string;
 	}
 
 	let stop_times: StopTimeWithTrip[] = $derived.by(() => {
-		if (stop.type === 'train') {
+		if (is_train_stop(stop)) {
 			const stop_times = rt_stop_times.stop_times
 				.filter((st) => st.stop_id === stop.id)
 				.map((st) => {
@@ -51,7 +70,7 @@
 				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
 			// TODO: also get trips where current stop_id is this stop
 			return stop_times;
-		} else {
+		} else if (is_bus_stop(stop)) {
 			const stop_times = rt_stop_times.stop_times
 				.filter((st) => st.stop_id === stop.id)
 				.map((st) => {
@@ -69,6 +88,9 @@
 				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
 			// TODO: also get trips where current stop_id is this stop
 			return stop_times;
+		} else {
+			console.error('Invalid stop type', stop);
+			return [];
 		}
 	});
 
@@ -106,19 +128,20 @@
 		<Button state={{ modal: 'trip', data: st.trip }}>
 			<div class="flex gap-2 items-center">
 				<div class="flex flex-col">
-					{#if is_bus(stop) && st.trip.data.passengers && st.trip.data.capacity}
+					{#if is_bus(stop, st.trip) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
 					{/if}
 					<Icon
 						width="1.2rem"
 						height="1.2rem"
-						express={st.trip.data.express}
+						express={is_train(stop, st.trip) && st.trip.data.express}
 						link={false}
 						route={$page.data.routes[st.trip.route_id] as Route}
 					/>
 				</div>
-				<div class="flex flex-col" class:italic={stop.type === 'train' && !st.trip.data.assigned}>
-					{#if stop.type === 'bus' && Math.abs(st.trip.data.deviation) > 120}
+				<div class="flex flex-col" class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}>
+					<!-- if bus trip and theres a deviation more than 2 min -->
+					{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
 						<div
 							class={`text-xs ${st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}`}
 						>

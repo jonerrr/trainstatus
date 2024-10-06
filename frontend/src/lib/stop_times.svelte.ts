@@ -8,23 +8,37 @@ export interface StopTime<T = never, D = never, R = never> {
 	route_id: R;
 }
 
+type Fetch = typeof fetch;
+
 export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
-	function update(routes: string[]) {
-		fetch(
-			`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
-		)
-			.then((res) => res.json())
-			.then(
-				(data) =>
-					// convert dates from strings to Date objects
-					(stop_times = data.map((stop_time: StopTime) => ({
-						...stop_time,
-						arrival: new Date(stop_time.arrival),
-						departure: new Date(stop_time.departure)
-					})))
-			);
+	async function update(fetch: Fetch, routes: string[]) {
+		const data: StopTime[] = await (
+			await fetch(
+				`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
+			)
+		).json();
+
+		stop_times = data.map((stop_time) => ({
+			...stop_time,
+			arrival: new Date(stop_time.arrival),
+			departure: new Date(stop_time.departure)
+		}));
+
+		// fetch(
+		// 	`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
+		// )
+		// 	.then((res) => res.json())
+		// 	.then(e
+		// 		(data) =>
+		// 			// convert dates from strings to Date objects
+		// 			(stop_times = data.map((stop_time: StopTime) => ({
+		// 				...stop_time,
+		// 				arrival: new Date(stop_time.arrival),
+		// 				departure: new Date(stop_time.departure)
+		// 			})))
+		// 	);
 		// TODO: add error handling and set offline status
 	}
 

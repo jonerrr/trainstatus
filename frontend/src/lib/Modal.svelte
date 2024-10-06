@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices, History } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck, History } from 'lucide-svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { slide } from 'svelte/transition';
 	import {
 		stop_pins_rune,
 		trip_pins_rune,
@@ -12,8 +13,8 @@
 	import { type Route, type Stop } from './static';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
+	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
-	import { slide } from 'svelte/transition';
 
 	let modal_el: HTMLDivElement;
 
@@ -162,6 +163,8 @@
 				{@render actions(true, $page.state.data.id, stop_pins_rune)}
 			{:else if $page.state.modal === 'route'}
 				{@const route = $page.state.data as Route}
+
+				<RouteModal {route} />
 
 				{@render actions(true, route.id, route_pins_rune)}
 			{:else if $page.state.modal === 'trip'}

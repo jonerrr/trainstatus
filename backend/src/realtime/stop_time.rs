@@ -21,11 +21,6 @@ pub struct StopTimeWithType {
     pub trip_type: String,
 }
 
-// pub enum TripType {
-//     Train,
-//     Bus,
-// }
-
 impl StopTime {
     pub async fn get(pool: &PgPool, trip_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         let stop_times = sqlx::query_as!(

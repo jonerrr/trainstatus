@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
-	import type {
-		BusRouteStop,
-		BusStopData,
-		Route,
-		Stop,
-		TrainRouteStop,
-		TrainStopData
+	import {
+		is_bus,
+		is_train,
+		type BusRouteStop,
+		type BusStopData,
+		type Route,
+		type Stop,
+		type TrainRouteStop,
+		type TrainStopData
 	} from '$lib/static';
 	import { type PersistedRune } from '$lib/util.svelte';
 	import {
@@ -28,9 +30,10 @@
 	}
 	let { stop, pin_rune = $bindable(), large }: ButtonProps = $props();
 
+	// if stop is a bus stop, add all routes to monitored_routes
 	$effect.pre(() => {
-		if (stop.type === 'bus') {
-			for (const route of stop.routes as BusRouteStop[]) {
+		if (is_bus(stop)) {
+			for (const route of stop.routes) {
 				if (!monitored_routes.includes(route.id)) {
 					monitored_routes.push(route.id);
 				}
@@ -84,7 +87,7 @@
 	}}
 	bind:pin_rune
 >
-	{#if stop.type === 'train'}
+	{#if is_train(stop)}
 		{#snippet arrivals(
 			headsign: string,
 			routes: Route[],
@@ -120,8 +123,8 @@
 			</div>
 		{/snippet}
 
-		{@const data = stop.data as TrainStopData}
-		{@const routes = stop.routes as TrainRouteStop[]}
+		{@const data = stop.data}
+		{@const routes = stop.routes}
 		{@const base_routes = routes
 			.filter((r) => r.type === 'full_time' || r.type === 'part_time')
 			.map((r) => r.id)}
@@ -207,10 +210,6 @@
 								<div class="text-xs text-neutral-400">No trips</div>
 							{/if}
 						</div>
-
-						<!-- <div class="">
-							<BusArrivals route_id={route.id} stop_id={stop.id} />
-						</div> -->
 					</div>
 				{/each}
 			</div>

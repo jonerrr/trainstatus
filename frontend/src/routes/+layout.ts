@@ -1,4 +1,6 @@
-import { is_bus, is_train, type Route, type Stop } from '$lib/static';
+import { type Route, type Stop, is_bus, is_train } from '$lib/static';
+import { trips } from '$lib/trips.svelte';
+import { stop_times } from '$lib/stop_times.svelte';
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ fetch }) => {
@@ -8,6 +10,8 @@ export const load: LayoutLoad = async ({ fetch }) => {
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[]] = await Promise.all([
 		stops_promise,
 		routes_promise
+		// trips.update(),
+		// stop_times.update([])
 	]);
 
 	const routes_obj: {
@@ -36,5 +40,11 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		{ bus_stops: [], train_stops: [] }
 	);
 
-	return { stops, bus_stops, train_stops, routes: routes_obj };
+	return {
+		stops: stops_obj,
+		bus_stops,
+		train_stops,
+		routes: routes_obj,
+		initial_promise: Promise.all([trips.update(fetch), stop_times.update(fetch, [])])
+	};
 };

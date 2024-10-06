@@ -23,6 +23,17 @@
 	}
 
 	const { trip, show_previous = $bindable() }: ModalProps = $props();
+
+	// if stop is a bus stop, add all routes to monitored_routes
+	// 	$effect.pre(() => {
+	// 	if (is_bus(stop)) {
+	// 		for (const route of stop.routes) {
+	// 			if (!monitored_routes.includes(route.id)) {
+	// 				monitored_routes.push(route.id);
+	// 			}
+	// 		}
+	// 	}
+	// });
 </script>
 
 <div class="flex gap-1 p-1">

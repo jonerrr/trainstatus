@@ -1,36 +1,76 @@
 <script lang="ts">
 	import '../app.css';
 	import '@fontsource/inter';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { page } from '$app/stores';
+	import { pushState } from '$app/navigation';
+	import { onMount, tick } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
+	// import { LoaderCircle } from 'lucide-svelte';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
-	let last_update = $state<Date>();
+	let last_update = $state<Date>(new Date());
 	let last_monitored_routes = $state<string>('');
 
 	$inspect(monitored_routes);
 
-	// TODO: check if monitored routes has more than like 20 and then remove oldest ones
+	onMount(async () => {
+		// TODO: error handling
+		await data.initial_promise;
+
+		const id = $page.url.searchParams.get('d');
+		console.log(id);
+		if (id) {
+			// check what type of id it is
+			if (id in $page.data.routes) {
+				await tick();
+				pushState('', {
+					modal: 'route',
+					data: $page.data.routes[id]
+				});
+				// TODO: does this work bc its a number
+			} else if (id in $page.data.stops) {
+				await tick();
+				pushState('', {
+					modal: 'stop',
+					data: $page.data.stops[parseInt(id)]
+				});
+			} else if (trips.trips.has(id)) {
+				await tick();
+				pushState('', {
+					modal: 'trip',
+					data: trips.trips.get(id)
+				});
+			} else {
+				console.error('Invalid id', id);
+			}
+		}
+	});
 
 	$effect(() => {
 		if (monitored_routes.sort().toString() !== last_monitored_routes) {
-			stop_times.update(monitored_routes);
+			// if there are more than 20 routes, remove the oldest
+			if (monitored_routes.length > 20) {
+				monitored_routes.shift();
+			}
+			// might be an issue bc async
+			stop_times.update(fetch, monitored_routes);
 			last_monitored_routes = monitored_routes.sort().toString();
 			last_update = new Date();
 		}
 
-		const interval = setInterval(() => {
+		const interval = setInterval(async () => {
 			// TODO: update more often if offline
 			// TODO: exponential backoff
-			if (!last_update || new Date().getTime() - last_update.getTime() > 1000 * 10) {
-				console.log('Updating');
-				trips.update();
-				stop_times.update(monitored_routes);
+			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
+				console.log('Updating rt data');
+				await Promise.all([trips.update(fetch), stop_times.update(fetch, monitored_routes)]);
+				// trips.update();
+				// stop_times.update(monitored_routes);
 				last_update = new Date();
 			}
 		}, 200);
@@ -39,20 +79,18 @@
 			clearInterval(interval);
 		};
 	});
-
-	// $inspect(trips.trips);
 </script>
 
 <Header />
 <Modal />
 <main class="md:w-[60%] m-auto relative h-[calc(100dvh-7.5rem)]">
-	{#if stop_times.stop_times.length && trips.trips.size}
-		{@render children()}
-	{:else}
+	<!-- {#await data.initial_promise}
 		<div class="text-neutral-50 text-4xl flex justify-center">
 			<LoaderCircle size="4rem" class="animate-spin" />
 		</div>
-	{/if}
+	{:then _} -->
+	{@render children()}
+	<!-- {/await} -->
 </main>
 <Navbar />
 
