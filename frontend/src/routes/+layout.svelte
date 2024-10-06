@@ -45,7 +45,7 @@
 
 <Header />
 <Modal />
-<main class="md:w-[60%] m-auto">
+<main class="md:w-[60%] m-auto relative h-[calc(100dvh-7.5rem)]">
 	{#if stop_times.stop_times.length && trips.trips.size}
 		{@render children()}
 	{:else}
