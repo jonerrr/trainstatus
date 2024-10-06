@@ -1,11 +1,8 @@
 import { browser } from '$app/environment';
-// import { page } from '$app/stores';
-// import type { Stop } from './static';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-	// distance between latitudes
-	// and longitudes
+	// distance between latitudes and longitudes
 	const dLat = ((lat2 - lat1) * Math.PI) / 180.0;
 	const dLon = ((lon2 - lon1) * Math.PI) / 180.0;
 
@@ -34,7 +31,8 @@ export function persisted_rune<T>(key: string, init_value: T) {
 		const item = localStorage.getItem(key);
 		storedValue = item ? JSON.parse(item) : init_value;
 	} catch (e) {
-		console.error(e);
+		// localStorage won't be defined so this will always throw on init load
+		if (browser) console.error(e);
 		storedValue = init_value;
 	}
 

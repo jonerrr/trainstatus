@@ -6,6 +6,23 @@
 	import { persisted_rune, type PersistedRune } from './util.svelte';
 	// import type { Action } from 'svelte/action';
 
+	interface ListProps {
+		// title of list
+		title: string;
+		// renders geolocate button for stops list
+		locate_button?: Snippet;
+		// current selected tab. Used for selecting correct search index
+		selected_tab?: PersistedRune<'train' | 'bus'>;
+		button: Snippet<[T | B, boolean]>;
+		bus_data: B[];
+		train_data: T[];
+		// control height of list by number of items
+		min_items?: number;
+		class?: string;
+		// scroll list into view if theres less than 8 items
+		auto_scroll?: boolean;
+	}
+
 	let {
 		title,
 		button,
@@ -16,86 +33,47 @@
 			persisted_rune<'train' | 'bus'>(`${title.toLocaleLowerCase()}_tab`, 'train')
 		),
 		min_items,
-		class: class_name
-	}: {
-		title: string;
-		locate_button?: Snippet;
-		selected_tab?: PersistedRune<'train' | 'bus'>;
-		button: Snippet<[T | B, boolean]>;
-		bus_data: B[];
-		train_data: T[];
-		min_items?: number;
-		class?: string;
-	} = $props();
+		class: class_name,
+		auto_scroll = false
+	}: ListProps = $props();
 
 	let list_height = $state(0);
+	// list_div needs to be wrapped in state so $effect runs
 	let list_div: HTMLDivElement | undefined = $state();
 
-	// export function scrollIntoView() {
-	// 	list_div.scrollIntoView({ behavior: 'smooth' });
-	// }
+	// probably could combine effects
+	if (auto_scroll) {
+		$effect(() => {
+			if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
+				console.log('scrolling list into view');
+				list_div.scrollIntoView({ behavior: 'smooth' });
+			}
+		});
+	}
 
 	function item_heights() {
 		const list_items = Array.from(list_div!.querySelectorAll('#list-item')).slice(
 			0,
 			min_items
 		) as HTMLDivElement[];
-
-		list_height = list_items.reduce((h, e) => e.offsetHeight + h, 0);
+		// start with 5 prevents scrollbars
+		list_height = list_items.reduce((h, e) => e.offsetHeight + h, 5);
 	}
 
-	$effect(() => {
-		if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
-			console.log('scrolling list into view');
-			list_div.scrollIntoView({ behavior: 'smooth' });
-		}
-	});
-
-	// const manage_scroll: Action<HTMLDivElement, [T[], B[]]> = (
-	// 	node,
-	// 	[train_data, bus_data]: [T[], B[]]
-	// ) => {
-	// 	if (bus_data.length < 8 || train_data.length < 8) {
-	// 		console.log('scrolling list into view');
-	// 		node.scrollIntoView({ behavior: 'smooth' });
-	// 	}
-
-	// 	// return {
-	// 	// 	destroy() {
-	// 	// 		// the node has been removed from the DOM
-	// 	// 	}
-	// 	// };
-	// };
-
-	$effect(() => {
-		if (min_items && list_div) {
-			// initial height check
+	if (min_items) {
+		$effect(() => {
+			// initial height calculation
 			item_heights();
 
 			// whenever list changes, recalculate height
 			const observer = new MutationObserver(() => {
-				// Callback function to handle mutations
 				console.log('list mutation');
 				item_heights();
-				// mutations.forEach((mutation) => {
-				// 	if (mutation.type === 'childList') {
-				// 		console.log('Child nodes changed:', mutation.addedNodes);
-				// 		// mutation.addedNodes.forEach((node) => {
-				// 		//  if (node.id)
-				// 		// })
-				// 	}
-				// });
 			});
 			const config = { childList: true, subtree: true };
-			observer.observe(list_div, config);
-		}
-	});
-
-	// const scroll_into_view: Action = (node) => {
-	// 	// the node has been mounted in the DOM
-
-	// 	node.scrollIntoView({ behavior: 'smooth' });
-	// };
+			observer.observe(list_div!, config);
+		});
+	}
 
 	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
