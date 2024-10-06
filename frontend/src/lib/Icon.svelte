@@ -25,7 +25,7 @@
 		style:background-color={`#${route.color}`}
 		class="p-1 text-indigo-100 rounded font-bold shadow-2xl"
 		onclick={() => {
-			pushState('', { dialog_open: true, dialog_id: route.id, dialog_type: 'route', data: route });
+			pushState('', { modal: 'route', data: route });
 		}}
 	>
 		{route.short_name}
@@ -36,7 +36,7 @@
 	<button
 		class="appearance-none"
 		onclick={() => {
-			pushState('', { dialog_open: true, dialog_id: route.id, dialog_type: 'route', data: route });
+			pushState('', { modal: 'route', data: route });
 		}}
 	>
 		<svg class={className} {width} {height} viewBox="0 0 90 90">

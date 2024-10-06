@@ -16,5 +16,10 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		route_map.set(route.id, route);
 	}
 
-	return { stops, routes: route_map };
+	const stop_map = new Map<number, Stop<'bus' | 'train'>>();
+	for (const stop of stops) {
+		stop_map.set(stop.id, stop);
+	}
+
+	return { stops, stop_map, routes: route_map };
 };

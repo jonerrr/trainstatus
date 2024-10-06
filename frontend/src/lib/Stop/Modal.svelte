@@ -5,7 +5,7 @@
 		monitored_routes,
 		type StopTime
 	} from '$lib/stop_times.svelte';
-	import type { Route, Stop } from '$lib/static';
+	import type { Route, Stop, TrainStopData } from '$lib/static';
 	import {
 		trips as rt_trips,
 		TripDirection,
@@ -16,43 +16,74 @@
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
+	import { persisted_rune } from '$lib/util.svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
 		stop: Stop<'bus' | 'train'>;
 	}
 
-	const { stop, show_previous = $bindable() }: ModalProps = $props();
+	// TODO: this probably doesn't needed to be binded
+	let { stop = $bindable(), show_previous = $bindable() }: ModalProps = $props();
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TrainTripData | BusTripData>;
+		last_stop: string;
 	}
 
 	let stop_times: StopTimeWithTrip[] = $derived.by(() => {
-		// get arrival for stop and add eta
-		const stop_times = rt_stop_times.stop_times
-			.filter((st) => st.stop_id === stop.id)
-			.map((st) => {
-				// const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
-				const trip = rt_trips.trips.get(st.trip_id);
+		if (stop.type === 'train') {
+			const stop_times = rt_stop_times.stop_times
+				.filter((st) => st.stop_id === stop.id)
+				.map((st) => {
+					const trip = rt_trips.trips.get(st.trip_id);
+					const last_st = rt_stop_times.stop_times.filter((st) => st.trip_id === trip?.id).pop();
+					// if (!trip) {
+					// 	$inspect(st);
+					// }
+					return {
+						...st,
+						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
+						last_stop: trip ? $page.data.stop_map.get(last_st!.stop_id)?.name : 'unknown',
+						trip
+					};
+				})
+				// TODO: fix so we don't need to filter (maybe store trips in map)
+				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
+			// TODO: also get trips where current stop_id is this stop
+			return stop_times;
+		} else {
+			const stop_times = rt_stop_times.stop_times
+				.filter((st) => st.stop_id === stop.id)
+				.map((st) => {
+					const trip = rt_trips.trips.get(st.trip_id);
+					// for bus, we get last stop from route headsing bc stop times doesn't include all of the stops
 
-				// if (!trip) {
-				// 	$inspect(st);
-				// }
-				return {
-					...st,
-					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					trip
-				};
-			})
-			// TODO: fix so we don't need to filter (maybe store trips in map)
-			.filter((st) => st.direction !== undefined && st.eta >= 0) as StopTimeWithTrip[];
-		// TODO: also get trips where current stop_id is this stop
-		return stop_times;
+					return {
+						...st,
+						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
+						last_stop: stop.routes.find((r) => r.id === trip?.route_id)?.headsign,
+						trip
+					};
+				})
+				// TODO: fix so we don't need to filter (maybe store trips in map)
+				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
+			// TODO: also get trips where current stop_id is this stop
+			return stop_times;
+		}
 	});
+
+	// $inspect(stop_times);
+	let selected_direction = persisted_rune('direction', TripDirection.North);
+	// if its a train, we only want to show stop times for the selected direction
+	let selected_stop_times = $derived(
+		stop.type === 'train'
+			? stop_times.filter((st) => st.trip.direction === selected_direction.value)
+			: stop_times
+	);
 </script>
 
-<div class="flex gap-1 p-1">
+<div class="flex gap-1">
 	<!-- {#if large} -->
 	{#each stop.routes as route}
 		<Icon
@@ -67,12 +98,56 @@
 	<div class="font-medium text-lg">
 		{stop.name}
 	</div>
-
-	<ModalList>
-		{#each stop_times as st}
-			<Button state={{ dialog_type: 'trip', data: st.trip }}>
-				<div class="flex items-center"></div>
-			</Button>
-		{/each}
-	</ModalList>
 </div>
+
+<ModalList>
+	{#each selected_stop_times as st}
+		<Button state={{ modal: 'trip', data: st.trip }}>
+			<div class="flex gap-2 items-center">
+				<Icon
+					width="1rem"
+					height="1rem"
+					express={st.trip.data.express}
+					link={false}
+					route={$page.data.routes.get(st.trip.route_id) as Route}
+				/>
+				<div class="" class:italic={!st.trip.data.assigned}>
+					{st.eta.toFixed(0)}m
+				</div>
+
+				<!-- {#if stops_away > 0}
+								<div class="text-indigo-200 text-xs">
+									{stops_away} stop{stops_away > 1 ? 's' : ''} away
+								</div>
+							{/if} -->
+			</div>
+
+			<div class="text-right pl-4">
+				{st.last_stop}
+			</div>
+		</Button>
+	{/each}
+</ModalList>
+
+{#if stop.type === 'train'}
+	{@const stop_data = stop.data as TrainStopData}
+
+	{#snippet direction_tab(direction: TripDirection, name: string)}
+		<button
+			class:bg-neutral-900={selected_direction.value === direction}
+			onclick={() => {
+				selected_direction.value = direction;
+			}}
+		>
+			{name}
+		</button>
+	{/snippet}
+
+	<div
+		class="grid grid-cols-2 text-neutral-100 bg-neutral-800 border-neutral-700"
+		aria-label="Trip information"
+	>
+		{@render direction_tab(TripDirection.North, stop_data.north_headsign)}
+		{@render direction_tab(TripDirection.South, stop_data.south_headsign)}
+	</div>
+{/if}

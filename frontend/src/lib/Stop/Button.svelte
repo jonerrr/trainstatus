@@ -79,7 +79,7 @@
 
 <Button
 	state={{
-		dialog_type: 'stop',
+		modal: 'stop',
 		data: stop
 	}}
 	bind:pin_rune

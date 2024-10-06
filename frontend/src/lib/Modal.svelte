@@ -2,21 +2,28 @@
 	import { CircleX, Share, ClipboardCheck, CircleHelp, Dices, History } from 'lucide-svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { stop_pins_rune, type PersistedRune } from '$lib/util.svelte';
+	import {
+		stop_pins_rune,
+		trip_pins_rune,
+		route_pins_rune,
+		type PersistedRune
+	} from '$lib/util.svelte';
+	import type { Trip, TrainTripData, BusTripData } from './trips.svelte';
 	import { type Route, type Stop } from './static';
 	import StopModal from '$lib/Stop/Modal.svelte';
+	import TripModal from '$lib/Trip/Modal.svelte';
 	import Pin from './Pin.svelte';
 
 	let modal_el: HTMLDivElement;
 
-	// function close() {
-	// 	enable_scroll();
-	// 	pushState('', { dialog_type: null });
-	// }
+	function close() {
+		// enable_scroll();
+		pushState('', { modal: null });
+	}
 
 	function manage_modal(node: HTMLDivElement) {
 		page.subscribe(({ state }) => {
-			if (state.dialog_type) {
+			if (state.modal) {
 				document.body.style.overflow = 'hidden';
 				// disable_scroll();
 			} else {
@@ -46,9 +53,7 @@
 
 			if (diffX < delta && diffY < delta) {
 				// Close the dialog
-				pushState('', {
-					dialog_type: null
-				});
+				close();
 			}
 		});
 	}
@@ -71,7 +76,7 @@
 	id: string | number,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
-	<div class="flex gap-1 items-center justify-between">
+	<div class="flex gap-1 items-center justify-between pt-2">
 		<button
 			onclick={() => {
 				close();
@@ -134,23 +139,32 @@
 	</div>
 {/snippet}
 
-<svelte:window
-	onkeydown={($event) => $page.state.dialog_type && $event.key === 'Escape' && close()}
-/>
+<!-- close modal on escape key -->
+<svelte:window onkeydown={($event) => $page.state.modal && $event.key === 'Escape' && close()} />
 
-{#if $page.state.dialog_type}
+{#if $page.state.modal}
 	<div
 		use:manage_modal
 		class="fixed top-0 left-0 flex flex-col justify-center items-center w-[100dvw] h-[100dvh] z-50 bg-black/50 bg-opacity-10 text-neutral-100"
 	>
 		<div role="dialog" aria-modal="true" class="relative bg-neutral-900 w-fit p-1 rounded">
 			<div class="flex flex-col relative">
-				{#if $page.state.dialog_type === 'stop'}
-					{@const stop = $page.state.data as Stop<'train' | 'bus'>}
+				{#if $page.state.modal === 'stop'}
+					<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
 
-					<StopModal bind:show_previous {stop} />
+					<StopModal bind:show_previous bind:stop={$page.state.data} />
 
-					{@render actions(true, stop.id, stop_pins_rune)}
+					{@render actions(true, $page.state.data.id, stop_pins_rune)}
+				{:else if $page.state.modal === 'route'}
+					{@const route = $page.state.data as Route}
+
+					{@render actions(true, route.id, route_pins_rune)}
+				{:else if $page.state.modal === 'trip'}
+					{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
+
+					<TripModal {trip} bind:show_previous />
+
+					{@render actions(true, trip.id, trip_pins_rune)}
 				{/if}
 			</div>
 		</div>
