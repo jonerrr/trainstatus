@@ -168,7 +168,9 @@ impl Trip {
                     'passengers',
                     p.passengers,
                     'capacity',
-                    p.capacity 
+                    p.capacity,
+                    'deviation',
+                    t.deviation
                 )
                 END AS DATA
             FROM
