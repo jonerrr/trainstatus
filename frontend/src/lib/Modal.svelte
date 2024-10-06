@@ -13,6 +13,7 @@
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import Pin from './Pin.svelte';
+	import { slide } from 'svelte/transition';
 
 	let modal_el: HTMLDivElement;
 
@@ -147,26 +148,29 @@
 		use:manage_modal
 		class="fixed top-0 left-0 flex flex-col justify-center items-center w-[100dvw] h-[100dvh] z-50 bg-black/50 bg-opacity-10 text-neutral-100"
 	>
-		<div role="dialog" aria-modal="true" class="relative bg-neutral-900 w-fit p-1 rounded">
-			<div class="flex flex-col relative">
-				{#if $page.state.modal === 'stop'}
-					<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
+		<div
+			transition:slide={{ duration: 300 }}
+			role="dialog"
+			aria-modal="true"
+			class="bg-neutral-900 w-full p-1 rounded flex flex-col fixed bottom-0"
+		>
+			{#if $page.state.modal === 'stop'}
+				<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
 
-					<StopModal bind:show_previous bind:stop={$page.state.data} />
+				<StopModal bind:show_previous bind:stop={$page.state.data} />
 
-					{@render actions(true, $page.state.data.id, stop_pins_rune)}
-				{:else if $page.state.modal === 'route'}
-					{@const route = $page.state.data as Route}
+				{@render actions(true, $page.state.data.id, stop_pins_rune)}
+			{:else if $page.state.modal === 'route'}
+				{@const route = $page.state.data as Route}
 
-					{@render actions(true, route.id, route_pins_rune)}
-				{:else if $page.state.modal === 'trip'}
-					{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
+				{@render actions(true, route.id, route_pins_rune)}
+			{:else if $page.state.modal === 'trip'}
+				{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
 
-					<TripModal {trip} bind:show_previous />
+				<TripModal {trip} bind:show_previous />
 
-					{@render actions(true, trip.id, trip_pins_rune)}
-				{/if}
-			</div>
+				{@render actions(true, trip.id, trip_pins_rune)}
+			{/if}
 		</div>
 	</div>
 {/if}

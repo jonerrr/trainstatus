@@ -127,7 +127,7 @@
 			.map((r) => r.id)}
 		{@const other_routes = stop_times.map((st) => st.route_id)}
 		{@const all_routes = [...new Set([...base_routes, ...other_routes])].map(
-			(id) => $page.data.routes.get(id) as Route
+			(id) => $page.data.routes[id] as Route
 		)}
 
 		{#key large}
@@ -190,7 +190,7 @@
 
 			<div class="flex flex-col">
 				{#each stop_routes as stop_route}
-					{@const route = $page.data.routes.get(stop_route.id) as Route}
+					{@const route = $page.data.routes[stop_route.id] as Route}
 					{@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)}
 					<div class="flex gap-2 items-center text-xs text-wrap text-left rounded p-1">
 						<Icon {route} link={false} express={false} />

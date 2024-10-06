@@ -5,7 +5,7 @@
 		monitored_routes,
 		type StopTime
 	} from '$lib/stop_times.svelte';
-	import type { Route, Stop, TrainStopData } from '$lib/static';
+	import { is_bus, type Route, type Stop, type TrainStopData } from '$lib/static';
 	import {
 		trips as rt_trips,
 		TripDirection,
@@ -45,7 +45,7 @@
 					return {
 						...st,
 						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-						last_stop: trip ? $page.data.stop_map.get(last_st!.stop_id)?.name : 'unknown',
+						last_stop: trip ? $page.data.stops[last_st!.stop_id].name : 'unknown',
 						trip
 					};
 				})
@@ -84,18 +84,19 @@
 	);
 </script>
 
-<div class="flex gap-1">
+<div class="flex gap-1 pb-1 items-center">
 	<!-- {#if large} -->
-
-	{#each stop.routes as route}
-		<Icon
-			width="1.5rem"
-			height="1.5rem"
-			express={false}
-			link={true}
-			route={$page.data.routes.get(route.id) as Route}
-		/>
-	{/each}
+	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
+		{#each stop.routes as route}
+			<Icon
+				width="1.5rem"
+				height="1.5rem"
+				express={false}
+				link={true}
+				route={$page.data.routes[route.id] as Route}
+			/>
+		{/each}
+	</div>
 
 	<div class="font-medium text-lg">
 		{stop.name}
@@ -107,7 +108,7 @@
 		<Button state={{ modal: 'trip', data: st.trip }}>
 			<div class="flex gap-2 items-center">
 				<div class="flex flex-col">
-					{#if stop.type === 'bus' && st.trip.data.passengers && st.trip.data.capacity}
+					{#if is_bus(stop) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
 					{/if}
 					<Icon
@@ -115,7 +116,7 @@
 						height="1.2rem"
 						express={st.trip.data.express}
 						link={false}
-						route={$page.data.routes.get(st.trip.route_id) as Route}
+						route={$page.data.routes[st.trip.route_id] as Route}
 					/>
 				</div>
 				<div class="flex flex-col" class:italic={stop.type === 'train' && !st.trip.data.assigned}>
@@ -153,6 +154,7 @@
 
 	{#snippet direction_tab(direction: TripDirection, name: string)}
 		<button
+			class="p-2"
 			class:bg-neutral-900={selected_direction.value === direction}
 			onclick={() => {
 				selected_direction.value = direction;
