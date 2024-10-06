@@ -39,9 +39,7 @@
 				.map((st) => {
 					const trip = rt_trips.trips.get(st.trip_id);
 					const last_st = rt_stop_times.stop_times.filter((st) => st.trip_id === trip?.id).pop();
-					// if (!trip) {
-					// 	$inspect(st);
-					// }
+
 					return {
 						...st,
 						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
@@ -58,7 +56,7 @@
 				.filter((st) => st.stop_id === stop.id)
 				.map((st) => {
 					const trip = rt_trips.trips.get(st.trip_id);
-					// for bus, we get last stop from route headsing bc stop times doesn't include all of the stops
+					// for bus, we get last stop from route headsign bc stop times doesn't include all of the stops
 
 					return {
 						...st,
