@@ -34,7 +34,7 @@
 > -->
 <div
 	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }}
-	class={`flex flex-col border-y border-neutral-800  divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
+	class={`flex flex-col max-h-[calc(60dvh)] border-y border-neutral-800 divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
 >
 	{@render children()}
 	<!-- {#each data as d}

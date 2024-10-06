@@ -10,15 +10,15 @@ declare global {
 		// maybe this should be maps
 		interface PageData {
 			routes: Map<string, Route>;
-			stops: Stop[];
+			stops: Stop<'bus' | 'train'>[];
+			stop_map: Map<number, Stop<'bus' | 'train'>>;
 		}
-		// TODO: maybe remove dialog_id
 		// <T extends string | number>
 		interface PageState {
 			// dialog_open: boolean;
 			// dialog_id: T;
 			// null is not open
-			dialog_type: 'stop' | 'trip' | 'route' | null;
+			modal: 'stop' | 'trip' | 'route' | null;
 			data?: Stop | Trip | Route;
 		}
 		// interface Platform {}
