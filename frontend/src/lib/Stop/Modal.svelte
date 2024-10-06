@@ -13,10 +13,11 @@
 		type TrainTripData,
 		type Trip
 	} from '$lib/trips.svelte';
+	import { persisted_rune } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
-	import { persisted_rune } from '$lib/util.svelte';
+	import BusCapacity from '$lib/BusCapacity.svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -85,6 +86,7 @@
 
 <div class="flex gap-1">
 	<!-- {#if large} -->
+
 	{#each stop.routes as route}
 		<Icon
 			width="1.5rem"
@@ -104,15 +106,32 @@
 	{#each selected_stop_times as st}
 		<Button state={{ modal: 'trip', data: st.trip }}>
 			<div class="flex gap-2 items-center">
-				<Icon
-					width="1rem"
-					height="1rem"
-					express={st.trip.data.express}
-					link={false}
-					route={$page.data.routes.get(st.trip.route_id) as Route}
-				/>
-				<div class="" class:italic={!st.trip.data.assigned}>
+				<div class="flex flex-col">
+					{#if stop.type === 'bus' && st.trip.data.passengers && st.trip.data.capacity}
+						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
+					{/if}
+					<Icon
+						width="1.2rem"
+						height="1.2rem"
+						express={st.trip.data.express}
+						link={false}
+						route={$page.data.routes.get(st.trip.route_id) as Route}
+					/>
+				</div>
+				<div class="flex flex-col" class:italic={stop.type === 'train' && !st.trip.data.assigned}>
+					{#if stop.type === 'bus' && Math.abs(st.trip.data.deviation) > 120}
+						<div
+							class={`text-xs ${st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}`}
+						>
+							{(st.trip.data.deviation / 60).toFixed(0)}m
+						</div>
+					{/if}
+
 					{st.eta.toFixed(0)}m
+
+					{#if st.trip.status === 'layover'}
+						<div class="text-neutral-400 text-xs">+Layover</div>
+					{/if}
 				</div>
 
 				<!-- {#if stops_away > 0}

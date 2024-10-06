@@ -24,6 +24,7 @@ export interface BusTripData {
 	bearing?: number;
 	passengers?: number;
 	capacity?: number;
+	deviation?: number;
 }
 
 export enum TripStatus {
