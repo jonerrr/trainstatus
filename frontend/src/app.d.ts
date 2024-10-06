@@ -9,9 +9,15 @@ declare global {
 		// interface Locals {}
 		// maybe this should be maps
 		interface PageData {
-			routes: Map<string, Route>;
-			stops: Stop<'bus' | 'train'>[];
-			stop_map: Map<number, Stop<'bus' | 'train'>>;
+			routes: {
+				[id: string]: Route;
+			};
+			// stops: Stop<'bus' | 'train'>[];
+			stops: {
+				[id: number]: Stop<'bus' | 'train'>;
+			};
+			bus_stops: Stop<'bus'>[];
+			train_stops: Stop<'train'>[];
 		}
 		// <T extends string | number>
 		interface PageState {

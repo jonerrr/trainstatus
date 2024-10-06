@@ -1,4 +1,4 @@
-import type { Route, Stop } from '$lib/static';
+import { is_bus, is_train, type Route, type Stop } from '$lib/static';
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ fetch }) => {
@@ -10,16 +10,31 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		routes_promise
 	]);
 
-	// put routes into a map
-	const route_map = new Map<string, Route>();
+	const routes_obj: {
+		[id: string]: Route;
+	} = {};
 	for (const route of routes) {
-		route_map.set(route.id, route);
+		routes_obj[route.id] = route;
 	}
 
-	const stop_map = new Map<number, Stop<'bus' | 'train'>>();
+	const stops_obj: {
+		[id: number]: Stop<'bus' | 'train'>;
+	} = {};
 	for (const stop of stops) {
-		stop_map.set(stop.id, stop);
+		stops_obj[stop.id] = stop;
 	}
 
-	return { stops, stop_map, routes: route_map };
+	const { bus_stops, train_stops } = stops.reduce(
+		(acc: { bus_stops: Stop<'bus'>[]; train_stops: Stop<'train'>[] }, stop) => {
+			if (is_bus(stop)) {
+				acc.bus_stops.push(stop);
+			} else if (is_train(stop)) {
+				acc.train_stops.push(stop);
+			}
+			return acc;
+		},
+		{ bus_stops: [], train_stops: [] }
+	);
+
+	return { stops, bus_stops, train_stops, routes: routes_obj };
 };

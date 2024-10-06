@@ -10,24 +10,10 @@
 	let search_worker: Worker;
 	let search = $state<'loading' | 'ready'>('loading');
 
-	let bus_stops = $state<Stop<'bus'>[]>([]);
-	let train_stops = $state<Stop<'train'>[]>([]);
+	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 20));
+	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 20));
 
 	$effect(() => {
-		const { all_bus_stops, all_train_stops } = $page.data.stops.reduce(
-			(acc, stop) => {
-				if (stop.type === 'bus') {
-					acc.all_bus_stops.push(stop);
-				} else if (stop.type === 'train') {
-					acc.all_train_stops.push(stop);
-				}
-				return acc;
-			},
-			{ all_bus_stops: [], all_train_stops: [] }
-		);
-		bus_stops = all_bus_stops;
-		train_stops = all_train_stops;
-
 		search_worker = new SearchWorker();
 
 		// listen for messages
@@ -98,7 +84,7 @@
 		<input
 			bind:this={search_el}
 			bind:value={search_term}
-			on:input={debounce(search_term)}
+			oninput={debounce(search_term)}
 			type="search"
 			placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
 			class="search-stops text-indigo-200 max-w-[calc(100dvw)] pl-10 z-20 w-full h-12 rounded bg-neutral-900 shadow-2xl border-neutral-800/20 ring-1 ring-inset ring-neutral-700 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
@@ -106,7 +92,7 @@
 		<button
 			aria-label="Clear search"
 			class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
-			on:click={clearSearch}
+			onclick={clearSearch}
 		>
 			<CircleX />
 		</button>
@@ -116,8 +102,8 @@
 <List
 	title="Stops"
 	button={stop_button}
-	bus_data={bus_stops.slice(0, 20)}
-	train_data={train_stops.slice(0, 20)}
+	bus_data={bus_stops}
+	train_data={train_stops}
 	class="mb-16"
 />
 

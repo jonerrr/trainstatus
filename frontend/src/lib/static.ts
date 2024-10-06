@@ -93,3 +93,11 @@ export interface TrainRouteStop {
 // 	FullTime = 'full_time',
 // 	PartTime = 'part_time'
 // }
+
+export const is_bus = (s: Stop<'bus' | 'train'>): s is Stop<'bus'> => {
+	return (s as Stop<'bus'>).type === 'bus';
+};
+
+export const is_train = (s: Stop<'bus' | 'train'>): s is Stop<'train'> => {
+	return (s as Stop<'train'>).type === 'train';
+};

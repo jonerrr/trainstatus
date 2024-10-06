@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { page } from '$app/stores';
-	import type { Stop } from '$lib/static';
+	import { is_bus, is_train, type Stop } from '$lib/static';
 	import { persisted_rune, haversine, stop_pins_rune } from '$lib/util.svelte';
 	// import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import List from '$lib/List.svelte';
@@ -19,25 +19,7 @@
 		location_status.value = 'loading';
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
-				const {
-					all_bus_stops,
-					all_train_stops
-				}: { all_bus_stops: Stop<'bus'>[]; all_train_stops: Stop<'train'>[] } =
-					$page.data.stops.reduce(
-						(acc, stop) => {
-							if (stop.type === 'bus') {
-								acc.all_bus_stops.push(stop);
-							} else if (stop.type === 'train') {
-								acc.all_train_stops.push(stop);
-							}
-							return acc;
-						},
-						{ all_bus_stops: [], all_train_stops: [] }
-					);
-
-				// console.log(all_bus_stops, all_train_stops, $page.data.stops);
-
-				nearby_train_stops = all_train_stops
+				nearby_train_stops = $page.data.train_stops
 					.map((stop: Stop<'train'>) => {
 						const distance = haversine(
 							position.coords.latitude,
@@ -50,7 +32,7 @@
 					.sort((a, b) => a.distance - b.distance)
 					.slice(0, 13);
 
-				nearby_bus_stops = all_bus_stops
+				nearby_bus_stops = $page.data.bus_stops
 					.map((stop: Stop<'bus'>) => {
 						const distance = haversine(
 							position.coords.latitude,
@@ -88,23 +70,35 @@
 	// const stop_pin_rune = persisted_rune<number[]>('stop_pins', []);
 
 	// const pinned_stops = $page.data.stops.filter(stop => stop_pin_rune.value.includes(stop.id));
-	const pinned_stops = $derived(
-		$page.data.stops.filter((stop) => stop_pins_rune.value.includes(stop.id))
+	const { pinned_bus_stops, pinned_train_stops } = $derived(
+		stop_pins_rune.value
+			.map((id) => $page.data.stops[id])
+			.reduce(
+				(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
+					if (is_bus(stop)) {
+						acc.pinned_bus_stops.push(stop);
+					} else if (is_train(stop)) {
+						acc.pinned_train_stops.push(stop);
+					}
+					return acc;
+				},
+				{ pinned_bus_stops: [], pinned_train_stops: [] }
+			)
 	);
 	// use reduced to get pinned bus stops and train stops
-	const { pinned_bus_stops, pinned_train_stops } = $derived.by(() => {
-		return pinned_stops.reduce(
-			(acc, stop) => {
-				if (stop.type === 'bus') {
-					acc.pinned_bus_stops.push(stop);
-				} else if (stop.type === 'train') {
-					acc.pinned_train_stops.push(stop);
-				}
-				return acc;
-			},
-			{ pinned_bus_stops: [], pinned_train_stops: [] }
-		);
-	});
+	// const { pinned_bus_stops, pinned_train_stops } = $derived(
+	// 	pinned_stops.reduce(
+	// 		(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
+	// 			if (is_bus(stop)) {
+	// 				acc.pinned_bus_stops.push(stop);
+	// 			} else if (is_train(stop)) {
+	// 				acc.pinned_train_stops.push(stop);
+	// 			}
+	// 			return acc;
+	// 		},
+	// 		{ pinned_bus_stops: [], pinned_train_stops: [] }
+	// 	)
+	// );
 </script>
 
 {#snippet locate_button()}
@@ -132,7 +126,7 @@
 	<StopButton {stop} pin_rune={stop_pins_rune} {large} />
 {/snippet}
 
-{#if pinned_stops.length}
+{#if stop_pins_rune.value.length}
 	<List
 		title="Pinned stops"
 		button={stop_button}
