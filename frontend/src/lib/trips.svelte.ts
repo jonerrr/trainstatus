@@ -1,3 +1,4 @@
+import { SvelteMap } from 'svelte/reactivity';
 import type { Stop } from './static';
 
 export interface Trip<T extends TripData> {
@@ -50,12 +51,12 @@ type Fetch = typeof fetch;
 
 export function createTrips() {
 	// let trips: Trip<TripData>[] = $state([]);
-	let trips = $state(new Map<string, Trip<TripData>>());
+	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	async function update(fetch: Fetch) {
 		const data: Trip<TripData>[] = await (await fetch('/api/trips')).json();
 
-		trips = new Map(
+		trips = new SvelteMap(
 			data.map((trip: Trip<TripData>) => [
 				trip.id,
 				{

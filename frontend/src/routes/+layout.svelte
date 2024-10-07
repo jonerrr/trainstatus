@@ -51,6 +51,13 @@
 		}
 	});
 
+	$effect.pre(() => {
+		if (monitored_routes.length > 20) {
+			console.log('removing routes');
+			monitored_routes.shift();
+		}
+	});
+
 	$effect(() => {
 		if (monitored_routes.sort().toString() !== last_monitored_routes) {
 			// this would make the effect go into an infinite loop

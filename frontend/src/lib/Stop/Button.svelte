@@ -31,39 +31,43 @@
 	let { stop, pin_rune = $bindable(), large }: ButtonProps = $props();
 
 	// if stop is a bus stop, add all routes to monitored_routes
-	// $effect(() => {
-	// 	if (is_bus(stop)) {
-	// 		for (const route of stop.routes) {
-	// 			if (!monitored_routes.includes(route.id)) {
-	// 				console.log('Adding route', route.id);
-	// 				if (monitored_routes.length > 20) {
-	// 					console.log('Removing oldest route');
-	// 					monitored_routes.shift();
-	// 				}
-	// 				monitored_routes.push(route.id);
-	// 			}
-	// 		}
-	// 	}
-	// });
-
-	// TODO: figure out why it causes an infinite loop (seems to happen after clearing search with 20 routes)
 	$effect(() => {
 		if (is_bus(stop)) {
-			const to_monitor = stop.routes
-				.filter((route) => !monitored_routes.includes(route.id))
-				.map((r) => r.id);
-			if (to_monitor.length) {
-				// remove routes if we're monitoring more than 20
-				if (monitored_routes.length + to_monitor.length > 20) {
-					console.log('removing routes');
-					monitored_routes.splice(0, monitored_routes.length + to_monitor.length - 20);
-				}
+			for (const route of stop.routes) {
+				console.log('adding route', route.id);
+				// monitored_routes.add(route.id);
 
-				console.log('Adding routes', to_monitor);
-				monitored_routes.push(...to_monitor);
+				// if (monitored_routes.size > )
+				if (!monitored_routes.includes(route.id)) {
+					console.log('Adding route', route.id);
+					// if (monitored_routes.length > 20) {
+					// 	console.log('Removing oldest route');
+					// 	monitored_routes.shift();
+					// }
+					monitored_routes.push(route.id);
+				}
 			}
 		}
 	});
+
+	// TODO: figure out why it causes an infinite loop (seems to happen after clearing search with 20 routes)
+	// $effect(() => {
+	// 	if (is_bus(stop)) {
+	// 		const to_monitor = stop.routes
+	// 			.filter((route) => !monitored_routes.includes(route.id))
+	// 			.map((r) => r.id);
+	// 		if (to_monitor.length) {
+	// 			// remove routes if we're monitoring more than 20
+	// 			if (monitored_routes.length + to_monitor.length > 20) {
+	// 				console.log('removing routes');
+	// 				monitored_routes.splice(0, monitored_routes.length + to_monitor.length - 20);
+	// 			}
+
+	// 			console.log('Adding routes', to_monitor);
+	// 			monitored_routes.push(...to_monitor);
+	// 		}
+	// 	}
+	// });
 
 	let stop_times = $derived(
 		rt_stop_times.stop_times
