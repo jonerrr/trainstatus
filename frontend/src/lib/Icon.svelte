@@ -21,26 +21,28 @@
 </script>
 
 {#if route.route_type === 'bus'}
-	<button
+	<div
+		role={link ? 'button' : undefined}
 		style:background-color={`#${route.color}`}
 		class="p-1 text-indigo-100 rounded font-bold shadow-2xl"
 		onclick={() => {
-			pushState('', { modal: 'route', data: route });
+			if (link) pushState('', { modal: 'route', data: route });
 		}}
 	>
 		{route.short_name}
-	</button>
+	</div>
 {:else}
 	{@const icon_name = express ? route.id + 'X' : route.id}
 	{@const icon = icons.find((i) => i.name === icon_name)!}
-	<button
+	<div
+		role={link ? 'button' : undefined}
 		class="appearance-none"
 		onclick={() => {
-			pushState('', { modal: 'route', data: route });
+			if (link) pushState('', { modal: 'route', data: route });
 		}}
 	>
 		<svg class={className} {width} {height} viewBox="0 0 90 90">
 			{@html icon.svg}
 		</svg>
-	</button>
+	</div>
 {/if}

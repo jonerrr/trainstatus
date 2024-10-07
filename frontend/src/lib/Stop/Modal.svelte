@@ -26,23 +26,45 @@
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
+	import { pushState } from '$app/navigation';
 
 	interface ModalProps {
 		show_previous: boolean;
 		stop: Stop<'bus' | 'train'>;
 	}
 
+	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
+
 	// TODO: this probably doesn't needed to be binded
-	let { stop = $bindable(), show_previous = $bindable() }: ModalProps = $props();
+	let { stop, show_previous }: ModalProps = $props();
 
 	// if stop is a bus stop, add all routes to monitored_routes
-	$effect.pre(() => {
+	$effect(() => {
 		if (is_bus_stop(stop)) {
-			for (const route of stop.routes) {
-				if (!monitored_routes.includes(route.id)) {
-					monitored_routes.push(route.id);
+			const to_monitor = stop.routes
+				.filter((route) => !monitored_routes.includes(route.id))
+				.map((r) => r.id);
+			if (to_monitor.length) {
+				// remove routes if we're monitoring more than 20
+				if (monitored_routes.length + to_monitor.length > 20) {
+					console.log('removing routes');
+					monitored_routes.splice(0, monitored_routes.length + to_monitor.length - 20);
 				}
+
+				console.log('Adding routes', to_monitor);
+				monitored_routes.push(...to_monitor);
 			}
+
+			// for (const route of stop.routes) {
+			// 	if (!monitored_routes.includes(route.id)) {
+			// 		console.log('Adding route', route.id);
+			// 		if (monitored_routes.length > 20) {
+			// 			console.log('Removing oldest route');
+			// 			monitored_routes.shift();
+			// 		}
+			// 		monitored_routes.push(route.id);
+			// 	}
+			// }
 		}
 	});
 
@@ -104,7 +126,7 @@
 	);
 </script>
 
-<div class="flex gap-1 pb-1 items-center">
+<div class="flex gap-1 items-center pb-1">
 	<!-- {#if large} -->
 	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
 		{#each stop.routes as route}
@@ -123,6 +145,33 @@
 	</div>
 </div>
 
+{#if is_train_stop(stop) && stop.data.transfers.length}
+	<div class="flex gap-1 items-center pb-1">
+		<div>Transfers:</div>
+		{#each stop.data.transfers as transfer}
+			{@const transfer_stop = $page.data.stops[transfer] as Stop<'train'>}
+			<button
+				class="flex gap-1 rounded border border-neutral-400 shadow-2xl active:border-neutral-700 hover:border-neutral-700"
+				onclick={() =>
+					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
+			>
+				{#each transfer_stop.routes as route}
+					<Icon
+						width="1.5rem"
+						height="1.5rem"
+						express={false}
+						link={false}
+						route={$page.data.routes[route.id]}
+					/>
+				{/each}
+			</button>
+		{/each}
+	</div>
+{/if}
+
+{#if !selected_stop_times.length}
+	<div class="text-neutral-400 text-center font-semibold">No upcoming trips</div>
+{/if}
 <ModalList>
 	{#each selected_stop_times as st}
 		<Button state={{ modal: 'trip', data: st.trip }}>
@@ -177,6 +226,7 @@
 		<button
 			class="p-2"
 			class:bg-neutral-900={selected_direction.value === direction}
+			class:text-neutral-400={selected_direction.value !== direction}
 			onclick={() => {
 				selected_direction.value = direction;
 			}}

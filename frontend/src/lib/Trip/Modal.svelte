@@ -24,16 +24,20 @@
 
 	const { trip, show_previous = $bindable() }: ModalProps = $props();
 
-	// if stop is a bus stop, add all routes to monitored_routes
-	// 	$effect.pre(() => {
-	// 	if (is_bus(stop)) {
-	// 		for (const route of stop.routes) {
-	// 			if (!monitored_routes.includes(route.id)) {
-	// 				monitored_routes.push(route.id);
-	// 			}
-	// 		}
-	// 	}
-	// });
+	// should this be in $derived?
+	const route = $page.data.routes[trip.route_id];
+
+	// if bus trip, add to monitored routes
+	$effect(() => {
+		if (route.route_type === 'bus') {
+			if (!monitored_routes.includes(route.id)) {
+				if (monitored_routes.length > 20) {
+					monitored_routes.shift();
+				}
+				monitored_routes.push(route.id);
+			}
+		}
+	});
 </script>
 
 <div class="flex gap-1 p-1">

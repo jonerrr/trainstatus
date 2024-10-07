@@ -6,6 +6,7 @@
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import SearchWorker from './search_worker?worker';
 	import { CircleX } from 'lucide-svelte';
+	import { untrack } from 'svelte';
 
 	let search_worker: Worker;
 	let search = $state<'loading' | 'ready'>('loading');
@@ -16,6 +17,7 @@
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
 	$effect(() => {
+		console.log('init search worker');
 		search_worker = new SearchWorker();
 
 		// listen for messages
@@ -43,7 +45,7 @@
 		});
 	});
 
-	let search_el: HTMLInputElement;
+	// let search_el: HTMLInputElement;
 	let search_term: string = $state('');
 
 	function clear_search() {
@@ -67,6 +69,18 @@
 			payload: { search_term, search_type: selected_tab.value }
 		});
 	}
+
+	// $effect(() => {
+	// 	untrack(() => search_term);
+
+	// 	if (search === 'ready' && search_term !== '') {
+	// 		console.log('tab changed');
+	// 		search_worker.postMessage({
+	// 			type: 'search',
+	// 			payload: { search_term, search_type: selected_tab.value }
+	// 		});
+	// 	}
+	// });
 
 	// from https://www.okupter.com/blog/svelte-debounce
 	function debounce(callback: Function, wait = 200) {
@@ -96,7 +110,6 @@
 
 <div class="absolute bottom-0 w-full">
 	<input
-		bind:this={search_el}
 		bind:value={search_term}
 		oninput={debounce(search_stops)}
 		type="search"

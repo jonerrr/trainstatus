@@ -158,7 +158,7 @@
 			{#if $page.state.modal === 'stop'}
 				<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
 
-				<StopModal bind:show_previous bind:stop={$page.state.data} />
+				<StopModal {show_previous} stop={$page.state.data} />
 
 				{@render actions(true, $page.state.data.id, stop_pins_rune)}
 			{:else if $page.state.modal === 'route'}
