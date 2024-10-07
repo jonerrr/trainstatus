@@ -12,8 +12,28 @@
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 
+	const { pinned_bus_stops, pinned_train_stops } = $derived(
+		stop_pins_rune.value
+			.map((id) => $page.data.stops[id])
+			.reduce(
+				(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
+					if (is_bus(stop)) {
+						acc.pinned_bus_stops.push(stop);
+					} else if (is_train(stop)) {
+						acc.pinned_train_stops.push(stop);
+					}
+					return acc;
+				},
+				{ pinned_bus_stops: [], pinned_train_stops: [] }
+			)
+	);
+
 	let nearby_train_stops = $state<Stop<'train'>[]>([]);
 	let nearby_bus_stops = $state<Stop<'bus'>[]>([]);
+
+	// $effect(() => {
+
+	// })
 
 	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
@@ -66,22 +86,6 @@
 	if (location_status.value === 'granted' || location_status.value === 'loading') {
 		get_nearby_stops();
 	}
-
-	const { pinned_bus_stops, pinned_train_stops } = $derived(
-		stop_pins_rune.value
-			.map((id) => $page.data.stops[id])
-			.reduce(
-				(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
-					if (is_bus(stop)) {
-						acc.pinned_bus_stops.push(stop);
-					} else if (is_train(stop)) {
-						acc.pinned_train_stops.push(stop);
-					}
-					return acc;
-				},
-				{ pinned_bus_stops: [], pinned_train_stops: [] }
-			)
-	);
 </script>
 
 <!-- TODO: better initial loading animation -->

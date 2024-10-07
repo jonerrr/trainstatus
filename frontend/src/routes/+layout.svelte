@@ -16,7 +16,7 @@
 	let last_update = $state<Date>(new Date());
 	let last_monitored_routes = $state<string>('');
 
-	$inspect(monitored_routes);
+	// $inspect(monitored_routes);
 
 	onMount(async () => {
 		// TODO: error handling
@@ -53,22 +53,24 @@
 
 	$effect(() => {
 		if (monitored_routes.sort().toString() !== last_monitored_routes) {
-			// if there are more than 20 routes, remove the oldest
-			if (monitored_routes.length > 20) {
-				monitored_routes.shift();
-			}
+			// this would make the effect go into an infinite loop
+			// if (monitored_routes.length > 20) {
+			// 	console.log('Removing oldest route');
+			// 	monitored_routes.shift();
+			// }
+			console.log('updating stop times bc monitored routes changed');
 			// might be an issue bc async
 			stop_times.update(fetch, monitored_routes);
 			last_monitored_routes = monitored_routes.sort().toString();
 			last_update = new Date();
 		}
 
-		const interval = setInterval(async () => {
+		const interval = setInterval(() => {
 			// TODO: update more often if offline
 			// TODO: exponential backoff
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
 				console.log('Updating rt data');
-				await Promise.all([trips.update(fetch), stop_times.update(fetch, monitored_routes)]);
+				Promise.all([trips.update(fetch), stop_times.update(fetch, monitored_routes)]);
 				// trips.update();
 				// stop_times.update(monitored_routes);
 				last_update = new Date();
