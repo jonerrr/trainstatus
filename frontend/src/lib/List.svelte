@@ -18,6 +18,8 @@
 		train_data: T[];
 		// control height of list by number of items
 		min_items?: number;
+		// watch for monitored routes changes
+		monitor_routes?: boolean;
 		class?: string;
 		// scroll list into view if theres less than 8 items
 		auto_scroll?: boolean;
@@ -33,6 +35,7 @@
 			persisted_rune<'train' | 'bus'>(`${title.toLocaleLowerCase()}_tab`, 'train')
 		),
 		min_items,
+		monitor_routes = false,
 		class: class_name,
 		auto_scroll = false
 	}: ListProps = $props();
@@ -51,24 +54,26 @@
 		});
 	}
 
-	function item_heights() {
-		const list_items = Array.from(list_div!.querySelectorAll('#list-item')).slice(
-			0,
-			min_items
-		) as HTMLDivElement[];
+	function get_items() {
+		const list_items = Array.from(list_div!.querySelectorAll('.list-item')) as HTMLDivElement[];
 		// start with 5 prevents scrollbars
-		list_height = list_items.reduce((h, e) => e.offsetHeight + h, 5);
+		if (min_items)
+			list_height = list_items.slice(0, min_items).reduce((h, e) => e.offsetHeight + h, 5);
+
+		// if (monitor_routes)
+		// const bus_routes = list_items.filter((i) => i.id)
 	}
 
 	if (min_items) {
 		$effect(() => {
 			// initial height calculation
-			item_heights();
+			if (min_items) get_items();
 
 			// whenever list changes, recalculate height
 			const observer = new MutationObserver(() => {
 				console.log('list mutation');
-				item_heights();
+				// if (min_items)
+				get_items();
 			});
 			const config = { childList: true, subtree: true };
 			observer.observe(list_div!, config);

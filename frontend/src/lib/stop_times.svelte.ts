@@ -1,3 +1,5 @@
+import { SvelteSet } from 'svelte/reactivity';
+
 export interface StopTime<T = never, D = never, R = never> {
 	trip_id: string;
 	stop_id: number;
@@ -53,7 +55,3 @@ export function createStopTimes() {
 
 export const stop_times = createStopTimes();
 export const monitored_routes = $state<string[]>([]);
-
-export function stop_arrivals(times: StopTime[], stop_id: number) {
-	return times.filter((time) => time.stop_id === stop_id);
-}

@@ -73,8 +73,8 @@ impl Position {
         let updated_ats = values.iter().map(|v| v.updated_at).collect::<Vec<_>>();
         let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
 
-        match values[0].data {
-            PositionData::Train => {
+        match values.first().map(|p| &p.data) {
+            Some(PositionData::Train) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status)
@@ -88,13 +88,13 @@ impl Position {
                     &statuses as &[Status],
                 ).execute(pool).await?;
             }
-            PositionData::Bus {
+            Some(PositionData::Bus {
                 lat: _,
                 lon: _,
                 bearing: _,
                 // passengers: _,
                 // capacity: _,
-            } => {
+            }) => {
                 let mut lats = vec![];
                 let mut lons = vec![];
                 let mut bearings = vec![];
@@ -138,6 +138,7 @@ impl Position {
                     // &capacities as &[Option<i32>]
                 ).execute(pool).await?;
             }
+            None => tracing::warn!("No positions to insert"),
         };
 
         Ok(())

@@ -12,7 +12,7 @@ use crate::{
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
-use tokio::sync::RwLock;
+// use tokio::sync::RwLock;
 use uuid::Uuid;
 
 // pub
@@ -97,7 +97,9 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     }
                 }
             }
-            let (found, changed) = trip.find(pool).await.unwrap_or_else(|e| {
+            // if trip is found, then the id is replaced with the existing one in the DB
+            // TODO: remove changed or something
+            let (_found, _changed) = trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
                 (false, true)
             });

@@ -10,16 +10,18 @@
 	// export let state: App.PageState;
 	let {
 		state,
+		id,
 		pin_rune = $bindable(),
 		children
 	}: {
 		state: App.PageState;
+		id?: string;
 		pin_rune?: PersistedRune<T[]>;
 		children: Snippet;
 	} = $props();
 </script>
 
-<div id="list-item" class="relative w-full">
+<div {id} class="relative w-full list-item">
 	<button
 		class="w-full flex justify-between items-center py-1 hover:bg-neutral-900 active:bg-neutral-900"
 		transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
