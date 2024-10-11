@@ -281,6 +281,8 @@ impl Alert {
             .iter()
             .map(|a| a.display_before_active)
             .collect::<Vec<_>>();
+        // add last_in_feed as utc::now for each alert
+        let last_in_feed = values.iter().map(|_| Utc::now()).collect::<Vec<_>>();
 
         sqlx::query!(r#"
         INSERT INTO alert (
@@ -293,6 +295,7 @@ impl Alert {
             description_html,
             created_at,
             updated_at,
+            last_in_feed,
             display_before_active
         )
         SELECT
@@ -305,8 +308,9 @@ impl Alert {
             unnest($7::text[]),
             unnest($8::timestamptz[]),
             unnest($9::timestamptz[]),
-            unnest($10::int[])
-        ON CONFLICT (id) DO UPDATE SET alert_type = EXCLUDED.alert_type, header_plain = EXCLUDED.header_plain, header_html = EXCLUDED.header_html, description_plain = EXCLUDED.description_plain, description_html = EXCLUDED.description_html, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, display_before_active = EXCLUDED.display_before_active
+            unnest($10::timestamptz[]),
+            unnest($11::int[])
+        ON CONFLICT (id) DO UPDATE SET alert_type = EXCLUDED.alert_type, header_plain = EXCLUDED.header_plain, header_html = EXCLUDED.header_html, description_plain = EXCLUDED.description_plain, description_html = EXCLUDED.description_html, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, last_in_feed = EXCLUDED.last_in_feed, display_before_active = EXCLUDED.display_before_active
         "#,
         &ids,
         &mta_ids,
@@ -317,6 +321,7 @@ impl Alert {
         &description_htmls as &[Option<String>],
         &created_ats,
         &updated_ats,
+        &last_in_feed,
         &display_before_actives)
         .execute(&mut **tx)
         .await?;
@@ -354,6 +359,7 @@ impl Alert {
             LEFT JOIN affected_entity ae ON
                 a.id = ae.alert_id
             WHERE
+                a.last_in_feed >= $1 - INTERVAL '5 minutes' AND
                 ae.route_id IS NOT NULL
                 AND ap.start_time <= now()
                 AND (ap.end_time >= now()

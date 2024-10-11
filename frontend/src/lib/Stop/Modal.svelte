@@ -27,7 +27,7 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import { pushState } from '$app/navigation';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -133,8 +133,7 @@
 	);
 </script>
 
-<div class="flex gap-1 items-center pb-1">
-	<!-- {#if large} -->
+<div class="flex gap-1 items-center p-1">
 	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
 		{#each stop.routes as route}
 			<Icon
@@ -187,7 +186,7 @@
 					{#if is_bus(stop, st.trip) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
 					{/if}
-					{st.trip.vehicle_id}
+					<!-- {st.trip.vehicle_id} -->
 					<Icon
 						width="1.2rem"
 						height="1.2rem"

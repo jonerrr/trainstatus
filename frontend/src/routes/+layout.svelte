@@ -9,19 +9,22 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
+	import { alerts } from '$lib/alerts.svelte';
 	// import { LoaderCircle } from 'lucide-svelte';
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
-	// let last_monitored_routes = $state<string>('');
+	let last_monitored_routes = $state<string>('');
 
 	// $inspect(monitored_routes);
 
 	onMount(async () => {
 		// TODO: error handling
-		await data.initial_promise;
+
+		// await data.initial_promise;
+		// console.log('initial promise resolved');
 
 		const id = $page.url.searchParams.get('d');
 		// console.log(id);
@@ -41,7 +44,9 @@
 					data: $page.data.stops[parseInt(id)]
 				});
 			} else if (trips.trips.has(id)) {
+				// console.log('creating trip modal');
 				await tick();
+
 				pushState('', {
 					modal: 'trip',
 					data: trips.trips.get(id)
@@ -50,6 +55,10 @@
 				console.error('Invalid id', id);
 			}
 		}
+
+		page.subscribe((val) => {
+			console.log(val.state);
+		});
 	});
 
 	const monitored_routes_arr = $derived(
@@ -60,8 +69,10 @@
 
 	$effect(() => {
 		// const routes = Array.from(monitored_routes.values()).flatMap((r) => r.map((id) => id));
+		if (monitored_routes_arr.join(',') === last_monitored_routes) return;
 		console.log('updating stop times', monitored_routes_arr);
 		stop_times.update(fetch, monitored_routes_arr);
+		last_monitored_routes = monitored_routes_arr.join(',');
 		last_st_update = new Date();
 	});
 
@@ -72,6 +83,7 @@
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
 				console.log('Updating rt data');
 				trips.update(fetch);
+				alerts.update(fetch);
 
 				last_update = new Date();
 			}
@@ -80,6 +92,7 @@
 				console.log('Updating stop times');
 				stop_times.update(fetch, monitored_routes_arr);
 				last_st_update = new Date();
+				last_monitored_routes = monitored_routes_arr.join(',');
 			}
 		}, 200);
 
@@ -90,8 +103,9 @@
 </script>
 
 <Header />
-<Modal />
 <main class="md:w-[60%] m-auto relative h-[calc(100dvh-7.5rem)]">
+	<Modal />
+
 	<!-- {#await data.initial_promise}
 		<div class="text-neutral-50 text-4xl flex justify-center">
 			<LoaderCircle size="4rem" class="animate-spin" />

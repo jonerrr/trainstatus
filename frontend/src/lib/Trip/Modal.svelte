@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ArrowBigRight } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import {
 		stop_times as rt_stop_times,
@@ -7,6 +8,9 @@
 	} from '$lib/stop_times.svelte';
 	import type { Route, Stop } from '$lib/static';
 	import {
+		is_bus,
+		is_bus_route,
+		is_train_route,
 		trips as rt_trips,
 		TripDirection,
 		type BusTripData,
@@ -16,42 +20,101 @@
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
+	import { onMount } from 'svelte';
+	import BusCapacity from '$lib/BusCapacity.svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
 		trip: Trip<TrainTripData | BusTripData>;
 	}
 
-	const { trip, show_previous = $bindable() }: ModalProps = $props();
+	const { trip, show_previous }: ModalProps = $props();
 
 	// should this be in $derived?
 	const route = $page.data.routes[trip.route_id];
 
-	// if bus trip, add to monitored routes
-	// $effect(() => {
-	// 	if (route.route_type === 'bus') {
-	// 		if (!monitored_routes.includes(route.id)) {
-	// 			if (monitored_routes.length > 20) {
-	// 				monitored_routes.shift();
-	// 			}
-	// 			monitored_routes.push(route.id);
-	// 		}
-	// 	}
-	// });
+	onMount(() => {
+		if (is_bus_route(route, trip)) {
+			const current_monitored_routes = monitored_routes.get('modal') || [];
+
+			current_monitored_routes.push(route.id);
+			monitored_routes.set('modal', current_monitored_routes.slice(-20));
+		}
+	});
+
+	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
+
+	const last_stop = $derived.by(() => {
+		if (is_bus_route(route, trip) && stop_times.length) {
+			// TODO: get actual last stop instead of headsign
+			// get stop in the direction of trip and get headsign
+			const stop = $page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
+			return stop.routes.find((r) => r.id === route.id)!.headsign;
+		} else {
+			const last_st = stop_times[stop_times.length - 1];
+			return $page.data.stops[last_st.stop_id].name;
+		}
+	});
 </script>
 
-<div class="flex gap-1 p-1">
-	<!-- {#if large} -->
+<div class="flex gap-1 items-center p-1">
+	<div class="flex flex-col gap-1 items-center">
+		{#if is_bus_route(route, trip) && trip.data.passengers && trip.data.capacity}
+			<BusCapacity passengers={trip.data.passengers} capacity={trip.data.capacity} />
+		{/if}
 
-	<div class="font-medium text-lg">
-		{trip.id}
+		<Icon
+			width="1.5rem"
+			height="1.5rem"
+			express={is_train_route(route, trip) && trip.data.express}
+			link={true}
+			{route}
+		/>
 	</div>
 
-	<!-- <ModalList>
-		{#each stop_times as st}
-			<Button state={{ dialog_type: 'trip', data: st.trip }}>
-				<div class="flex items-center"></div>
-			</Button>
-		{/each}
-	</ModalList> -->
+	<ArrowBigRight class="w-8" />
+
+	<div class="font-medium text-lg">
+		{last_stop}
+	</div>
 </div>
+
+<!-- <div class="text-left">
+		{stop.name}
+		{#if stop_time.stop_id === stop_id}
+			<span class="text-indigo-400 text-xs">
+				{#if train_status === TrainStatus.AtStop}
+					(at stop)
+				{:else if train_status === TrainStatus.InTransitTo}
+					(approaching)
+				{:else if train_status === TrainStatus.Incoming}
+					(arriving)
+				{/if}
+			</span>
+		{/if}
+	</div>
+	{#if stop_time.arrival > new Date()}
+		<div class={`text-right`}>
+			{stop_time.arrival.toLocaleTimeString()}
+		</div>
+	{:else}
+		<div class={`text-right text-neutral-400`}>
+			{stop_time.arrival.toLocaleTimeString()}
+		</div>
+	{/if} -->
+
+<ModalList>
+	{#each stop_times as st}
+		{@const stop = $page.data.stops[st.stop_id]}
+
+		<Button state={{ modal: 'stop', data: stop }}>
+			<div class="text-left">
+				{stop.name}
+			</div>
+
+			<div>
+				{st.arrival.toLocaleTimeString()}
+			</div>
+		</Button>
+	{/each}
+</ModalList>
