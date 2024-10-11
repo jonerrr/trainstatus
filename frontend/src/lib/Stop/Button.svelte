@@ -34,7 +34,7 @@
 	$effect(() => {
 		if (is_bus(stop)) {
 			for (const route of stop.routes) {
-				console.log('adding route', route.id);
+				// console.log('adding route', route.id);
 				// monitored_routes.add(route.id);
 
 				// if (monitored_routes.size > )
