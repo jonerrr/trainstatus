@@ -14,6 +14,7 @@
 	let { children, data } = $props();
 
 	let last_update = $state<Date>(new Date());
+	let last_st_update = $state<Date>(new Date());
 	let last_monitored_routes = $state<string>('');
 
 	// $inspect(monitored_routes);
@@ -23,7 +24,7 @@
 		await data.initial_promise;
 
 		const id = $page.url.searchParams.get('d');
-		console.log(id);
+		// console.log(id);
 		if (id) {
 			// check what type of id it is
 			if (id in $page.data.routes) {
@@ -51,11 +52,25 @@
 		}
 	});
 
-	$effect.pre(() => {
-		if (monitored_routes.length > 20) {
-			console.log('removing routes');
-			monitored_routes.shift();
-		}
+	// $effect.pre(() => {
+	// if (monitored_routes.length > 20) {
+	// 	console.log('removing routes');
+	// 	monitored_routes.shift();
+	// }
+	// });
+
+	$effect(() => {
+		const interval = setInterval(() => {
+			if (monitored_routes.length > 30) {
+				// $state.snapshot(monitored_routes);
+				console.log('removing routes', monitored_routes);
+				monitored_routes.shift();
+			}
+		}, 500);
+
+		return () => {
+			clearInterval(interval);
+		};
 	});
 
 	$effect(() => {
@@ -67,9 +82,13 @@
 			// }
 			console.log('updating stop times bc monitored routes changed');
 			// might be an issue bc async
-			stop_times.update(fetch, monitored_routes);
+			stop_times.update(fetch, monitored_routes.slice(0, 30));
+			// .then(() => {
+			last_st_update = new Date();
 			last_monitored_routes = monitored_routes.sort().toString();
-			last_update = new Date();
+			// });
+			// last_monitored_routes = monitored_routes.sort().toString();
+			// last_update = new Date();
 		}
 
 		const interval = setInterval(() => {
@@ -77,10 +96,22 @@
 			// TODO: exponential backoff
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
 				console.log('Updating rt data');
-				Promise.all([trips.update(fetch), stop_times.update(fetch, monitored_routes)]);
+				trips.update(fetch);
+				// Promise.all([trips.update(fetch), stop_times.update(fetch, monitored_routes)]);
+				// .then(() => {
+				// 	last_update = new Date();
+				// });
 				// trips.update();
 				// stop_times.update(monitored_routes);
 				last_update = new Date();
+			}
+
+			if (new Date().getTime() - last_st_update.getTime() > 1000 * 60) {
+				console.log('Updating stop times');
+				stop_times.update(fetch, monitored_routes.slice(0, 30));
+				// .then(() => {
+				last_st_update = new Date();
+				// });
 			}
 		}, 200);
 

@@ -17,8 +17,10 @@
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
 	$effect(() => {
-		console.log('init search worker');
-		search_worker = new SearchWorker();
+		if (!search_worker) {
+			console.log('init search worker');
+			search_worker = new SearchWorker();
+		}
 
 		// listen for messages
 		search_worker.addEventListener('message', (e) => {
