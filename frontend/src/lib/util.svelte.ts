@@ -21,6 +21,7 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 
 export interface PersistedRune<T> {
 	value: T;
+	// key: string;
 	reset: () => void;
 }
 
@@ -73,6 +74,9 @@ export function persisted_rune<T>(key: string, init_value: T) {
 		get value() {
 			return state;
 		},
+		// get key() {
+		// 	return key;
+		// },
 		set value(newValue: T) {
 			state = newValue;
 		},

@@ -109,8 +109,8 @@
 	</button>
 {/snippet}
 
-{#snippet stop_button(stop: Stop<'bus' | 'train'>, large: boolean)}
-	<StopButton {stop} pin_rune={stop_pins_rune} {large} />
+{#snippet stop_button(stop: Stop<'bus' | 'train'>)}
+	<StopButton {stop} pin_rune={stop_pins_rune} />
 {/snippet}
 
 {#if stop_pins_rune.value.length}
@@ -120,6 +120,7 @@
 		bus_data={pinned_bus_stops}
 		train_data={pinned_train_stops}
 		min_items={2}
+		monitor_routes
 	/>
 {/if}
 
@@ -130,4 +131,5 @@
 	train_data={nearby_train_stops}
 	{locate_button}
 	class="mb-16"
+	monitor_routes
 />

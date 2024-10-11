@@ -18,20 +18,20 @@
 
 <div>
 	{#if direction === 'SW'}
-		<ArrowDownLeft size={16} />
+		<ArrowDownLeft size="1.5rem" />
 	{:else if direction === 'S'}
-		<ArrowDown size={16} />
+		<ArrowDown size="1.5rem" />
 	{:else if direction === 'SE'}
-		<ArrowDownRight size={16} />
+		<ArrowDownRight size="1.5rem" />
 	{:else if direction === 'E'}
-		<ArrowRight size={16} />
+		<ArrowRight size="1.5rem" />
 	{:else if direction === 'W'}
-		<ArrowLeft size={16} />
+		<ArrowLeft size="1.5rem" />
 	{:else if direction === 'NW'}
-		<ArrowUpLeft size={16} />
+		<ArrowUpLeft size="1.5rem" />
 	{:else if direction === 'NE'}
-		<ArrowUpRight size={16} />
+		<ArrowUpRight size="1.5rem" />
 	{:else if direction === 'N'}
-		<ArrowUp size={16} />
+		<ArrowUp size="1.5rem" />
 	{/if}
 </div>
