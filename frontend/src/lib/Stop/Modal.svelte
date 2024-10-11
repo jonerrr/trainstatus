@@ -39,34 +39,20 @@
 	let { stop, show_previous }: ModalProps = $props();
 
 	// if stop is a bus stop, add all routes to monitored_routes
-	// $effect(() => {
-	// 	if (is_bus_stop(stop)) {
-	// 		const to_monitor = stop.routes
-	// 			.filter((route) => !monitored_routes.includes(route.id))
-	// 			.map((r) => r.id);
-	// 		if (to_monitor.length) {
-	// 			// remove routes if we're monitoring more than 20
-	// 			if (monitored_routes.length + to_monitor.length > 20) {
-	// 				console.log('removing routes');
-	// 				monitored_routes.splice(0, monitored_routes.length + to_monitor.length - 20);
-	// 			}
-
-	// 			console.log('Adding routes', to_monitor);
-	// 			monitored_routes.push(...to_monitor);
-	// 		}
-
-	// 		// for (const route of stop.routes) {
-	// 		// 	if (!monitored_routes.includes(route.id)) {
-	// 		// 		console.log('Adding route', route.id);
-	// 		// 		if (monitored_routes.length > 20) {
-	// 		// 			console.log('Removing oldest route');
-	// 		// 			monitored_routes.shift();
-	// 		// 		}
-	// 		// 		monitored_routes.push(route.id);
-	// 		// 	}
-	// 		// }
-	// 	}
-	// });
+	$effect(() => {
+		if (is_bus_stop(stop)) {
+			// for (const route of stop.routes) {
+			// 	if (!monitored_routes.includes(route.id)) {
+			// 		console.log('Adding route', route.id);
+			// 		// if (monitored_routes.length > 20) {
+			// 		// 	console.log('Removing oldest route');
+			// 		// 	monitored_routes.shift();
+			// 		// }
+			// 		monitored_routes.push(route.id);
+			// 	}
+			// }
+		}
+	});
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TrainTripData | BusTripData>;
@@ -176,7 +162,7 @@
 	{#each selected_stop_times as st}
 		<Button state={{ modal: 'trip', data: st.trip }}>
 			<div class="flex gap-2 items-center">
-				<div class="flex flex-col">
+				<div class="flex flex-col items-center">
 					{#if is_bus(stop, st.trip) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
 					{/if}

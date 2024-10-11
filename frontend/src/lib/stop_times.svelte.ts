@@ -1,4 +1,4 @@
-// import { SvelteSet } from 'svelte//reactivity';
+import { SvelteMap } from 'svelte/reactivity';
 
 export interface StopTime<T = never, D = never, R = never> {
 	trip_id: string;
@@ -54,4 +54,6 @@ export function createStopTimes() {
 }
 
 export const stop_times = createStopTimes();
-export const monitored_routes = $state<string[]>([]);
+// export const monitored_routes = $state<string[]>([]);
+
+export const monitored_routes = $state<SvelteMap<string, string[]>>(new SvelteMap());

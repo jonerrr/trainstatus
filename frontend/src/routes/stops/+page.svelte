@@ -97,7 +97,7 @@
 
 <!-- TODO: Fix large here -->
 {#snippet stop_button(stop: Stop<'bus' | 'train'>)}
-	<StopButton {stop} pin_rune={stop_pins_rune} large />
+	<StopButton {stop} pin_rune={stop_pins_rune} />
 {/snippet}
 
 <List
@@ -105,6 +105,7 @@
 	button={stop_button}
 	bus_data={bus_stops}
 	train_data={train_stops}
+	monitor_routes
 	class="max-h-[calc(100dvh-13rem)]"
 	auto_scroll
 	bind:selected_tab

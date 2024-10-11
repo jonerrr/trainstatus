@@ -24,7 +24,7 @@
 	<div
 		role={link ? 'button' : undefined}
 		style:background-color={`#${route.color}`}
-		class="p-1 text-indigo-100 rounded font-bold shadow-2xl"
+		class="p-1 text-lg text-indigo-100 rounded font-bold shadow-2xl"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });
 		}}

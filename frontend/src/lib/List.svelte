@@ -1,9 +1,11 @@
 <script lang="ts" generics="T, B">
 	import { BusFront, TrainFront, AArrowUp, AArrowDown } from 'lucide-svelte';
-	import type { Snippet } from 'svelte';
+	import { onDestroy, onMount, untrack, type Snippet } from 'svelte';
 	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut, quintOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
+	import { monitored_routes } from './stop_times.svelte';
+	import type { Stop } from './static';
 	// import type { Action } from 'svelte/action';
 
 	interface ListProps {
@@ -13,7 +15,7 @@
 		locate_button?: Snippet;
 		// current selected tab. Used for selecting correct search index
 		selected_tab?: PersistedRune<'train' | 'bus'>;
-		button: Snippet<[T | B, boolean]>;
+		button: Snippet<[T | B]>;
 		bus_data: B[];
 		train_data: T[];
 		// control height of list by number of items
@@ -57,17 +59,30 @@
 	function get_items() {
 		const list_items = Array.from(list_div!.querySelectorAll('.list-item')) as HTMLDivElement[];
 		// start with 5 prevents scrollbars
-		if (min_items)
-			list_height = list_items.slice(0, min_items).reduce((h, e) => e.offsetHeight + h, 5);
+		list_height = list_items.slice(0, min_items).reduce((h, e) => e.offsetHeight + h, 5);
+	}
 
-		// if (monitor_routes)
-		// const bus_routes = list_items.filter((i) => i.id)
+	if (monitor_routes) {
+		$effect(() => {
+			console.log('adding routes');
+			//@ts-expect-error
+			const bus_routes = bus_data.flatMap((stop: Stop<'bus'>) => {
+				return stop.routes.map((r) => r.id);
+			});
+
+			monitored_routes.set(title, [...new Set(bus_routes)]);
+		});
+
+		onDestroy(() => {
+			console.log('unmounted', title);
+			monitored_routes.delete(title);
+		});
 	}
 
 	if (min_items) {
 		$effect(() => {
 			// initial height calculation
-			if (min_items) get_items();
+			get_items();
 
 			// whenever list changes, recalculate height
 			const observer = new MutationObserver(() => {
@@ -80,7 +95,7 @@
 		});
 	}
 
-	let large = persisted_rune(`${title.toLowerCase()}_large`, false);
+	// let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
 	const tab_icons = {
 		train: TrainFront,
@@ -101,7 +116,7 @@
 		<div class="flex gap-1 items-center font-bold text-lg">
 			{title}
 
-			<button
+			<!-- <button
 				aria-label="Change font size"
 				class="rounded p-1 active:bg-neutral-800 hover:bg-neutral-800"
 				class:bg-neutral-800={large.value}
@@ -114,19 +129,20 @@
 				{:else}
 					<AArrowDown />
 				{/if}
-			</button>
+			</button> -->
 
 			{#if locate_button}
 				{@render locate_button()}
 			{/if}
 		</div>
 
-		{#snippet tab_button(value: 'train' | 'bus')}
+		{#snippet tab_button(value: 'train' | 'bus', data: T[] | B[])}
 			{@const Icon = tab_icons[value]}
 			<button
 				class="p-1 px-2 rounded relative m-0.5 border-transparent"
 				class:text-neutral-100={selected_tab.value === value}
 				onclick={() => (selected_tab.value = value)}
+				disabled={!data.length}
 			>
 				<Icon class="relative z-10" />
 
@@ -143,8 +159,8 @@
 		<div
 			class="grid grid-cols-2 bg-neutral-700 rounded text-neutral-300 border border-neutral-600 relative"
 		>
-			{@render tab_button('train')}
-			{@render tab_button('bus')}
+			{@render tab_button('train', train_data)}
+			{@render tab_button('bus', bus_data)}
 		</div>
 	</div>
 
@@ -155,11 +171,11 @@
 	>
 		{#if selected_tab.value === 'train'}
 			{#each train_data as d}
-				{@render button(d, large.value)}
+				{@render button(d)}
 			{/each}
 		{:else}
 			{#each bus_data as d}
-				{@render button(d, large.value)}
+				{@render button(d)}
 			{/each}
 		{/if}
 	</div>
