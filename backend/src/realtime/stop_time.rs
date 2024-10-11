@@ -63,8 +63,9 @@ impl StopTime {
                             FROM
                                 trip t
                             WHERE
-                                t.assigned IS NOT NULL
-                                OR t.route_id = ANY($2)
+                                t.updated_at >= $1 - INTERVAL '5 minutes' AND
+                                (t.assigned IS NOT NULL
+                                OR t.route_id = ANY($2))
                         )
                     ORDER BY
                         st.arrival
@@ -95,6 +96,7 @@ impl StopTime {
                             FROM
                                 trip t
                             WHERE
+                                t.updated_at >= $1 - INTERVAL '5 minutes' AND
                                 t.assigned IS NOT NULL
                         )
                     ORDER BY

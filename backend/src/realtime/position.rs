@@ -119,12 +119,12 @@ impl Position {
                         _ => unreachable!("all positions should be the same type"),
                     }
                 }
-
+                // status is updated from SIRI so we don't set it here
                 sqlx::query!(
                     r#"
                     INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status, lat, lon, bearing)
                     SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::status[], $6::float[], $7::float[], $8::float[])
-                    ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, status = EXCLUDED.status, lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, stop_id = EXCLUDED.stop_id
+                    ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, stop_id = EXCLUDED.stop_id
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],

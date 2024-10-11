@@ -28,16 +28,16 @@
 	const route = $page.data.routes[trip.route_id];
 
 	// if bus trip, add to monitored routes
-	$effect(() => {
-		if (route.route_type === 'bus') {
-			if (!monitored_routes.includes(route.id)) {
-				if (monitored_routes.length > 20) {
-					monitored_routes.shift();
-				}
-				monitored_routes.push(route.id);
-			}
-		}
-	});
+	// $effect(() => {
+	// 	if (route.route_type === 'bus') {
+	// 		if (!monitored_routes.includes(route.id)) {
+	// 			if (monitored_routes.length > 20) {
+	// 				monitored_routes.shift();
+	// 			}
+	// 			monitored_routes.push(route.id);
+	// 		}
+	// 	}
+	// });
 </script>
 
 <div class="flex gap-1 p-1">

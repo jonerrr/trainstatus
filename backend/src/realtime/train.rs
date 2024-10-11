@@ -9,7 +9,7 @@ use crate::{
     feed::{trip_update::StopTimeUpdate, TripDescriptor, VehiclePosition},
     static_data::stop::convert_stop_id,
 };
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
 // use tokio::sync::RwLock;
@@ -216,6 +216,7 @@ impl TryFrom<TripDescriptor> for Trip {
             mta_id: trip_id.to_owned(),
             vehicle_id: vehicle_id.to_owned(),
             created_at,
+            updated_at: Utc::now(),
             direction,
             route_id,
             deviation: None,

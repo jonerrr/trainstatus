@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, PartialEq)]
+#[derive(Clone, Serialize, PartialEq, Debug)]
 pub struct Trip {
     pub id: Uuid,
     pub mta_id: String,
@@ -14,6 +14,7 @@ pub struct Trip {
     pub direction: Option<i16>,
     // for bus, this is start_date + current time bc it doesn't include time
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     // currently only for bus but could also be for train too
     pub deviation: Option<i32>,
     pub data: TripData,
@@ -41,7 +42,7 @@ pub struct Trip {
 //     assigned: Option<bool>,
 // }
 
-#[derive(Serialize, Clone, PartialEq)]
+#[derive(Serialize, Clone, PartialEq, Debug)]
 pub enum TripData {
     Train { express: bool, assigned: bool },
     Bus,
@@ -68,6 +69,10 @@ impl Trip {
             .iter()
             .map(|v| v.created_at)
             .collect::<Vec<DateTime<Utc>>>();
+        let update_ats = values
+            .iter()
+            .map(|v| v.updated_at)
+            .collect::<Vec<DateTime<Utc>>>();
         let deviations = values
             .iter()
             .map(|v| v.deviation)
@@ -89,9 +94,9 @@ impl Trip {
 
                 sqlx::query!(
                     r#"
-                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, deviation, express, assigned)
-                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::integer[], $8::bool[], $9::bool[])
-                    ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned
+                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, express, assigned)
+                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::bool[], $10::bool[])
+                    ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned, updated_at = EXCLUDED.updated_at
                     "#,
                     &ids,
                     &mta_ids,
@@ -99,6 +104,7 @@ impl Trip {
                     &route_ids,
                     &directions as &[Option<i16>],
                     &created_ats,
+                    &update_ats,
                     &deviations as &[Option<i32>],
                     &expresses,
                     &assigns
@@ -109,9 +115,9 @@ impl Trip {
             Some(TripData::Bus) => {
                 sqlx::query!(
                     r#"
-                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, deviation)
-                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::integer[])
-                    ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation
+                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
+                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
+                    ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
                     "#,
                     &ids,
                     &mta_ids,
@@ -119,6 +125,7 @@ impl Trip {
                     &route_ids,
                     &directions as &[Option<i16>],
                     &created_ats,
+                    &update_ats,
                     &deviations as &[Option<i32>]
                 )
                 .execute(pool)
@@ -149,7 +156,6 @@ impl Trip {
                 t.created_at,
                 p.vehicle_id,
                 p.stop_id,
-                p.updated_at,
                 p.status,
                 CASE
                     WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
@@ -178,6 +184,7 @@ impl Trip {
             LEFT JOIN "position" p ON
                 t.vehicle_id = p.vehicle_id
             WHERE
+                t.updated_at >= $1 - INTERVAL '5 minutes' AND
                 t.id = ANY(
                 SELECT
                     t.id
@@ -230,6 +237,7 @@ impl Trip {
         match res {
             Some(t) => {
                 self.id = t.id;
+                // self.created_at = t.created_at;
 
                 let changed = match &self.data {
                     TripData::Train { express, assigned } => {

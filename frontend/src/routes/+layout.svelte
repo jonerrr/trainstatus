@@ -56,6 +56,8 @@
 		Array.from(new Set(Array.from(monitored_routes.values()).flatMap((r) => r.map((id) => id))))
 	);
 
+	// $inspect(monitored_routes_arr);
+
 	$effect(() => {
 		// const routes = Array.from(monitored_routes.values()).flatMap((r) => r.map((id) => id));
 		console.log('updating stop times', monitored_routes_arr);

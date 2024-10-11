@@ -27,33 +27,6 @@
 	}
 	let { stop, pin_rune = $bindable() }: ButtonProps = $props();
 
-	// if stop is a bus stop, add all routes to monitored_routes
-	// $effect(() => {
-	// 	if (is_bus(stop)) {
-	// 		for (const route of stop.routes) {
-	// 			// console.log('adding route', route.id);
-	// 			// monitored_routes.add(route.id);
-
-	// 			// if (monitored_routes.size > )
-	// 			if (!monitored_routes.includes(route.id)) {
-	// 				console.log('Adding route', route.id, stop);
-
-	// 				monitored_routes.push(route.id);
-	// 			}
-	// 		}
-	// 	}
-
-	// 	return () => {
-	// 		if (is_bus(stop)) {
-	// 			for (const route of stop.routes) {
-	// 				console.log('removing route', route.id);
-	// 				// monitored_routes.delete(route.id);
-	// 				// monitored_routes.splice(monitored_routes.indexOf(route.id), 1);
-	// 			}
-	// 		}
-	// 	};
-	// });
-
 	let stop_times = $derived(
 		rt_stop_times.stop_times
 			.filter((st) => st.stop_id === stop.id)
@@ -61,9 +34,9 @@
 				// const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
 				const trip = rt_trips.trips.get(st.trip_id);
 
-				// if (!trip) {
-				// 	$inspect(st);
-				// }
+				if (!trip) {
+					$inspect(st);
+				}
 				return {
 					...st,
 					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
@@ -165,7 +138,7 @@
 		{@const data = stop.data as BusStopData}
 		{@const stop_routes = stop.routes as BusRouteStop[]}
 
-		<div class="flex flex-col text-left max-w-[95%]">
+		<div class="flex flex-col text-left max-w-[90%]">
 			<div class="flex gap-2 items-center">
 				<div>
 					<BusArrow direction={data.direction} />
