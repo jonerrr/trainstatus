@@ -18,7 +18,7 @@ declare global {
 			};
 			bus_stops: Stop<'bus'>[];
 			train_stops: Stop<'train'>[];
-			initial_promise: Promise<[void, void]>;
+			// initial_promise: Promise<[void, void]>;
 		}
 		// <T extends string | number>
 		interface PageState {

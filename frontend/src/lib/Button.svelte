@@ -23,7 +23,7 @@
 
 <div {id} class="relative w-full list-item">
 	<button
-		class="w-full flex justify-between items-center py-1 hover:bg-neutral-900 active:bg-neutral-900"
+		class="w-full flex justify-between items-center p-1 hover:bg-neutral-900 active:bg-neutral-900"
 		transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 		onclick={() => {
 			pushState('', JSON.parse(JSON.stringify(state)));

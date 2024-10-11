@@ -1,6 +1,6 @@
 <script lang="ts" generics="T, B">
-	import { BusFront, TrainFront, AArrowUp, AArrowDown } from 'lucide-svelte';
-	import { onDestroy, onMount, untrack, type Snippet } from 'svelte';
+	import { BusFront, TrainFront } from 'lucide-svelte';
+	import { onDestroy, type Snippet } from 'svelte';
 	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut, quintOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
@@ -45,6 +45,12 @@
 	let list_height = $state(0);
 	// list_div needs to be wrapped in state so $effect runs
 	let list_div: HTMLDivElement | undefined = $state();
+
+	// if bus/train data don't have any items, switch tabs
+	$effect(() => {
+		if (!bus_data.length) selected_tab.value = 'train';
+		if (!train_data.length) selected_tab.value = 'bus';
+	});
 
 	// probably could combine effects
 	if (auto_scroll) {
@@ -108,10 +114,8 @@
 	});
 </script>
 
-<div
-	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }}
-	class="flex flex-col text-neutral-200 relative w-full px-1 z-30"
->
+<!-- 	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }} -->
+<div class="flex flex-col text-neutral-200 relative w-full px-1 z-30">
 	<div class="flex text-neutral-50 justify-between w-full z-30">
 		<div class="flex gap-1 items-center font-bold text-lg">
 			{title}
@@ -143,6 +147,7 @@
 				class:text-neutral-100={selected_tab.value === value}
 				onclick={() => (selected_tab.value = value)}
 				disabled={!data.length}
+				aria-label={`Show ${value} stops`}
 			>
 				<Icon class="relative z-10" />
 

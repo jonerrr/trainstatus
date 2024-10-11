@@ -24,15 +24,17 @@
 	}
 
 	function manage_modal(node: HTMLDivElement) {
-		page.subscribe(({ state }) => {
-			if (state.modal) {
-				document.body.style.overflow = 'hidden';
-				// disable_scroll();
-			} else {
-				document.body.style.overflow = '';
-				// enable_scroll();
-			}
-		});
+		document.body.style.overflow = 'hidden';
+
+		// page.subscribe(({ state }) => {
+		// 	if (state.modal) {
+		// 		document.body.style.overflow = 'hidden';
+		// 		// disable_scroll();
+		// 	} else {
+		// 		document.body.style.overflow = '';
+		// 		// enable_scroll();
+		// 	}
+		// });
 
 		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog when swiping to go back
 		// from here https://stackoverflow.com/a/59741870
@@ -40,15 +42,16 @@
 		let startX: number;
 		let startY: number;
 
-		node.addEventListener('mousedown', function (event) {
-			// Make sure the user is clicking outside of the dialog
+		function handle_mouse_down(event: MouseEvent) {
 			if (event.target === node) {
 				startX = event.pageX;
 				startY = event.pageY;
 			}
-		});
+		}
 
-		node.addEventListener('mouseup', function (event) {
+		node.addEventListener('mousedown', handle_mouse_down);
+
+		function handle_mouse_up(event: MouseEvent) {
 			const diffX = Math.abs(event.pageX - startX);
 			const diffY = Math.abs(event.pageY - startY);
 			// console.log(event.target.id);
@@ -57,18 +60,28 @@
 				// Close the dialog
 				close();
 			}
-		});
+		}
+
+		node.addEventListener('mouseup', handle_mouse_up);
+
+		return {
+			destroy() {
+				document.body.style.overflow = '';
+				node.removeEventListener('mousedown', handle_mouse_down);
+				node.removeEventListener('mouseup', handle_mouse_up);
+			}
+		};
 	}
 
 	let copied = $state(false);
 	// show  stops/trips before current datetime
 	let show_previous = $state(false);
 
-	$effect(() => {
-		page.subscribe((val) => {
-			console.log(val.state);
-		});
-	});
+	// $effect(() => {
+	// 	page.subscribe((val) => {
+	// 		console.log(val.state);
+	// 	});
+	// });
 
 	// for sharing, trip will be a uuid, stop will be a number, and route will be a string
 </script>
@@ -78,7 +91,7 @@
 	id: string | number,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
-	<div class="flex gap-1 items-center justify-between pt-2">
+	<div class="flex gap-1 items-center justify-between pt-2 px-1">
 		<button
 			onclick={() => {
 				close();
@@ -150,10 +163,10 @@
 		class="fixed top-0 left-0 flex flex-col justify-center items-center w-[100dvw] h-[100dvh] z-50 bg-black/50 bg-opacity-10 text-neutral-100"
 	>
 		<div
-			transition:slide={{ duration: 300 }}
+			transition:slide={{ duration: 150 }}
 			role="dialog"
 			aria-modal="true"
-			class="bg-neutral-900 w-full p-1 rounded flex flex-col fixed bottom-0"
+			class="bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0"
 		>
 			{#if $page.state.modal === 'stop'}
 				<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
@@ -170,7 +183,7 @@
 			{:else if $page.state.modal === 'trip'}
 				{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
 
-				<TripModal {trip} bind:show_previous />
+				<TripModal {trip} {show_previous} />
 
 				{@render actions(true, trip.id, trip_pins_rune)}
 			{/if}

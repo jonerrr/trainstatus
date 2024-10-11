@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS alert (
     description_plain VARCHAR,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_in_feed TIMESTAMP WITH TIME ZONE NOT NULL,
     display_before_active INTEGER
 );
 

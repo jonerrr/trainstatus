@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import type { Stop } from './static';
+import type { Route, Stop } from './static';
 
 export interface Trip<T extends TripData> {
 	id: string;
@@ -111,4 +111,19 @@ export const is_train = (
 	t: Trip<TrainTripData | BusTripData>
 ): t is Trip<TrainTripData> => {
 	return s.type === 'train';
+};
+
+// type guards for trip and route.
+export const is_bus_route = (
+	r: Route,
+	t: Trip<TrainTripData | BusTripData>
+): t is Trip<BusTripData> => {
+	return r.route_type === 'bus';
+};
+
+export const is_train_route = (
+	r: Route,
+	t: Trip<TrainTripData | BusTripData>
+): t is Trip<TrainTripData> => {
+	return r.route_type === 'train';
 };

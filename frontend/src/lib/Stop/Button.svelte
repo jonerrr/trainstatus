@@ -34,9 +34,9 @@
 				// const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
 				const trip = rt_trips.trips.get(st.trip_id);
 
-				if (!trip) {
-					$inspect(st);
-				}
+				// if (!trip) {
+				// 	$inspect(st);
+				// }
 				return {
 					...st,
 					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
@@ -146,9 +146,6 @@
 				<div class="font-bold">
 					{stop.name}
 				</div>
-				<div class="text-neutral-300">
-					#{stop.id}
-				</div>
 			</div>
 
 			<div class="flex flex-col">
@@ -174,6 +171,10 @@
 					</div>
 				{/each}
 			</div>
+		</div>
+
+		<div class="text-neutral-300 self-start">
+			#{stop.id}
 		</div>
 	{/if}
 </Button>
