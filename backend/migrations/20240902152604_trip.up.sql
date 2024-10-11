@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS trip (
     direction SMALLINT,
     -- for bus, only date part is from GTFS
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     deviation INTEGER,
     -- train fields
     express BOOLEAN,

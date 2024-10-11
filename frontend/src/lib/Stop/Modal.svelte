@@ -27,6 +27,7 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import { pushState } from '$app/navigation';
+	import { onDestroy, onMount } from 'svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -38,21 +39,41 @@
 	// TODO: this probably doesn't needed to be binded
 	let { stop, show_previous }: ModalProps = $props();
 
-	// if stop is a bus stop, add all routes to monitored_routes
-	$effect(() => {
+	onMount(() => {
 		if (is_bus_stop(stop)) {
-			// for (const route of stop.routes) {
-			// 	if (!monitored_routes.includes(route.id)) {
-			// 		console.log('Adding route', route.id);
-			// 		// if (monitored_routes.length > 20) {
-			// 		// 	console.log('Removing oldest route');
-			// 		// 	monitored_routes.shift();
-			// 		// }
-			// 		monitored_routes.push(route.id);
-			// 	}
-			// }
+			const current_monitored_routes = monitored_routes.get('modal') || [];
+
+			// const routes = stop.routes.map((r) => r.id);
+			current_monitored_routes.push(...stop.routes.map((r) => r.id));
+			// keep a max of 20 monitored routes for modal
+			monitored_routes.set('modal', current_monitored_routes.slice(-20));
+			console.log('modal monitoring route');
 		}
 	});
+
+	// if stop is a bus stop, add all routes to monitored_routes
+	// $effect(() => {
+	// 	if (is_bus_stop(stop)) {
+	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
+
+	// 		// const routes = stop.routes.map((r) => r.id);
+	// 		current_monitored_routes.push(...stop.routes.map((r) => r.id));
+	// 		// keep a max of 20 monitored routes for modal
+	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
+	// 		console.log('modal monitoring route');
+
+	// 		// for (const route of stop.routes) {
+	// 		// 	if (!monitored_routes.includes(route.id)) {
+	// 		// 		console.log('Adding route', route.id);
+	// 		// 		// if (monitored_routes.length > 20) {
+	// 		// 		// 	console.log('Removing oldest route');
+	// 		// 		// 	monitored_routes.shift();
+	// 		// 		// }
+	// 		// 		monitored_routes.push(route.id);
+	// 		// 	}
+	// 		// }
+	// 	}
+	// });
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TrainTripData | BusTripData>;
@@ -166,6 +187,7 @@
 					{#if is_bus(stop, st.trip) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
 					{/if}
+					{st.trip.vehicle_id}
 					<Icon
 						width="1.2rem"
 						height="1.2rem"

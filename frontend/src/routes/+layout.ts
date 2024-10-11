@@ -28,6 +28,41 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		stops_obj[stop.id] = stop;
 	}
 
+	// const id = url.searchParams.get('id');
+
+	// const monitor_routes: string[] = []
+
+	// if (id) {
+	// 	// check what type of id it is
+	// 	if (id in routes_obj) {
+	// 		// if (routes_obj[id].route_type === 'bus') {
+	// 		// await tick();
+	// 		// pushState('', {
+	// 		// 	modal: 'route',
+	// 		// 	data: $page.data.routes[id]
+	// 		// });
+	// 		// TODO: does this work bc its a number
+	// 	} else if (id in stops_obj) {
+	// 		if (stops_obj[parseInt(id)].type === 'bus') {
+	// 			monitor_routes
+	// 		}
+
+	// 		// await tick();
+	// 		// pushState('', {
+	// 		// 	modal: 'stop',
+	// 		// 	data: $page.data.stops[parseInt(id)]
+	// 		// });
+	// 	} else if (trips.trips.has(id)) {
+	// 		// await tick();
+	// 		// pushState('', {
+	// 		// 	modal: 'trip',
+	// 		// 	data: trips.trips.get(id)
+	// 		// });
+	// 	} else {
+	// 		console.error('Invalid id', id);
+	// 	}
+	// }
+
 	const { bus_stops, train_stops } = stops.reduce(
 		(acc: { bus_stops: Stop<'bus'>[]; train_stops: Stop<'train'>[] }, stop) => {
 			if (is_bus(stop)) {

@@ -9,7 +9,7 @@ use redis::AsyncCommands;
 // use serde_json::json;
 use sqlx::PgPool;
 // use std::collections::HashSet;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use std::{env::var, time::Duration};
 use thiserror::Error;
 // use tokio::sync::RwLock;

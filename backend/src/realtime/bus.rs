@@ -54,6 +54,10 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 continue;
             }
 
+            // if trip.vehicle_id == "7792" {
+            //     dbg!(&trip);
+            // }
+
             trip.find(pool).await.unwrap_or_else(|e| {
                 tracing::error!("Error finding trip: {:?}", e);
                 (false, true)
@@ -151,6 +155,7 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
             mta_id: trip_id,
             vehicle_id,
             created_at,
+            updated_at: Utc::now(),
             direction: Some(direction),
             deviation: value.0.delay,
             route_id,
@@ -224,6 +229,7 @@ impl TryFrom<BusVehiclePosition> for Position {
         let position = value.0.position.ok_or(IntoPositionError::Position)?;
         let mta_id = value.0.trip.and_then(|t| t.trip_id);
 
+        // TODO: should we use status from gtfs
         Ok(Position {
             vehicle_id,
             mta_id,
@@ -259,6 +265,10 @@ impl From<MonitoredVehicleJourney> for SiriPosition {
                 })
             })
             .unzip();
+
+        // if value.vehicle_ref == "7892" {
+        //     dbg!(&value);
+        // }
 
         let mta_id = value.framed_vehicle_journey_ref.dated_vehicle_journey_ref;
 
