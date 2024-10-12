@@ -56,7 +56,7 @@ impl Route {
         route_type: Option<&RouteType>,
         geom: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        let mut query =
+        let mut query: QueryBuilder<'_, sqlx::Postgres> =
             QueryBuilder::new("SELECT id, long_name, short_name, color, shuttle, route_type, ");
 
         if geom {
@@ -71,6 +71,7 @@ impl Route {
             query.push(" WHERE route_type = $1");
             query.push_bind(route_type as &RouteType);
         }
+        query.push(" ORDER BY id");
 
         query.build_query_as().fetch_all(pool).await
     }

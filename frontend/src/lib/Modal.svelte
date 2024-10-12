@@ -89,6 +89,7 @@
 {#snippet actions(
 	history: boolean,
 	id: string | number,
+	title: string,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
 	<div class="flex gap-1 items-center justify-between pt-2 px-1">
@@ -132,7 +133,7 @@
 							}, 800);
 						} else {
 							navigator.share({
-								// title: document.title,
+								title,
 								url
 							});
 						}
@@ -173,19 +174,19 @@
 
 				<StopModal {show_previous} stop={$page.state.data} />
 
-				{@render actions(true, $page.state.data.id, stop_pins_rune)}
+				{@render actions(true, $page.state.data.id, `Arrivals at ${stop.name}`, stop_pins_rune)}
 			{:else if $page.state.modal === 'route'}
 				{@const route = $page.state.data as Route}
 
 				<RouteModal {route} />
 
-				{@render actions(true, route.id, route_pins_rune)}
+				{@render actions(true, route.id, `Alerts for ${route.id}`, route_pins_rune)}
 			{:else if $page.state.modal === 'trip'}
 				{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
 
 				<TripModal {trip} {show_previous} />
 
-				{@render actions(true, trip.id, trip_pins_rune)}
+				{@render actions(true, trip.id, `${trip.route_id} Trip`, trip_pins_rune)}
 			{/if}
 		</div>
 	</div>
