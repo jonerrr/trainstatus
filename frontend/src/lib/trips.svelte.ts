@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
 
-export interface Trip<T extends TripData> {
+export interface Trip<T extends TripData, R = never> {
 	id: string;
 	mta_id: string;
 	route_id: string;
@@ -12,6 +12,7 @@ export interface Trip<T extends TripData> {
 	data: T;
 	created_at: Date;
 	updated_at: Date;
+	route: R;
 }
 
 type TripData = TrainTripData | BusTripData;
@@ -50,22 +51,27 @@ export enum TripDirection {
 type Fetch = typeof fetch;
 
 export function createTrips() {
-	// let trips: Trip<TripData>[] = $state([]);
-	let trips = $state(new SvelteMap<string, Trip<TripData>>());
+	const trips = $state(new SvelteMap<string, Trip<TripData>>());
 
+	// this returns true if there was an error (aka offline)
 	async function update(fetch: Fetch) {
-		const data: Trip<TripData>[] = await (await fetch('/api/trips')).json();
+		try {
+			const data: Trip<TripData>[] = await (await fetch('/api/trips')).json();
+			trips.clear();
 
-		trips = new SvelteMap(
-			data.map((trip: Trip<TripData>) => [
-				trip.id,
-				{
+			data.forEach((trip) => {
+				trips.set(trip.id, {
 					...trip,
 					created_at: new Date(trip.created_at),
 					updated_at: new Date(trip.updated_at)
-				}
-			])
-		);
+				});
+			});
+
+			return false;
+		} catch (e) {
+			console.error(e);
+			return true;
+		}
 		// .then((res) => res.json())
 		// .then(
 		// 	(data) =>
@@ -116,14 +122,14 @@ export const is_train = (
 // type guards for trip and route.
 export const is_bus_route = (
 	r: Route,
-	t: Trip<TrainTripData | BusTripData>
+	t: Trip<TrainTripData | BusTripData, unknown>
 ): t is Trip<BusTripData> => {
 	return r.route_type === 'bus';
 };
 
 export const is_train_route = (
 	r: Route,
-	t: Trip<TrainTripData | BusTripData>
+	t: Trip<TrainTripData | BusTripData, unknown>
 ): t is Trip<TrainTripData> => {
 	return r.route_type === 'train';
 };

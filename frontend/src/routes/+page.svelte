@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { page } from '$app/stores';
-	import { type Stop, is_bus, is_train } from '$lib/static';
+	import { type Route, type Stop, is_bus, is_train } from '$lib/static';
 	import {
 		persisted_rune,
 		haversine,
@@ -11,6 +11,18 @@
 	} from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
+	import RouteButton from '$lib/Route/Button.svelte';
+	import TripButton from '$lib/Trip/Button.svelte';
+	import {
+		type BusTripData,
+		is_bus_route,
+		is_train_route,
+		type TrainTripData,
+		type Trip,
+		trips
+	} from '$lib/trips.svelte';
+	import { untrack } from 'svelte';
+	import { monitored_routes } from '$lib/stop_times.svelte';
 
 	const { pinned_bus_stops, pinned_train_stops } = $derived(
 		stop_pins_rune.value
@@ -28,18 +40,70 @@
 			)
 	);
 
-	let nearby_train_stops = $state<Stop<'train'>[]>([]);
-	let nearby_bus_stops = $state<Stop<'bus'>[]>([]);
+	const { pinned_bus_routes, pinned_train_routes } = $derived(
+		route_pins_rune.value
+			.map((id) => $page.data.routes[id])
+			.reduce(
+				(acc: { pinned_bus_routes: Route[]; pinned_train_routes: Route[] }, route) => {
+					if (route.route_type === 'bus') {
+						acc.pinned_bus_routes.push(route);
+					} else {
+						acc.pinned_train_routes.push(route);
+					}
+					return acc;
+				},
+				{ pinned_bus_routes: [], pinned_train_routes: [] }
+			)
+	);
+
+	$effect.pre(() => {
+		console.log('removing old trip pins');
+		untrack(
+			() => (trip_pins_rune.value = trip_pins_rune.value.filter((id) => trips.trips.has(id)))
+		);
+	});
+
+	const { pinned_bus_trips, pinned_train_trips } = $derived(
+		trip_pins_rune.value
+			.map((id) => trips.trips.get(id)!)
+			.reduce(
+				(
+					acc: {
+						pinned_bus_trips: Trip<BusTripData, Route>[];
+						pinned_train_trips: Trip<TrainTripData, Route>[];
+						// monitored_trip_routes: string[];
+					},
+					trip
+				) => {
+					const route = $page.data.routes[trip.route_id];
+
+					if (is_bus_route(route, trip)) {
+						acc.pinned_bus_trips.push({ ...trip, route });
+						// monitored_trip_routes.push(route.id);
+					} else if (is_train_route(route, trip)) {
+						acc.pinned_train_trips.push({ ...trip, route });
+					}
+					return acc;
+				},
+				{ pinned_bus_trips: [], pinned_train_trips: [] }
+			)
+	);
 
 	// $effect(() => {
+	// 	if (monitored_trip_routes.length) {
+	// 		console.log('monitoring pinned trip bus routes');
+	// 		monitored_routes.set('pinned_trip', monitored_trip_routes);
+	// 	}
+	// });
 
-	// })
+	let nearby_train_stops = $state<Stop<'train'>[]>([]);
+	let nearby_bus_stops = $state<Stop<'bus'>[]>([]);
 
 	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
 		'unknown'
 	);
-	// console.log($page.data.routes);
+
 	function get_nearby_stops() {
 		location_status.value = 'loading';
 		navigator.geolocation.getCurrentPosition(
@@ -79,16 +143,40 @@
 		);
 	}
 
-	// $inspect($page.data);
-
-	// $inspect(bus_stops, train_stops, $page.data.stops);
-
 	if (location_status.value === 'granted' || location_status.value === 'loading') {
 		get_nearby_stops();
 	}
 </script>
 
 <!-- TODO: better initial loading animation -->
+
+{#snippet trip_button(trip: Trip<TrainTripData | BusTripData, Route>)}
+	<TripButton {trip} pin_rune={trip_pins_rune} />
+{/snippet}
+
+{#if trip_pins_rune.value.length}
+	<List
+		title="Pinned Trips"
+		bus_data={pinned_bus_trips}
+		train_data={pinned_train_trips}
+		button={trip_button}
+		min_items={2}
+	/>
+{/if}
+
+{#snippet route_button(route: Route)}
+	<RouteButton {route} pin_rune={route_pins_rune} />
+{/snippet}
+
+{#if route_pins_rune.value.length}
+	<List
+		title="Pinned Routes"
+		bus_data={pinned_bus_routes}
+		train_data={pinned_train_routes}
+		button={route_button}
+		min_items={2}
+	/>
+{/if}
 
 {#snippet locate_button()}
 	<button

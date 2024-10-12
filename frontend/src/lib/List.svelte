@@ -70,7 +70,7 @@
 
 	if (monitor_routes) {
 		$effect(() => {
-			console.log('adding routes');
+			// console.log('adding routes');
 			//@ts-expect-error
 			const bus_routes = bus_data.flatMap((stop: Stop<'bus'>) => {
 				return stop.routes.map((r) => r.id);
@@ -96,8 +96,7 @@
 				// if (min_items)
 				get_items();
 			});
-			const config = { childList: true, subtree: true };
-			observer.observe(list_div!, config);
+			observer.observe(list_div!, { childList: true, subtree: true, characterData: true });
 		});
 	}
 

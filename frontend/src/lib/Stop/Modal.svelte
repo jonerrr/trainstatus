@@ -152,7 +152,7 @@
 </div>
 
 {#if is_train_stop(stop) && stop.data.transfers.length}
-	<div class="flex gap-1 items-center pb-1">
+	<div class="flex gap-1 items-center pb-1 pl-1">
 		<div>Transfers:</div>
 		{#each stop.data.transfers as transfer}
 			{@const transfer_stop = $page.data.stops[transfer] as Stop<'train'>}
