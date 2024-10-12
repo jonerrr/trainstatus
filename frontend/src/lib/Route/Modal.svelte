@@ -107,7 +107,7 @@
 </div>
 
 <div
-	class="snap-mandatory snap-x px-1 overflow-x-scroll flex scrollbar-hidden"
+	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
 	bind:this={scroll_area}
 	use:manage_scroll
 >
@@ -115,7 +115,7 @@
 		<button
 			disabled={idx === 0}
 			class:text-neutral-500={idx === 0}
-			class="absolute left-0 inset-y-0"
+			class="absolute left-0 inset-y-0 z-40"
 			aria-label="Previous alert"
 			onclick={() => scroll_to_alert(idx - 1)}
 		>
@@ -126,7 +126,7 @@
 		<button
 			disabled={idx === alerts.length - 1}
 			class:text-neutral-500={idx === alerts.length - 1}
-			class="absolute right-0 inset-y-0"
+			class="absolute right-0 inset-y-0 z-40"
 			aria-label="Next alert"
 			onclick={() => scroll_to_alert(idx + 1)}
 		>

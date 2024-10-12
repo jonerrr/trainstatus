@@ -6,7 +6,7 @@
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import SearchWorker from './search_worker?worker';
 	import { CircleX } from 'lucide-svelte';
-	import { untrack } from 'svelte';
+	// import { untrack } from 'svelte';
 
 	let search_worker: Worker;
 	let search = $state<'loading' | 'ready'>('loading');
@@ -106,7 +106,7 @@
 	bus_data={bus_stops}
 	train_data={train_stops}
 	monitor_routes
-	class="max-h-[calc(100dvh-13rem)]"
+	class="max-h-[calc(100dvh-12.8rem)]"
 	auto_scroll
 	bind:selected_tab
 />
@@ -117,11 +117,11 @@
 		oninput={debounce(search_stops)}
 		type="search"
 		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
-		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-700 focus:ring-indigo-700 focus:border-indigo-700 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
+		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-600 focus:ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
 	/>
 	<button
 		aria-label="Clear search"
-		class="z-30 w-6 h-6 text-indigo-600 hover:text-indigo-700 active:text-indigo-700 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
+		class="z-30 w-6 h-6 text-neutral-200 hover:text-neutral-400 active:text-neutral-400 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
 		onclick={clear_search}
 	>
 		<CircleX />

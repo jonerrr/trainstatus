@@ -18,13 +18,24 @@
 	<a
 		aria-label={label}
 		{href}
+		class="hover:bg-neutral-600 rounded"
 		class:text-neutral-200={href === $page.url.pathname}
 		class:text-neutral-400={href !== $page.url.pathname}
-		class:underline={href === $page.url.pathname}
+		class:font-semibold={href === $page.url.pathname}
 	>
 		<Icon class="m-auto h-full" />
 		{label}
 	</a>
+	<!-- <a aria-label={label} {href} class="flex items-center justify-center h-full w-full">
+		<div
+			class="p-1 rounded hover:bg-neutral-600"
+			class:bg-neutral-100={href === $page.url.pathname}
+			class:text-neutral-400={href !== $page.url.pathname}
+		>
+			<Icon class="m-auto h-full" />
+			{label}
+		</div>
+	</a> -->
 {/snippet}
 
 <nav
