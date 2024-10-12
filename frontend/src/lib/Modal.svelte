@@ -9,14 +9,12 @@
 		route_pins_rune,
 		type PersistedRune
 	} from '$lib/util.svelte';
-	import type { Trip, TrainTripData, BusTripData } from './trips.svelte';
-	import { type Route, type Stop } from './static';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
 
-	let modal_el: HTMLDivElement;
+	// let modal_el: HTMLDivElement;
 
 	function close() {
 		// enable_scroll();
@@ -74,7 +72,7 @@
 	}
 
 	let copied = $state(false);
-	// show  stops/trips before current datetime
+	// show stops/trips before current datetime
 	let show_previous = $state(false);
 
 	// $effect(() => {
@@ -82,8 +80,6 @@
 	// 		console.log(val.state);
 	// 	});
 	// });
-
-	// for sharing, trip will be a uuid, stop will be a number, and route will be a string
 </script>
 
 {#snippet actions(
@@ -92,34 +88,33 @@
 	title: string,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
-	<div class="flex gap-1 items-center justify-between pt-2 px-1">
+	<div class="flex gap-1 items-center justify-between px-1 h-12">
 		<button
 			onclick={() => {
 				close();
 			}}
 			aria-label="Close modal"
-			class="appearance-none h-8 w-8 flex"
 		>
-			<CircleX />
+			<CircleX size="2rem" />
 		</button>
 
-		<div class="flex">
+		<div class="flex gap-1 items-center">
 			{#if history}
+				<!-- class:spin={show_previous} -->
 				<button
-					class="appearance-none h-8 w-8 flex"
-					class:text-indigo-600={show_previous}
+					class:text-neutral-400={!show_previous}
+					class:text-neutral-50={show_previous}
 					aria-label="Show previous"
 					onclick={() => {
 						show_previous = !show_previous;
 					}}
 				>
-					<History />
+					<History size="2rem" />
 				</button>
 			{/if}
 
 			{#if !copied}
 				<button
-					class="appearance-none h-8 w-8 flex"
 					aria-label="Share"
 					onclick={() => {
 						const url = `${window.location.origin}/?d=${id}`;
@@ -139,18 +134,15 @@
 						}
 					}}
 				>
-					<Share class="h-6 w-6" />
+					<Share size="2rem" />
 				</button>
 			{:else}
-				<button
-					class="appearance-none flex h-8 w-8 text-green-600"
-					aria-label="Link copied to clipboard"
-				>
-					<ClipboardCheck class="h-6 w-6" />
+				<button class="appearance-none flex text-green-600" aria-label="Link copied to clipboard">
+					<ClipboardCheck size="2rem" />
 				</button>
 			{/if}
 
-			<Pin {id} {pin_rune} class="appearance-none h-8 w-8 flex" />
+			<Pin {id} {pin_rune} size="2rem" />
 		</div>
 	</div>
 {/snippet}
@@ -170,24 +162,43 @@
 			class="bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0"
 		>
 			{#if $page.state.modal === 'stop'}
-				<!-- {@const stop = $page.state.data as Stop<'train' | 'bus'>} -->
-
 				<StopModal {show_previous} stop={$page.state.data} />
 
 				{@render actions(true, $page.state.data.id, `Arrivals at ${stop.name}`, stop_pins_rune)}
 			{:else if $page.state.modal === 'route'}
-				{@const route = $page.state.data as Route}
+				<RouteModal route={$page.state.data} />
 
-				<RouteModal {route} />
-
-				{@render actions(true, route.id, `Alerts for ${route.id}`, route_pins_rune)}
+				{@render actions(
+					true,
+					$page.state.data.id,
+					`Alerts for ${$page.state.data.id}`,
+					route_pins_rune
+				)}
 			{:else if $page.state.modal === 'trip'}
-				{@const trip = $page.state.data as Trip<TrainTripData | BusTripData>}
+				<TripModal trip={$page.state.data} {show_previous} />
 
-				<TripModal {trip} {show_previous} />
-
-				{@render actions(true, trip.id, `${trip.route_id} Trip`, trip_pins_rune)}
+				{@render actions(
+					true,
+					$page.state.data.id,
+					`${$page.state.data.route_id} Trip`,
+					trip_pins_rune
+				)}
 			{/if}
 		</div>
 	</div>
 {/if}
+
+<!-- <style>
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.spin {
+		animation: spin 0.5s linear;
+	}
+</style> -->

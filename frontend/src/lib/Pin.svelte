@@ -6,11 +6,13 @@
 	let {
 		pin_rune = $bindable(),
 		id = $bindable(),
-		class: class_name
+		class: class_name,
+		size
 	}: {
 		pin_rune: PersistedRune<T[]>;
 		id: T;
 		class?: string;
+		size?: string;
 	} = $props();
 </script>
 
@@ -24,8 +26,32 @@
 	class={class_name}
 >
 	{#if pin_rune.value.includes(id)}
-		<Pin fill="#d4d4d4" />
+		<Pin {size} fill="#d4d4d4" />
 	{:else}
-		<Pin />
+		<Pin {size} />
 	{/if}
 </button>
+
+<!-- <style>
+	@keyframes wiggle {
+		0% {
+			transform: rotate(0deg);
+		}
+		80% {
+			transform: rotate(0deg);
+		}
+		85% {
+			transform: rotate(10deg);
+		}
+		95% {
+			transform: rotate(-10deg);
+		}
+		100% {
+			transform: rotate(0deg);
+		}
+	}
+
+	.wiggle {
+		animation: wiggle 1s ease-in-out;
+	}
+</style> -->
