@@ -34,29 +34,36 @@ function parse_html(html: string) {
 
 export function createAlerts() {
 	let alerts: Alert[] = $state([]);
-	let alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
+	const alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
 
 	async function update(fetch: Fetch) {
-		const data: Alert[] = await (await fetch(`/api/alerts`)).json();
+		try {
+			const data: Alert[] = await (await fetch(`/api/alerts`)).json();
 
-		alerts = data.map((alert) => ({
-			...alert,
-			header_html: parse_html(alert.header_html),
-			description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
-			start_time: new Date(alert.start_time),
-			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-			updated_at: new Date(alert.updated_at),
-			created_at: new Date(alert.created_at)
-		}));
-
-		alerts_by_route = new SvelteMap<string, Alert[]>();
-		for (const alert of alerts) {
-			for (const entity of alert.entities) {
-				if (!alerts_by_route.has(entity.route_id)) {
-					alerts_by_route.set(entity.route_id, []);
+			alerts = data.map((alert) => ({
+				...alert,
+				header_html: parse_html(alert.header_html),
+				description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+				start_time: new Date(alert.start_time),
+				end_time: alert.end_time ? new Date(alert.end_time) : undefined,
+				updated_at: new Date(alert.updated_at),
+				created_at: new Date(alert.created_at)
+			}));
+			alerts_by_route.clear();
+			// alerts_by_route = new SvelteMap<string, Alert[]>();
+			for (const alert of alerts) {
+				for (const entity of alert.entities) {
+					if (!alerts_by_route.has(entity.route_id)) {
+						alerts_by_route.set(entity.route_id, []);
+					}
+					alerts_by_route.get(entity.route_id)!.push(alert);
 				}
-				alerts_by_route.get(entity.route_id)!.push(alert);
 			}
+
+			return false;
+		} catch (e) {
+			console.error(e);
+			return true;
 		}
 
 		// fetch(

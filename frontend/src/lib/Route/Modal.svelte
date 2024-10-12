@@ -52,7 +52,7 @@
 			},
 			{
 				root: node,
-				threshold: 1.0
+				threshold: 0.7
 			}
 		);
 

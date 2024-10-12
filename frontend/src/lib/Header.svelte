@@ -1,6 +1,8 @@
 <script lang="ts">
 	// import { offline } from '$lib/stores';
 	// import TimeSelect from '$lib/components/TimeSelect.svelte';
+
+	let { offline }: { offline: boolean } = $props();
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative">
@@ -8,9 +10,9 @@
 
 	<!-- <TimeSelect /> -->
 
-	<!-- {#if $offline}
-        <div class="text-red-500 text-xs">Offline</div>
-    {/if} -->
+	{#if offline}
+		<div class="text-red-500 text-xs">Offline</div>
+	{/if}
 </header>
 
 <style>

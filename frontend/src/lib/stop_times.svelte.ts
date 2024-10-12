@@ -16,17 +16,24 @@ export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
 	async function update(fetch: Fetch, routes: string[]) {
-		const data: StopTime[] = await (
-			await fetch(
-				`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
-			)
-		).json();
+		try {
+			const data: StopTime[] = await (
+				await fetch(
+					`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
+				)
+			).json();
 
-		stop_times = data.map((stop_time) => ({
-			...stop_time,
-			arrival: new Date(stop_time.arrival),
-			departure: new Date(stop_time.departure)
-		}));
+			stop_times = data.map((stop_time) => ({
+				...stop_time,
+				arrival: new Date(stop_time.arrival),
+				departure: new Date(stop_time.departure)
+			}));
+
+			return false;
+		} catch (e) {
+			console.error(e);
+			return true;
+		}
 
 		// fetch(
 		// 	`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`

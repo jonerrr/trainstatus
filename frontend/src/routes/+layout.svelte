@@ -10,6 +10,7 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import { alerts } from '$lib/alerts.svelte';
+	import { trip_pins_rune } from '$lib/util.svelte';
 	// import { LoaderCircle } from 'lucide-svelte';
 
 	let { children } = $props();
@@ -17,14 +18,12 @@
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
 	let last_monitored_routes = $state<string>('');
+	let offline = $state(false);
 
 	// $inspect(monitored_routes);
 
 	onMount(async () => {
 		// TODO: error handling
-
-		// await data.initial_promise;
-		// console.log('initial promise resolved');
 
 		const id = $page.url.searchParams.get('d');
 		// console.log(id);
@@ -36,7 +35,6 @@
 					modal: 'route',
 					data: $page.data.routes[id]
 				});
-				// TODO: does this work bc its a number
 			} else if (id in $page.data.stops) {
 				await tick();
 				pushState('', {
@@ -44,9 +42,7 @@
 					data: $page.data.stops[parseInt(id)]
 				});
 			} else if (trips.trips.has(id)) {
-				// console.log('creating trip modal');
 				await tick();
-
 				pushState('', {
 					modal: 'trip',
 					data: trips.trips.get(id)
@@ -68,10 +64,12 @@
 	// $inspect(monitored_routes_arr);
 
 	$effect(() => {
-		// const routes = Array.from(monitored_routes.values()).flatMap((r) => r.map((id) => id));
 		if (monitored_routes_arr.join(',') === last_monitored_routes) return;
 		console.log('updating stop times', monitored_routes_arr);
-		stop_times.update(fetch, monitored_routes_arr);
+		stop_times.update(fetch, monitored_routes_arr).then((o) => {
+			// last_st_update = new Date();
+			offline = o;
+		});
 		last_monitored_routes = monitored_routes_arr.join(',');
 		last_st_update = new Date();
 	});
@@ -82,8 +80,14 @@
 			// TODO: exponential backoff
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
 				console.log('Updating rt data');
-				trips.update(fetch);
-				alerts.update(fetch);
+				trips.update(fetch).then((o) => {
+					// last_st_update = new Date();
+					offline = o;
+				});
+				alerts.update(fetch).then((o) => {
+					// last_st_update = new Date();
+					offline = o;
+				});
 
 				last_update = new Date();
 			}
@@ -102,7 +106,7 @@
 	});
 </script>
 
-<Header />
+<Header {offline} />
 <main class="md:w-[60%] m-auto relative h-[calc(100dvh-7.5rem)]">
 	<Modal />
 

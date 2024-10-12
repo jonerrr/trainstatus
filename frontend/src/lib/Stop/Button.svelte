@@ -67,7 +67,7 @@
 		modal: 'stop',
 		data: stop
 	}}
-	bind:pin_rune
+	{pin_rune}
 >
 	{#if is_train(stop)}
 		{#snippet arrivals(
