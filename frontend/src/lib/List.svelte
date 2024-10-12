@@ -172,7 +172,7 @@
 	<div
 		bind:this={list_div}
 		style:height={min_items ? `${list_height}px` : 'auto'}
-		class={`flex border-y border-neutral-800 flex-col divide-y overflow-auto overscroll-none divide-neutral-800 text-base ${class_name ?? ''}`}
+		class={`flex border-y border-neutral-800 flex-col divide-y overflow-auto divide-neutral-800 text-base ${class_name ?? ''}`}
 	>
 		{#if selected_tab.value === 'train'}
 			{#each train_data as d}

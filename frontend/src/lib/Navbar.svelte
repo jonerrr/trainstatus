@@ -18,7 +18,6 @@
 	<a
 		aria-label={label}
 		{href}
-		class="hover:bg-neutral-600 rounded"
 		class:text-neutral-200={href === $page.url.pathname}
 		class:text-neutral-400={href !== $page.url.pathname}
 		class:font-semibold={href === $page.url.pathname}
