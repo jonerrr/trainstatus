@@ -56,7 +56,7 @@ export function createTrips() {
 	// this returns true if there was an error (aka offline)
 	async function update(fetch: Fetch) {
 		try {
-			const data: Trip<TripData>[] = await (await fetch('/api/trips')).json();
+			const data: Trip<TripData>[] = await (await fetch('/api/v1/trips')).json();
 			trips.clear();
 
 			data.forEach((trip) => {

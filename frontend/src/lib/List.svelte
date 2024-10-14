@@ -146,6 +146,7 @@
 				class:text-neutral-100={selected_tab.value === value}
 				onclick={() => (selected_tab.value = value)}
 				disabled={!data.length}
+				class:text-neutral-500={!data.length}
 				aria-label={`Show ${value} stops`}
 			>
 				<Icon class="relative z-10" />

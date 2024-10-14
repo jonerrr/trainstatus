@@ -5,16 +5,17 @@ import type { LayoutLoad } from './$types';
 import { alerts } from '$lib/alerts.svelte';
 
 export const load: LayoutLoad = async ({ fetch }) => {
-	const stops_promise = fetch('/api/stops').then((res) => res.json());
-	const routes_promise = fetch('/api/routes').then((res) => res.json());
+	const stops_promise = fetch('/api//v1/stops').then((res) => res.json());
+	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
 
-	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
-		stops_promise,
-		routes_promise,
-		trips.update(fetch),
-		stop_times.update(fetch, []),
-		alerts.update(fetch)
-	]);
+	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], boolean, boolean, boolean] =
+		await Promise.all([
+			stops_promise,
+			routes_promise,
+			trips.update(fetch),
+			stop_times.update(fetch, []),
+			alerts.update(fetch)
+		]);
 
 	const routes_obj: {
 		[id: string]: Route;

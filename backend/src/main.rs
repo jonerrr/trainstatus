@@ -1,6 +1,7 @@
 use api::websocket::{Clients, Update};
 use axum::{
     body::Body,
+    error_handling::HandleErrorLayer,
     extract::Request,
     response::{IntoResponse, Response},
     routing::get,
@@ -17,6 +18,7 @@ use std::{
     convert::Infallible,
     env::var,
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 use tokio::{
     signal,
@@ -25,7 +27,7 @@ use tokio::{
         Mutex, Notify, RwLock,
     },
 };
-use tower::Layer;
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, BoxError, Layer, ServiceBuilder};
 use tower_http::{
     compression::CompressionLayer,
     cors::{AllowOrigin, CorsLayer},
@@ -143,7 +145,7 @@ async fn main() {
 
     let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
 
-    let app = Router::new()
+    let routes = Router::new()
         .route(
             "/",
             get(|| async {
@@ -177,9 +179,6 @@ async fn main() {
         // .route("/bus/trips/:id", get(routes::bus::trips::by_id))
         // alerts
         // .route("/alerts", get(routes::alerts::get))
-        .layer(TraceLayer::new_for_http())
-        .layer(CompressionLayer::new())
-        .layer(cors_layer)
         .with_state(AppState {
             pg_pool,
             redis_pool,
@@ -193,6 +192,21 @@ async fn main() {
         // .layer(Extension(tx1))
         // .layer(Extension(ws_clients))
         .fallback(handler_404);
+
+    let app = Router::new().nest("/v1", routes).layer(
+        ServiceBuilder::new()
+            .layer(TraceLayer::new_for_http())
+            .layer(CompressionLayer::new())
+            .layer(cors_layer)
+            .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled error: {}", err),
+                )
+            }))
+            .layer(BufferLayer::new(1024))
+            .layer(RateLimitLayer::new(500, Duration::from_secs(1))),
+    );
 
     // Need to specify normalize path layer like this so it runs before routing
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);

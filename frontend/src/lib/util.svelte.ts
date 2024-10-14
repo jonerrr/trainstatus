@@ -86,6 +86,6 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	};
 }
 
-export const stop_pins_rune = persisted_rune<number[]>('stop_pins', []);
-export const route_pins_rune = persisted_rune<string[]>('route_pins', []);
+export const stop_pins_rune = persisted_rune<number[]>('stop_pins', [106]);
+export const route_pins_rune = persisted_rune<string[]>('route_pins', ['4']);
 export const trip_pins_rune = persisted_rune<string[]>('trip_pins', []);

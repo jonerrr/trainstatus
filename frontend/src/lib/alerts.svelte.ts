@@ -38,7 +38,7 @@ export function createAlerts() {
 
 	async function update(fetch: Fetch) {
 		try {
-			const data: Alert[] = await (await fetch(`/api/alerts`)).json();
+			const data: Alert[] = await (await fetch(`/api/v1/alerts`)).json();
 
 			alerts = data.map((alert) => ({
 				...alert,

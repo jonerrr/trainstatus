@@ -41,7 +41,7 @@ thiserror = "1.0.64"
 tokio = { version = "1.40.0", features = ["full"] }
 tokio-stream = { version = "0.1.16", features = ["sync"] }
 tokio-tungstenite = "0.24.0"
-tower = "0.5.1"
+tower = { version = "0.5.1", features = ["limit", "buffer"] }
 tower-http = { version = "0.6.1", features = [
     "trace",
     "timeout",
