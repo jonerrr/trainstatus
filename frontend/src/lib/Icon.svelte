@@ -23,6 +23,7 @@
 {#if route.route_type === 'bus'}
 	<div
 		role={link ? 'button' : undefined}
+		aria-label={link ? route.short_name : undefined}
 		style:background-color={`#${route.color}`}
 		class="p-1 text-lg text-indigo-100 rounded font-bold shadow-2xl"
 		onclick={() => {
@@ -36,6 +37,7 @@
 	{@const icon = icons.find((i) => i.name === icon_name)!}
 	<div
 		role={link ? 'button' : undefined}
+		aria-label={link ? route.short_name : undefined}
 		class="appearance-none"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });

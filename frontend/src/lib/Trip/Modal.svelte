@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { ArrowBigRight } from 'lucide-svelte';
+	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import {
 		stop_times as rt_stop_times,
 		monitored_routes,
@@ -20,8 +21,8 @@
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
-	import { onMount } from 'svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
+	import Transfers from './Transfers.svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -45,7 +46,9 @@
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 
 	const last_stop = $derived.by(() => {
-		if (is_bus_route(route, trip) && stop_times.length) {
+		if (!stop_times.length) return 'Unknown';
+
+		if (is_bus_route(route, trip)) {
 			// TODO: get actual last stop instead of headsign
 			// get stop in the direction of trip and get headsign
 			const stop = $page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
@@ -55,6 +58,12 @@
 			return $page.data.stops[last_st.stop_id].name;
 		}
 	});
+
+	interface OpenTransfers {
+		[stop_id: number]: boolean;
+	}
+
+	const open_transfers = $state<OpenTransfers>({});
 </script>
 
 <div class="flex gap-1 items-center p-1">
@@ -106,15 +115,47 @@
 <ModalList>
 	{#each stop_times as st}
 		{@const stop = $page.data.stops[st.stop_id]}
+		<div class="relative">
+			<Button state={{ modal: 'stop', data: stop }}>
+				<div class="flex flex-col w-full">
+					<div class="flex items-center justify-between">
+						<div class="text-left">
+							{stop.name}
+						</div>
 
-		<Button state={{ modal: 'stop', data: stop }}>
-			<div class="text-left">
-				{stop.name}
-			</div>
+						<div class="flex gap-1 items-center text-right pr-6">
+							<div>
+								{st.arrival.toLocaleTimeString()}
+							</div>
+							<!-- <div role="button" aria-label="Transfers" class="rounded bg-neutral-800">
+								<ChevronDown />
+							</div> -->
+						</div>
+					</div>
+				</div>
+			</Button>
+			<button
+				tabindex="0"
+				onclick={() => {
+					if (open_transfers[st.stop_id]) {
+						open_transfers[st.stop_id] = false;
+					} else {
+						open_transfers[st.stop_id] = true;
+					}
+				}}
+				aria-label="Transfers"
+				class="rounded bg-neutral-800 z-50 absolute right-0 top-[50%] -translate-y-1/2"
+			>
+				{#if !open_transfers[st.stop_id]}
+					<ChevronDown />
+				{:else}
+					<ChevronUp />
+				{/if}
+			</button>
+		</div>
 
-			<div>
-				{st.arrival.toLocaleTimeString()}
-			</div>
-		</Button>
+		{#if open_transfers[st.stop_id]}
+			<Transfers stop_time={st} {trip} />
+		{/if}
 	{/each}
 </ModalList>

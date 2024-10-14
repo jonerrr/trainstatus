@@ -19,7 +19,7 @@ export function createStopTimes() {
 		try {
 			const data: StopTime[] = await (
 				await fetch(
-					`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
+					`/api/v1/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
 				)
 			).json();
 

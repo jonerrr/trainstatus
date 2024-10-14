@@ -21,10 +21,20 @@
 	}
 	let { trip, pin_rune }: ButtonProps = $props();
 
+	onMount(() => {
+		if (is_bus_route(trip.route, trip)) {
+			const current_monitored_routes = monitored_routes.get('pinned_trips') || [];
+			current_monitored_routes.push(trip.route_id);
+			monitored_routes.set('pinned_trips', current_monitored_routes);
+		}
+	});
+
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 
 	const last_stop = $derived.by(() => {
-		if (is_bus_route(trip.route, trip) && stop_times.length) {
+		if (!stop_times.length) return 'Unknown';
+
+		if (is_bus_route(trip.route, trip)) {
 			// TODO: get actual last stop instead of headsign
 			// get stop in the direction of trip and get headsign
 			const stop = $page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
@@ -36,6 +46,8 @@
 	});
 
 	const { current_status, current_stop } = $derived.by(() => {
+		if (!stop_times.length) return { current_status: 'Unknown', current_stop: 'Unknown' };
+
 		// check if trip has been updated in past 3 minutes
 		if (
 			trip.updated_at.getTime() > new Date().getTime() - 3 * 60 * 1000 &&
@@ -44,22 +56,13 @@
 		) {
 			return {
 				current_status: trip.status.toString(),
-				current_stop: $page.data.stops[trip.stop_id]
+				current_stop: $page.data.stops[trip.stop_id].name
 			};
 		}
 		return {
 			current_status: 'Next stop:',
-			current_stop: $page.data.stops[stop_times[0].stop_id]
+			current_stop: $page.data.stops[stop_times[0].stop_id].name
 		};
-	});
-
-	onMount(() => {
-		if (is_bus_route(trip.route, trip)) {
-			const current_monitored_routes = monitored_routes.get('pinned_trips') || [];
-
-			current_monitored_routes.push(trip.route_id);
-			monitored_routes.set('pinned_trips', current_monitored_routes);
-		}
 	});
 </script>
 
@@ -70,7 +73,7 @@
 	}}
 	{pin_rune}
 >
-	<div class="flex flex-col gap-1 items-center">
+	<div class="flex flex-col gap-1 items-center text-left">
 		<div class="flex gap-1 items-center self-start">
 			<Icon
 				width="2rem"
@@ -88,7 +91,7 @@
 		<div class="flex self-start">
 			<div>
 				<span class="font-medium">{current_status}</span>
-				{current_stop.name}
+				{current_stop}
 			</div>
 		</div>
 	</div>

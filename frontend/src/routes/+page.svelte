@@ -22,7 +22,7 @@
 		trips
 	} from '$lib/trips.svelte';
 	import { untrack } from 'svelte';
-	import { monitored_routes } from '$lib/stop_times.svelte';
+	// import { monitored_routes } from '$lib/stop_times.svelte';
 
 	const { pinned_bus_stops, pinned_train_stops } = $derived(
 		stop_pins_rune.value
@@ -63,18 +63,17 @@
 		);
 	});
 
+	// need to define interface here bc my IDE was acting up
+	interface AccumulatedTrips {
+		pinned_bus_trips: Trip<BusTripData, Route>[];
+		pinned_train_trips: Trip<TrainTripData, Route>[];
+	}
+
 	const { pinned_bus_trips, pinned_train_trips } = $derived(
 		trip_pins_rune.value
 			.map((id) => trips.trips.get(id)!)
 			.reduce(
-				(
-					acc: {
-						pinned_bus_trips: Trip<BusTripData, Route>[];
-						pinned_train_trips: Trip<TrainTripData, Route>[];
-						// monitored_trip_routes: string[];
-					},
-					trip
-				) => {
+				(acc: AccumulatedTrips, trip) => {
 					const route = $page.data.routes[trip.route_id];
 
 					if (is_bus_route(route, trip)) {
@@ -183,7 +182,7 @@
 		onclick={get_nearby_stops}
 		class:bg-neutral-800={location_status.value === 'granted'}
 		aria-label="Nearby stops"
-		class=" text-white rounded p-1 active:bg-neutral-600 hover:bg-neutral-600"
+		class="text-white rounded p-1 bg-neutral-700 active:bg-neutral-600 hover:bg-neutral-600"
 	>
 		{#if location_status.value === 'denied'}
 			<LocateOff />
@@ -212,12 +211,15 @@
 	/>
 {/if}
 
-<List
-	title="Nearby Stops"
-	button={stop_button}
-	bus_data={nearby_bus_stops}
-	train_data={nearby_train_stops}
-	{locate_button}
-	class="mb-16"
-	monitor_routes
-/>
+<!-- by only showing nearby stops only when the nearby stops array is not empty, the list won't automatically switch tabs bc theres no data yet -->
+{#if nearby_bus_stops.length || nearby_train_stops.length}
+	<List
+		title="Nearby Stops"
+		button={stop_button}
+		bus_data={nearby_bus_stops}
+		train_data={nearby_train_stops}
+		{locate_button}
+		class="mb-16"
+		monitor_routes
+	/>
+{/if}
