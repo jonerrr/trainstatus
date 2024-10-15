@@ -333,7 +333,7 @@ impl Alert {
         pool: &PgPool,
         at: DateTime<Utc>,
     ) -> Result<serde_json::Value, sqlx::Error> {
-        let alerts: (serde_json::Value,) = sqlx::query_as(
+        let alerts: (Option<serde_json::Value>,) = sqlx::query_as(
             r#"
             SELECT json_agg(result) FROM
             (SELECT
@@ -374,7 +374,10 @@ impl Alert {
         .fetch_one(pool)
         .await?;
 
-        Ok(alerts.0)
+        match alerts.0 {
+            Some(value) => Ok(value),
+            None => Ok(serde_json::Value::Array(vec![])), // Return an empty array if the result is NULL
+        }
     }
 
     pub async fn find(&mut self, pool: &PgPool) -> Result<bool, sqlx::Error> {

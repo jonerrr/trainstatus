@@ -180,29 +180,36 @@ pub async fn import(
             //         .unwrap();
             // };
 
-            let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await else {
-                tracing::error!("failed to get trips");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
-            let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await
-            else {
-                tracing::error!("failed to get stop times");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
-            let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await else {
-                tracing::error!("failed to get alerts");
-                sleep(Duration::from_secs(35)).await;
-                continue;
-            };
-            let mut conn = redis_pool.get().await.unwrap();
-            let items = [
-                ("trips", serde_json::to_string(&trips).unwrap()),
-                ("stop_times", serde_json::to_string(&stop_times).unwrap()),
-                ("alerts", serde_json::to_string(&alerts).unwrap()),
-            ];
-            let _: () = conn.mset(&items).await.unwrap();
+            match trip::Trip::get_all(&c_pool, Utc::now()).await {
+                Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
+                    Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now()).await {
+                        Ok(alerts) => {
+                            let mut conn = redis_pool.get().await.unwrap();
+                            let items = [
+                                ("trips", serde_json::to_string(&trips).unwrap()),
+                                ("stop_times", serde_json::to_string(&stop_times).unwrap()),
+                                ("alerts", serde_json::to_string(&alerts).unwrap()),
+                            ];
+                            let _: () = conn.mset(&items).await.unwrap();
+                        }
+                        Err(err) => {
+                            tracing::error!("failed to cache alerts: {}", err);
+                            sleep(Duration::from_secs(35)).await;
+                            continue;
+                        }
+                    },
+                    Err(err) => {
+                        tracing::error!("failed to cache stop times: {}", err);
+                        sleep(Duration::from_secs(35)).await;
+                        continue;
+                    }
+                },
+                Err(err) => {
+                    tracing::error!("failed to cache trips: {}", err);
+                    sleep(Duration::from_secs(35)).await;
+                    continue;
+                }
+            }
 
             sleep(Duration::from_secs(30)).await;
         }

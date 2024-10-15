@@ -212,14 +212,14 @@
 {/if}
 
 <!-- by only showing nearby stops only when the nearby stops array is not empty, the list won't automatically switch tabs bc theres no data yet -->
-{#if nearby_bus_stops.length || nearby_train_stops.length}
-	<List
-		title="Nearby Stops"
-		button={stop_button}
-		bus_data={nearby_bus_stops}
-		train_data={nearby_train_stops}
-		{locate_button}
-		class="mb-16"
-		monitor_routes
-	/>
-{/if}
+<!-- {#if nearby_bus_stops.length || nearby_train_stops.length} -->
+<List
+	title="Nearby Stops"
+	button={stop_button}
+	bus_data={nearby_bus_stops}
+	train_data={nearby_train_stops}
+	{locate_button}
+	class="mb-16"
+	monitor_routes
+/>
+<!-- {/if} -->

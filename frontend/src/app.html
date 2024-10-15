@@ -2,7 +2,6 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 		<!-- <link
@@ -40,13 +39,16 @@
 			href="/splash/icon-2048x2732.png"
 			media="(min-device-width: 1024px) and (max-device-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) and (orientation: portrait)"
 		/> -->
+		<!-- TODO: better splash screen support -->
+		<link rel="apple-touch-startup-image" href="/splash-screen.png" />
 
+		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<link rel="icon" type="image/png" sizes="32x32" href="%sveltekit.assets%/favicon-32x32.png" />
 		<link rel="icon" type="image/png" sizes="16x16" href="%sveltekit.assets%/favicon-16x16.png" />
 		<link rel="mask-icon" href="%sveltekit.assets%/safari-pinned-tab.svg" color="#4338ca" />
-		<meta name="msapplication-TileColor" content="#171717" />
-		<meta name="theme-color" content="#18181b" />
+		<meta name="msapplication-TileColor" content="#09090b" />
+		<meta name="theme-color" content="#09090b" />
 
 		<meta
 			name="description"
@@ -74,6 +76,7 @@
 		<!-- <meta name="twitter:image" content="https://trainstat.us/logo.png" /> -->
 
 		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<title>Trainstat.us</title>
 

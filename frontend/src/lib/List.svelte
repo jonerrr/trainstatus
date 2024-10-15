@@ -48,8 +48,8 @@
 
 	// if bus/train data don't have any items, switch tabs
 	$effect(() => {
-		if (!bus_data.length) selected_tab.value = 'train';
-		if (!train_data.length) selected_tab.value = 'bus';
+		if (!bus_data.length && train_data.length) selected_tab.value = 'train';
+		if (!train_data.length && bus_data.length) selected_tab.value = 'bus';
 	});
 
 	// probably could combine effects

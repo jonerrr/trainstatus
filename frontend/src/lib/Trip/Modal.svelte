@@ -127,9 +127,6 @@
 							<div>
 								{st.arrival.toLocaleTimeString()}
 							</div>
-							<!-- <div role="button" aria-label="Transfers" class="rounded bg-neutral-800">
-								<ChevronDown />
-							</div> -->
 						</div>
 					</div>
 				</div>
@@ -143,7 +140,7 @@
 						open_transfers[st.stop_id] = true;
 					}
 				}}
-				aria-label="Transfers"
+				aria-label="Show transfers at stop"
 				class="rounded bg-neutral-800 z-50 absolute right-0 top-[50%] -translate-y-1/2"
 			>
 				{#if !open_transfers[st.stop_id]}
