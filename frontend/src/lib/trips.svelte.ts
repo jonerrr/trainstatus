@@ -5,7 +5,7 @@ export interface Trip<T extends TripData, R = never> {
 	id: string;
 	mta_id: string;
 	route_id: string;
-	status: TripStatus;
+	status: 'none' | 'incoming' | 'at_stop' | 'in_transit_to' | 'layover';
 	stop_id?: number;
 	vehicle_id: string;
 	direction: TripDirection;
@@ -31,17 +31,17 @@ export interface BusTripData {
 	deviation?: number;
 }
 
-export enum TripStatus {
-	None = 'none',
-	// train statuses
-	Incoming = 'incoming',
-	AtStop = 'at_stop',
-	InTransitTo = 'in_transit_to',
-	// bus statuses
-	Spooking = 'spooking',
-	Layover = 'layover',
-	NoProgress = 'no_progress'
-}
+// export enum TripStatus {
+// 	None = 'none',
+// 	// train statuses
+// 	Incoming = 'incoming',
+// 	AtStop = 'at_stop',
+// 	InTransitTo = 'in_transit_to',
+// 	// bus statuses
+// 	Spooking = 'spooking',
+// 	Layover = 'layover',
+// 	NoProgress = 'no_progress'
+// }
 
 export enum TripDirection {
 	North = 1,

@@ -188,25 +188,27 @@ async fn main() {
             clients: ws_clients,
             // shutdown_tx: shutdown_tx.clone(),
             initial_data,
-        })
-        // .layer(Extension(tx1))
-        // .layer(Extension(ws_clients))
-        .fallback(handler_404);
+        });
+    // .layer(Extension(tx1))
+    // .layer(Extension(ws_clients))
 
-    let app = Router::new().nest("/v1", routes).layer(
-        ServiceBuilder::new()
-            .layer(TraceLayer::new_for_http())
-            .layer(CompressionLayer::new())
-            .layer(cors_layer)
-            .layer(HandleErrorLayer::new(|err: BoxError| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled error: {}", err),
-                )
-            }))
-            .layer(BufferLayer::new(1024))
-            .layer(RateLimitLayer::new(500, Duration::from_secs(1))),
-    );
+    let app = Router::new()
+        .nest("/v1", routes)
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(CompressionLayer::new())
+                .layer(cors_layer)
+                .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled error: {}", err),
+                    )
+                }))
+                .layer(BufferLayer::new(1024))
+                .layer(RateLimitLayer::new(500, Duration::from_secs(1))),
+        )
+        .fallback(handler_404);
 
     // Need to specify normalize path layer like this so it runs before routing
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);
