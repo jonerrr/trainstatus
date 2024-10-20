@@ -101,8 +101,8 @@
 		</button>
 
 		<div class="flex gap-1 items-center">
-			{#if history}
-				<!-- class:spin={show_previous} -->
+			<!-- TODO: make history button work -->
+			<!-- {#if history}
 				<button
 					class:text-neutral-400={!show_previous}
 					class:text-neutral-50={show_previous}
@@ -113,7 +113,7 @@
 				>
 					<History size="2rem" />
 				</button>
-			{/if}
+			{/if} -->
 
 			<button
 				aria-label="Change time formatting"
