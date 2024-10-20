@@ -12,14 +12,14 @@ CREATE TABLE IF NOT EXISTS alert (
     display_before_active INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS active_period(
+CREATE TABLE IF NOT EXISTS active_period (
     alert_id UUID NOT NULL REFERENCES alert(id) ON DELETE CASCADE,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time TIMESTAMP WITH TIME ZONE,
     PRIMARY KEY (alert_id, start_time)
 );
 
-CREATE TABLE IF NOT EXISTS affected_entity(
+CREATE TABLE IF NOT EXISTS affected_entity (
     alert_id UUID NOT NULL REFERENCES alert(id) ON DELETE CASCADE,
     route_id VARCHAR REFERENCES route(id),
     stop_id INTEGER REFERENCES stop(id),

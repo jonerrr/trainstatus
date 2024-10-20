@@ -199,7 +199,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // .await?;
     // Set end time for active periods that are no longer active
     sqlx::query!(
-        "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_periods WHERE alert_id = ANY($1))",
+        "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_period WHERE alert_id = ANY($1))",
         &in_feed_ids
     ).execute(&mut *transaction).await?;
 
