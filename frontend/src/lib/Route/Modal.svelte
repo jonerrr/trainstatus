@@ -132,7 +132,7 @@
 			class="alert relative snap-start snap-always flex flex-col gap-1 items-center justify-center shrink-0 w-full max-h-[65dvh]"
 		>
 			<div
-				class={`${alerts.length > 1 ? 'w-10/12' : 'px-1'} max-h-[65dvh] overflow-auto bg-neutral-950 text-center`}
+				class={`${alerts.length > 1 ? 'w-10/12' : 'px-1'} max-h-[65dvh] overflow-auto bg-neutral-950`}
 			>
 				{@html alert.header_html}
 

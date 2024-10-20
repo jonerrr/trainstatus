@@ -48,3 +48,10 @@
 		</svg>
 	</div>
 {/if}
+
+<style>
+	/* the train icon has a weird white dot on webkit browsers. It goes away after hover / active or if I apply translateZ(0) */
+	svg {
+		transform: translateZ(0);
+	}
+</style>
