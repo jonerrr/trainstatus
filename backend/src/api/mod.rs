@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 
 pub mod errors;
 pub mod realtime;
-pub mod websocket;
+// pub mod websocket;
 // pub mod sse;
 pub mod static_data;
 

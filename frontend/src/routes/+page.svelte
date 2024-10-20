@@ -145,6 +145,8 @@
 	if (location_status.value === 'granted' || location_status.value === 'loading') {
 		get_nearby_stops();
 	}
+
+	// let pin_list_heights: number = $state(0);
 </script>
 
 <!-- TODO: better initial loading animation -->
@@ -152,30 +154,6 @@
 {#snippet trip_button(trip: Trip<TrainTripData | BusTripData, Route>)}
 	<TripButton {trip} pin_rune={trip_pins_rune} />
 {/snippet}
-
-{#if trip_pins_rune.value.length}
-	<List
-		title="Pinned Trips"
-		bus_data={pinned_bus_trips}
-		train_data={pinned_train_trips}
-		button={trip_button}
-		min_items={2}
-	/>
-{/if}
-
-{#snippet route_button(route: Route)}
-	<RouteButton {route} pin_rune={route_pins_rune} />
-{/snippet}
-
-{#if route_pins_rune.value.length}
-	<List
-		title="Pinned Routes"
-		bus_data={pinned_bus_routes}
-		train_data={pinned_train_routes}
-		button={route_button}
-		min_items={2}
-	/>
-{/if}
 
 {#snippet locate_button()}
 	<button
@@ -200,6 +178,31 @@
 	<StopButton {stop} pin_rune={stop_pins_rune} />
 {/snippet}
 
+{#snippet route_button(route: Route)}
+	<RouteButton {route} pin_rune={route_pins_rune} />
+{/snippet}
+
+<!-- <div bind:offsetHeight={pin_list_heights}> -->
+{#if trip_pins_rune.value.length}
+	<List
+		title="Pinned Trips"
+		bus_data={pinned_bus_trips}
+		train_data={pinned_train_trips}
+		button={trip_button}
+		min_items={2}
+	/>
+{/if}
+
+{#if route_pins_rune.value.length}
+	<List
+		title="Pinned Routes"
+		bus_data={pinned_bus_routes}
+		train_data={pinned_train_routes}
+		button={route_button}
+		min_items={2}
+	/>
+{/if}
+
 {#if stop_pins_rune.value.length}
 	<List
 		title="Pinned stops"
@@ -210,6 +213,7 @@
 		monitor_routes
 	/>
 {/if}
+<!-- </div> -->
 
 <!-- by only showing nearby stops only when the nearby stops array is not empty, the list won't automatically switch tabs bc theres no data yet -->
 <!-- {#if nearby_bus_stops.length || nearby_train_stops.length} -->

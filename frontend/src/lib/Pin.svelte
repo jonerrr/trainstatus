@@ -26,7 +26,7 @@
 	class={class_name}
 >
 	{#if pin_rune.value.includes(id)}
-		<Pin {size} fill="#d4d4d4" />
+		<Pin {size} fill="#fff" />
 	{:else}
 		<Pin {size} />
 	{/if}

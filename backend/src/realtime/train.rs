@@ -338,7 +338,6 @@ impl TryFrom<VehiclePosition> for Position {
             updated_at,
             status,
             data: PositionData::Train,
-            vehicle_type: super::position::VehicleType::Train,
             // data: PositionData::Train {
             //     trip_id: trip.id,
             //     current_stop_sequence: current_stop_sequence.unwrap_or(0),

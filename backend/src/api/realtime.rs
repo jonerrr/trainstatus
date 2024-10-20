@@ -1,10 +1,10 @@
 use super::errors::ServerError;
 use super::json_headers;
+use crate::api::parse_list;
 use crate::realtime::stop_time::StopTime;
 use crate::AppState;
-use crate::{api::parse_list, realtime::trip::Trip};
 use axum::extract::Query;
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{extract::State, response::IntoResponse};
 use chrono::Utc;
 use redis::AsyncCommands;
 use serde::Deserialize;

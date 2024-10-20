@@ -2,18 +2,11 @@
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { stop_times as rt_stop_times, monitored_routes } from '$lib/stop_times.svelte';
+	import type { Stop } from '$lib/static';
 	import {
-		stop_times as rt_stop_times,
-		monitored_routes,
-		type StopTime
-	} from '$lib/stop_times.svelte';
-	import type { Route, Stop } from '$lib/static';
-	import {
-		is_bus,
 		is_bus_route,
 		is_train_route,
-		trips as rt_trips,
-		TripDirection,
 		type BusTripData,
 		type TrainTripData,
 		type Trip
@@ -26,10 +19,11 @@
 
 	interface ModalProps {
 		show_previous: boolean;
+		time_format: 'time' | 'countdown';
 		trip: Trip<TrainTripData | BusTripData>;
 	}
 
-	const { trip, show_previous }: ModalProps = $props();
+	const { trip, show_previous, time_format }: ModalProps = $props();
 
 	// should this be in $derived?
 	const route = $page.data.routes[trip.route_id];
@@ -44,7 +38,6 @@
 	});
 
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
-
 	const last_stop = $derived.by(() => {
 		if (!stop_times.length) return 'Unknown';
 
@@ -73,8 +66,8 @@
 		{/if}
 
 		<Icon
-			width="1.5rem"
-			height="1.5rem"
+			width={24}
+			height={24}
 			express={is_train_route(route, trip) && trip.data.express}
 			link={true}
 			{route}
@@ -124,8 +117,12 @@
 						</div>
 
 						<div class="flex gap-1 items-center text-right pr-6">
-							<div>
-								{st.arrival.toLocaleTimeString()}
+							<div class="text-left">
+								{#if time_format === 'time'}
+									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+								{:else}
+									{((st.arrival.getTime() - new Date().getTime()) / 1000 / 60).toFixed(0)}m
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -152,7 +149,7 @@
 		</div>
 
 		{#if open_transfers[st.stop_id]}
-			<Transfers stop_time={st} {trip} />
+			<Transfers stop_time={st} {trip} {time_format} />
 		{/if}
 	{/each}
 </ModalList>

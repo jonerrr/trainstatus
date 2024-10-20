@@ -34,8 +34,7 @@ CREATE TYPE status AS ENUM (
     'no_progress'
 );
 
-CREATE TYPE vehicle_type AS ENUM ('train', 'bus');
-
+-- CREATE TYPE vehicle_type AS ENUM ('train', 'bus');
 CREATE TABLE IF NOT EXISTS position (
     vehicle_id VARCHAR PRIMARY KEY,
     mta_id VARCHAR,
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS position (
     -- trip_id UUID UNIQUE REFERENCES trip(id) ON DELETE CASCADE,
     -- current_stop_sequence SMALLINT,
     -- bus
-    vehicle_type vehicle_type,
+    -- vehicle_type vehicle_type,
     lat REAL,
     lon REAL,
     bearing REAL,
