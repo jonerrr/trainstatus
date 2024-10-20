@@ -19,7 +19,8 @@
 		is_train,
 		type BusTripData,
 		type TrainTripData,
-		type Trip
+		type Trip,
+		type TripData
 	} from '$lib/trips.svelte';
 	import { persisted_rune } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
@@ -52,52 +53,24 @@
 	});
 
 	interface StopTimeWithTrip extends StopTime<number> {
-		trip: Trip<TrainTripData | BusTripData>;
-		last_stop: string;
+		trip: Trip<TripData>;
 	}
 
-	let stop_times: StopTimeWithTrip[] = $derived.by(() => {
-		if (is_train_stop(stop)) {
-			const stop_times = rt_stop_times.stop_times
-				.filter((st) => st.stop_id === stop.id)
-				.map((st) => {
-					const trip = rt_trips.trips.get(st.trip_id);
-					const last_st = rt_stop_times.stop_times.filter((st) => st.trip_id === trip?.id).pop();
+	let stop_times: StopTimeWithTrip[] = $derived(
+		rt_stop_times.stop_times
+			.filter((st) => st.stop_id === stop.id && rt_trips.trips.has(st.trip_id))
+			.map((st) => {
+				const trip = rt_trips.trips.get(st.trip_id)!;
 
-					return {
-						...st,
-						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-						last_stop: trip ? $page.data.stops[last_st!.stop_id].name : 'unknown',
-						trip
-					};
-				})
-				// TODO: fix so we don't need to filter (maybe store trips in map)
-				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
-			// TODO: also get trips where current stop_id is this stop
-			return stop_times;
-		} else if (is_bus_stop(stop)) {
-			const stop_times = rt_stop_times.stop_times
-				.filter((st) => st.stop_id === stop.id)
-				.map((st) => {
-					const trip = rt_trips.trips.get(st.trip_id);
-					// for bus, we get last stop from route headsign bc stop times doesn't include all of the stops
-
-					return {
-						...st,
-						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-						last_stop: stop.routes.find((r) => r.id === trip?.route_id)?.headsign,
-						trip
-					};
-				})
-				// TODO: fix so we don't need to filter (maybe store trips in map)
-				.filter((st) => st.trip !== undefined && st.eta >= 0) as StopTimeWithTrip[];
-			// TODO: also get trips where current stop_id is this stop
-			return stop_times;
-		} else {
-			console.error('Invalid stop type', stop);
-			return [];
-		}
-	});
+				return {
+					...st,
+					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
+					// last_stop: trip ? $page.data.stops[last_st!.stop_id].name : 'unknown',
+					trip
+				};
+			})
+			.filter((st) => st.eta >= 0)
+	);
 
 	// $inspect(stop_times);
 	let selected_direction = persisted_rune('direction', TripDirection.North);
@@ -127,6 +100,7 @@
 	</div>
 </div>
 
+<!-- TODO: also show transfers for bus if multiple routes at bus stop -->
 {#if is_train_stop(stop) && stop.data.transfers.length}
 	<div class="flex gap-1 items-center pb-1 pl-1">
 		<div>Transfers:</div>
@@ -202,7 +176,14 @@
 			</div>
 
 			<div class="text-right pl-4">
-				{st.last_stop}
+				{#if is_train_stop(stop)}
+					{@const last_stop_time = rt_stop_times.stop_times
+						.filter((trip_st) => trip_st.trip_id === st.trip.id)
+						.pop()!}
+					{$page.data.stops[last_stop_time.stop_id].name}
+				{:else if is_bus_stop(stop)}
+					{stop.routes.find((r) => r.id === st.trip.route_id)?.headsign}
+				{/if}
 			</div>
 		</Button>
 	{/each}

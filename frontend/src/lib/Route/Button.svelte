@@ -24,7 +24,7 @@
 </script>
 
 <Button state={{ modal: 'route', data: route }} {pin_rune}>
-	<div class="flex gap-1 items-center">
+	<section class="flex gap-1 items-center">
 		<Icon height={32} width={32} express={false} link={true} {route} />
 		{#if alerts.length}
 			<div class="font-semibold">
@@ -38,5 +38,5 @@
 		{:else}
 			No Alerts
 		{/if}
-	</div>
+	</section>
 </Button>
