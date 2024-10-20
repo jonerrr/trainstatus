@@ -1,7 +1,4 @@
 <script lang="ts">
-	// import { offline } from '$lib/stores';
-	// import TimeSelect from '$lib/components/TimeSelect.svelte';
-
 	let { offline }: { offline: boolean } = $props();
 </script>
 

@@ -1,8 +1,8 @@
 <script lang="ts" generics="T, B">
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { onDestroy, type Snippet } from 'svelte';
-	import { crossfade, slide } from 'svelte/transition';
-	import { cubicInOut, quintOut } from 'svelte/easing';
+	import { crossfade } from 'svelte/transition';
+	import { cubicInOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
 	import { monitored_routes } from './stop_times.svelte';
 	import type { Stop } from './static';
@@ -80,7 +80,7 @@
 		});
 
 		onDestroy(() => {
-			console.log('unmounted', title);
+			// console.log('unmounted', title);
 			monitored_routes.delete(title);
 		});
 	}

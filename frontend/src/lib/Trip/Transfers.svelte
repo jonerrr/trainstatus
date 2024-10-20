@@ -11,28 +11,44 @@
 	} from '$lib/trips.svelte';
 	import Icon from '$lib/Icon.svelte';
 
-	const { stop_time, trip }: { stop_time: StopTime; trip: Trip<BusTripData | TrainTripData> } =
-		$props();
+	interface TransferProps {
+		stop_time: StopTime;
+		trip: Trip<BusTripData | TrainTripData>;
+		time_format: 'time' | 'countdown';
+	}
+
+	const { stop_time, trip, time_format }: TransferProps = $props();
 
 	// get all trips that stop at this stop after this stop time
 	const transfers = $derived.by(() => {
 		const transfers = [];
 
+		// stop_times.stop_times
+		// this should prob be a while loop (or map)
 		for (const st of stop_times.stop_times) {
-			if (
-				st.trip_id === stop_time.trip_id ||
-				st.stop_id !== stop_time.stop_id ||
-				st.arrival < stop_time.arrival
-			) {
-				continue;
-			}
+			// if ($page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) {
+			// 	console.log('transfer stop');
+			// }
 			if (transfers.length >= 3) {
 				break;
 			}
 
-			const transfer_trip = trips.trips.get(st.trip_id)!;
+			if (
+				st.trip_id === stop_time.trip_id ||
+				(st.stop_id !== stop_time.stop_id &&
+					!$page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) ||
+				st.arrival < stop_time.arrival
+			) {
+				continue;
+			}
+
+			const transfer_trip = trips.trips.get(st.trip_id);
 			// nobody wants to transfer to the same route
-			if (transfer_trip.route_id === trip.route_id || transfer_trip.direction !== trip.direction) {
+			if (
+				!transfer_trip ||
+				transfer_trip.route_id === trip.route_id ||
+				transfer_trip.direction !== trip.direction
+			) {
 				continue;
 			}
 
@@ -55,7 +71,12 @@
 						link={false}
 						express={is_train_route(route, st.trip) && st.trip.data.express}
 					/>
-					{st.arrival.toLocaleTimeString()}
+					{#if time_format === 'time'}
+						{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+					{:else}
+						{((st.arrival.getTime() - new Date().getTime()) / 1000 / 60).toFixed(0)}m
+						<!-- {st.arrival - new Date().getTime()} -->
+					{/if}
 				</div>
 			{/each}
 		{:else}

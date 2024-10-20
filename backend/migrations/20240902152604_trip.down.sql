@@ -13,4 +13,4 @@ DROP TABLE IF EXISTS trip;
 
 DROP TYPE IF EXISTS status;
 
-DROP TYPE IF EXISTS vehicle_type;
+-- DROP TYPE IF EXISTS vehicle_type;

@@ -8,15 +8,15 @@
 		link,
 		express,
 		class: className,
-		width = '1rem',
-		height = '1rem'
+		width = 16,
+		height = 16
 	}: {
 		route: Route;
 		link: boolean;
 		express: boolean;
 		class?: string;
-		width?: string;
-		height?: string;
+		width?: number;
+		height?: number;
 	} = $props();
 </script>
 

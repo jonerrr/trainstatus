@@ -144,7 +144,7 @@ impl Trip {
         pool: &PgPool,
         at: DateTime<Utc>,
     ) -> Result<serde_json::Value, sqlx::Error> {
-        let trips: (serde_json::Value,) = sqlx::query_as(
+        let trips: (Option<serde_json::Value>,) = sqlx::query_as(
             r#"
             SELECT json_agg(result) FROM
             (SELECT
@@ -204,7 +204,10 @@ impl Trip {
         .fetch_one(pool)
         .await?;
 
-        Ok(trips.0)
+        match trips.0 {
+            Some(value) => Ok(value),
+            None => Ok(serde_json::Value::Array(vec![])), // Return an empty array if the result is NULL
+        }
     }
 
     // finds trip in db by matching mta_id, train_id, created_at, and direction, returns tuple of (found, changed) indicating if trip was found and if it is different than current trip in db
@@ -241,19 +244,9 @@ impl Trip {
 
                 let changed = match &self.data {
                     TripData::Train { express, assigned } => {
-                        if t.express != Some(*express) || t.assigned != Some(*assigned) {
-                            true
-                        } else {
-                            false
-                        }
+                        t.express != Some(*express) || t.assigned != Some(*assigned)
                     }
-                    TripData::Bus => {
-                        if t.deviation != self.deviation {
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                    TripData::Bus => t.deviation != self.deviation,
                 };
 
                 Ok((true, changed))

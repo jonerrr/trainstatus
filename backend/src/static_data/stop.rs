@@ -269,9 +269,9 @@ impl Stop {
         // todo!("return train stops")
     }
 
-    pub async fn parse_bus(routes: &[&str]) -> Vec<Stop> {
-        todo!("return bus stops")
-    }
+    // pub async fn parse_bus(routes: &[&str]) -> Vec<Stop> {
+    //     todo!("return bus stops")
+    // }
 
     pub async fn get_all(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
         let stops: (serde_json::Value,) = sqlx::query_as(

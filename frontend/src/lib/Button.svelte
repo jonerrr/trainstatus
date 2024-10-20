@@ -5,9 +5,7 @@
 	import { pushState } from '$app/navigation';
 	import type { PersistedRune } from './util.svelte';
 	import Pin from './Pin.svelte';
-	// import { Pin } from 'lucide-svelte';
 
-	// export let state: App.PageState;
 	let {
 		state,
 		id,
@@ -38,21 +36,5 @@
 			id={state.data.id}
 			class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-300 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
 		/>
-		<!-- <button
-			onclick={() => {
-				// console.log('pin button', pin_rune.value, id, pin_rune.value.includes(id));
-				pin_rune.value = pin_rune.value.includes(state.data.id)
-					? pin_rune.value.filter((item) => item !== state.data.id)
-					: [...pin_rune.value, state.data.id];
-			}}
-			aria-label="Pin to home screen"
-			class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-300 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
-		>
-			{#if pin_rune.value.includes(state.data.id)}
-				<Pin fill="#d4d4d4" />
-			{:else}
-				<Pin />
-			{/if}
-		</button> -->
 	{/if}
 </div>

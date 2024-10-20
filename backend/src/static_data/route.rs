@@ -193,7 +193,7 @@ impl Route {
                 .collect::<Vec<_>>();
             route_stops.extend(route_stops_g.into_iter().flatten());
 
-            pb.set_prefix(format!("{}", &route.id));
+            pb.set_prefix(route.id);
             pb.inc(1);
         }
 

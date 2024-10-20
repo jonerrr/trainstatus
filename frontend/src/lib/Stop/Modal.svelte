@@ -31,13 +31,13 @@
 
 	interface ModalProps {
 		show_previous: boolean;
+		time_format: 'time' | 'countdown';
 		stop: Stop<'bus' | 'train'>;
 	}
 
 	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
 
-	// TODO: this probably doesn't needed to be binded
-	let { stop, show_previous }: ModalProps = $props();
+	let { stop, show_previous, time_format }: ModalProps = $props();
 
 	onMount(() => {
 		if (is_bus_stop(stop)) {
@@ -50,30 +50,6 @@
 			console.log('modal monitoring route');
 		}
 	});
-
-	// if stop is a bus stop, add all routes to monitored_routes
-	// $effect(() => {
-	// 	if (is_bus_stop(stop)) {
-	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
-
-	// 		// const routes = stop.routes.map((r) => r.id);
-	// 		current_monitored_routes.push(...stop.routes.map((r) => r.id));
-	// 		// keep a max of 20 monitored routes for modal
-	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
-	// 		console.log('modal monitoring route');
-
-	// 		// for (const route of stop.routes) {
-	// 		// 	if (!monitored_routes.includes(route.id)) {
-	// 		// 		console.log('Adding route', route.id);
-	// 		// 		// if (monitored_routes.length > 20) {
-	// 		// 		// 	console.log('Removing oldest route');
-	// 		// 		// 	monitored_routes.shift();
-	// 		// 		// }
-	// 		// 		monitored_routes.push(route.id);
-	// 		// 	}
-	// 		// }
-	// 	}
-	// });
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TrainTripData | BusTripData>;
@@ -137,8 +113,8 @@
 	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
 		{#each stop.routes as route}
 			<Icon
-				width="1.5rem"
-				height="1.5rem"
+				width={24}
+				height={24}
 				express={false}
 				link={true}
 				route={$page.data.routes[route.id] as Route}
@@ -163,8 +139,8 @@
 			>
 				{#each transfer_stop.routes as route}
 					<Icon
-						width="1.5rem"
-						height="1.5rem"
+						width={24}
+						height={24}
 						express={false}
 						link={false}
 						route={$page.data.routes[route.id]}
@@ -188,8 +164,8 @@
 					{/if}
 					<!-- {st.trip.vehicle_id} -->
 					<Icon
-						width="1.2rem"
-						height="1.2rem"
+						width={20}
+						height={20}
 						express={is_train(stop, st.trip) && st.trip.data.express}
 						link={false}
 						route={$page.data.routes[st.trip.route_id] as Route}
@@ -205,7 +181,13 @@
 						</div>
 					{/if}
 
-					{st.eta.toFixed(0)}m
+					<div class="text-left">
+						{#if time_format === 'time'}
+							{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+						{:else}
+							{st.eta.toFixed(0)}m
+						{/if}
+					</div>
 
 					{#if st.trip.status === 'layover'}
 						<div class="text-neutral-400 text-xs">+Layover</div>

@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, History } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck, History, Timer, Clock, AlarmClock } from 'lucide-svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { slide } from 'svelte/transition';
+	// import { slide } from 'svelte/transition';
 	import {
 		stop_pins_rune,
 		trip_pins_rune,
 		route_pins_rune,
-		type PersistedRune
+		type PersistedRune,
+		persisted_rune
 	} from '$lib/util.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
@@ -74,6 +75,7 @@
 	let copied = $state(false);
 	// show stops/trips before current datetime
 	let show_previous = $state(false);
+	let time_format = persisted_rune<'countdown' | 'time'>('time_format', 'countdown');
 
 	// $effect(() => {
 	// 	page.subscribe((val) => {
@@ -112,6 +114,19 @@
 					<History size="2rem" />
 				</button>
 			{/if}
+
+			<button
+				aria-label="Change time formatting"
+				onclick={() => {
+					time_format.value = time_format.value === 'countdown' ? 'time' : 'countdown';
+				}}
+			>
+				{#if time_format.value === 'countdown'}
+					<AlarmClock size="2rem" />
+				{:else}
+					<Timer size="2rem" />
+				{/if}
+			</button>
 
 			{#if !copied}
 				<button
@@ -155,18 +170,23 @@
 		use:manage_modal
 		class="fixed top-0 left-0 flex flex-col justify-center items-center w-[100dvw] h-[100dvh] z-50 bg-black/50 bg-opacity-10 text-neutral-100"
 	>
+		<!-- transition:slide={{ duration: 150 }} -->
 		<div
-			transition:slide={{ duration: 150 }}
 			role="dialog"
 			aria-modal="true"
-			class="bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0"
+			class="bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0 pb-2"
 		>
 			{#if $page.state.modal === 'stop'}
-				<StopModal {show_previous} stop={$page.state.data} />
+				<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />
 
-				{@render actions(true, $page.state.data.id, `Arrivals at ${stop.name}`, stop_pins_rune)}
+				{@render actions(
+					true,
+					$page.state.data.id,
+					`Arrivals at ${$page.state.data.name}`,
+					stop_pins_rune
+				)}
 			{:else if $page.state.modal === 'route'}
-				<RouteModal route={$page.state.data} />
+				<RouteModal route={$page.state.data} time_format={time_format.value} />
 
 				{@render actions(
 					true,
@@ -175,7 +195,7 @@
 					route_pins_rune
 				)}
 			{:else if $page.state.modal === 'trip'}
-				<TripModal trip={$page.state.data} {show_previous} />
+				<TripModal trip={$page.state.data} {show_previous} time_format={time_format.value} />
 
 				{@render actions(
 					true,

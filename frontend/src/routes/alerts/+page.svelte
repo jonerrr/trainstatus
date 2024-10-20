@@ -29,5 +29,5 @@
 	bus_data={bus_routes}
 	train_data={train_routes}
 	button={route_button}
-	class="mb-16"
+	class="max-h-[calc(100dvh-10rem)] mb-16"
 />

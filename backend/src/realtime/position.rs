@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
-use rayon::prelude::*;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 // use uuid::Uuid;
 
 pub struct Position {
@@ -11,7 +10,7 @@ pub struct Position {
     pub status: Status,
     pub data: PositionData,
     // TODO: remove this probably
-    pub vehicle_type: VehicleType,
+    // pub vehicle_type: VehicleType,
 }
 
 // because the bus GTFS doesn't include passengers and status, we need to also get stuff from SIRI API
@@ -144,48 +143,48 @@ impl Position {
         Ok(())
     }
 
-    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Self, sqlx::Error> {
-        let rows = sqlx::query(
-            r#"
-            SELECT
-                vehicle_id,
-                mta_id,
-                status,
-                stop_id,
-                updated_at,
-                lat,
-                lon,
-                bearing,
-                passengers,
-                capacity
-            FROM
-                "position" p
-            WHERE 
-                p.updated_at BETWEEN (now() - INTERVAL '5 minutes') AND now()
-            ORDER BY
-                updated_at DESC
-            "#,
-        )
-        .fetch_all(pool)
-        .await?;
+    // pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Self, sqlx::Error> {
+    //     let rows = sqlx::query(
+    //         r#"
+    //         SELECT
+    //             vehicle_id,
+    //             mta_id,
+    //             status,
+    //             stop_id,
+    //             updated_at,
+    //             lat,
+    //             lon,
+    //             bearing,
+    //             passengers,
+    //             capacity
+    //         FROM
+    //             "position" p
+    //         WHERE
+    //             p.updated_at BETWEEN (now() - INTERVAL '5 minutes') AND now()
+    //         ORDER BY
+    //             updated_at DESC
+    //         "#,
+    //     )
+    //     .fetch_all(pool)
+    //     .await?;
 
-        // let mut positions = vec![];
-        // rows.
-        // rows.into_par_iter()
-        //     .map(|row| {
-        //         // let data =
+    //     // let mut positions = vec![];
+    //     // rows.
+    //     // rows.into_par_iter()
+    //     //     .map(|row| {
+    //     //         // let data =
 
-        //         Ok(Self {
-        //             vehicle_id: row.get("vehicle_id"),
-        //             mta_id: row.get("mta_id"),
-        //             status: row.get("status"),
-        //             passengers: row.get("passengers"),
-        //             capacity: row.get("capacity"),
-        //         })
-        //     })
-        //     .collect();
-        todo!()
-    }
+    //     //         Ok(Self {
+    //     //             vehicle_id: row.get("vehicle_id"),
+    //     //             mta_id: row.get("mta_id"),
+    //     //             status: row.get("status"),
+    //     //             passengers: row.get("passengers"),
+    //     //             capacity: row.get("capacity"),
+    //     //         })
+    //     //     })
+    //     //     .collect();
+    //     todo!()
+    // }
 }
 
 impl SiriPosition {

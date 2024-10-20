@@ -1,4 +1,4 @@
-use api::websocket::{Clients, Update};
+// use api::websocket::{Clients, Update};
 use axum::{
     body::Body,
     error_handling::HandleErrorLayer,
@@ -8,13 +8,13 @@ use axum::{
     Router, ServiceExt,
 };
 use bb8_redis::RedisConnectionManager;
-use crossbeam::channel::unbounded;
+// use crossbeam::channel::unbounded;
 // use crossbeam::channel::{Receiver, Sender};
 use http::{request::Parts, HeaderValue, Method, StatusCode};
-use serde_json::json;
+// use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
-    collections::{HashMap, HashSet},
+    // collections::{HashMap, HashSet},
     convert::Infallible,
     env::var,
     sync::{Arc, OnceLock},
@@ -24,7 +24,7 @@ use tokio::{
     signal,
     sync::{
         broadcast::{self, Sender},
-        Mutex, Notify, RwLock,
+        Notify,
     },
 };
 use tower::{buffer::BufferLayer, limit::RateLimitLayer, BoxError, Layer, ServiceBuilder};
@@ -62,12 +62,11 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 struct AppState {
     pg_pool: sqlx::PgPool,
     redis_pool: bb8::Pool<RedisConnectionManager>,
-    // rx: Arc<Mutex<broadcast::Receiver<String>>>,
-    rx: crossbeam::channel::Receiver<Vec<Update>>,
-    clients: Clients,
+    // rx: crossbeam::channel::Receiver<Vec<Update>>,
+    // clients: Clients,
     // tx: Sender<serde_json::Value>,
     // shutdown_tx: Sender<()>,
-    initial_data: Arc<RwLock<serde_json::Value>>,
+    // initial_data: Arc<RwLock<serde_json::Value>>,
 }
 
 #[tokio::main]
@@ -126,9 +125,9 @@ async fn main() {
 
     // This will store alerts and trips for initial websocket load
     // null in rust :explode:
-    let initial_data: Arc<RwLock<serde_json::Value>> = Arc::new(RwLock::new(json!(null)));
+    // let initial_data: Arc<RwLock<serde_json::Value>> = Arc::new(RwLock::new(json!(null)));
 
-    let (tx, rx) = unbounded::<Vec<Update>>();
+    // let (tx, rx) = unbounded::<Vec<Update>>();
     // tx, initial_data.clone()
     realtime::import(pg_pool.clone(), redis_pool.clone()).await;
 
@@ -143,7 +142,7 @@ async fn main() {
 
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
-    let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
+    // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
 
     let routes = Router::new()
         .route(
@@ -184,10 +183,10 @@ async fn main() {
             redis_pool,
             // updated_trips,
             // tx,
-            rx,
-            clients: ws_clients,
+            // rx,
+            // clients: ws_clients,
             // shutdown_tx: shutdown_tx.clone(),
-            initial_data,
+            // initial_data,
         });
     // .layer(Extension(tx1))
     // .layer(Extension(ws_clients))

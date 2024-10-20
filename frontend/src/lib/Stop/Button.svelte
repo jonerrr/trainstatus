@@ -84,7 +84,7 @@
 					{#each routes as route}
 						{@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)}
 						<div class="flex gap-1 items-center">
-							<Icon height="1.2rem" width="1.2rem" express={false} link={false} {route} />
+							<Icon height={20} width={20} express={false} link={false} {route} />
 							<div class="flex gap-1 items-center">
 								{#if route_stop_times.length}
 									{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
@@ -113,7 +113,7 @@
 		<div class="grid gap-1 w-full grid-cols-1" in:fade={{ duration: 300 }}>
 			<div class="flex gap-1 items-center">
 				{#each all_routes as route}
-					<Icon height="1.5rem" width="1.5rem" express={false} link={false} {route} />
+					<Icon height={24} width={24} express={false} link={false} {route} />
 				{/each}
 
 				<div class="font-medium my-auto text-left text-lg">

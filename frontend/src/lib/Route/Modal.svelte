@@ -10,9 +10,10 @@
 
 	interface ModalProps {
 		route: Route;
+		time_format: 'time' | 'countdown';
 	}
 
-	let { route }: ModalProps = $props();
+	let { route, time_format }: ModalProps = $props();
 
 	const alerts = $derived(
 		rt_alerts.alerts_by_route
@@ -89,7 +90,7 @@
 </script>
 
 <div class="flex gap-1 p-1 items-center">
-	<Icon width="2rem" height="2rem" express={false} link={false} {route} />
+	<Icon width={32} height={32} express={false} link={false} {route} />
 
 	<div class="font-medium text-lg flex items-center gap-1">
 		{#if alerts.length && idx < alerts.length}
@@ -138,7 +139,7 @@
 			class="alert relative snap-start snap-always flex flex-col gap-1 items-center justify-center shrink-0 w-full max-h-[65dvh]"
 		>
 			<div
-				class={`${alerts.length > 1 ? 'w-10/12' : ''} max-h-[65dvh] overflow-auto bg-neutral-950`}
+				class={`${alerts.length > 1 ? 'w-10/12' : 'px-1'} max-h-[65dvh] overflow-auto bg-neutral-950 text-center`}
 			>
 				{@html alert.header_html}
 
@@ -147,9 +148,23 @@
 				{/if}
 			</div>
 			<div class="text-s text-neutral-400 px-1 w-full flex justify-between">
-				<div>Updated {dayjs(alert.updated_at).fromNow()}</div>
+				<div class="text-left">
+					Updated
+					{#if time_format === 'countdown'}
+						{dayjs(alert.updated_at).fromNow()}
+					{:else}
+						{dayjs(alert.updated_at).format('h:mm A')}
+					{/if}
+				</div>
 				{#if alert.end_time}
-					<div>End {dayjs(alert.end_time).fromNow()}</div>
+					<div class="text-right">
+						End
+						{#if time_format === 'countdown'}
+							{dayjs(alert.end_time).fromNow()}
+						{:else}
+							{dayjs(alert.end_time).format('h:mm A')}
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</div>

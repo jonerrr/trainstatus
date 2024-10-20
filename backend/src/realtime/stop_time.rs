@@ -22,21 +22,21 @@ pub struct StopTimeWithType {
 }
 
 impl StopTime {
-    pub async fn get(pool: &PgPool, trip_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
-        let stop_times = sqlx::query_as!(
-            StopTime,
-            r#"
-            SELECT *
-            FROM stop_time
-            WHERE trip_id = $1
-            "#,
-            trip_id
-        )
-        .fetch_all(pool)
-        .await?;
+    // pub async fn get(pool: &PgPool, trip_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    //     let stop_times = sqlx::query_as!(
+    //         StopTime,
+    //         r#"
+    //         SELECT *
+    //         FROM stop_time
+    //         WHERE trip_id = $1
+    //         "#,
+    //         trip_id
+    //     )
+    //     .fetch_all(pool)
+    //     .await?;
 
-        Ok(stop_times)
-    }
+    //     Ok(stop_times)
+    // }
 
     pub async fn get_all(
         pool: &PgPool,
