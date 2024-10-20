@@ -25,7 +25,7 @@
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
 		style:background-color={`#${route.color}`}
-		class="p-1 text-lg text-indigo-100 rounded font-bold shadow-2xl"
+		class="p-1 text-lg text-indigo-100 rounded font-bold shadow-2xl text-center"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });
 		}}

@@ -18,7 +18,7 @@
 
 	$effect(() => {
 		if (!search_worker) {
-			console.log('init search worker');
+			// console.log('init search worker');
 			search_worker = new SearchWorker();
 		}
 
@@ -58,41 +58,48 @@
 		search_term = '';
 	}
 
-	function search_stops(e: { target: { value: string } }) {
-		// If search is empty, clear search and show all stops
-		if (e.target.value === '') {
+	// function search_stops(e: { target: { value: string } }) {
+	// 	// If search is empty, clear search and show all stops
+	// 	if (e.target.value === '') {
+	// 		clear_search();
+	// 		return;
+	// 	}
+
+	// 	// search_term = e.target.value;
+	// 	search_worker.postMessage({
+	// 		type: 'search',
+	// 		payload: { search_term, search_type: selected_tab.value }
+	// 	});
+	// }
+
+	$effect(() => {
+		// untrack(() => search_term);
+		// console.log(selected_tab.value);
+		if (search !== 'ready') return;
+
+		if (search_term === '') {
 			clear_search();
 			return;
 		}
 
-		// search_term = e.target.value;
-		search_worker.postMessage({
-			type: 'search',
-			payload: { search_term, search_type: selected_tab.value }
-		});
-	}
-
-	// $effect(() => {
-	// 	untrack(() => search_term);
-
-	// 	if (search === 'ready' && search_term !== '') {
-	// 		console.log('tab changed');
-	// 		search_worker.postMessage({
-	// 			type: 'search',
-	// 			payload: { search_term, search_type: selected_tab.value }
-	// 		});
-	// 	}
-	// });
+		if (search === 'ready') {
+			console.log('searching stops');
+			search_worker.postMessage({
+				type: 'search',
+				payload: { search_term, search_type: selected_tab.value }
+			});
+		}
+	});
 
 	// from https://www.okupter.com/blog/svelte-debounce
-	function debounce(callback: Function, wait = 200) {
-		let timeout: ReturnType<typeof setTimeout>;
+	// function debounce(callback: Function, wait = 200) {
+	// 	let timeout: ReturnType<typeof setTimeout>;
 
-		return (...args: any[]) => {
-			clearTimeout(timeout);
-			timeout = setTimeout(() => callback(...args), wait);
-		};
-	}
+	// 	return (...args: any[]) => {
+	// 		clearTimeout(timeout);
+	// 		timeout = setTimeout(() => callback(...args), wait);
+	// 	};
+	// }
 </script>
 
 <!-- TODO: Fix large here -->
@@ -112,9 +119,9 @@
 />
 
 <div class="absolute bottom-0 w-full">
+	<!-- 		oninput={debounce(search_stops)} -->
 	<input
 		bind:value={search_term}
-		oninput={debounce(search_stops)}
 		type="search"
 		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
 		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-600 focus:ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"

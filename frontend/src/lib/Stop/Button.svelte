@@ -10,11 +10,7 @@
 		type Stop
 	} from '$lib/static';
 	import { type PersistedRune } from '$lib/util.svelte';
-	import {
-		stop_times as rt_stop_times,
-		monitored_routes,
-		type StopTime
-	} from '$lib/stop_times.svelte';
+	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
 	import Button from '$lib/Button.svelte';
 	import BusArrow from './BusArrow.svelte';
@@ -77,7 +73,7 @@
 		)}
 			<!-- <div class="flex flex-col mt-auto" style:width={large ? '' : '40%'}> -->
 			<div class="flex flex-col mt-auto">
-				<div class="text-neutral-200 font-semibold table-cell text-left">
+				<div class="text-neutral-200 font-semibold table-cell text-left max-w-[85%]">
 					{headsign}
 				</div>
 				<div class="flex flex-col gap-1">
@@ -138,7 +134,7 @@
 		{@const data = stop.data as BusStopData}
 		{@const stop_routes = stop.routes as BusRouteStop[]}
 
-		<div class="flex flex-col text-left max-w-[90%]">
+		<div class="flex flex-col text-left">
 			<div class="flex gap-2 items-center">
 				<div>
 					<BusArrow direction={data.direction} />
