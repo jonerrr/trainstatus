@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_period WHERE alert_id = ANY($1))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "228a06f0941553944a310185d178de68de361650234bcd1939b9be2e5aad0385"
+}
