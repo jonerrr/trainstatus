@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowBigRight } from 'lucide-svelte';
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import {
 		is_bus_route,
 		is_train_route,
@@ -13,7 +14,6 @@
 	import Button from '$lib/Button.svelte';
 	import type { Route, Stop } from '$lib/static';
 	import Icon from '$lib/Icon.svelte';
-	import { onMount } from 'svelte';
 
 	interface ButtonProps {
 		trip: Trip<TrainTripData | BusTripData, Route>;
@@ -76,8 +76,8 @@
 	<div class="flex flex-col gap-1 items-center text-left">
 		<div class="flex gap-1 items-center self-start">
 			<Icon
-				width="2rem"
-				height="2rem"
+				width={32}
+				height={32}
 				route={trip.route}
 				link={false}
 				express={is_train_route(trip.route, trip) && trip.data.express}

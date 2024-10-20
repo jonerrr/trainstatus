@@ -10,15 +10,14 @@
 		type Stop,
 		type TrainStopData,
 		is_train as is_train_stop,
-		is_bus as is_bus_stop
+		is_bus as is_bus_stop,
+		type TrainRouteStop
 	} from '$lib/static';
 	import {
 		trips as rt_trips,
 		TripDirection,
 		is_bus,
 		is_train,
-		type BusTripData,
-		type TrainTripData,
 		type Trip,
 		type TripData
 	} from '$lib/trips.svelte';
@@ -65,7 +64,6 @@
 				return {
 					...st,
 					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					// last_stop: trip ? $page.data.stops[last_st!.stop_id].name : 'unknown',
 					trip
 				};
 			})
@@ -80,11 +78,18 @@
 			? stop_times.filter((st) => st.trip.direction === selected_direction.value)
 			: stop_times
 	);
+
+	const always_stop = ['full_time', 'part_time'];
+
+	// only show routes that stop at this stop
+	let stop_routes = stop.routes.filter(
+		(r) => !is_train_stop(stop) || always_stop.includes((r as TrainRouteStop).type!)
+	);
 </script>
 
 <div class="flex gap-1 items-center p-1">
 	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
-		{#each stop.routes as route}
+		{#each stop_routes as route}
 			<Icon
 				width={24}
 				height={24}
@@ -131,7 +136,7 @@
 <ModalList>
 	{#each selected_stop_times as st}
 		<Button state={{ modal: 'trip', data: st.trip }}>
-			<div class="flex gap-2 items-center">
+			<div class="flex items-center gap-1">
 				<div class="flex flex-col items-center">
 					{#if is_bus(stop, st.trip) && st.trip.data.passengers && st.trip.data.capacity}
 						<BusCapacity passengers={st.trip.data.passengers} capacity={st.trip.data.capacity} />
@@ -145,26 +150,15 @@
 						route={$page.data.routes[st.trip.route_id] as Route}
 					/>
 				</div>
-				<div class="flex flex-col" class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}>
-					<!-- if bus trip and theres a deviation more than 2 min -->
-					{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
-						<div
-							class={`text-xs ${st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}`}
-						>
-							{(st.trip.data.deviation / 60).toFixed(0)}m
-						</div>
-					{/if}
 
-					<div class="text-left">
-						{#if time_format === 'time'}
-							{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
-						{:else}
-							{st.eta.toFixed(0)}m
-						{/if}
-					</div>
-
-					{#if st.trip.status === 'layover'}
-						<div class="text-neutral-400 text-xs">+Layover</div>
+				<div class="text-left">
+					{#if is_train_stop(stop)}
+						{@const last_stop_time = rt_stop_times.stop_times
+							.filter((trip_st) => trip_st.trip_id === st.trip.id)
+							.pop()!}
+						{$page.data.stops[last_stop_time.stop_id].name}
+					{:else if is_bus_stop(stop)}
+						{stop.routes.find((r) => r.id === st.trip.route_id)?.headsign}
 					{/if}
 				</div>
 
@@ -175,14 +169,27 @@
 							{/if} -->
 			</div>
 
-			<div class="text-right pl-4">
-				{#if is_train_stop(stop)}
-					{@const last_stop_time = rt_stop_times.stop_times
-						.filter((trip_st) => trip_st.trip_id === st.trip.id)
-						.pop()!}
-					{$page.data.stops[last_stop_time.stop_id].name}
-				{:else if is_bus_stop(stop)}
-					{stop.routes.find((r) => r.id === st.trip.route_id)?.headsign}
+			<div
+				class="flex flex-col items-center"
+				class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}
+			>
+				<!-- if bus trip and theres a deviation more than 2 min -->
+				{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
+					<div class={`text-xs ${st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}`}>
+						{(st.trip.data.deviation / 60).toFixed(0)}m
+					</div>
+				{/if}
+
+				<div class="text-right">
+					{#if time_format === 'time'}
+						{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+					{:else}
+						{st.eta.toFixed(0)}m
+					{/if}
+				</div>
+
+				{#if st.trip.status === 'layover'}
+					<div class="text-neutral-400 text-xs">+Layover</div>
 				{/if}
 			</div>
 		</Button>
