@@ -27,13 +27,6 @@
 
 	let idx = $state(0);
 
-	// $effect(() => {
-	// 	// check if idx is out of bounds
-	// 	if (idx >= alerts.length) {
-	// 		idx = 0
-	// 	}
-	// });
-
 	let scroll_area: HTMLDivElement | undefined;
 
 	function manage_scroll(node: HTMLDivElement) {
@@ -44,7 +37,7 @@
 						const alert_els = node.querySelectorAll('.alert') as NodeListOf<HTMLDivElement>;
 						const index = Array.prototype.indexOf.call(alert_els, entry.target);
 
-						console.log({ index, alert_els, entry });
+						// console.log({ index, alert_els, entry });
 						if (index !== -1) {
 							idx = index;
 						}
@@ -89,7 +82,7 @@
 	});
 </script>
 
-<div class="flex gap-1 p-1 items-center">
+<header class="flex gap-1 p-1 items-center">
 	<Icon width={32} height={32} express={false} link={false} {route} />
 
 	<div class="font-medium text-lg flex items-center gap-1">
@@ -105,7 +98,7 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</header>
 
 <div
 	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
@@ -135,7 +128,7 @@
 		</button>
 	{/if}
 	{#each alerts as alert}
-		<div
+		<article
 			class="alert relative snap-start snap-always flex flex-col gap-1 items-center justify-center shrink-0 w-full max-h-[65dvh]"
 		>
 			<div
@@ -167,6 +160,6 @@
 					</div>
 				{/if}
 			</div>
-		</div>
+		</article>
 	{/each}
 </div>

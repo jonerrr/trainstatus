@@ -56,7 +56,7 @@
 	if (auto_scroll) {
 		$effect(() => {
 			if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
-				console.log('scrolling list into view');
+				// console.log('scrolling list into view');
 				list_div.scrollIntoView({ behavior: 'smooth' });
 			}
 		});
@@ -92,7 +92,7 @@
 
 			// whenever list changes, recalculate height
 			const observer = new MutationObserver(() => {
-				console.log('list mutation');
+				// console.log('list mutation');
 				// if (min_items)
 				get_items();
 			});

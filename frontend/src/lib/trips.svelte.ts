@@ -15,7 +15,7 @@ export interface Trip<T extends TripData, R = never> {
 	route: R;
 }
 
-type TripData = TrainTripData | BusTripData;
+export type TripData = TrainTripData | BusTripData;
 
 export interface TrainTripData {
 	express: boolean;
