@@ -59,7 +59,7 @@
 	});
 </script>
 
-<div class="flex flex-col px-1 bg-neutral-900">
+<div class="flex flex-col px-1 bg-neutral-900 pb-1">
 	<div class="font-medium">Transfers:</div>
 	<div class="flex gap-2 items-center justify-evenly">
 		{#if transfers.length}

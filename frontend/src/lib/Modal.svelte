@@ -90,7 +90,7 @@
 	title: string,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
-	<div class="flex gap-1 items-center justify-between px-1 h-12">
+	<div class="flex gap-1 items-center justify-between px-1 h-16">
 		<button
 			onclick={() => {
 				close();
@@ -100,7 +100,7 @@
 			<CircleX size="2rem" />
 		</button>
 
-		<div class="flex gap-1 items-center">
+		<div class="flex gap-1 items-center text-xs">
 			<!-- TODO: make history button work -->
 			<!-- {#if history}
 				<button
@@ -116,6 +116,7 @@
 			{/if} -->
 
 			<button
+				class="flex flex-col items-center"
 				aria-label="Change time formatting"
 				onclick={() => {
 					time_format.value = time_format.value === 'countdown' ? 'time' : 'countdown';
@@ -126,13 +127,14 @@
 				{:else}
 					<Timer size="2rem" />
 				{/if}
+				<!-- Time Format -->
 			</button>
 
 			{#if !copied}
 				<button
 					aria-label="Share"
 					onclick={() => {
-						const url = `${window.location.origin}/?d=${id}`;
+						const url = `${window.location.origin}?d=${id}`;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {

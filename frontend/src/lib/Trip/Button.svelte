@@ -29,7 +29,9 @@
 		}
 	});
 
-	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
+	const stop_times = $derived(
+		rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id && st.arrival > new Date())!
+	);
 
 	const last_stop = $derived.by(() => {
 		if (!stop_times.length) return 'Unknown';

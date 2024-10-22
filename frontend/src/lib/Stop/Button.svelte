@@ -40,7 +40,7 @@
 					route_id: trip?.route_id
 				};
 			})
-			// TODO: fix so we don't need to filter (maybe store trips in map)
+			// TODO: prevent trips that don't exist from having stop times
 			.filter((st) => st.direction !== undefined && st.eta >= 0) as StopTime<
 			number,
 			TripDirection,
@@ -52,7 +52,7 @@
 {#snippet eta(n: number)}
 	{@const eta = n.toFixed(0)}
 	{#key eta}
-		<span class="" in:fade={{ duration: 300 }}>
+		<span in:fade={{ duration: 300 }}>
 			{eta}m
 		</span>
 	{/key}
@@ -71,7 +71,6 @@
 			routes: Route[],
 			stop_times: StopTime<number, TripDirection, string>[]
 		)}
-			<!-- <div class="flex flex-col mt-auto" style:width={large ? '' : '40%'}> -->
 			<div class="flex flex-col mt-auto">
 				<div class="text-neutral-200 font-semibold table-cell text-left max-w-[85%]">
 					{headsign}

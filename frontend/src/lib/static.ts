@@ -101,3 +101,12 @@ export const is_bus = (s: Stop<'bus' | 'train'>): s is Stop<'bus'> => {
 export const is_train = (s: Stop<'bus' | 'train'>): s is Stop<'train'> => {
 	return (s as Stop<'train'>).type === 'train';
 };
+
+// these stop types should be shown
+const always_stop = ['full_time', 'part_time'];
+// get the main stop routes for a stop
+export const main_stop_routes = (stop: Stop<'bus' | 'train'>) => {
+	return stop.routes.filter(
+		(r) => !is_train(stop) || always_stop.includes((r as TrainRouteStop).type!)
+	);
+};
