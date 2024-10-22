@@ -11,7 +11,7 @@
 		type TrainStopData,
 		is_train as is_train_stop,
 		is_bus as is_bus_stop,
-		type TrainRouteStop
+		main_stop_routes
 	} from '$lib/static';
 	import {
 		trips as rt_trips,
@@ -79,17 +79,13 @@
 			: stop_times
 	);
 
-	const always_stop = ['full_time', 'part_time'];
-
 	// only show routes that stop at this stop
-	let stop_routes = stop.routes.filter(
-		(r) => !is_train_stop(stop) || always_stop.includes((r as TrainRouteStop).type!)
-	);
+	let route_stops = main_stop_routes(stop);
 </script>
 
 <div class="flex gap-1 items-center p-1">
 	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
-		{#each stop_routes as route}
+		{#each route_stops as route}
 			<Icon
 				width={24}
 				height={24}

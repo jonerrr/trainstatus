@@ -16,6 +16,7 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import Transfers from './Transfers.svelte';
+	import { slide } from 'svelte/transition';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -108,7 +109,7 @@
 <ModalList>
 	{#each stop_times as st}
 		{@const stop = $page.data.stops[st.stop_id]}
-		<div class="relative">
+		<div class="relative text-base">
 			<Button state={{ modal: 'stop', data: stop }}>
 				<div class="flex flex-col w-full">
 					<div class="flex items-center justify-between">
@@ -116,7 +117,7 @@
 							{stop.name}
 						</div>
 
-						<div class="flex gap-1 items-center text-right pr-6">
+						<div class="flex gap-1 items-center text-right pr-24">
 							<div class="text-left">
 								{#if time_format === 'time'}
 									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
@@ -138,18 +139,23 @@
 					}
 				}}
 				aria-label="Show transfers at stop"
-				class="rounded bg-neutral-800 z-50 absolute right-0 top-[50%] -translate-y-1/2"
+				class="rounded bg-neutral-800 z-20 absolute right-1 top-[50%] -translate-y-1/2"
 			>
-				{#if !open_transfers[st.stop_id]}
-					<ChevronDown />
-				{:else}
-					<ChevronUp />
-				{/if}
+				<div class="flex items-center text-xs pl-1">
+					Transfers
+					{#if !open_transfers[st.stop_id]}
+						<ChevronDown />
+					{:else}
+						<ChevronUp />
+					{/if}
+				</div>
 			</button>
 		</div>
 
 		{#if open_transfers[st.stop_id]}
-			<Transfers stop_time={st} {trip} {time_format} />
+			<div transition:slide={{ duration: 250 }}>
+				<Transfers stop_time={st} {trip} {time_format} />
+			</div>
 		{/if}
 	{/each}
 </ModalList>
