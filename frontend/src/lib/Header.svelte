@@ -3,7 +3,7 @@
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative">
-	<div class="gradient-text font-bold">Trainstat.us</div>
+	<div class="gradient-text font-bold">TrainStat.us</div>
 
 	<!-- <TimeSelect /> -->
 

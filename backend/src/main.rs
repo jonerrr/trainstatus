@@ -80,7 +80,7 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    tracing::info!("Starting trainstat.us API v{}", VERSION);
+    tracing::info!("Starting TrainStat.us API v{}", VERSION);
 
     let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
         .expect("DATABASE_URL env not set")
@@ -136,7 +136,7 @@ async fn main() {
             .allow_methods([Method::GET])
             .allow_origin(AllowOrigin::predicate(
                 |origin: &HeaderValue, _request_parts: &Parts| {
-                    origin.as_bytes().ends_with(b".trainstat.us")
+                    origin.as_bytes().ends_with(b".TrainStat.us")
                 },
             ));
 
@@ -149,7 +149,7 @@ async fn main() {
             "/",
             get(|| async {
                 let res =
-                    Response::new(Body::from(format!("Trainstat.us API\nVersion: {VERSION}")));
+                    Response::new(Body::from(format!("TrainStat.us API\nVersion: {VERSION}")));
                 Ok::<_, Infallible>(res)
             }),
         )

@@ -149,6 +149,61 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
+pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
+    // Convert hundredths of minutes to duration
+    let minutes = origin_time as f64 / 100.0;
+    let total_seconds = (minutes * 60.0) as i64;
+
+    // Handle negative times and times past midnight
+    let normalized_seconds = total_seconds.rem_euclid(24 * 60 * 60);
+
+    // Extract hours, minutes, seconds
+    let hours = (normalized_seconds / 3600) as u32;
+    let minutes = ((normalized_seconds % 3600) / 60) as u32;
+    let seconds = (normalized_seconds % 60) as u32;
+
+    NaiveTime::from_hms_opt(hours, minutes, seconds)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normal_time() {
+        // 021150 -> 03:31:30
+        let result = parse_origin_time(21150);
+        assert_eq!(result, NaiveTime::from_hms_opt(3, 31, 30));
+    }
+
+    #[test]
+    fn test_negative_time() {
+        // -200 -> 23:58:00 (previous day)
+        let result = parse_origin_time(-200);
+        assert_eq!(result, NaiveTime::from_hms_opt(23, 58, 0));
+    }
+
+    #[test]
+    fn test_next_day_time() {
+        // 145000 -> 00:10:00 (next day)
+        let result = parse_origin_time(145000);
+        assert_eq!(result, NaiveTime::from_hms_opt(0, 10, 0));
+    }
+
+    #[test]
+    fn test_exact_midnight() {
+        let result = parse_origin_time(0);
+        assert_eq!(result, NaiveTime::from_hms_opt(0, 0, 0));
+    }
+
+    #[test]
+    fn test_end_of_day() {
+        // 144000 -> 24:00:00 -> 00:00:00
+        let result = parse_origin_time(144000);
+        assert_eq!(result, NaiveTime::from_hms_opt(0, 0, 0));
+    }
+}
+
 impl TryFrom<TripDescriptor> for Trip {
     type Error = IntoTripError;
 
@@ -183,26 +238,58 @@ impl TryFrom<TripDescriptor> for Trip {
             Some(time) => NaiveTime::parse_from_str(&time, "%H:%M:%S")?,
             None => {
                 // This is how you parse the origin time according to MTA's gtfs docs
-                let mut origin_time =
-                    trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
+                let origin_time = trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
 
-                // time greater than 1440 (1 day) means its the next day or negative means its the previous day
-                if origin_time > 1440 {
-                    origin_time -= 1440;
-                } else if origin_time < 0 {
-                    origin_time += 1440;
-                }
+                // let total_minutes = if origin_time < 0 {
+                //     origin_time + 1440 * 100
+                // } else if origin_time >= 1440 * 100 {
+                //     origin_time - 1440 * 100
+                // } else {
+                //     origin_time
+                // };
 
-                match NaiveTime::from_hms_opt(
-                    origin_time as u32 / 60,
-                    origin_time as u32 % 60,
-                    ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
-                ) {
-                    Some(time) => time,
-                    None => {
-                        return Err(IntoTripError::StartTime);
-                    }
-                }
+                // // Convert hundredths of a minute to hours, minutes, and seconds
+                // let minutes = total_minutes / 100;
+                // let seconds = ((total_minutes as f32 % 1.0) * 60.0 * 60.0) as u32;
+
+                // let hours = minutes / 60;
+                // let minutes = minutes % 60;
+
+                // match NaiveTime::from_hms_opt(hours as u32, minutes as u32, seconds) {
+                //     Some(time) => time,
+                //     None => Err(IntoTripError::StartTime(format!(
+                //         "Invalid time: {}",
+                //         origin_time
+                //     )))?,
+                // }
+
+                parse_origin_time(origin_time).ok_or(IntoTripError::StartTime(format!(
+                    "Invalid time: {}",
+                    origin_time
+                )))?
+
+                // // time greater than 1440 (1 day) means its the next day or negative means its the previous day
+                // if origin_time >= 1440 {
+                //     dbg!("change origin time", origin_time);
+                //     origin_time -= 1440;
+                //     dbg!("changed origin time", origin_time, &trip_id);
+                // } else if origin_time <= 0 {
+                //     origin_time += 1440;
+                // }
+
+                // match NaiveTime::from_hms_opt(
+                //     origin_time as u32 / 60,
+                //     origin_time as u32 % 60,
+                //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
+                // ) {
+                //     Some(time) => time,
+                //     None => {
+                //         return Err(IntoTripError::StartTime(format!(
+                //             "Invalid time: {}",
+                //             origin_time
+                //         )));
+                //     }
+                // }
             }
         };
 
