@@ -286,7 +286,7 @@ pub enum IntoTripError {
     #[error("Direction not found")]
     Direction,
     #[error("Start time not found")]
-    StartTime,
+    StartTime(String),
     #[error("Start date not found")]
     StartDate,
     #[error("vehicle descriptor not found")]

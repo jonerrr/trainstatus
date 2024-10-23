@@ -1,4 +1,4 @@
-# Trainstat.us
+# TrainStat.us
 
 The best website to check the status of your train (and bus).
 
