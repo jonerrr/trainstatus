@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, History, Timer, Clock, AlarmClock } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from 'lucide-svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/stores';
 	// import { slide } from 'svelte/transition';
@@ -76,12 +76,6 @@
 	// show stops/trips before current datetime
 	let show_previous = $state(false);
 	let time_format = persisted_rune<'countdown' | 'time'>('time_format', 'countdown');
-
-	// $effect(() => {
-	// 	page.subscribe((val) => {
-	// 		console.log(val.state);
-	// 	});
-	// });
 </script>
 
 {#snippet actions(
@@ -96,6 +90,7 @@
 				close();
 			}}
 			aria-label="Close modal"
+			title="Close modal"
 		>
 			<CircleX size="2rem" />
 		</button>
@@ -118,6 +113,7 @@
 			<button
 				class="flex flex-col items-center"
 				aria-label="Change time formatting"
+				title="Change time formatting"
 				onclick={() => {
 					time_format.value = time_format.value === 'countdown' ? 'time' : 'countdown';
 				}}
@@ -133,6 +129,7 @@
 			{#if !copied}
 				<button
 					aria-label="Share"
+					title="Share"
 					onclick={() => {
 						const url = `${window.location.origin}?d=${id}`;
 
@@ -165,7 +162,7 @@
 {/snippet}
 
 <!-- close modal on escape key -->
-<svelte:window onkeydown={($event) => $page.state.modal && $event.key === 'Escape' && close()} />
+<svelte:window onkeydown={($event) => $page.state.modal && $event.key == 'Escape' && close()} />
 
 {#if $page.state.modal}
 	<div
@@ -176,7 +173,7 @@
 		<div
 			role="dialog"
 			aria-modal="true"
-			class="bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0 pb-2"
+			class="snap-start bg-neutral-900 w-full md:w-[60%] rounded flex flex-col fixed bottom-0"
 		>
 			{#if $page.state.modal === 'stop'}
 				<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />

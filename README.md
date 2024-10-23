@@ -15,9 +15,10 @@ The best website to check the status of your train (and bus).
 - View historical data
 - Simple API for developers
 
-## Build Requirements
+## Requirements
 
 - Postgres
+- Redis
 - Node.js
 - Pnpm
 - Rust
