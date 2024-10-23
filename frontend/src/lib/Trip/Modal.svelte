@@ -2,6 +2,8 @@
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { slide } from 'svelte/transition';
+	import { cubicInOut, quintOut } from 'svelte/easing';
 	import { stop_times as rt_stop_times, monitored_routes } from '$lib/stop_times.svelte';
 	import type { Stop } from '$lib/static';
 	import {
@@ -16,7 +18,6 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import Transfers from './Transfers.svelte';
-	import { slide } from 'svelte/transition';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -110,14 +111,36 @@
 	{#each stop_times as st}
 		{@const stop = $page.data.stops[st.stop_id]}
 		<div class="relative text-base">
+			<button
+				tabindex="0"
+				onclick={() => {
+					if (open_transfers[st.stop_id]) {
+						open_transfers[st.stop_id] = false;
+					} else {
+						open_transfers[st.stop_id] = true;
+					}
+				}}
+				aria-label="Show transfers at stop"
+				class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded"
+			>
+				<div class="flex items-center mx-1">
+					<!-- Transfers -->
+					{#if !open_transfers[st.stop_id]}
+						<ChevronDown />
+					{:else}
+						<ChevronUp />
+					{/if}
+				</div>
+			</button>
+
 			<Button state={{ modal: 'stop', data: stop }}>
 				<div class="flex flex-col w-full">
 					<div class="flex items-center justify-between">
-						<div class="text-left">
+						<div class="text-left pl-10">
 							{stop.name}
 						</div>
 
-						<div class="flex gap-1 items-center text-right pr-24">
+						<div class="flex gap-1 items-center text-right">
 							<div class="text-left">
 								{#if time_format === 'time'}
 									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
@@ -129,31 +152,10 @@
 					</div>
 				</div>
 			</Button>
-			<button
-				tabindex="0"
-				onclick={() => {
-					if (open_transfers[st.stop_id]) {
-						open_transfers[st.stop_id] = false;
-					} else {
-						open_transfers[st.stop_id] = true;
-					}
-				}}
-				aria-label="Show transfers at stop"
-				class="rounded bg-neutral-800 z-20 absolute right-1 top-[50%] -translate-y-1/2"
-			>
-				<div class="flex items-center text-xs pl-1">
-					Transfers
-					{#if !open_transfers[st.stop_id]}
-						<ChevronDown />
-					{:else}
-						<ChevronUp />
-					{/if}
-				</div>
-			</button>
 		</div>
 
 		{#if open_transfers[st.stop_id]}
-			<div transition:slide={{ duration: 250 }}>
+			<div transition:slide={{ easing: cubicInOut, duration: 250 }}>
 				<Transfers stop_time={st} {trip} {time_format} />
 			</div>
 		{/if}

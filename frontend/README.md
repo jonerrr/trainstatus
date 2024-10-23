@@ -1,3 +1,5 @@
-# frontend
+# Frontend
 
-made with svelte 5
+## Structure
+
+- Trips, routes, and stops, each have a `Button` and `Modal` component.

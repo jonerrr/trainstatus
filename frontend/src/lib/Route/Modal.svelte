@@ -100,6 +100,17 @@
 	</div>
 </header>
 
+<!-- handle arrow keys -->
+<svelte:window
+	onkeydown={($event) => {
+		if ($event.key === 'ArrowLeft' && idx > 0) {
+			scroll_to_alert(idx - 1);
+		} else if ($event.key === 'ArrowRight' && idx < alerts.length - 1) {
+			scroll_to_alert(idx + 1);
+		}
+	}}
+/>
+
 <div
 	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
 	bind:this={scroll_area}

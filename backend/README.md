@@ -2,8 +2,10 @@
 
 ## Structure
 
-- The `train` and `bus` folders and `alert.rs` file each contain the logic for parsing GTFS data into the database.
-- The `routes` folder contains all the API routes
+- `protos` folder contains GTFS protobuf definitions
+- `realtime` folder contains SIRI, GTFS-RT, parsing and handling logic
+- `static_data` folder contains fetching and parsing static bus and train data logic
+- `api` folder contains the API routes
 
 ## Config
 
