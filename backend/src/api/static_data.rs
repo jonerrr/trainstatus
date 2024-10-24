@@ -24,37 +24,53 @@ pub async fn routes_handler(
     params: Query<Parameters>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ServerError> {
-    if params.geom || params.route_type.is_some() {
-        let routes =
-            route::Route::get_all(&state.pg_pool, params.route_type.as_ref(), params.geom).await?;
+    match (params.geom, &params.route_type) {
+        (true, Some(route::RouteType::Bus)) => {
+            let mut conn = state.redis_pool.get().await?;
+            let geojson: String = conn.get("routes_geojson").await?;
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                header::CONTENT_TYPE,
+                "application/geo+json".parse().unwrap(),
+            );
 
-        Ok((
-            StatusCode::OK,
-            json_headers().clone(),
-            serde_json::to_string(&routes)?,
-        ))
-    } else {
-        let mut conn = state.redis_pool.get().await?;
-        let (routes, routes_hash): (String, String) = conn.mget(&["routes", "routes_hash"]).await?;
-
-        if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-            let etag = routes_hash.parse::<ETag>().unwrap();
-
-            // if the etag matches the request, return 304
-            if !if_none_match.precondition_passes(&etag) {
-                return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
-            }
+            Ok((StatusCode::OK, headers, geojson))
         }
+        (true, _) | (_, Some(_)) => {
+            let routes =
+                route::Route::get_all(&state.pg_pool, params.route_type.as_ref(), params.geom)
+                    .await?;
 
-        let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-        headers.insert(header::ETAG, routes_hash.parse().unwrap());
-        headers.insert(
-            header::CACHE_CONTROL,
-            "public, max-age=3600, must-revalidate".parse().unwrap(),
-        );
+            Ok((
+                StatusCode::OK,
+                json_headers().clone(),
+                serde_json::to_string(&routes)?,
+            ))
+        }
+        _ => {
+            let mut conn = state.redis_pool.get().await?;
+            let (routes, routes_hash): (String, String) =
+                conn.mget(&["routes", "routes_hash"]).await?;
 
-        Ok((StatusCode::OK, headers, routes))
+            if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
+                let etag = routes_hash.parse::<ETag>().unwrap();
+
+                // if the etag matches the request, return 304
+                if !if_none_match.precondition_passes(&etag) {
+                    return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
+                }
+            }
+
+            let mut headers = HeaderMap::new();
+            headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+            headers.insert(header::ETAG, routes_hash.parse().unwrap());
+            headers.insert(
+                header::CACHE_CONTROL,
+                "public, max-age=3600, must-revalidate".parse().unwrap(),
+            );
+
+            Ok((StatusCode::OK, headers, routes))
+        }
     }
 }
 

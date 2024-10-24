@@ -9,7 +9,6 @@ use polyline::decode_polyline;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::json;
 use sqlx::{PgPool, QueryBuilder};
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -20,11 +19,12 @@ pub struct Route {
     pub color: String,
     pub shuttle: bool,
     // optional for api response
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub geom: Option<serde_json::Value>,
     pub route_type: RouteType,
 }
 
-#[derive(sqlx::Type, Serialize, Deserialize, Debug)]
+#[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq)]
 #[sqlx(type_name = "route_type", rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RouteType {
@@ -68,7 +68,7 @@ impl Route {
         query.push(" FROM route");
 
         if let Some(route_type) = route_type {
-            query.push(" WHERE route_type = $1");
+            query.push(" WHERE route_type = ");
             query.push_bind(route_type as &RouteType);
         }
         query.push(" ORDER BY id");
@@ -76,7 +76,7 @@ impl Route {
         query.build_query_as().fetch_all(pool).await
     }
 
-    pub fn parse_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
+    pub fn parse_train(gtfs_routes: Vec<GtfsRoute>, gtfs_geom: Vec<GtfsRouteGeom>) -> Vec<Self> {
         gtfs_routes
             .into_iter()
             .filter_map(|r| {
@@ -84,7 +84,21 @@ impl Route {
                 if r.route_id.ends_with("X") {
                     None
                 } else {
-                    Some(r.into())
+                    // let route_geom = gtfs_geom
+                    //     .iter()
+                    //     .filter(|g| g.shape_id == r.route_id)
+                    //     .map(|g| (g.shape_pt_lat, g.shape_pt_lon))
+                    //     .collect::<Vec<(f32, f32)>>();
+
+                    Some(Route {
+                        id: r.route_id,
+                        long_name: r.route_long_name,
+                        short_name: r.route_short_name,
+                        color: r.route_color,
+                        shuttle: false,
+                        geom: Some(serde_json::json!({})),
+                        route_type: RouteType::Train,
+                    })
                 }
             })
             .collect::<Vec<Route>>()
@@ -219,23 +233,24 @@ pub struct GtfsRoute {
     route_color: String,
 }
 
-impl From<GtfsRoute> for Route {
-    fn from(value: GtfsRoute) -> Self {
-        // let mut route_id = value.route_id.clone();
-        // if value.route_id.ends_with('X') {
-        //     route_id.pop();
-        // }
+fn de_split_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str = String::deserialize(deserializer)?;
+    str.split_once('.')
+        .map(|(id, _)| id.to_string())
+        .ok_or("failed to split id")
+        .map_err(serde::de::Error::custom)
+}
 
-        Route {
-            id: value.route_id,
-            long_name: value.route_long_name,
-            short_name: value.route_short_name,
-            color: value.route_color,
-            shuttle: false,
-            geom: Some(json!({})),
-            route_type: RouteType::Train,
-        }
-    }
+#[derive(Deserialize, Clone)]
+pub struct GtfsRouteGeom {
+    #[serde(deserialize_with = "de_split_id")]
+    shape_id: String,
+    shape_pt_sequence: i32,
+    shape_pt_lat: f32,
+    shape_pt_lon: f32,
 }
 
 #[derive(Deserialize, Clone)]

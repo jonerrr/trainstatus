@@ -1,6 +1,8 @@
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
+use geo::CoordsIter;
 use redis::AsyncCommands;
+use serde_json::json;
 use sqlx::PgPool;
 use std::{
     env::{remove_var, var},
@@ -37,14 +39,21 @@ pub async fn import(
                     let duration_since_last_update =
                         Utc::now().signed_duration_since(last_updated.update_at);
 
-                    // Check if the data is older than 3 days
-                    if duration_since_last_update.num_days() <= 3 {
-                        // Sleep until it has been 3 days, take into account the time since last update
-                        let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
-                            .checked_sub(duration_since_last_update.to_std().unwrap())
-                            .unwrap();
-                        tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
-                        sleep(sleep_time).await;
+                    // Sleep until it has been 3 days, take into account the time since last update
+                    let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
+                        .checked_sub(duration_since_last_update.to_std().unwrap());
+
+                    match sleep_time {
+                        Some(sleep_time) => {
+                            tracing::info!(
+                                "Waiting {} seconds before updating",
+                                sleep_time.as_secs()
+                            );
+                            sleep(sleep_time).await;
+                        }
+                        None => {
+                            tracing::info!("Duration since last update is greater than 3 days, no need to wait.");
+                        }
                     }
                 }
             } else {
@@ -63,15 +72,19 @@ pub async fn import(
                 .unwrap();
 
             // bc the zip crate doesn't support tokio, we need to read it all here (I think i can remove this and the issue i was having was just bc i forgot to clone the archive)
-            let (gtfs_routes, gtfs_transfers) = tokio::task::spawn_blocking(move || {
+            let (gtfs_routes, gtfs_transfers, gtfs_geom) = tokio::task::spawn_blocking(move || {
                 let reader = Cursor::new(gtfs);
                 let mut archive = zip::ZipArchive::new(reader).unwrap();
                 let mut archive2 = archive.clone();
+                let mut archive3 = archive.clone();
+
                 let routes_file = archive.by_name("routes.txt").unwrap();
                 let transfers_file = archive2.by_name("transfers.txt").unwrap();
+                let shape_file = archive3.by_name("shapes.txt").unwrap();
 
                 let mut routes_rdr = csv::Reader::from_reader(routes_file);
                 let mut transfers_rdr = csv::Reader::from_reader(transfers_file);
+                let mut shape_rdr = csv::Reader::from_reader(shape_file);
 
                 let routes = routes_rdr
                     .deserialize()
@@ -82,28 +95,34 @@ pub async fn import(
                     .deserialize()
                     .collect::<Result<Vec<stop::Transfer<String>>, csv::Error>>()
                     .unwrap();
-                (routes, transfers)
+
+                let geom = shape_rdr
+                    .deserialize()
+                    .collect::<Result<Vec<route::GtfsRouteGeom>, csv::Error>>()
+                    .unwrap();
+
+                (routes, transfers, geom)
             })
             .await
             .unwrap();
 
-            let mut routes = route::Route::parse_train(gtfs_routes);
-            let (mut stops, route_stops) = stop::Stop::parse_train(
+            let mut routes = route::Route::parse_train(gtfs_routes, gtfs_geom);
+            let (mut stops, mut route_stops) = stop::Stop::parse_train(
                 routes.iter().map(|r| r.id.clone()).collect(),
                 gtfs_transfers,
             )
             .await;
-            let (mut bus_routes, mut bus_stops, bus_route_stops) = route::Route::parse_bus().await;
+            let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
+                route::Route::parse_bus().await;
             routes.append(&mut bus_routes);
             stops.append(&mut bus_stops);
-            // route_stops.append(&mut bus_route_stops);
+            route_stops.append(&mut bus_route_stops);
 
             // dbg!(bus_route_stops.len());
             route::Route::insert(routes, &pool).await;
             stop::Stop::insert(stops, &pool).await;
-            // TODO: figure out why i cant combine train and bus without getting pg duplicate conflict error
+
             stop::RouteStop::insert(route_stops, &pool).await;
-            stop::RouteStop::insert(bus_route_stops, &pool).await;
 
             // remove old update_ats
             sqlx::query!("DELETE FROM last_update")
@@ -132,6 +151,36 @@ pub async fn cache_all(
     let stops = stop::Stop::get_all(&pool).await?;
     let routes = route::Route::get_all(&pool, None, false).await?;
 
+    // cache geojson of bus routes
+    let bus_routes = route::Route::get_all(&pool, Some(&route::RouteType::Bus), true).await?;
+
+    let features = bus_routes
+        .into_iter()
+        .map(|r| {
+            let geom: geo::MultiLineString = serde_json::from_value(r.geom.unwrap()).unwrap();
+
+            json!({
+                "type": "Feature",
+                "properties": {
+                    "route_id": r.id,
+                    "route_short_name": r.short_name,
+                    "route_long_name": r.long_name,
+                    "route_type": r.route_type,
+                },
+                "geometry": {
+                    "type": "MultiLineString",
+                    "coordinates": geom.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>(),
+                },
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let bus_routes_geojson = json!({
+        "type": "FeatureCollection",
+        "features": features,
+    })
+    .to_string();
+
     let stops_json = serde_json::to_string(&stops).unwrap();
     let routes_json = serde_json::to_string(&routes).unwrap();
 
@@ -142,6 +191,7 @@ pub async fn cache_all(
     let items = [
         ("stops", stops_json),
         ("routes", routes_json),
+        ("routes_geojson", bus_routes_geojson),
         ("stops_hash", format!(r#""{stops_hash}""#)),
         ("routes_hash", format!(r#""{routes_hash}""#)),
     ];
