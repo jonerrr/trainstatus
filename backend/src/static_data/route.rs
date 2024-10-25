@@ -1,3 +1,5 @@
+use std::{collections::HashMap, fmt};
+
 use crate::{
     api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
@@ -30,6 +32,12 @@ pub struct Route {
 pub enum RouteType {
     Train,
     Bus,
+}
+
+impl fmt::Display for RouteType {
+    fn fmt(&self, r: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, r)
+    }
 }
 
 impl Route {
@@ -76,7 +84,34 @@ impl Route {
         query.build_query_as().fetch_all(pool).await
     }
 
-    pub fn parse_train(gtfs_routes: Vec<GtfsRoute>, gtfs_geom: Vec<GtfsRouteGeom>) -> Vec<Self> {
+    pub async fn parse_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
+        let train_geom = reqwest::Client::new()
+            .get("https://data.cityofnewyork.us/resource/s7zz-qmyz.json")
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<TrainLine>>()
+            .await
+            .unwrap();
+
+        let mut line_geom: HashMap<String, Vec<LineString<f32>>> = HashMap::new();
+        for train in train_geom {
+            let lines = train.name.split('-').collect::<Vec<_>>();
+
+            for line in lines {
+                let geom = train
+                    .the_geom
+                    .coordinates
+                    .iter()
+                    .map(|c| (c[0], c[1]))
+                    .collect::<Vec<_>>();
+                line_geom
+                    .entry(line.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(LineString::from(geom));
+            }
+        }
+
         gtfs_routes
             .into_iter()
             .filter_map(|r| {
@@ -84,11 +119,21 @@ impl Route {
                 if r.route_id.ends_with("X") {
                     None
                 } else {
-                    // let route_geom = gtfs_geom
-                    //     .iter()
-                    //     .filter(|g| g.shape_id == r.route_id)
-                    //     .map(|g| (g.shape_pt_lat, g.shape_pt_lon))
-                    //     .collect::<Vec<(f32, f32)>>();
+                    let geom = line_geom
+                        .get(&r.route_short_name)
+                        .map(|lines| {
+                            MultiLineString::new(
+                                lines
+                                    .iter()
+                                    .map(|l| l.clone())
+                                    .collect::<Vec<LineString<f32>>>(),
+                            )
+                        })
+                        .map(|g| serde_json::to_value(g).unwrap())
+                        .unwrap_or_else(|| {
+                            tracing::warn!("no geometry for route {}", r.route_short_name);
+                            serde_json::json!(null)
+                        });
 
                     Some(Route {
                         id: r.route_id,
@@ -96,7 +141,7 @@ impl Route {
                         short_name: r.route_short_name,
                         color: r.route_color,
                         shuttle: false,
-                        geom: Some(serde_json::json!({})),
+                        geom: Some(geom),
                         route_type: RouteType::Train,
                     })
                 }
@@ -233,24 +278,26 @@ pub struct GtfsRoute {
     route_color: String,
 }
 
-fn de_split_id<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    str.split_once('.')
-        .map(|(id, _)| id.to_string())
-        .ok_or("failed to split id")
-        .map_err(serde::de::Error::custom)
+// fn de_split_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let str = String::deserialize(deserializer)?;
+//     str.split_once('.')
+//         .map(|(id, _)| id.to_string())
+//         .ok_or("failed to split id")
+//         .map_err(serde::de::Error::custom)
+// }
+
+#[derive(Deserialize, Clone)]
+pub struct TrainLine {
+    name: String,
+    the_geom: TrainGeom,
 }
 
 #[derive(Deserialize, Clone)]
-pub struct GtfsRouteGeom {
-    #[serde(deserialize_with = "de_split_id")]
-    shape_id: String,
-    shape_pt_sequence: i32,
-    shape_pt_lat: f32,
-    shape_pt_lon: f32,
+pub struct TrainGeom {
+    coordinates: Vec<[f32; 2]>,
 }
 
 #[derive(Deserialize, Clone)]

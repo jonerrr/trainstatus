@@ -9,8 +9,15 @@ use chrono::Utc;
 use redis::AsyncCommands;
 use serde::Deserialize;
 
+#[derive(Deserialize)]
+pub struct TripsParameters {
+    #[serde(default)]
+    geojson: bool,
+}
+
 pub async fn trips_handler(
     State(state): State<AppState>,
+    params: Query<TripsParameters>,
 ) -> Result<impl IntoResponse, ServerError> {
     // let trips = Trip::get_all(&state.pg_pool, Utc::now()).await?;
 
@@ -21,14 +28,14 @@ pub async fn trips_handler(
 }
 
 #[derive(Deserialize)]
-pub struct Parameters {
+pub struct StopTimesParameters {
     #[serde(deserialize_with = "parse_list", default)]
     bus_route_ids: Vec<String>,
 }
 
 pub async fn stop_times_handler(
     State(state): State<AppState>,
-    params: Query<Parameters>,
+    params: Query<StopTimesParameters>,
 ) -> Result<impl IntoResponse, ServerError> {
     // let stop_times = if params.bus_route_ids.is_empty() {
     //     StopTime::get_all(&state.pg_pool, Utc::now(), None).await?

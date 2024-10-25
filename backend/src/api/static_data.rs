@@ -1,5 +1,5 @@
 use super::errors::ServerError;
-use super::json_headers;
+// use super::json_headers;
 use crate::static_data::route;
 use crate::AppState;
 use axum::extract::Query;
@@ -13,7 +13,7 @@ use serde::Deserialize;
 pub struct Parameters {
     // include geometry, default is false
     #[serde(default)]
-    geom: bool,
+    geojson: bool,
     // filter for bus or train routes
     #[serde(default)]
     route_type: Option<route::RouteType>,
@@ -24,10 +24,17 @@ pub async fn routes_handler(
     params: Query<Parameters>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ServerError> {
-    match (params.geom, &params.route_type) {
-        (true, Some(route::RouteType::Bus)) => {
+    match (params.geojson, &params.route_type) {
+        (true, route_type) => {
             let mut conn = state.redis_pool.get().await?;
-            let geojson: String = conn.get("routes_geojson").await?;
+            let geojson: String = match route_type {
+                Some(route_type) => {
+                    conn.get(format!("routes_geojson_{}", route_type.to_string()))
+                        .await?
+                }
+                None => conn.get("routes_geojson").await?,
+            };
+            // conn.get("routes_geojson").await?;
             let mut headers = HeaderMap::new();
             headers.insert(
                 header::CONTENT_TYPE,
@@ -35,17 +42,6 @@ pub async fn routes_handler(
             );
 
             Ok((StatusCode::OK, headers, geojson))
-        }
-        (true, _) | (_, Some(_)) => {
-            let routes =
-                route::Route::get_all(&state.pg_pool, params.route_type.as_ref(), params.geom)
-                    .await?;
-
-            Ok((
-                StatusCode::OK,
-                json_headers().clone(),
-                serde_json::to_string(&routes)?,
-            ))
         }
         _ => {
             let mut conn = state.redis_pool.get().await?;
