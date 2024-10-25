@@ -159,9 +159,11 @@ pub async fn cache_all(
                 "type": "Feature",
                 "id": s.id,
                 "properties": {
-                    "stop_id": s.id,
-                    "stop_name": s.name,
+                    "id": s.id,
+                    "name": s.name,
                     "route_type": s.route_type,
+                    "routes": s.routes,
+                    "data": s.data,
                 },
                 "geometry": {
                     "type": "Point",
@@ -184,15 +186,17 @@ pub async fn cache_all(
             |(mut bus_acc, mut train_acc), r| {
                 let geom: geo::MultiLineString =
                     serde_json::from_value(r.geom.clone().unwrap()).unwrap();
-
+                
                 let feature = json!({
                     "type": "Feature",
                     "id": r.id,
                     "properties": {
-                        "route_id": r.id,
-                        "route_short_name": r.short_name,
-                        "route_long_name": r.long_name,
+                        "id": r.id,
+                        "short_name": r.short_name,
+                        "long_name": r.long_name,
                         "route_type": r.route_type,
+                        "color": format!("#{}", r.color),
+                        "shuttle": r.shuttle,
                     },
                     "geometry": {
                         "type": "MultiLineString",

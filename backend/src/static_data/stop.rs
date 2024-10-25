@@ -280,10 +280,7 @@ impl Stop<StopData> {
     //     todo!("return bus stops")
     // }
 
-    pub async fn get_all(
-        pool: &PgPool,
-        // route_type: Option<RouteType>,
-    ) -> Result<Vec<Stop<serde_json::Value>>, sqlx::Error> {
+    pub async fn get_all(pool: &PgPool) -> Result<Vec<Stop<serde_json::Value>>, sqlx::Error> {
         sqlx::query_as!(
             Stop::<serde_json::Value>,
             r#"
