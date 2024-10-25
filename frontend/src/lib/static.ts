@@ -32,7 +32,7 @@ export interface Stop<T extends keyof StopMapping> {
 	lon: number;
 	data: StopMapping[T]['data'];
 	routes: StopMapping[T]['routes'][];
-	type: T;
+	route_type: T;
 }
 
 // export interface Stop<D extends StopData, R extends RouteStop> {
@@ -95,11 +95,11 @@ export interface TrainRouteStop {
 // }
 
 export const is_bus = (s: Stop<'bus' | 'train'>): s is Stop<'bus'> => {
-	return (s as Stop<'bus'>).type === 'bus';
+	return (s as Stop<'bus'>).route_type === 'bus';
 };
 
 export const is_train = (s: Stop<'bus' | 'train'>): s is Stop<'train'> => {
-	return (s as Stop<'train'>).type === 'train';
+	return (s as Stop<'train'>).route_type === 'train';
 };
 
 // these stop types should be shown
