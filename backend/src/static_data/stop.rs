@@ -1,15 +1,19 @@
+use super::route::RouteType;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 
+// generic is StopData for importing but serde_json value for exporting
 #[derive(Serialize)]
-pub struct Stop {
+pub struct Stop<D> {
     //    Bus stops are already numbers, but train stop ids are converted to numbers by their unicode value
     pub id: i32,
     pub name: String,
     pub lat: f32,
     pub lon: f32,
-    pub data: StopData,
+    pub route_type: RouteType,
+    pub data: D,
+    pub routes: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -93,17 +97,18 @@ pub fn convert_stop_id(stop_id: String) -> Option<i32> {
     Some(stop_id.parse().unwrap())
 }
 
-impl Stop {
+impl Stop<StopData> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
         for chunk in values.chunks(32000 / 12) {
             let mut query_builder = QueryBuilder::new(
-            "INSERT INTO stop (id, name, lat, lon, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
+            "INSERT INTO stop (id, name, lat, lon, route_type, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
         );
             query_builder.push_values(chunk, |mut b, stop| {
                 b.push_bind(stop.id)
                     .push_bind(&stop.name)
                     .push_bind(stop.lat)
-                    .push_bind(stop.lon);
+                    .push_bind(stop.lon)
+                    .push_bind(&stop.route_type);
 
                 match &stop.data {
                     StopData::Bus { direction } => {
@@ -142,7 +147,7 @@ impl Stop {
     pub async fn parse_train(
         routes: Vec<String>,
         mut transfers: Vec<Transfer<String>>,
-    ) -> (Vec<Stop>, Vec<RouteStop>) {
+    ) -> (Vec<Stop<StopData>>, Vec<RouteStop>) {
         let mut stations: Vec<StationResponse> = vec![];
         let mut route_stops: Vec<RouteStop> = vec![];
 
@@ -224,6 +229,8 @@ impl Stop {
                     name: station_data.stop_name.to_owned(),
                     lat: station.stop.lat,
                     lon: station.stop.lon,
+                    route_type: RouteType::Train,
+                    routes: None,
                     data: StopData::Train {
                         ada: station_data.ada,
                         north_headsign: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
@@ -273,60 +280,71 @@ impl Stop {
     //     todo!("return bus stops")
     // }
 
-    pub async fn get_all(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
-        let stops: (serde_json::Value,) = sqlx::query_as(
+    pub async fn get_all(
+        pool: &PgPool,
+        // route_type: Option<RouteType>,
+    ) -> Result<Vec<Stop<serde_json::Value>>, sqlx::Error> {
+        sqlx::query_as!(
+            Stop::<serde_json::Value>,
             r#"
-            SELECT json_agg(result)
-            FROM (
-                SELECT
-                    s.id,
-                    s.name,
-                    s.lat,
-                    s.lon,
-                    CASE 
-                        WHEN s.borough IS NOT NULL THEN 'train'
-                        ELSE 'bus'
-                    END AS type,
-                    CASE
-                        WHEN s.borough IS NOT NULL THEN jsonb_build_object(
-                            'ada', s.ada,
-                            'north_headsign', s.north_headsign,
-                            'south_headsign', s.south_headsign,
-                            'transfers', s.transfers,
-                            'notes', s.notes,
-                            'borough', s.borough
-                        )
-                        ELSE jsonb_build_object(
-                            'direction', s.direction
-                        )
-                    END AS data,
-                    json_agg(
-                        CASE
-                            WHEN s.borough IS NOT NULL THEN jsonb_build_object(
-                                'id', rs.route_id,
-                                'stop_sequence', rs.stop_sequence,
-                                'type', rs."stop_type"
-                            )
-                            ELSE jsonb_build_object(
-                                'id', rs.route_id,
-                                'stop_sequence', rs.stop_sequence,
-                                'headsign', rs.headsign,
-                                'direction', rs.direction
-                            )
-                        END
-                    ) AS routes
-                FROM
-                    stop s
-                LEFT JOIN route_stop rs ON
-                    s.id = rs.stop_id
-                GROUP BY
-                    s.id
-            ) AS result;"#,
+            SELECT
+                s.id,
+                s.name,
+                s.lat,
+                s.lon,
+                s.route_type as "route_type!: RouteType",
+                CASE
+                    WHEN s.route_type = 'train' THEN jsonb_build_object(
+                                        'ada',
+                    s.ada,
+                    'north_headsign',
+                    s.north_headsign,
+                    'south_headsign',
+                    s.south_headsign,
+                    'transfers',
+                    s.transfers,
+                    'notes',
+                    s.notes,
+                    'borough',
+                    s.borough
+                                    )
+                    ELSE jsonb_build_object(
+                                        'direction',
+                    s.direction
+                                    )
+                END AS DATA,
+                json_agg(
+                                    CASE
+                    WHEN s."route_type" = 'train' THEN jsonb_build_object(
+                                            'id',
+                    rs.route_id,
+                    'stop_sequence',
+                    rs.stop_sequence,
+                    'type',
+                    rs."stop_type"
+                                        )
+                    ELSE jsonb_build_object(
+                                            'id',
+                    rs.route_id,
+                    'stop_sequence',
+                    rs.stop_sequence,
+                    'headsign',
+                    rs.headsign,
+                    'direction',
+                    rs.direction
+                                        )
+                END
+                                ) AS routes
+            FROM
+                stop s
+            LEFT JOIN route_stop rs ON
+                s.id = rs.stop_id
+            GROUP BY
+                s.id
+        "#
         )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(stops.0)
+        .fetch_all(pool)
+        .await
     }
 }
 

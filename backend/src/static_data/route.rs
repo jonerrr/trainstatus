@@ -149,10 +149,10 @@ impl Route {
             .collect::<Vec<Route>>()
     }
 
-    pub async fn parse_bus() -> (Vec<Self>, Vec<Stop>, Vec<RouteStop>) {
+    pub async fn parse_bus() -> (Vec<Self>, Vec<Stop<StopData>>, Vec<RouteStop>) {
         // It wouldn't make sense to get bus routes and stops at different times bc they are all from the same API
         let mut routes: Vec<Route> = Vec::new();
-        let mut stops: Vec<Stop> = Vec::new();
+        let mut stops: Vec<Stop<StopData>> = Vec::new();
         let mut route_stops: Vec<RouteStop> = Vec::new();
 
         let all_routes = AgencyBusRoute::get_all().await;
@@ -216,13 +216,15 @@ impl Route {
                     id: s.code,
                     name: s.name,
                     lat: s.lat,
+                    route_type: RouteType::Bus,
+                    routes: None,
                     data: StopData::Bus {
                         // this can be a blank string
                         direction: s.direction,
                     },
                     lon: s.lon,
                 })
-                .collect::<Vec<Stop>>();
+                .collect::<Vec<_>>();
             // let s_names = stops_n.iter().map(|s| s.1.clone()).collect::<Vec<String>>();
             // println!("{:?}", s_names);
             stops.extend(stops_n);

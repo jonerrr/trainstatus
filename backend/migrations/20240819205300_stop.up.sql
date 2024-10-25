@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS stop (
     name VARCHAR NOT NULL,
     lat REAL NOT NULL,
     lon REAL NOT NULL,
+    route_type route_type NOT NULL,
     -- train fields
     ada BOOLEAN,
     north_headsign VARCHAR,

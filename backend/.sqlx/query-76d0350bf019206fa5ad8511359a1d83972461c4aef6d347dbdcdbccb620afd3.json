@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    t.id,\n                    t.mta_id,\n                    t.vehicle_id,\n                    t.route_id,\n                    t.direction,\n                    t.created_at,\n                    t.updated_at,\n                    p.stop_id,\n                    p.status as \"status!: Status\",\n                    p.lat as \"lat!\",\n                    p.lon as \"lon!\",\n                    p.capacity,\n                    p.passengers,\n                    t.deviation\n                FROM\n                    trip t\n                LEFT JOIN \"position\" p ON\n                    t.vehicle_id = p.vehicle_id\n                WHERE\n                    t.updated_at >= now() - INTERVAL '5 minutes'\n                    AND \n                    p.lat IS NOT NULL\n                    AND p.lon IS NOT NULL\n                    AND \n                                t.id = ANY(\n                    SELECT\n                        t.id\n                    FROM\n                        trip t\n                    LEFT JOIN stop_time st ON\n                        st.trip_id = t.id\n                    WHERE\n                        st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')\n                                    )\n                ORDER BY\n                    t.created_at DESC\n                        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "mta_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "vehicle_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "stop_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "status!: Status",
+        "type_info": {
+          "Custom": {
+            "name": "status",
+            "kind": {
+              "Enum": [
+                "none",
+                "incoming",
+                "at_stop",
+                "in_transit_to",
+                "spooking",
+                "layover",
+                "no_progress"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "lat!",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 10,
+        "name": "lon!",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 11,
+        "name": "capacity",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "passengers",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "deviation",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "76d0350bf019206fa5ad8511359a1d83972461c4aef6d347dbdcdbccb620afd3"
+}

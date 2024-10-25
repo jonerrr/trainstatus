@@ -151,35 +151,12 @@ pub async fn import(
         }
     });
 
+    // sleep 10 seconds to wait for the feeds to be imported before caching
+    // sleep(Duration::from_secs(10)).await;
+
     // cache data in redis
     tokio::spawn(async move {
         loop {
-            // if let Ok(trips) = trip::Trip::get_all(&c_pool, Utc::now()).await {
-            //     // TODO: don't unwrap
-            //     let mut conn = redis_pool.get().await.unwrap();
-            //     let _: () = conn
-            //         .set("trips", serde_json::to_string(&trips).unwrap())
-            //         .await
-            //         .unwrap();
-            // };
-            // if let Ok(stop_times) = stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
-            //     // TODO: don't unwrap
-            //     let mut conn = redis_pool.get().await.unwrap();
-            //     let _: () = conn
-            //         .set("stop_times", serde_json::to_string(&stop_times).unwrap())
-            //         .await
-            //         .unwrap();
-            // };
-
-            // if let Ok(alerts) = alert::Alert::get_all(&c_pool, Utc::now()).await {
-            //     // TODO: don't unwrap
-            //     let mut conn = redis_pool.get().await.unwrap();
-            //     let _: () = conn
-            //         .set("alerts", serde_json::to_string(&alerts).unwrap())
-            //         .await
-            //         .unwrap();
-            // };
-
             match trip::Trip::get_all(&c_pool, Utc::now()).await {
                 Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
                     Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now()).await {
