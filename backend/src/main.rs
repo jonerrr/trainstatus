@@ -136,7 +136,7 @@ async fn main() {
             .allow_methods([Method::GET])
             .allow_origin(AllowOrigin::predicate(
                 |origin: &HeaderValue, _request_parts: &Parts| {
-                    origin.as_bytes().ends_with(b".TrainStat.us")
+                    origin.as_bytes().ends_with(b".trainstat.us")
                 },
             ));
 
