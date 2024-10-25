@@ -147,87 +147,149 @@ pub async fn cache_all(
     redis_pool: bb8::Pool<RedisConnectionManager>,
 ) -> Result<(), sqlx::Error> {
     let stops = stop::Stop::get_all(&pool).await?;
-    let routes = route::Route::get_all(&pool, None, false).await?;
+    let mut routes = route::Route::get_all(&pool, None, true).await?;
 
-    // cache geojson of bus routes
-    let routes_w_geom = route::Route::get_all(&pool, None, true).await?;
+    // cache geojson
+    // let routes_w_geom = route::Route::get_all(&pool, None, true).await?;
 
-    let bus_features = routes_w_geom
-        .iter()
-        .filter_map(|r| {
-            if r.route_type != route::RouteType::Bus {
-                return None;
-            }
-            let geom: geo::MultiLineString =
-                serde_json::from_value(r.geom.clone().unwrap()).unwrap();
-
-            Some(json!({
+    let (bus_stop_features, train_stop_features) = stops.iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut bus_acc, mut train_acc), s| {
+            let feature = json!({
                 "type": "Feature",
-                "id": r.id,
+                "id": s.id,
                 "properties": {
-                    "route_id": r.id,
-                    "route_short_name": r.short_name,
-                    "route_long_name": r.long_name,
-                    "route_type": r.route_type,
+                    "stop_id": s.id,
+                    "stop_name": s.name,
+                    "route_type": s.route_type,
                 },
                 "geometry": {
-                    "type": "MultiLineString",
-                    "coordinates": geom.lines_iter().map(|l| l.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>()).collect::<Vec<_>>(),
+                    "type": "Point",
+                    "coordinates": [s.lon, s.lat],
                 },
-            }))
-        })
-        .collect::<Vec<_>>();
+            });
 
-    let train_features = routes_w_geom
-        .iter()
-        .filter_map(|r| {
-            // SIR doesn't have any geometry for some reason
-            if r.route_type != route::RouteType::Train || r.id == "SI" {
-                return None;
+            match s.route_type {
+                route::RouteType::Bus => bus_acc.push(feature),
+                route::RouteType::Train => train_acc.push(feature),
             }
 
-            let geom: geo::MultiLineString =
-                serde_json::from_value(r.geom.clone().unwrap()).unwrap();
+            (bus_acc, train_acc)
+        },
+    );
 
-            Some(json!({
-                "type": "Feature",
-                "id": r.id,
-                "properties": {
-                    "route_id": r.id,
-                    "route_short_name": r.short_name,
-                    "route_long_name": r.long_name,
-                    "route_type": r.route_type,
-                },
-                "geometry": {
-                    "type": "MultiLineString",
-                    "coordinates": geom.lines_iter().map(|l| l.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>()).collect::<Vec<_>>(),
-                },
-            }))
-        })
-        .collect::<Vec<_>>();
+    let (bus_route_features, train_route_features) =
+        routes.iter().filter(|r| &r.id != "SI").fold(
+            (Vec::new(), Vec::new()),
+            |(mut bus_acc, mut train_acc), r| {
+                let geom: geo::MultiLineString =
+                    serde_json::from_value(r.geom.clone().unwrap()).unwrap();
 
-    let features = bus_features
+                let feature = json!({
+                    "type": "Feature",
+                    "id": r.id,
+                    "properties": {
+                        "route_id": r.id,
+                        "route_short_name": r.short_name,
+                        "route_long_name": r.long_name,
+                        "route_type": r.route_type,
+                    },
+                    "geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": geom.lines_iter().map(|l| l.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>()).collect::<Vec<_>>(),
+                    },
+                });
+
+                match r.route_type {
+                    route::RouteType::Bus => bus_acc.push(feature),
+                    route::RouteType::Train => train_acc.push(feature),
+                }
+
+                (bus_acc, train_acc)
+            },
+        );
+
+    // combine bus and train features into one vec
+    let stop_features = bus_stop_features
         .iter()
-        .chain(train_features.iter())
+        .chain(train_stop_features.iter())
         .collect::<Vec<_>>();
 
+    let route_features = bus_route_features
+        .iter()
+        .chain(train_route_features.iter())
+        .collect::<Vec<_>>();
+
+    // stops geojson
+    let bus_stop_geojson = json!({
+        "type": "FeatureCollection",
+        "features": bus_stop_features,
+    })
+    .to_string();
+    let train_stop_geojson = json!({
+        "type": "FeatureCollection",
+        "features": train_stop_features,
+    })
+    .to_string();
+    let stops_geojson = json!({
+        "type": "FeatureCollection",
+        "features": stop_features,
+    })
+    .to_string();
+
+    // routes geojson
     let bus_routes_geojson = json!({
         "type": "FeatureCollection",
-        "features": bus_features,
+        "features": bus_route_features,
     })
     .to_string();
     let train_route_geojson = json!({
         "type": "FeatureCollection",
-        "features": train_features,
+        "features": train_route_features,
     })
     .to_string();
     let routes_geojson = json!({
         "type": "FeatureCollection",
-        "features": features,
+        "features": route_features,
     })
     .to_string();
 
+    // remove geometry from routes before caching
+    for r in routes.iter_mut() {
+        r.geom = None;
+    }
+
+    // save bus and train route and stops to redis
+    let (bus_stops, train_stops) = stops.iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut bus_acc, mut train_acc), s| {
+            match s.route_type {
+                route::RouteType::Bus => bus_acc.push(s),
+                route::RouteType::Train => train_acc.push(s),
+            }
+
+            (bus_acc, train_acc)
+        },
+    );
+
+    let (bus_routes, train_routes) = routes.iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut bus_acc, mut train_acc), r| {
+            match r.route_type {
+                route::RouteType::Bus => bus_acc.push(r),
+                route::RouteType::Train => train_acc.push(r),
+            }
+
+            (bus_acc, train_acc)
+        },
+    );
+
+    let bus_stops_json = serde_json::to_string(&bus_stops).unwrap();
+    let train_stops_json = serde_json::to_string(&train_stops).unwrap();
     let stops_json = serde_json::to_string(&stops).unwrap();
+
+    let bus_routes_json = serde_json::to_string(&bus_routes).unwrap();
+    let train_routes_json = serde_json::to_string(&train_routes).unwrap();
     let routes_json = serde_json::to_string(&routes).unwrap();
 
     // hash stops and routes so we can use them in an eTag
@@ -236,7 +298,31 @@ pub async fn cache_all(
 
     let items = [
         ("stops", stops_json),
+        (&format!("stops_{}", route::RouteType::Bus), bus_stops_json),
+        (
+            &format!("stops_{}", route::RouteType::Train),
+            train_stops_json,
+        ),
         ("routes", routes_json),
+        (
+            &format!("routes_{}", route::RouteType::Bus),
+            bus_routes_json,
+        ),
+        (
+            &format!("routes_{}", route::RouteType::Train),
+            train_routes_json,
+        ),
+        ("stops_hash", format!(r#""{stops_hash}""#)),
+        ("routes_hash", format!(r#""{routes_hash}""#)),
+        (
+            &format!("stops_geojson_{}", route::RouteType::Bus),
+            bus_stop_geojson,
+        ),
+        (
+            &format!("stops_geojson_{}", route::RouteType::Train),
+            train_stop_geojson,
+        ),
+        ("stops_geojson", stops_geojson),
         (
             &format!("routes_geojson_{}", route::RouteType::Bus),
             bus_routes_geojson,
@@ -246,8 +332,6 @@ pub async fn cache_all(
             train_route_geojson,
         ),
         ("routes_geojson", routes_geojson),
-        ("stops_hash", format!(r#""{stops_hash}""#)),
-        ("routes_hash", format!(r#""{routes_hash}""#)),
     ];
 
     // TODO: don't unwrap

@@ -154,7 +154,6 @@ impl Trip {
                 t.route_id,
                 t.direction,
                 t.created_at,
-                p.vehicle_id,
                 p.stop_id,
                 p.status,
                 CASE

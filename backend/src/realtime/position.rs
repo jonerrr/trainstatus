@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::PgPool;
 // use uuid::Uuid;
 
@@ -22,7 +23,7 @@ pub struct SiriPosition {
     pub capacity: Option<i32>,
 }
 
-#[derive(sqlx::Type, Clone)]
+#[derive(sqlx::Type, Clone, Serialize)]
 #[sqlx(type_name = "status", rename_all = "snake_case")]
 pub enum Status {
     None,
