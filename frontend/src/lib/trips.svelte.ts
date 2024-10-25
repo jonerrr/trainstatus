@@ -109,14 +109,14 @@ export const is_bus = (
 	s: Stop<'bus' | 'train'>,
 	t: Trip<TrainTripData | BusTripData>
 ): t is Trip<BusTripData> => {
-	return s.type === 'bus';
+	return s.route_type === 'bus';
 };
 
 export const is_train = (
 	s: Stop<'bus' | 'train'>,
 	t: Trip<TrainTripData | BusTripData>
 ): t is Trip<TrainTripData> => {
-	return s.type === 'train';
+	return s.route_type === 'train';
 };
 
 // type guards for trip and route.

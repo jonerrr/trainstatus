@@ -74,7 +74,7 @@
 	let selected_direction = persisted_rune('direction', TripDirection.North);
 	// if its a train, we only want to show stop times for the selected direction
 	let selected_stop_times = $derived(
-		stop.type === 'train'
+		stop.route_type === 'train'
 			? stop_times.filter((st) => st.trip.direction === selected_direction.value)
 			: stop_times
 	);
@@ -84,7 +84,7 @@
 </script>
 
 <div class="flex gap-1 items-center p-1">
-	<div class="flex gap-1" class:flex-col={stop.type === 'bus'}>
+	<div class="flex gap-1" class:flex-col={stop.route_type === 'bus'}>
 		{#each route_stops as route}
 			<Icon
 				width={24}
@@ -192,7 +192,7 @@
 	{/each}
 </ModalList>
 
-{#if stop.type === 'train'}
+{#if stop.route_type === 'train'}
 	{@const stop_data = stop.data as TrainStopData}
 
 	{#snippet direction_tab(direction: TripDirection, name: string)}
