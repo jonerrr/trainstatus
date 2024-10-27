@@ -33,6 +33,7 @@ pub struct BusTrip {
     capacity: Option<i32>,
     passengers: Option<i32>,
     deviation: Option<i32>,
+    bearing: Option<f32>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -59,7 +60,8 @@ pub async fn trips_handler(
                     p.lon as "lon!",
                     p.capacity,
                     p.passengers,
-                    t.deviation
+                    t.deviation,
+                    p.bearing
                 FROM
                     trip t
                 LEFT JOIN "position" p ON
@@ -104,6 +106,7 @@ pub async fn trips_handler(
                         "capacity": t.capacity,
                         "passengers": t.passengers,
                         "deviation": t.deviation,
+                        "bearing": t.bearing,
                         "created_at": t.created_at,
                         "updated_at": t.updated_at
                     },
