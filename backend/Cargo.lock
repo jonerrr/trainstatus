@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "0.7.6"
+version = "0.7.7"
 dependencies = [
  "axum",
  "bb8",

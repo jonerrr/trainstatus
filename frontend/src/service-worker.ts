@@ -64,7 +64,8 @@ sw.addEventListener('fetch', (event) => {
 				throw new Error('invalid response from fetch');
 			}
 
-			if (response.status === 200) {
+			// if the response is OK and http (prevents caching chrome-extension:// etc)
+			if (response.status === 200 && url.protocol.startsWith('http')) {
 				cache.put(event.request, response.clone());
 			}
 
