@@ -52,9 +52,9 @@
 			}
 		}
 
-		page.subscribe((val) => {
-			console.log(val.state);
-		});
+		// page.subscribe((val) => {
+		// 	console.log(val.state);
+		// });
 	});
 
 	const monitored_routes_arr = $derived(
@@ -65,7 +65,7 @@
 
 	$effect(() => {
 		if (monitored_routes_arr.join(',') === last_monitored_routes) return;
-		console.log('updating stop times', monitored_routes_arr);
+		// console.log('updating stop times', monitored_routes_arr);
 		stop_times.update(fetch, monitored_routes_arr).then((o) => {
 			// last_st_update = new Date();
 			offline = o;
@@ -79,7 +79,7 @@
 			// TODO: update more often if offline
 			// TODO: exponential backoff
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
-				console.log('Updating rt data');
+				// console.log('Updating rt data');
 				trips.update(fetch).then((o) => {
 					// last_st_update = new Date();
 					offline = o;
@@ -93,7 +93,7 @@
 			}
 
 			if (new Date().getTime() - last_st_update.getTime() > 1000 * 60) {
-				console.log('Updating stop times');
+				// console.log('Updating stop times');
 				stop_times.update(fetch, monitored_routes_arr);
 				last_st_update = new Date();
 				last_monitored_routes = monitored_routes_arr.join(',');

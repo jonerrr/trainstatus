@@ -70,6 +70,19 @@
 
 	// $inspect(alerts);
 
+	function debounce(callback: Function, wait = 100) {
+		let timeout: ReturnType<typeof setTimeout>;
+
+		return (...args: any[]) => {
+			clearTimeout(timeout);
+			timeout = setTimeout(() => callback(...args), wait);
+		};
+	}
+
+	function debounce_scroll_to_alert(i: number) {
+		debounce(scroll_to_alert)(i);
+	}
+
 	$effect(() => {
 		// onMount(() => {
 		// remove href from all links in alert-text id. I don't want people leaving my website ):<
@@ -104,9 +117,9 @@
 <svelte:window
 	onkeydown={($event) => {
 		if ($event.key === 'ArrowLeft' && idx > 0) {
-			scroll_to_alert(idx - 1);
+			debounce_scroll_to_alert(idx - 1);
 		} else if ($event.key === 'ArrowRight' && idx < alerts.length - 1) {
-			scroll_to_alert(idx + 1);
+			debounce_scroll_to_alert(idx + 1);
 		}
 	}}
 />

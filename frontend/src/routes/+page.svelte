@@ -57,7 +57,7 @@
 	);
 
 	$effect.pre(() => {
-		console.log('removing old trip pins');
+		// console.log('removing old trip pins');
 		untrack(
 			() => (trip_pins_rune.value = trip_pins_rune.value.filter((id) => trips.trips.has(id)))
 		);
