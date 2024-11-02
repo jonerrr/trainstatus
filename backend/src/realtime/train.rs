@@ -9,7 +9,8 @@ use crate::{
     feed::{trip_update::StopTimeUpdate, TripDescriptor, VehiclePosition},
     static_data::stop::convert_stop_id,
 };
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono_tz::America::New_York;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
 // use tokio::sync::RwLock;
@@ -293,10 +294,22 @@ impl TryFrom<TripDescriptor> for Trip {
             }
         };
 
-        let created_at = NaiveDateTime::new(start_date, start_time)
-            .and_local_timezone(chrono_tz::America::New_York)
-            .unwrap()
-            .to_utc();
+        // let created_at = NaiveDateTime::new(start_date, start_time)
+        //     .and_local_timezone(chrono_tz::America::New_York)
+        //     .unwrap()
+        //     .to_utc();
+        let local_time = NaiveDateTime::new(start_date, start_time);
+        let created_at = match New_York.from_local_datetime(&local_time) {
+            chrono::LocalResult::Single(dt) => dt,
+            chrono::LocalResult::Ambiguous(dt1, _dt2) => dt1, // Choose the earliest time
+            chrono::LocalResult::None => {
+                return Err(IntoTripError::StartTime(format!(
+                    "Invalid time: {}",
+                    local_time
+                )));
+            }
+        }
+        .with_timezone(&Utc);
 
         Ok(Trip {
             id: Uuid::now_v7(),

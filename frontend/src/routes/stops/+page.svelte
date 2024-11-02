@@ -83,7 +83,7 @@
 		}
 
 		if (search === 'ready') {
-			console.log('searching stops');
+			// console.log('searching stops');
 			search_worker.postMessage({
 				type: 'search',
 				payload: { search_term, search_type: selected_tab.value }

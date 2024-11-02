@@ -47,7 +47,7 @@
 			current_monitored_routes.push(...stop.routes.map((r) => r.id));
 			// keep a max of 20 monitored routes for modal
 			monitored_routes.set('modal', current_monitored_routes.slice(-20));
-			console.log('modal monitoring route');
+			// console.log('modal monitoring route');
 		}
 	});
 
