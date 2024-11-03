@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from 'lucide-svelte';
+	import { onMount } from 'svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/stores';
-	// import { slide } from 'svelte/transition';
 	import {
 		stop_pins_rune,
 		trip_pins_rune,
@@ -14,9 +14,6 @@
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
-	import { onMount } from 'svelte';
-
-	// let modal_el: HTMLDivElement;
 
 	function close() {
 		// enable_scroll();
@@ -76,21 +73,8 @@
 	// manage title changes
 	onMount(() => {
 		page.subscribe(({ state, route }) => {
-			console.log(route, state.modal);
+			// console.log(route, state.modal);
 			switch (state.modal) {
-				// case null:
-				// 	switch (route.id) {
-				// 		case '/stops':
-				// 			document.title = 'Stops';
-				// 			break;
-				// 		case '/alerts':
-				// 			document.title = 'Alerts';
-				// 			break;
-				// 		default:
-				// 			document.title = 'TrainStat.us';
-				// 			break;
-				// 	}
-				// 	break;
 				case 'route':
 					document.title = `Alerts for ${state.data.id}`;
 					break;
