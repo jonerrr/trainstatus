@@ -113,13 +113,13 @@
 />
 
 <div
-	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950 relative"
+	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
 	bind:this={scroll_area}
 	use:manage_scroll
 >
 	{#each alerts as alert}
 		<article
-			class="alert relative snap-start snap-always flex flex-col gap-1 items-center shrink-0 w-full max-h-[65dvh]"
+			class="alert snap-start snap-always flex flex-col gap-1 items-center justify-between shrink-0 w-full max-h-[65dvh]"
 		>
 			<div class="px-1 max-h-[65dvh] overflow-auto bg-neutral-950">
 				{@html alert.header_html}
@@ -152,34 +152,34 @@
 	{/each}
 
 	{#if alerts.length > 1}
-		<div class="fixed z-40 size-full translate-y-[62%]">
-			<div class="flex gap-2 justify-center items-center">
+		<div class="absolute bottom-0 -translate-y-16 w-full flex gap-2 justify-center items-center">
+			<!-- <div class="flex  w-fit"> -->
+			<button
+				disabled={idx === 0}
+				class:text-neutral-500={idx === 0}
+				aria-label="Previous alert"
+				onclick={() => scroll_to_alert(idx - 1)}
+			>
+				<ChevronLeft />
+			</button>
+			{#each alerts as _alert, i}
 				<button
-					disabled={idx === 0}
-					class:text-neutral-500={idx === 0}
-					aria-label="Previous alert"
-					onclick={() => scroll_to_alert(idx - 1)}
+					class="rounded-full bg-neutral-300 size-3"
+					class:bg-neutral-500={i !== idx}
+					aria-label="Scroll to alert"
+					onclick={() => scroll_to_alert(i)}
 				>
-					<ChevronLeft />
 				</button>
-				{#each alerts as _alert, i}
-					<button
-						class="rounded-full bg-neutral-300 size-3"
-						class:bg-neutral-500={i !== idx}
-						aria-label="Scroll to alert"
-						onclick={() => scroll_to_alert(i)}
-					>
-					</button>
-				{/each}
-				<button
-					disabled={idx === alerts.length - 1}
-					class:text-neutral-500={idx === alerts.length - 1}
-					aria-label="Next alert"
-					onclick={() => scroll_to_alert(idx + 1)}
-				>
-					<ChevronRight />
-				</button>
-			</div>
+			{/each}
+			<button
+				disabled={idx === alerts.length - 1}
+				class:text-neutral-500={idx === alerts.length - 1}
+				aria-label="Next alert"
+				onclick={() => scroll_to_alert(idx + 1)}
+			>
+				<ChevronRight />
+			</button>
+			<!-- </div> -->
 		</div>
 	{/if}
 </div>
