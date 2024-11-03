@@ -102,6 +102,10 @@
 	// }
 </script>
 
+<svelte:head>
+	<title>Stops</title>
+</svelte:head>
+
 <!-- TODO: Fix large here -->
 {#snippet stop_button(stop: Stop<'bus' | 'train'>)}
 	<StopButton {stop} pin_rune={stop_pins_rune} />

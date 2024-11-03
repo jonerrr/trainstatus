@@ -14,6 +14,7 @@
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
+	import { onMount } from 'svelte';
 
 	// let modal_el: HTMLDivElement;
 
@@ -71,6 +72,50 @@
 			}
 		};
 	}
+
+	// manage title changes
+	onMount(() => {
+		page.subscribe(({ state, route }) => {
+			console.log(route, state.modal);
+			switch (state.modal) {
+				// case null:
+				// 	switch (route.id) {
+				// 		case '/stops':
+				// 			document.title = 'Stops';
+				// 			break;
+				// 		case '/alerts':
+				// 			document.title = 'Alerts';
+				// 			break;
+				// 		default:
+				// 			document.title = 'TrainStat.us';
+				// 			break;
+				// 	}
+				// 	break;
+				case 'route':
+					document.title = `Alerts for ${state.data.id}`;
+					break;
+				case 'stop':
+					document.title = `Arrivals at ${state.data.name}`;
+					break;
+				case 'trip':
+					document.title = `${state.data.route_id} Trip`;
+					break;
+				default:
+					switch (route.id) {
+						case '/stops':
+							document.title = 'Stops';
+							break;
+						case '/alerts':
+							document.title = 'Alerts';
+							break;
+						default:
+							document.title = 'TrainStat.us';
+							break;
+					}
+					break;
+			}
+		});
+	});
 
 	let copied = $state(false);
 	// show stops/trips before current datetime
