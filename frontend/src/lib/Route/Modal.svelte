@@ -2,7 +2,6 @@
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { ChevronRight, ChevronLeft } from 'lucide-svelte';
-	// import { page } from '$app/stores';
 	import { alerts as rt_alerts } from '$lib/alerts.svelte';
 	import { type Route } from '$lib/static';
 	import Icon from '$lib/Icon.svelte';
@@ -50,7 +49,7 @@
 			}
 		);
 
-		// alert_els.forEach((el) => observer.observe(el));
+		// node.children.forEach((el) => observer.observe(el));
 		const alert_els = Array.from(node.children) as HTMLDivElement[];
 		alert_els.forEach((el) => observer.observe(el));
 
@@ -68,9 +67,7 @@
 		alert_els[i].scrollIntoView({ behavior: 'smooth' });
 	}
 
-	// $inspect(alerts);
-
-	function debounce(callback: Function, wait = 100) {
+	function debounce(callback: Function, wait = 75) {
 		let timeout: ReturnType<typeof setTimeout>;
 
 		return (...args: any[]) => {
@@ -84,14 +81,10 @@
 	}
 
 	$effect(() => {
-		// onMount(() => {
 		// remove href from all links in alert-text id. I don't want people leaving my website ):<
 		scroll_area?.querySelectorAll('a').forEach((a) => {
 			a.removeAttribute('href');
 		});
-		// });
-
-		// console.log({ idx });
 	});
 </script>
 
@@ -104,12 +97,6 @@
 		{:else}
 			No alerts
 		{/if}
-
-		{#if alerts.length > 1}
-			<div class="bg-neutral-700 text-neutral-50 rounded p-1">
-				+{alerts.length - 1}
-			</div>
-		{/if}
 	</div>
 </header>
 
@@ -117,6 +104,7 @@
 <svelte:window
 	onkeydown={($event) => {
 		if ($event.key === 'ArrowLeft' && idx > 0) {
+			// if we don't debounce, clicking arrow key twice really fast will get the scroll stuck
 			debounce_scroll_to_alert(idx - 1);
 		} else if ($event.key === 'ArrowRight' && idx < alerts.length - 1) {
 			debounce_scroll_to_alert(idx + 1);
@@ -125,46 +113,22 @@
 />
 
 <div
-	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
+	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950 relative"
 	bind:this={scroll_area}
 	use:manage_scroll
 >
-	{#if alerts.length > 1}
-		<button
-			disabled={idx === 0}
-			class:text-neutral-500={idx === 0}
-			class="absolute left-0 inset-y-0 z-40"
-			aria-label="Previous alert"
-			onclick={() => scroll_to_alert(idx - 1)}
-		>
-			<ChevronLeft />
-		</button>
-	{/if}
-	{#if alerts.length > 1}
-		<button
-			disabled={idx === alerts.length - 1}
-			class:text-neutral-500={idx === alerts.length - 1}
-			class="absolute right-0 inset-y-0 z-40"
-			aria-label="Next alert"
-			onclick={() => scroll_to_alert(idx + 1)}
-		>
-			<ChevronRight />
-		</button>
-	{/if}
 	{#each alerts as alert}
 		<article
-			class="alert relative snap-start snap-always flex flex-col gap-1 items-center justify-center shrink-0 w-full max-h-[65dvh]"
+			class="alert relative snap-start snap-always flex flex-col gap-1 items-center shrink-0 w-full max-h-[65dvh]"
 		>
-			<div
-				class={`${alerts.length > 1 ? 'w-10/12' : 'px-1'} max-h-[65dvh] overflow-auto bg-neutral-950`}
-			>
+			<div class="px-1 max-h-[65dvh] overflow-auto bg-neutral-950">
 				{@html alert.header_html}
 
 				{#if alert.description_html}
 					{@html alert.description_html}
 				{/if}
 			</div>
-			<div class="text-s text-neutral-400 px-1 w-full flex justify-between">
+			<div class="text-sm text-neutral-400 px-1 w-full flex justify-between">
 				<div class="text-left">
 					Updated
 					{#if time_format === 'countdown'}
@@ -186,4 +150,36 @@
 			</div>
 		</article>
 	{/each}
+
+	{#if alerts.length > 1}
+		<div class="fixed z-40 size-full translate-y-[62%]">
+			<div class="flex gap-2 justify-center items-center">
+				<button
+					disabled={idx === 0}
+					class:text-neutral-500={idx === 0}
+					aria-label="Previous alert"
+					onclick={() => scroll_to_alert(idx - 1)}
+				>
+					<ChevronLeft />
+				</button>
+				{#each alerts as _alert, i}
+					<button
+						class="rounded-full bg-neutral-300 size-3"
+						class:bg-neutral-500={i !== idx}
+						aria-label="Scroll to alert"
+						onclick={() => scroll_to_alert(i)}
+					>
+					</button>
+				{/each}
+				<button
+					disabled={idx === alerts.length - 1}
+					class:text-neutral-500={idx === alerts.length - 1}
+					aria-label="Next alert"
+					onclick={() => scroll_to_alert(idx + 1)}
+				>
+					<ChevronRight />
+				</button>
+			</div>
+		</div>
+	{/if}
 </div>

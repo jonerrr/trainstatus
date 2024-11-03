@@ -11,7 +11,6 @@ use std::sync::OnceLock;
 pub mod errors;
 pub mod realtime;
 // pub mod websocket;
-// pub mod sse;
 pub mod static_data;
 
 // not sure if its better to do a oncelock headermap and clone or to just create headermap everytime

@@ -14,7 +14,6 @@ use http::{request::Parts, HeaderValue, Method, StatusCode};
 // use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
-    // collections::{HashMap, HashSet},
     convert::Infallible,
     env::var,
     sync::{Arc, OnceLock},
@@ -188,7 +187,7 @@ async fn main() {
                     )
                 }))
                 .layer(BufferLayer::new(1024))
-                .layer(RateLimitLayer::new(500, Duration::from_secs(1))),
+                .layer(RateLimitLayer::new(750, Duration::from_secs(1))),
         )
         .fallback(handler_404);
 
