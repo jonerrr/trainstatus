@@ -20,6 +20,10 @@
 	);
 </script>
 
+<svelte:head>
+	<title>Alerts</title>
+</svelte:head>
+
 {#snippet route_button(route: Route)}
 	<Button {route} pin_rune={route_pins_rune} />
 {/snippet}

@@ -10,8 +10,6 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import { alerts } from '$lib/alerts.svelte';
-	import { trip_pins_rune } from '$lib/util.svelte';
-	// import { LoaderCircle } from 'lucide-svelte';
 
 	let { children } = $props();
 
@@ -48,7 +46,8 @@
 					data: trips.trips.get(id)
 				});
 			} else {
-				console.error('Invalid id', id);
+				console.error('Invalid ID', id);
+				alert('Invalid ID');
 			}
 		}
 

@@ -21,10 +21,10 @@ pub enum ServerError {
     Broadcast(#[from] BroadcastStreamRecvError),
     #[error("{0}")]
     SerdeJson(#[from] serde_json::Error),
-    #[error("Bad request")]
-    BadRequest,
-    #[error("Not found")]
-    NotFound,
+    // #[error("Bad request")]
+    // BadRequest,
+    // #[error("Not found")]
+    // NotFound,
 }
 
 impl IntoResponse for ServerError {
@@ -37,10 +37,10 @@ impl IntoResponse for ServerError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "cache error")
             }
             ServerError::SerdeJson(_) => (StatusCode::INTERNAL_SERVER_ERROR, "json error"),
-            ServerError::NotFound => (StatusCode::NOT_FOUND, "not found"),
             ServerError::Broadcast(_) => (StatusCode::INTERNAL_SERVER_ERROR, "broadcast error"),
             ServerError::Axum(_) => (StatusCode::INTERNAL_SERVER_ERROR, "stream error"),
-            ServerError::BadRequest => (StatusCode::BAD_REQUEST, "bad request"),
+            // ServerError::BadRequest => (StatusCode::BAD_REQUEST, "bad request"),
+            // ServerError::NotFound => (StatusCode::NOT_FOUND, "not found"),
         };
 
         let body = Json(json!({ "message": message }));
