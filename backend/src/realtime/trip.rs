@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono_tz::America::New_York;
 use serde::Serialize;
 use sqlx::PgPool;
 use thiserror::Error;
@@ -252,6 +253,29 @@ impl Trip {
             }
             None => Ok((false, true)),
         }
+    }
+
+    // when daylight savings time changes, this will error so we need to handle that
+    // im not sure if its correct to choose earliest time or latest time
+    pub fn created_at(
+        start_date: NaiveDate,
+        start_time: NaiveTime,
+    ) -> Result<DateTime<Utc>, IntoTripError> {
+        let local_time = NaiveDateTime::new(start_date, start_time);
+
+        let dt = match New_York.from_local_datetime(&local_time) {
+            chrono::LocalResult::Single(dt) => dt,
+            chrono::LocalResult::Ambiguous(dt1, _dt2) => dt1, // Choose the earliest time
+            chrono::LocalResult::None => {
+                return Err(IntoTripError::StartTime(format!(
+                    "Invalid time: {}",
+                    local_time
+                )));
+            }
+        }
+        .with_timezone(&Utc);
+
+        Ok(dt)
     }
 
     // this deletes without using ID

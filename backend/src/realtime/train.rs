@@ -241,75 +241,14 @@ impl TryFrom<TripDescriptor> for Trip {
                 // This is how you parse the origin time according to MTA's gtfs docs
                 let origin_time = trip_id.split_once('_').unwrap().0.parse::<i32>().unwrap() / 100;
 
-                // let total_minutes = if origin_time < 0 {
-                //     origin_time + 1440 * 100
-                // } else if origin_time >= 1440 * 100 {
-                //     origin_time - 1440 * 100
-                // } else {
-                //     origin_time
-                // };
-
-                // // Convert hundredths of a minute to hours, minutes, and seconds
-                // let minutes = total_minutes / 100;
-                // let seconds = ((total_minutes as f32 % 1.0) * 60.0 * 60.0) as u32;
-
-                // let hours = minutes / 60;
-                // let minutes = minutes % 60;
-
-                // match NaiveTime::from_hms_opt(hours as u32, minutes as u32, seconds) {
-                //     Some(time) => time,
-                //     None => Err(IntoTripError::StartTime(format!(
-                //         "Invalid time: {}",
-                //         origin_time
-                //     )))?,
-                // }
-
                 parse_origin_time(origin_time).ok_or(IntoTripError::StartTime(format!(
                     "Invalid time: {}",
                     origin_time
                 )))?
-
-                // // time greater than 1440 (1 day) means its the next day or negative means its the previous day
-                // if origin_time >= 1440 {
-                //     dbg!("change origin time", origin_time);
-                //     origin_time -= 1440;
-                //     dbg!("changed origin time", origin_time, &trip_id);
-                // } else if origin_time <= 0 {
-                //     origin_time += 1440;
-                // }
-
-                // match NaiveTime::from_hms_opt(
-                //     origin_time as u32 / 60,
-                //     origin_time as u32 % 60,
-                //     ((origin_time as f32 % 1.0) * 60.0 * 60.0) as u32,
-                // ) {
-                //     Some(time) => time,
-                //     None => {
-                //         return Err(IntoTripError::StartTime(format!(
-                //             "Invalid time: {}",
-                //             origin_time
-                //         )));
-                //     }
-                // }
             }
         };
 
-        // let created_at = NaiveDateTime::new(start_date, start_time)
-        //     .and_local_timezone(chrono_tz::America::New_York)
-        //     .unwrap()
-        //     .to_utc();
-        let local_time = NaiveDateTime::new(start_date, start_time);
-        let created_at = match New_York.from_local_datetime(&local_time) {
-            chrono::LocalResult::Single(dt) => dt,
-            chrono::LocalResult::Ambiguous(dt1, _dt2) => dt1, // Choose the earliest time
-            chrono::LocalResult::None => {
-                return Err(IntoTripError::StartTime(format!(
-                    "Invalid time: {}",
-                    local_time
-                )));
-            }
-        }
-        .with_timezone(&Utc);
+        let created_at = Self::created_at(start_date, start_time)?;
 
         Ok(Trip {
             id: Uuid::now_v7(),

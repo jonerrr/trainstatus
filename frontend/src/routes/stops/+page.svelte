@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { CircleX } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import { type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import SearchWorker from './search_worker?worker';
-	import { CircleX } from 'lucide-svelte';
 	// import { untrack } from 'svelte';
 
 	let search_worker: Worker;
@@ -125,6 +125,7 @@
 <div class="absolute bottom-0 w-full">
 	<!-- 		oninput={debounce(search_stops)} -->
 	<input
+		name="search"
 		bind:value={search_term}
 		type="search"
 		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
