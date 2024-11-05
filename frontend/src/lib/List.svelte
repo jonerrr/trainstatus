@@ -116,7 +116,7 @@
 <!-- 	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }} -->
 <div class="flex flex-col text-neutral-200 relative w-full px-1 z-30">
 	<div class="flex text-neutral-50 justify-between w-full z-30">
-		<div class="flex gap-1 items-center font-bold text-lg">
+		<h1 class="flex gap-1 items-center font-bold text-lg">
 			{title}
 
 			<!-- <button
@@ -137,7 +137,7 @@
 			{#if locate_button}
 				{@render locate_button()}
 			{/if}
-		</div>
+		</h1>
 
 		{#snippet tab_button(value: 'train' | 'bus', data: T[] | B[])}
 			{@const Icon = tab_icons[value]}

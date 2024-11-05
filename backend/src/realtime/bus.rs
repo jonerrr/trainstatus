@@ -131,10 +131,8 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
         let start_date = trip.start_date.ok_or(IntoTripError::StartDate)?;
         let start_date = chrono::NaiveDate::parse_from_str(&start_date, "%Y%m%d").unwrap();
         // Created at for bus is start_date + current time
-        let created_at = chrono::NaiveDateTime::new(start_date, chrono::Local::now().time())
-            .and_local_timezone(chrono_tz::America::New_York)
-            .unwrap()
-            .to_utc();
+
+        let created_at = Self::created_at(start_date, Utc::now().time())?;
 
         // If the trip is cancelled, the vehicle descriptor will be none and error out. So i'm setting it to 0 and it will get deleted right after
         let vehicle_id = match trip.schedule_relationship {
