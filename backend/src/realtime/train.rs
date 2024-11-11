@@ -9,11 +9,9 @@ use crate::{
     feed::{trip_update::StopTimeUpdate, TripDescriptor, VehiclePosition},
     static_data::stop::convert_stop_id,
 };
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use chrono_tz::America::New_York;
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
-// use tokio::sync::RwLock;
 use uuid::Uuid;
 
 // pub

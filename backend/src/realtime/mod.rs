@@ -1,13 +1,16 @@
 // use crate::api::websocket::Update;
 use crate::feed::FeedMessage;
 use bb8_redis::RedisConnectionManager;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use position::Status;
 // use crossbeam::channel::Sender;
 use prost::Message;
 // use rayon::prelude::*;
 use redis::AsyncCommands;
+use serde::Serialize;
 // use serde_json::json;
 use sqlx::PgPool;
+use uuid::Uuid;
 // use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::{env::var, time::Duration};
@@ -161,13 +164,33 @@ pub async fn import(
                 Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
                     Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now()).await {
                         Ok(alerts) => {
-                            let mut conn = redis_pool.get().await.unwrap();
-                            let items = [
-                                ("trips", serde_json::to_string(&trips).unwrap()),
-                                ("stop_times", serde_json::to_string(&stop_times).unwrap()),
-                                ("alerts", serde_json::to_string(&alerts).unwrap()),
-                            ];
-                            let _: () = conn.mset(&items).await.unwrap();
+                            match bus_trip_geojson(&c_pool).await {
+                                Ok(geojson) => {
+                                    let mut conn = redis_pool.get().await.unwrap();
+                                    let items = [
+                                        ("trips", serde_json::to_string(&trips).unwrap()),
+                                        ("stop_times", serde_json::to_string(&stop_times).unwrap()),
+                                        ("alerts", serde_json::to_string(&alerts).unwrap()),
+                                        (
+                                            "bus_trips_geojson",
+                                            serde_json::to_string(&geojson).unwrap(),
+                                        ),
+                                    ];
+                                    let _: () = conn.mset(&items).await.unwrap();
+                                }
+                                Err(err) => {
+                                    tracing::error!("failed to cache geojson: {}", err);
+                                    sleep(Duration::from_secs(35)).await;
+                                    continue;
+                                }
+                            }
+                            // let mut conn = redis_pool.get().await.unwrap();
+                            // let items = [
+                            //     ("trips", serde_json::to_string(&trips).unwrap()),
+                            //     ("stop_times", serde_json::to_string(&stop_times).unwrap()),
+                            //     ("alerts", serde_json::to_string(&alerts).unwrap()),
+                            // ];
+                            // let _: () = conn.mset(&items).await.unwrap();
                         }
                         Err(err) => {
                             tracing::error!("failed to cache alerts: {}", err);
@@ -301,4 +324,107 @@ pub async fn import(
     //         sleep(Duration::from_secs(35)).await;
     //     }
     // });
+}
+
+#[derive(Serialize)]
+pub struct BusTrip {
+    id: Uuid,
+    mta_id: String,
+    vehicle_id: String,
+    route_id: String,
+    direction: Option<i16>,
+    stop_id: Option<i32>,
+    status: Status,
+    lat: f32,
+    lon: f32,
+    capacity: Option<i32>,
+    passengers: Option<i32>,
+    deviation: Option<i32>,
+    bearing: Option<f32>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+// TODO: move this somwhere else
+async fn bus_trip_geojson(pool: &PgPool) -> Result<serde_json::Value, sqlx::Error> {
+    let trips = sqlx::query_as!(
+        BusTrip,
+        r#"
+            SELECT
+                t.id,
+                t.mta_id,
+                t.vehicle_id,
+                t.route_id,
+                t.direction,
+                t.created_at,
+                t.updated_at,
+                p.stop_id,
+                p.status as "status!: Status",
+                p.lat as "lat!",
+                p.lon as "lon!",
+                p.capacity,
+                p.passengers,
+                t.deviation,
+                p.bearing
+            FROM
+                trip t
+            LEFT JOIN "position" p ON
+                t.vehicle_id = p.vehicle_id
+            WHERE
+                t.updated_at >= now() - INTERVAL '5 minutes'
+                AND
+                p.lat IS NOT NULL
+                AND p.lon IS NOT NULL
+                AND
+                            t.id = ANY(
+                SELECT
+                    t.id
+                FROM
+                    trip t
+                LEFT JOIN stop_time st ON
+                    st.trip_id = t.id
+                WHERE
+                    st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
+                                )
+            ORDER BY
+                t.created_at DESC
+                    "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let features = trips
+        .into_iter()
+        .map(|t| {
+            serde_json::json!({
+                "type": "Feature",
+                "id": t.id,
+                "properties": {
+                    "id": t.id,
+                    "mta_id": t.mta_id,
+                    "vehicle_id": t.vehicle_id,
+                    "route_id": t.route_id,
+                    "direction": t.direction,
+                    "stop_id": t.stop_id,
+                    "status": t.status,
+                    "capacity": t.capacity,
+                    "passengers": t.passengers,
+                    "deviation": t.deviation,
+                    "bearing": t.bearing,
+                    "created_at": t.created_at,
+                    "updated_at": t.updated_at
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [t.lon, t.lat]
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    let geojson = serde_json::json!({
+        "type": "FeatureCollection",
+        "features": features
+    });
+
+    Ok(geojson)
 }

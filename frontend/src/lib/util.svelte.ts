@@ -19,6 +19,16 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+export function debounce(callback: Function, wait = 75) {
+	let timeout: ReturnType<typeof setTimeout>;
+
+	return (...args: unknown[]) => {
+		clearTimeout(timeout);
+		timeout = setTimeout(() => callback(...args), wait);
+	};
+}
+
 export interface PersistedRune<T> {
 	value: T;
 	// key: string;

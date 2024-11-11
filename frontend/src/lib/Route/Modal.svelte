@@ -3,6 +3,7 @@
 	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { ChevronRight, ChevronLeft } from 'lucide-svelte';
 	import { alerts as rt_alerts } from '$lib/alerts.svelte';
+	import { debounce } from '$lib/util.svelte';
 	import { type Route } from '$lib/static';
 	import Icon from '$lib/Icon.svelte';
 	dayjs.extend(relativeTime);
@@ -67,14 +68,14 @@
 		alert_els[i].scrollIntoView({ behavior: 'smooth' });
 	}
 
-	function debounce(callback: Function, wait = 75) {
-		let timeout: ReturnType<typeof setTimeout>;
+	// function debounce(callback: Function, wait = 75) {
+	// 	let timeout: ReturnType<typeof setTimeout>;
 
-		return (...args: any[]) => {
-			clearTimeout(timeout);
-			timeout = setTimeout(() => callback(...args), wait);
-		};
-	}
+	// 	return (...args: any[]) => {
+	// 		clearTimeout(timeout);
+	// 		timeout = setTimeout(() => callback(...args), wait);
+	// 	};
+	// }
 
 	function debounce_scroll_to_alert(i: number) {
 		debounce(scroll_to_alert)(i);
@@ -154,6 +155,7 @@
 	{#if alerts.length > 1}
 		<div class="absolute bottom-0 -translate-y-16 w-full flex gap-2 justify-center items-center">
 			<!-- <div class="flex  w-fit"> -->
+
 			<button
 				disabled={idx === 0}
 				class:text-neutral-500={idx === 0}

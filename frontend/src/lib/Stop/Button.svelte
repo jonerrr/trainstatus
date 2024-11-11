@@ -47,6 +47,16 @@
 			string
 		>[]
 	);
+
+	// if its bus, show loading if its in trips but not in stop times
+	// const loading = $derived(
+	// 	() =>
+	// 		is_bus(stop) &&
+	// 		!stop.routes.every((r) => {
+	// 			const trip = rt_trips.trips.values().find((t) => t.route_id === r.id);
+	// 			return trip && stop_times.some((st) => st.trip_id === trip.id);
+	// 		})
+	// );
 </script>
 
 {#snippet eta(n: number)}
@@ -147,6 +157,7 @@
 				{#each stop_routes as stop_route}
 					{@const route = $page.data.routes[stop_route.id] as Route}
 					{@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)}
+
 					<div class="flex gap-2 items-center text-wrap text-left rounded p-1">
 						<Icon {route} link={false} express={false} />
 						<div class="flex flex-col">
@@ -158,6 +169,9 @@
 									{#each route_stop_times.slice(0, 2) as stop_time}
 										{@render eta(stop_time.eta)}
 									{/each}
+									<!-- check if trips contains trip with route_id and that there are no stop times -->
+									<!-- {:else if stop_times.length && !route_stop_times.length}
+									<div class="text-neutral-400">Loading...</div> -->
 								{:else}
 									<div class="text-neutral-400">No trips</div>
 								{/if}

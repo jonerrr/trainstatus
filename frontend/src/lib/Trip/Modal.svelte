@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
-	import { cubicInOut, quintOut } from 'svelte/easing';
-	import { stop_times as rt_stop_times, monitored_routes } from '$lib/stop_times.svelte';
+	import { cubicInOut } from 'svelte/easing';
+	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import type { Stop } from '$lib/static';
 	import {
 		is_bus_route,
@@ -30,14 +29,14 @@
 	// should this be in $derived?
 	const route = $page.data.routes[trip.route_id];
 
-	onMount(() => {
-		if (is_bus_route(route, trip)) {
-			const current_monitored_routes = monitored_routes.get('modal') || [];
+	// onMount(() => {
+	// 	if (is_bus_route(route, trip)) {
+	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
 
-			current_monitored_routes.push(route.id);
-			monitored_routes.set('modal', current_monitored_routes.slice(-20));
-		}
-	});
+	// 		current_monitored_routes.push(route.id);
+	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
+	// 	}
+	// });
 
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 	const last_stop = $derived.by(() => {

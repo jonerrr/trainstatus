@@ -51,9 +51,10 @@ pub async fn import(
                             );
                             sleep(sleep_time).await;
                         }
-                        None => {
-                            tracing::info!("Duration since last update is greater than 3 days, no need to wait.");
-                        }
+                        None => (),
+                        // {
+                        //     tracing::info!("Duration since last update is greater than 3 days, no need to wait.");
+                        // }
                     }
                 }
             } else {

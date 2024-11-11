@@ -5,17 +5,17 @@
 	import { pushState } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
-	import { stop_times, monitored_routes } from '$lib/stop_times.svelte';
+	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
+	import { alerts } from '$lib/alerts.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
-	import { alerts } from '$lib/alerts.svelte';
 
 	let { children } = $props();
 
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
-	let last_monitored_routes = $state<string>('');
+	// let last_monitored_routes = $state<string>('');
 	let offline = $state(false);
 
 	// $inspect(monitored_routes);
@@ -50,28 +50,44 @@
 				alert('Invalid ID');
 			}
 		}
-
-		// page.subscribe((val) => {
-		// 	console.log(val.state);
-		// });
 	});
 
-	const monitored_routes_arr = $derived(
-		Array.from(new Set(Array.from(monitored_routes.values()).flatMap((r) => r.map((id) => id))))
-	);
+	let monitor_delay: number;
+
+	$effect(() => {
+		clearTimeout(monitor_delay);
+
+		if (monitored_bus_routes.size > 30) {
+			// remove until there are 30 left
+			const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
+			console.log('removing', to_remove);
+			to_remove.forEach((r) => monitored_bus_routes.delete(r));
+		}
+
+		monitor_delay = setTimeout(() => {
+			console.log('updating stop times');
+			stop_times.update(fetch, [...monitored_bus_routes]).then((o) => {
+				console.log('updated');
+				last_st_update = new Date();
+				offline = o;
+			});
+		}, 200);
+	});
 
 	// $inspect(monitored_routes_arr);
 
-	$effect(() => {
-		if (monitored_routes_arr.join(',') === last_monitored_routes) return;
-		// console.log('updating stop times', monitored_routes_arr);
-		stop_times.update(fetch, monitored_routes_arr).then((o) => {
-			// last_st_update = new Date();
-			offline = o;
-		});
-		last_monitored_routes = monitored_routes_arr.join(',');
-		last_st_update = new Date();
-	});
+	// $effect(() => {
+	// 	if (monitored_routes_arr.join(',') === last_monitored_routes) return;
+	// 	// console.log('updating stop times', monitored_routes_arr);
+	// 	stop_times.update(fetch, monitored_routes_arr).then((o) => {
+	// 		// last_st_update = new Date();
+	// 		offline = o;
+	// 		// used to show loading
+	// 		// $page.data.current_monitored_routes = monitored_routes_arr;
+	// 	});
+	// 	last_monitored_routes = monitored_routes_arr.join(',');
+	// 	last_st_update = new Date();
+	// });
 
 	$effect(() => {
 		const interval = setInterval(() => {
@@ -93,9 +109,9 @@
 
 			if (new Date().getTime() - last_st_update.getTime() > 1000 * 60) {
 				// console.log('Updating stop times');
-				stop_times.update(fetch, monitored_routes_arr);
+				stop_times.update(fetch, [...monitored_bus_routes]);
 				last_st_update = new Date();
-				last_monitored_routes = monitored_routes_arr.join(',');
+				// last_monitored_routes = [...monitored_bus_routes].join(',');
 			}
 		}, 200);
 

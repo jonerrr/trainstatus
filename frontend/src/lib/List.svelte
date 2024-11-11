@@ -4,7 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
-	import { monitored_routes } from './stop_times.svelte';
+	import { monitored_bus_routes } from './stop_times.svelte';
 	import type { Stop } from './static';
 	// import type { Action } from 'svelte/action';
 
@@ -69,20 +69,46 @@
 	}
 
 	if (monitor_routes) {
+		const all_bus_routes = $derived(
+			bus_data
+				//@ts-expect-error
+				.flatMap((stop: Stop<'bus'>) => {
+					return stop.routes.map((r) => r.id);
+				})
+		);
+
 		$effect(() => {
-			// console.log('adding routes');
-			//@ts-expect-error
-			const bus_routes = bus_data.flatMap((stop: Stop<'bus'>) => {
-				return stop.routes.map((r) => r.id);
-			});
-
-			monitored_routes.set(title, [...new Set(bus_routes)]);
+			console.log('adding routes');
+			all_bus_routes.forEach((r) => monitored_bus_routes.add(r));
 		});
 
-		onDestroy(() => {
-			// console.log('unmounted', title);
-			monitored_routes.delete(title);
-		});
+		// const cleanup = $effect.root(() => {
+		// 	$effect(() => {
+		// 		console.log('adding routes');
+		// 		all_bus_routes.forEach((r) => monitored_bus_routes.add(r));
+		// 	});
+
+		// 	return () => {
+		// 		console.log('removing routes');
+		// 		all_bus_routes.forEach((r) => monitored_bus_routes.delete(r));
+		// 	};
+		// });
+
+		// $effect(() => {
+		// 	// console.log('adding routes');
+		// 	bus_data
+		// 		//@ts-expect-error
+		// 		.flatMap((stop: Stop<'bus'>) => {
+		// 			return stop.routes.map((r) => r.id);
+		// 		})
+		// 		.forEach((r) => monitored_bus_routes.add(r));
+
+		// 	// monitored_routes.set(title, [...new Set(bus_routes)]);
+		// });
+
+		// onDestroy(() => {
+		// monitored_routes.delete(title);
+		// });
 	}
 
 	if (min_items) {
