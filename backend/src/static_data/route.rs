@@ -1,5 +1,3 @@
-use std::{collections::HashMap, fmt};
-
 use crate::{
     api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
@@ -12,6 +10,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
+use std::{collections::HashMap, fmt};
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct Route {

@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 export interface StopTime<T = never, D = never, R = never> {
 	trip_id: string;
@@ -9,6 +9,8 @@ export interface StopTime<T = never, D = never, R = never> {
 	direction: D;
 	route_id: R;
 }
+
+// export let monitored_routes = $state(new SvelteSet())
 
 type Fetch = typeof fetch;
 
@@ -63,4 +65,18 @@ export function createStopTimes() {
 export const stop_times = createStopTimes();
 // export const monitored_routes = $state<string[]>([]);
 
-export const monitored_routes = $state<SvelteMap<string, string[]>>(new SvelteMap());
+// export const monitored_routes = $state<SvelteMap<string, string[]>>(new SvelteMap());
+
+export const monitored_bus_routes = $state(new SvelteSet<string>());
+
+// $effect.root(() => {
+// 	console.log('monitored_routes effect', monitored_bus_routes);
+
+// 	if (monitored_bus_routes.size === 0) return;
+// 	if (monitored_bus_routes.size > 30) {
+// 		console.log('removing first route from monitored_bus_routes');
+// 		monitored_bus_routes.delete(monitored_bus_routes.values().next().value);
+// 	}
+
+// 	stop_times.update(fetch, Array.from(monitored_bus_routes));
+// });

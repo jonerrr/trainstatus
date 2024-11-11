@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import {
 		stop_times as rt_stop_times,
-		monitored_routes,
+		monitored_bus_routes,
 		type StopTime
 	} from '$lib/stop_times.svelte';
 	import {
@@ -39,17 +39,17 @@
 
 	let { stop, show_previous, time_format }: ModalProps = $props();
 
-	onMount(() => {
-		if (is_bus_stop(stop)) {
-			const current_monitored_routes = monitored_routes.get('modal') || [];
+	// onMount(() => {
+	// 	if (is_bus_stop(stop)) {
+	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
 
-			// const routes = stop.routes.map((r) => r.id);
-			current_monitored_routes.push(...stop.routes.map((r) => r.id));
-			// keep a max of 20 monitored routes for modal
-			monitored_routes.set('modal', current_monitored_routes.slice(-20));
-			// console.log('modal monitoring route');
-		}
-	});
+	// 		// const routes = stop.routes.map((r) => r.id);
+	// 		current_monitored_routes.push(...stop.routes.map((r) => r.id));
+	// 		// keep a max of 20 monitored routes for modal
+	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
+	// 		// console.log('modal monitoring route');
+	// 	}
+	// });
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TripData>;

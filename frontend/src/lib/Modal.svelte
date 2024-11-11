@@ -10,10 +10,13 @@
 		type PersistedRune,
 		persisted_rune
 	} from '$lib/util.svelte';
+	import { is_bus, type Stop } from './static';
+	import { monitored_bus_routes } from './stop_times.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
+	import { is_bus_route, type Trip, type TripData } from './trips.svelte';
 
 	function close() {
 		// enable_scroll();
@@ -70,7 +73,7 @@
 		};
 	}
 
-	// manage title changes
+	// manage title changes and monitored bus routes
 	onMount(() => {
 		page.subscribe(({ state, route }) => {
 			// console.log(route, state.modal);
@@ -80,9 +83,23 @@
 					break;
 				case 'stop':
 					document.title = `Arrivals at ${state.data.name}`;
+
+					const stop: Stop<'bus' | 'train'> = state.data;
+					if (is_bus(stop)) {
+						console.log('monitoring modal bus routes');
+						stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
+					}
 					break;
 				case 'trip':
 					document.title = `${state.data.route_id} Trip`;
+
+					const trip: Trip<TripData> = state.data;
+					const bus_route = $page.data.routes[trip.route_id];
+					if (is_bus_route(bus_route, trip)) {
+						console.log('monitoring modal bus routes');
+						monitored_bus_routes.add(trip.route_id);
+					}
+
 					break;
 				default:
 					switch (route.id) {

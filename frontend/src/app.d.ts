@@ -18,6 +18,8 @@ declare global {
 			};
 			bus_stops: Stop<'bus'>[];
 			train_stops: Stop<'train'>[];
+			// used to keep track of the current monitored
+			// current_monitored_routes: string[];
 			// initial_promise: Promise<[void, void]>;
 		}
 		// <T extends string | number>

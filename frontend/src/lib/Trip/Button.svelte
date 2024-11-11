@@ -10,7 +10,7 @@
 		type Trip
 	} from '$lib/trips.svelte';
 	import type { PersistedRune } from '$lib/util.svelte';
-	import { monitored_routes, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
+	import { stop_times as rt_stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
 	import Button from '$lib/Button.svelte';
 	import type { Route, Stop } from '$lib/static';
 	import Icon from '$lib/Icon.svelte';
@@ -23,9 +23,7 @@
 
 	onMount(() => {
 		if (is_bus_route(trip.route, trip)) {
-			const current_monitored_routes = monitored_routes.get('pinned_trips') || [];
-			current_monitored_routes.push(trip.route_id);
-			monitored_routes.set('pinned_trips', current_monitored_routes);
+			monitored_bus_routes.add(trip.route_id);
 		}
 	});
 
