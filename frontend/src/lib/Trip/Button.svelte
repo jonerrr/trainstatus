@@ -21,6 +21,7 @@
 	}
 	let { trip, pin_rune }: ButtonProps = $props();
 
+	// TODO: maybe move this to List.svelte
 	onMount(() => {
 		if (is_bus_route(trip.route, trip)) {
 			monitored_bus_routes.add(trip.route_id);
