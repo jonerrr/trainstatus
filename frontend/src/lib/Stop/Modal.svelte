@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { pushState } from '$app/navigation';
 	import {
 		stop_times as rt_stop_times,
 		monitored_bus_routes,
@@ -26,8 +27,6 @@
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
-	import { pushState } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -38,18 +37,6 @@
 	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
 
 	let { stop, show_previous, time_format }: ModalProps = $props();
-
-	// onMount(() => {
-	// 	if (is_bus_stop(stop)) {
-	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
-
-	// 		// const routes = stop.routes.map((r) => r.id);
-	// 		current_monitored_routes.push(...stop.routes.map((r) => r.id));
-	// 		// keep a max of 20 monitored routes for modal
-	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
-	// 		// console.log('modal monitoring route');
-	// 	}
-	// });
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TripData>;

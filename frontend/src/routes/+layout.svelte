@@ -18,11 +18,7 @@
 	// let last_monitored_routes = $state<string>('');
 	let offline = $state(false);
 
-	// $inspect(monitored_routes);
-
 	onMount(async () => {
-		// TODO: error handling
-
 		const id = $page.url.searchParams.get('d');
 		// console.log(id);
 		if (id) {
@@ -71,23 +67,8 @@
 				last_st_update = new Date();
 				offline = o;
 			});
-		}, 200);
+		}, 80);
 	});
-
-	// $inspect(monitored_routes_arr);
-
-	// $effect(() => {
-	// 	if (monitored_routes_arr.join(',') === last_monitored_routes) return;
-	// 	// console.log('updating stop times', monitored_routes_arr);
-	// 	stop_times.update(fetch, monitored_routes_arr).then((o) => {
-	// 		// last_st_update = new Date();
-	// 		offline = o;
-	// 		// used to show loading
-	// 		// $page.data.current_monitored_routes = monitored_routes_arr;
-	// 	});
-	// 	last_monitored_routes = monitored_routes_arr.join(',');
-	// 	last_st_update = new Date();
-	// });
 
 	$effect(() => {
 		const interval = setInterval(() => {

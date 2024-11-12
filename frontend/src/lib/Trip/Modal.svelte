@@ -29,15 +29,6 @@
 	// should this be in $derived?
 	const route = $page.data.routes[trip.route_id];
 
-	// onMount(() => {
-	// 	if (is_bus_route(route, trip)) {
-	// 		const current_monitored_routes = monitored_routes.get('modal') || [];
-
-	// 		current_monitored_routes.push(route.id);
-	// 		monitored_routes.set('modal', current_monitored_routes.slice(-20));
-	// 	}
-	// });
-
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 	const last_stop = $derived.by(() => {
 		if (!stop_times.length) return 'Unknown';
