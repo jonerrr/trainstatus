@@ -5,8 +5,6 @@ export interface Trip<T extends TripData, R = never> {
 	id: string;
 	mta_id: string;
 	route_id: string;
-	status: 'none' | 'incoming' | 'at_stop' | 'in_transit_to' | 'layover';
-	stop_id?: number;
 	vehicle_id: string;
 	direction: TripDirection;
 	data: T;
@@ -17,12 +15,17 @@ export interface Trip<T extends TripData, R = never> {
 
 export type TripData = TrainTripData | BusTripData;
 
-export interface TrainTripData {
+interface BaseTripData {
+	stop_id?: number;
+	status: 'none' | 'incoming' | 'at_stop' | 'in_transit_to' | 'layover';
+}
+
+export interface TrainTripData extends BaseTripData {
 	express: boolean;
 	assigned: boolean;
 }
 
-export interface BusTripData {
+export interface BusTripData extends BaseTripData {
 	lat?: number;
 	lon?: number;
 	bearing?: number;

@@ -184,13 +184,6 @@ pub async fn import(
                                     continue;
                                 }
                             }
-                            // let mut conn = redis_pool.get().await.unwrap();
-                            // let items = [
-                            //     ("trips", serde_json::to_string(&trips).unwrap()),
-                            //     ("stop_times", serde_json::to_string(&stop_times).unwrap()),
-                            //     ("alerts", serde_json::to_string(&alerts).unwrap()),
-                            // ];
-                            // let _: () = conn.mset(&items).await.unwrap();
                         }
                         Err(err) => {
                             tracing::error!("failed to cache alerts: {}", err);
@@ -211,7 +204,7 @@ pub async fn import(
                 }
             }
 
-            sleep(Duration::from_secs(30)).await;
+            sleep(Duration::from_secs(25)).await;
         }
     });
 

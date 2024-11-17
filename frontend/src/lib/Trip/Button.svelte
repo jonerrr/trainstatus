@@ -52,12 +52,12 @@
 		// check if trip has been updated in past 3 minutes
 		if (
 			trip.updated_at.getTime() > new Date().getTime() - 3 * 60 * 1000 &&
-			trip.status !== 'none' &&
-			trip.stop_id
+			trip.data.status !== 'none' &&
+			trip.data.stop_id
 		) {
 			return {
-				current_status: trip.status.toString(),
-				current_stop: $page.data.stops[trip.stop_id].name
+				current_status: trip.data.status.toString(),
+				current_stop: $page.data.stops[trip.data.stop_id].name
 			};
 		}
 		return {
