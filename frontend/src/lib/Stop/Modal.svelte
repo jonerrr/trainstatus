@@ -171,7 +171,7 @@
 					{/if}
 				</div>
 
-				{#if st.trip.status === 'layover'}
+				{#if st.trip.data.status === 'layover'}
 					<div class="text-neutral-400 text-xs">+Layover</div>
 				{/if}
 			</div>
