@@ -65,13 +65,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     // (trip, updated or new)
     // let mut trips: Vec<(Trip, bool)> = vec![];
-    let mut trips: Vec<Trip> = vec![];
+    let mut trips: Vec<Trip<TripData>> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
-            let mut trip: Trip = match trip_update.trip.try_into() {
+            let mut trip: Trip<TripData> = match trip_update.trip.try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error parsing trip: {:?}", e);
@@ -203,7 +203,7 @@ mod tests {
     }
 }
 
-impl TryFrom<TripDescriptor> for Trip {
+impl TryFrom<TripDescriptor> for Trip<TripData> {
     type Error = IntoTripError;
 
     fn try_from(value: TripDescriptor) -> Result<Self, Self::Error> {
@@ -284,7 +284,7 @@ fn parse_route_id(route_id: String) -> (String, bool) {
 
 struct StopTimeUpdateWithTrip<'a> {
     stop_time: StopTimeUpdate,
-    trip: &'a Trip,
+    trip: &'a Trip<TripData>,
 }
 
 impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
@@ -339,7 +339,7 @@ impl TryFrom<VehiclePosition> for Position {
         let stop_id = convert_stop_id(stop_id).ok_or(IntoPositionError::FakeStop)?;
 
         let trip = value.trip.ok_or(IntoPositionError::Trip)?;
-        let mut trip: Trip = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
+        let mut trip: Trip<TripData> = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
 
         if trip.direction.is_none() {
             trip.direction = match direction {

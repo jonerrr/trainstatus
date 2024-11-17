@@ -1,12 +1,14 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
-#[derive(Clone, Serialize, PartialEq, Debug)]
-pub struct Trip {
+// #[serde(skip_serializing_if = "Option::is_none")]
+
+#[derive(Clone, Serialize, PartialEq, Debug, Deserialize)]
+pub struct Trip<D> {
     pub id: Uuid,
     pub mta_id: String,
     pub vehicle_id: String,
@@ -17,31 +19,10 @@ pub struct Trip {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     // currently only for bus but could also be for train too
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub deviation: Option<i32>,
-    pub data: TripData,
+    pub data: D,
 }
-
-// Version of trip that includes position data and other things
-// pub struct ApiTrip {
-//     pub id: Uuid,
-//     pub mta_id: String,
-//     pub vehicle_id: String,
-//     pub route_id: String,
-//     pub direction: Option<i16>,
-//     pub created_at: DateTime<Utc>,
-//     pub data: serde_json::Value,
-// }
-
-// pub struct ApiTripData {
-//     lat: Option<f64>,
-//     lon: Option<f64>,
-//     bearing: Option<f64>,
-//     passengers: Option<i32>,
-//     capacity: Option<i32>,
-//     // train
-//     express: Option<bool>,
-//     assigned: Option<bool>,
-// }
 
 #[derive(Serialize, Clone, PartialEq, Debug)]
 pub enum TripData {
@@ -49,7 +30,7 @@ pub enum TripData {
     Bus,
 }
 
-impl Trip {
+impl Trip<TripData> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         // check if there are duplicate ids
         let mut ids_test = vec![];
@@ -149,76 +130,6 @@ impl Trip {
         Ok(())
     }
 
-    // TODO: order by updated_at desc for everything
-    pub async fn get_all(
-        pool: &PgPool,
-        at: DateTime<Utc>,
-    ) -> Result<serde_json::Value, sqlx::Error> {
-        let trips: (Option<serde_json::Value>,) = sqlx::query_as(
-            r#"
-            SELECT json_agg(result) FROM
-            (SELECT
-                t.id,
-                t.mta_id,
-                t.vehicle_id,
-                t.route_id,
-                t.direction,
-                t.created_at,
-                p.stop_id,
-                p.status,
-                CASE
-                    WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
-                    'express',
-                    t.express,
-                    'assigned',
-                    t.assigned
-                )
-                    ELSE jsonb_build_object(
-                    'lat',
-                    p.lat,
-                    'lon',
-                    p.lon,
-                    'bearing',
-                    p.bearing,
-                    'passengers',
-                    p.passengers,
-                    'capacity',
-                    p.capacity,
-                    'deviation',
-                    t.deviation
-                )
-                END AS DATA
-            FROM
-                trip t
-            LEFT JOIN "position" p ON
-                t.vehicle_id = p.vehicle_id
-            WHERE
-                t.updated_at >= $1 - INTERVAL '5 minutes' AND
-                t.id = ANY(
-                SELECT
-                    t.id
-                FROM
-                    trip t
-                LEFT JOIN stop_time st ON
-                    st.trip_id = t.id
-                WHERE
-                    st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                    )
-            ORDER BY
-                t.created_at DESC
-            ) AS result
-                    "#,
-        )
-        .bind(at)
-        .fetch_one(pool)
-        .await?;
-
-        match trips.0 {
-            Some(value) => Ok(value),
-            None => Ok(serde_json::Value::Array(vec![])), // Return an empty array if the result is NULL
-        }
-    }
-
     // finds trip in db by matching mta_id, train_id, created_at, and direction, returns tuple of (found, changed) indicating if trip was found and if it is different than current trip in db
     pub async fn find(&mut self, pool: &PgPool) -> Result<(bool, bool), sqlx::Error> {
         let res = sqlx::query!(
@@ -302,6 +213,125 @@ impl Trip {
         .await?;
 
         Ok(())
+    }
+}
+
+impl Trip<serde_json::Value> {
+    // TODO: order by updated_at desc for everything
+    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
+        // TODO: fix using at for interval instead of now()
+        sqlx::query_as!(
+            Trip::<serde_json::Value>,
+            r#"
+        SELECT
+            t.id,
+            t.mta_id,
+            t.vehicle_id,
+            t.route_id,
+            t.direction,
+            t.created_at,
+            t.updated_at,
+            NULL AS "deviation: _",
+            CASE
+                WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
+                'stop_id',
+                p.stop_id,
+                'status',
+                p.status,
+                'express',
+                t.express,
+                'assigned',
+                t.assigned
+                        )
+                ELSE jsonb_build_object(
+                'stop_id',
+                p.stop_id,
+                'status',
+                p.status,
+                'lat',
+                p.lat,
+                'lon',
+                p.lon,
+                'bearing',
+                p.bearing,
+                'passengers',
+                p.passengers,
+                'capacity',
+                p.capacity,
+                'deviation',
+                t.deviation
+                        )
+            END AS DATA
+        FROM
+            trip t
+        LEFT JOIN "position" p ON
+            t.vehicle_id = p.vehicle_id
+        WHERE
+            t.updated_at >= (now() - INTERVAL '5 minutes')
+            AND
+                        t.id = ANY(
+            SELECT
+                t.id
+            FROM
+                trip t
+            LEFT JOIN stop_time st ON
+                st.trip_id = t.id
+            WHERE
+                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                            )
+        ORDER BY
+            t.created_at DESC
+                    "#,
+            at
+        )
+        .fetch_all(pool)
+        .await
+        // match trips.0 {
+        //     Some(value) => Ok(value),
+        //     None => Ok(serde_json::Value::Array(vec![])), // Return an empty array if the result is NULL
+        // }
+    }
+
+    // TODO: i dont think we need result
+    pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
+        let features = trips
+            .into_iter()
+            .filter_map(|t| {
+                let data = t.data.as_object()?;
+
+                let lon = data.get("lon")?.as_f64()?;
+                let lat = data.get("lat")?.as_f64()?;
+
+                Some(serde_json::json!({
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [lon, lat]
+                    },
+                    "id": t.id,
+                    "properties": {
+                        "id": t.id,
+                        "mta_id": t.mta_id,
+                        "vehicle_id": t.vehicle_id,
+                        "route_id": t.route_id,
+                        "direction": t.direction,
+                        "stop_id": data["stop_id"],
+                        "status": data["status"],
+                        "capacity": data["capacity"],
+                        "passengers": data["passengers"],
+                        "deviation": t.deviation,
+                        "bearing": data["bearing"],
+                        "created_at": t.created_at,
+                        "updated_at": t.updated_at
+                    },
+                }))
+            })
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "type": "FeatureCollection",
+            "features": features
+        }))
     }
 }
 

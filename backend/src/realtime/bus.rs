@@ -33,13 +33,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         .flat_map(|f| f.entity.into_iter())
         .collect::<Vec<_>>();
 
-    let mut trips: Vec<Trip> = vec![];
+    let mut trips: Vec<Trip<TripData>> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
-            let mut trip: Trip = match BusTripUpdate(&trip_update).try_into() {
+            let mut trip: Trip<TripData> = match BusTripUpdate(&trip_update).try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error converting trip: {:?}", e);
@@ -119,7 +119,7 @@ pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
 
 struct BusTripUpdate<'a>(&'a TripUpdate);
 
-impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
+impl<'a> TryFrom<BusTripUpdate<'a>> for Trip<TripData> {
     type Error = IntoTripError;
 
     fn try_from(value: BusTripUpdate<'a>) -> Result<Self, Self::Error> {
@@ -165,7 +165,7 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
 // can't reuse train version otherwise we get trait conflict
 struct StopTimeUpdateWithTrip<'a> {
     stop_time: StopTimeUpdate,
-    trip: &'a Trip,
+    trip: &'a Trip<TripData>,
 }
 
 impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {

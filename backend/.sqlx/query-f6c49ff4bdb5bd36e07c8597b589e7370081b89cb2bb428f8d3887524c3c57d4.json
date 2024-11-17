@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            t.id,\n            t.mta_id,\n            t.vehicle_id,\n            t.route_id,\n            t.direction,\n            t.created_at,\n            t.updated_at,\n            NULL AS \"deviation: _\",\n            CASE\n                WHEN t.assigned IS NOT NULL THEN jsonb_build_object(\n                'stop_id',\n                p.stop_id,\n                'status',\n                p.status,\n                'express',\n                t.express,\n                'assigned',\n                t.assigned\n                        )\n                ELSE jsonb_build_object(\n                'stop_id',\n                p.stop_id,\n                'status',\n                p.status,\n                'lat',\n                p.lat,\n                'lon',\n                p.lon,\n                'bearing',\n                p.bearing,\n                'passengers',\n                p.passengers,\n                'capacity',\n                p.capacity,\n                'deviation',\n                t.deviation\n                        )\n            END AS DATA\n        FROM\n            trip t\n        LEFT JOIN \"position\" p ON\n            t.vehicle_id = p.vehicle_id\n        WHERE\n            t.updated_at >= (now() - INTERVAL '5 minutes')\n            AND\n                        t.id = ANY(\n            SELECT\n                t.id\n            FROM\n                trip t\n            LEFT JOIN stop_time st ON\n                st.trip_id = t.id\n            WHERE\n                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')\n                            )\n        ORDER BY\n            t.created_at DESC\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "mta_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "vehicle_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "deviation: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "data",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "f6c49ff4bdb5bd36e07c8597b589e7370081b89cb2bb428f8d3887524c3c57d4"
+}
