@@ -55,6 +55,7 @@
 			trip.data.status !== 'none' &&
 			trip.data.stop_id
 		) {
+			// TODO: better stop status formatting
 			return {
 				current_status: trip.data.status.toString(),
 				current_stop: $page.data.stops[trip.data.stop_id].name

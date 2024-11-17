@@ -1,16 +1,13 @@
 // use crate::api::websocket::Update;
 use crate::feed::FeedMessage;
 use bb8_redis::RedisConnectionManager;
-use chrono::{DateTime, Utc};
-use position::Status;
+use chrono::Utc;
 // use crossbeam::channel::Sender;
 use prost::Message;
 // use rayon::prelude::*;
 use redis::AsyncCommands;
-use serde::Serialize;
 // use serde_json::json;
 use sqlx::PgPool;
-use uuid::Uuid;
 // use std::collections::HashSet;
 use std::sync::OnceLock;
 use std::{env::var, time::Duration};
@@ -64,45 +61,6 @@ pub enum ImportError {
     #[error("protobuf decode error: {0}")]
     Decode(#[from] prost::DecodeError),
 }
-
-// pub struct RealtimeState {
-
-// }
-
-// trait RealtimeSource {}
-
-// pub enum RealtimeSource {
-//     GTFSAlert,
-//     GTFSBus,
-//     GTFSTrain,
-//     SIRIBus,
-// }
-
-// pub struct Realtime {
-//     pub source: RealtimeSource,
-//     pub pool: PgPool,
-//     pub tx: Sender<Vec<Update>>,
-//     pub initial_data: Arc<RwLock<serde_json::Value>>,
-// }
-
-// pub trait RealtimeImport {
-//     fn import(&self) -> Result<(), ImportError>;
-// }
-
-// pub struct ImportUpdate {
-
-// }
-
-// impl Realtime {
-//     pub async fn import(&self) -> Result<(), ImportError> {
-//         match self.source {
-//             RealtimeSource::GTFSAlert => alert::import(&self.pool).await,
-//             RealtimeSource::GTFSBus => bus::import(&self.pool).await,
-//             RealtimeSource::GTFSTrain => train::import(&self.pool).await,
-//             RealtimeSource::SIRIBus => bus::import_siri(&self.pool).await,
-//         }
-//     }
-// }
 
 pub async fn import(
     pool: PgPool,

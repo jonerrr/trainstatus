@@ -21,93 +21,13 @@ pub async fn trips_handler(
 ) -> Result<impl IntoResponse, ServerError> {
     let mut conn = state.redis_pool.get().await?;
 
-    if params.geojson {
-        // let trips = sqlx::query_as!(
-        //     BusTrip,
-        //     r#"
-        //         SELECT
-        //             t.id,
-        //             t.mta_id,
-        //             t.vehicle_id,
-        //             t.route_id,
-        //             t.direction,
-        //             t.created_at,
-        //             t.updated_at,
-        //             p.stop_id,
-        //             p.status as "status!: Status",
-        //             p.lat as "lat!",
-        //             p.lon as "lon!",
-        //             p.capacity,
-        //             p.passengers,
-        //             t.deviation,
-        //             p.bearing
-        //         FROM
-        //             trip t
-        //         LEFT JOIN "position" p ON
-        //             t.vehicle_id = p.vehicle_id
-        //         WHERE
-        //             t.updated_at >= now() - INTERVAL '5 minutes'
-        //             AND
-        //             p.lat IS NOT NULL
-        //             AND p.lon IS NOT NULL
-        //             AND
-        //                         t.id = ANY(
-        //             SELECT
-        //                 t.id
-        //             FROM
-        //                 trip t
-        //             LEFT JOIN stop_time st ON
-        //                 st.trip_id = t.id
-        //             WHERE
-        //                 st.arrival BETWEEN now() AND (now() + INTERVAL '4 hours')
-        //                             )
-        //         ORDER BY
-        //             t.created_at DESC
-        //                 "#
-        // )
-        // .fetch_all(&state.pg_pool)
-        // .await?;
-
-        // let features = trips
-        //     .into_iter()
-        //     .map(|t| {
-        //         json!({
-        //             "type": "Feature",
-        //             "id": t.id,
-        //             "properties": {
-        //                 "id": t.id,
-        //                 "mta_id": t.mta_id,
-        //                 "vehicle_id": t.vehicle_id,
-        //                 "route_id": t.route_id,
-        //                 "direction": t.direction,
-        //                 "stop_id": t.stop_id,
-        //                 "status": t.status,
-        //                 "capacity": t.capacity,
-        //                 "passengers": t.passengers,
-        //                 "deviation": t.deviation,
-        //                 "bearing": t.bearing,
-        //                 "created_at": t.created_at,
-        //                 "updated_at": t.updated_at
-        //             },
-        //             "geometry": {
-        //                 "type": "Point",
-        //                 "coordinates": [t.lon, t.lat]
-        //             }
-        //         })
-        //     })
-        //     .collect::<Vec<_>>();
-        // let geojson = json!({
-        //     "type": "FeatureCollection",
-        //     "features": features
-        // });
-        let geojson: String = conn.get("bus_trips_geojson").await?;
-
-        Ok((json_headers().clone(), geojson))
+    let key = if params.geojson {
+        "bus_trips_geojson"
     } else {
-        let trips: String = conn.get("trips").await?;
-
-        Ok((json_headers().clone(), trips))
-    }
+        "trips"
+    };
+    let trips: String = conn.get(key).await?;
+    Ok((json_headers().clone(), trips))
 }
 
 #[derive(Deserialize)]
@@ -138,9 +58,6 @@ pub async fn stop_times_handler(
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))
         }
     }
-
-    // TODO: remove json headers prob
-    // Ok((json_headers().clone(), Json(stop_times)))
 }
 
 pub async fn alerts_handler(

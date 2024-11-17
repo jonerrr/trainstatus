@@ -295,7 +295,7 @@ impl Trip<serde_json::Value> {
     // TODO: i dont think we need result
     pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
         let features = trips
-            .into_iter()
+            .iter()
             .filter_map(|t| {
                 let data = t.data.as_object()?;
 

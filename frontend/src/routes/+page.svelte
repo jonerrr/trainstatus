@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
 	import { type Route, type Stop, is_bus, is_train } from '$lib/static';
 	import {
 		persisted_rune,
@@ -21,8 +22,6 @@
 		type Trip,
 		trips
 	} from '$lib/trips.svelte';
-	import { untrack } from 'svelte';
-	// import { monitored_routes } from '$lib/stop_times.svelte';
 
 	const { pinned_bus_stops, pinned_train_stops } = $derived(
 		stop_pins_rune.value
