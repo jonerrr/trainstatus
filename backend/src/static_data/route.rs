@@ -106,7 +106,7 @@ impl Route {
                     .collect::<Vec<_>>();
                 line_geom
                     .entry(line.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(LineString::from(geom));
             }
         }
@@ -120,14 +120,7 @@ impl Route {
                 } else {
                     let geom = line_geom
                         .get(&r.route_short_name)
-                        .map(|lines| {
-                            MultiLineString::new(
-                                lines
-                                    .iter()
-                                    .map(|l| l.clone())
-                                    .collect::<Vec<LineString<f32>>>(),
-                            )
-                        })
+                        .map(|lines| MultiLineString::new(lines.to_vec()))
                         .map(|g| serde_json::to_value(g).unwrap())
                         .unwrap_or_else(|| {
                             tracing::warn!("no geometry for route {}", r.route_short_name);

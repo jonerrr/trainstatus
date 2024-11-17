@@ -56,18 +56,18 @@
 		if (monitored_bus_routes.size > 30) {
 			// remove until there are 30 left
 			const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
-			console.log('removing', to_remove);
+			// console.log('removing', to_remove);
 			to_remove.forEach((r) => monitored_bus_routes.delete(r));
 		}
 
 		monitor_delay = setTimeout(() => {
-			console.log('updating stop times');
+			// console.log('updating stop times');
 			stop_times.update(fetch, [...monitored_bus_routes]).then((o) => {
 				console.log('updated');
 				last_st_update = new Date();
 				offline = o;
 			});
-		}, 80);
+		}, 50);
 	});
 
 	$effect(() => {
@@ -77,11 +77,9 @@
 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
 				// console.log('Updating rt data');
 				trips.update(fetch).then((o) => {
-					// last_st_update = new Date();
 					offline = o;
 				});
 				alerts.update(fetch).then((o) => {
-					// last_st_update = new Date();
 					offline = o;
 				});
 

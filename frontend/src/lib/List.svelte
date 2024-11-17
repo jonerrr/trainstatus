@@ -1,6 +1,6 @@
 <script lang="ts" generics="T, B">
 	import { BusFront, TrainFront } from 'lucide-svelte';
-	import { onDestroy, type Snippet } from 'svelte';
+	import { type Snippet } from 'svelte';
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { persisted_rune, type PersistedRune } from './util.svelte';
@@ -78,37 +78,9 @@
 		);
 
 		$effect(() => {
-			console.log('adding routes');
+			// console.log('adding routes');
 			all_bus_routes.forEach((r) => monitored_bus_routes.add(r));
 		});
-
-		// const cleanup = $effect.root(() => {
-		// 	$effect(() => {
-		// 		console.log('adding routes');
-		// 		all_bus_routes.forEach((r) => monitored_bus_routes.add(r));
-		// 	});
-
-		// 	return () => {
-		// 		console.log('removing routes');
-		// 		all_bus_routes.forEach((r) => monitored_bus_routes.delete(r));
-		// 	};
-		// });
-
-		// $effect(() => {
-		// 	// console.log('adding routes');
-		// 	bus_data
-		// 		//@ts-expect-error
-		// 		.flatMap((stop: Stop<'bus'>) => {
-		// 			return stop.routes.map((r) => r.id);
-		// 		})
-		// 		.forEach((r) => monitored_bus_routes.add(r));
-
-		// 	// monitored_routes.set(title, [...new Set(bus_routes)]);
-		// });
-
-		// onDestroy(() => {
-		// monitored_routes.delete(title);
-		// });
 	}
 
 	if (min_items) {

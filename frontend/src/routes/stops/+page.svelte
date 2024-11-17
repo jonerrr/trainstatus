@@ -48,58 +48,71 @@
 	});
 
 	// let search_el: HTMLInputElement;
-	let search_term: string = $state('');
-
+	let search_input: string = $state('');
+	// let search_term = $derived.by(debounce(() => search_input, 300));
+	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
 		bus_stops = $page.data.bus_stops.slice(0, 15);
 		train_stops = $page.data.train_stops.slice(0, 15);
 
-		search_term = '';
+		search_input = '';
 	}
 
-	// function search_stops(e: { target: { value: string } }) {
-	// 	// If search is empty, clear search and show all stops
-	// 	if (e.target.value === '') {
+	// let debounce_timeout = $state<number>();
+	// let debounce_timeout: number;
+
+	// $effect(() => {
+	// 	if (search !== 'ready') return;
+
+	// 	if (search_input === '') {
 	// 		clear_search();
 	// 		return;
 	// 	}
 
-	// 	// search_term = e.target.value;
+	// 	clearTimeout(debounce_timeout);
+
+	// 	debounce_timeout = setTimeout(() => {
+	// 		console.log('updating stops');
+	// 		// if (search_input === '') {
+	// 		// 	clear_search();
+	// 		// } else {
+	// 		search_worker.postMessage({
+	// 			type: 'search',
+	// 			payload: { search_term: search_input, search_type: selected_tab.value }
+	// 		});
+	// 		// }
+	// 	}, 150);
+	// });
+	// if (search === 'ready') {
+	// 	// console.log('searching stops');
 	// 	search_worker.postMessage({
 	// 		type: 'search',
 	// 		payload: { search_term, search_type: selected_tab.value }
 	// 	});
 	// }
+	// });
 
 	$effect(() => {
-		// untrack(() => search_term);
-		// console.log(selected_tab.value);
 		if (search !== 'ready') return;
 
-		if (search_term === '') {
+		if (search_input === '') {
 			clear_search();
-			return;
-		}
-
-		if (search === 'ready') {
-			// console.log('searching stops');
+		} else {
 			search_worker.postMessage({
 				type: 'search',
-				payload: { search_term, search_type: selected_tab.value }
+				payload: { search_term: search_input, search_type: selected_tab.value }
 			});
 		}
+
+		// if (search === 'ready') {
+		// 	// console.log('searching stops');
+		// 	search_worker.postMessage({
+		// 		type: 'search',
+		// 		payload: { search_term, search_type: selected_tab.value }
+		// 	});
+		// }
 	});
-
-	// from https://www.okupter.com/blog/svelte-debounce
-	// function debounce(callback: Function, wait = 200) {
-	// 	let timeout: ReturnType<typeof setTimeout>;
-
-	// 	return (...args: any[]) => {
-	// 		clearTimeout(timeout);
-	// 		timeout = setTimeout(() => callback(...args), wait);
-	// 	};
-	// }
 </script>
 
 <svelte:head>
@@ -123,10 +136,9 @@
 />
 
 <div class="absolute bottom-0 w-full">
-	<!-- 		oninput={debounce(search_stops)} -->
 	<input
 		name="search"
-		bind:value={search_term}
+		bind:value={search_input}
 		type="search"
 		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
 		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-600 focus:ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"

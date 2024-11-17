@@ -43,18 +43,9 @@ pub async fn import(
                     let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
                         .checked_sub(duration_since_last_update.to_std().unwrap());
 
-                    match sleep_time {
-                        Some(sleep_time) => {
-                            tracing::info!(
-                                "Waiting {} seconds before updating",
-                                sleep_time.as_secs()
-                            );
-                            sleep(sleep_time).await;
-                        }
-                        None => (),
-                        // {
-                        //     tracing::info!("Duration since last update is greater than 3 days, no need to wait.");
-                        // }
+                    if let Some(sleep_time) = sleep_time {
+                        tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
+                        sleep(sleep_time).await;
                     }
                 }
             } else {
@@ -187,7 +178,7 @@ pub async fn cache_all(
             |(mut bus_acc, mut train_acc), r| {
                 let geom: geo::MultiLineString =
                     serde_json::from_value(r.geom.clone().unwrap()).unwrap();
-                
+
                 let feature = json!({
                     "type": "Feature",
                     "id": r.id,
