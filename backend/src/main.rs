@@ -144,6 +144,7 @@ async fn main() {
     // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
 
     let routes = Router::new()
+        // TODO: show total stored trips and alerts
         .route(
             "/",
             get(|| async {
