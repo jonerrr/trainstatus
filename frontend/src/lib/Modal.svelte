@@ -126,6 +126,7 @@
 
 {#snippet actions(
 	history: boolean,
+	param_name: 'r' | 's' | 't',
 	id: string | number,
 	title: string,
 	pin_rune: PersistedRune<(string | number)[]>
@@ -177,7 +178,7 @@
 					aria-label="Share"
 					title="Share"
 					onclick={() => {
-						const url = `${window.location.origin}?d=${id}`;
+						const url = `${window.location.origin}/?${param_name}=${id}`;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
@@ -226,6 +227,7 @@
 
 				{@render actions(
 					true,
+					's',
 					$page.state.data.id,
 					`Arrivals at ${$page.state.data.name}`,
 					stop_pins_rune
@@ -235,6 +237,7 @@
 
 				{@render actions(
 					true,
+					'r',
 					$page.state.data.id,
 					`Alerts for ${$page.state.data.id}`,
 					route_pins_rune
@@ -244,6 +247,7 @@
 
 				{@render actions(
 					true,
+					't',
 					$page.state.data.id,
 					`${$page.state.data.route_id} Trip`,
 					trip_pins_rune

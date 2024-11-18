@@ -2,9 +2,10 @@ use super::route::RouteType;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
+use utoipa::ToSchema;
 
 // generic is StopData for importing but serde_json value for exporting
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct Stop<D> {
     //    Bus stops are already numbers, but train stop ids are converted to numbers by their unicode value
     pub id: i32,

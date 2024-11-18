@@ -19,7 +19,13 @@
 	let offline = $state(false);
 
 	onMount(async () => {
-		const id = $page.url.searchParams.get('d');
+		const id =
+			// stop
+			$page.url.searchParams.get('s') ||
+			// route
+			$page.url.searchParams.get('r') ||
+			// trip
+			$page.url.searchParams.get('t');
 		// console.log(id);
 		if (id) {
 			// check what type of id it is

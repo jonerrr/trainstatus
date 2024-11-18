@@ -3,6 +3,7 @@ use crate::static_data::stop::convert_stop_id;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 // pub const ROUTES: [&str; 26] = [
@@ -234,7 +235,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
-// #[derive(Debug)]
+#[derive(ToSchema)]
 pub struct Alert {
     pub id: Uuid,
     pub mta_id: String,

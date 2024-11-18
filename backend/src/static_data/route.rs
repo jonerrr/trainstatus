@@ -11,8 +11,9 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
 use std::{collections::HashMap, fmt};
+use utoipa::ToSchema;
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct Route {
     pub id: String,
     pub long_name: String,
@@ -25,7 +26,7 @@ pub struct Route {
     pub route_type: RouteType,
 }
 
-#[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[sqlx(type_name = "route_type", rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RouteType {

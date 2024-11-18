@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{prelude::FromRow, PgPool};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(PartialEq, Serialize, Hash, Eq, FromRow)]
+#[derive(PartialEq, Serialize, Hash, Eq, FromRow, ToSchema)]
 pub struct StopTime {
     pub trip_id: Uuid,
     pub stop_id: i32,

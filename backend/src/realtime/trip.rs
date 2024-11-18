@@ -3,11 +3,12 @@ use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use thiserror::Error;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 // #[serde(skip_serializing_if = "Option::is_none")]
 
-#[derive(Clone, Serialize, PartialEq, Debug, Deserialize)]
+#[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema)]
 pub struct Trip<D> {
     pub id: Uuid,
     pub mta_id: String,
