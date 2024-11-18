@@ -47,6 +47,4 @@ export function createStopTimes() {
 
 export const stop_times = createStopTimes();
 
-// export const monitored_routes = $state<SvelteMap<string, string[]>>(new SvelteMap());
-
 export const monitored_bus_routes = $state(new SvelteSet<string>());

@@ -8,6 +8,8 @@ export const load: LayoutLoad = async ({ fetch }) => {
 	const stops_promise = fetch('/api//v1/stops').then((res) => res.json());
 	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
 
+	// TODO: preload bus route ids using search param
+
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], boolean, boolean, boolean] =
 		await Promise.all([
 			stops_promise,

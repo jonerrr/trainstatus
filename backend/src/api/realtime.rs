@@ -1,20 +1,36 @@
 use super::errors::ServerError;
 use super::json_headers;
 use crate::api::parse_list;
+use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
+use crate::realtime::trip::Trip;
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use chrono::Utc;
 use redis::AsyncCommands;
 use serde::Deserialize;
+use utoipa::IntoParams;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams)]
 pub struct TripsParameters {
+    /// Return in GeoJSON format instead of JSON
     #[serde(default)]
     geojson: bool,
 }
 
+// TODO: dont use serde_json::Value
+#[utoipa::path(
+    get,
+    path = "/trips",
+    tag = "REALTIME",
+    params(
+        TripsParameters
+    ),
+    responses(
+        (status = 200, description = "Subway and bus trips", body = [Trip<serde_json::Value>])
+    )
+)]
 pub async fn trips_handler(
     State(state): State<AppState>,
     params: Query<TripsParameters>,
@@ -30,12 +46,24 @@ pub async fn trips_handler(
     Ok((json_headers().clone(), trips))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams)]
 pub struct StopTimesParameters {
+    /// Comma-separated list of bus route IDs to include in response. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     bus_route_ids: Vec<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/stop_times",
+    tag = "REALTIME",
+    params(
+        StopTimesParameters
+    ),
+    responses(
+        (status = 200, description = "Subway and bus stop times. Unlike other routes, by default this will ONLY return train routes unless specified.", body = [StopTime])
+    )
+)]
 pub async fn stop_times_handler(
     State(state): State<AppState>,
     params: Query<StopTimesParameters>,
@@ -60,6 +88,15 @@ pub async fn stop_times_handler(
     }
 }
 
+// TODO: make sure struct matches
+#[utoipa::path(
+    get,
+    path = "/alerts",
+    tag = "REALTIME",
+    responses(
+        (status = 200, description = "Subway and bus alerts", body = [Alert])
+    )
+)]
 pub async fn alerts_handler(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ServerError> {

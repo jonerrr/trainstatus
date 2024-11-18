@@ -1,7 +1,7 @@
 use super::errors::ServerError;
 use super::json_headers;
-// use super::json_headers;
-use crate::static_data::route;
+use crate::static_data::route::{self, Route};
+use crate::static_data::stop::Stop;
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
@@ -9,17 +9,41 @@ use headers::{ETag, HeaderMapExt, IfNoneMatch};
 use http::{header, HeaderMap, StatusCode};
 use redis::AsyncCommands;
 use serde::Deserialize;
+use utoipa::IntoParams;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams)]
 pub struct Parameters {
-    // include geometry, default is false
+    /// Return in GeoJSON format instead of JSON
     #[serde(default)]
     geojson: bool,
-    // filter for bus or train routes
+    /// Filter by route type. If none provided, return all routes
     #[serde(default)]
     route_type: Option<route::RouteType>,
 }
 
+pub fn cache_headers(hash: String) -> HeaderMap {
+    let mut headers = json_headers().clone();
+    headers.insert(header::ETAG, hash.parse().unwrap());
+    headers.insert(
+        header::CACHE_CONTROL,
+        "public, max-age=3600, stale-while-revalidate=86400"
+            .parse()
+            .unwrap(),
+    );
+    headers
+}
+
+#[utoipa::path(
+    get,
+    path = "/routes",
+    tag = "STATIC",
+    params(
+        Parameters
+    ),
+    responses(
+        (status = 200, description = "Subway and bus routes", body = [Route])
+    )
+)]
 pub async fn routes_handler(
     State(state): State<AppState>,
     params: Query<Parameters>,
@@ -65,19 +89,23 @@ pub async fn routes_handler(
                 }
             }
 
-            let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-            headers.insert(header::ETAG, routes_hash.parse().unwrap());
-            headers.insert(
-                header::CACHE_CONTROL,
-                "public, max-age=3600, must-revalidate".parse().unwrap(),
-            );
-
-            Ok((StatusCode::OK, headers, routes))
+            Ok((StatusCode::OK, cache_headers(routes_hash), routes))
         }
     }
 }
 
+// TODO: use struct instead of serde_json value
+#[utoipa::path(
+    get,
+    path = "/stops",
+    tag = "STATIC",
+    params(
+        Parameters
+    ),
+    responses(
+        (status = 200, description = "Subway and bus stops", body = [Stop<serde_json::Value>])
+    )
+)]
 pub async fn stops_handler(
     State(state): State<AppState>,
     params: Query<Parameters>,
@@ -108,35 +136,7 @@ pub async fn stops_handler(
                 }
             }
 
-            let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-            headers.insert(header::ETAG, stops_hash.parse().unwrap());
-            headers.insert(
-                header::CACHE_CONTROL,
-                "public, max-age=3600, must-revalidate".parse().unwrap(),
-            );
-
-            Ok((StatusCode::OK, headers, stops))
+            Ok((StatusCode::OK, cache_headers(stops_hash), stops))
         }
     }
-    // let (stops, stops_hash): (String, String) = conn.mget(&["stops", "stops_hash"]).await?;
-
-    // if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-    //     let etag = stops_hash.parse::<ETag>().unwrap();
-
-    //     // if the etag matches the request, return 304
-    //     if !if_none_match.precondition_passes(&etag) {
-    //         return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
-    //     }
-    // }
-
-    // let mut headers = HeaderMap::new();
-    // headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-    // headers.insert(header::ETAG, stops_hash.parse().unwrap());
-    // headers.insert(
-    //     header::CACHE_CONTROL,
-    //     "public, max-age=3600, must-revalidate".parse().unwrap(),
-    // );
-
-    // Ok((StatusCode::OK, headers, stops))
 }

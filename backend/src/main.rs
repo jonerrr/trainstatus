@@ -34,6 +34,9 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 // mod alerts;
 mod api;
@@ -68,10 +71,10 @@ struct AppState {
     // initial_data: Arc<RwLock<serde_json::Value>>,
 }
 
+const API_DESCRIPTION: &str = concat!("TrainStat.us API v", env!("CARGO_PKG_VERSION"));
+
 #[tokio::main]
 async fn main() {
-    // let fart = (0..8).map(|_| api_key()).collect::<Vec<_>>();
-
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -142,9 +145,33 @@ async fn main() {
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
     // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
+    // TODO: use env var for email
+    #[derive(OpenApi)]
+    #[openapi(info(title = "TrainStat.us API", description = API_DESCRIPTION, contact(email = "jonah@trainstat.us")),
+    tags(
+        (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
+        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts)")
+    )
+    )]
+    struct ApiDoc;
 
-    let routes = Router::new()
-        // TODO: show total stored trips and alerts
+    let state = AppState {
+        pg_pool,
+        redis_pool,
+        // updated_trips,
+        // tx,
+        // rx,
+        // clients: ws_clients,
+        // shutdown_tx: shutdown_tx.clone(),
+        // initial_data,
+    };
+
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .nest("/v1", api::router(state))
+        .split_for_parts();
+
+    let app = router
+        .merge(Scalar::with_url("/docs", api))
         .route(
             "/",
             get(|| async {
@@ -153,29 +180,6 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
-        // sse testing
-        // .route("/sse", get(api::sse::sse_handler))
-        // .route("/realtime", get(api::realtime::realtime_handler))
-        .route("/routes", get(api::static_data::routes_handler))
-        .route("/stops", get(api::static_data::stops_handler))
-        .route("/trips", get(api::realtime::trips_handler))
-        .route("/stop_times", get(api::realtime::stop_times_handler))
-        .route("/alerts", get(api::realtime::alerts_handler))
-        .with_state(AppState {
-            pg_pool,
-            redis_pool,
-            // updated_trips,
-            // tx,
-            // rx,
-            // clients: ws_clients,
-            // shutdown_tx: shutdown_tx.clone(),
-            // initial_data,
-        });
-    // .layer(Extension(tx1))
-    // .layer(Extension(ws_clients))
-
-    let app = Router::new()
-        .nest("/v1", routes)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
