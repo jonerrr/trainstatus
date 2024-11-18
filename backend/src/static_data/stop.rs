@@ -6,15 +6,19 @@ use utoipa::ToSchema;
 
 // generic is StopData for importing but serde_json value for exporting
 #[derive(Serialize, ToSchema)]
-pub struct Stop<D> {
-    //    Bus stops are already numbers, but train stop ids are converted to numbers by their unicode value
+pub struct Stop<D, R> {
+    /// Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
+    #[schema(example = 101)]
     pub id: i32,
+    #[schema(example = "Van Cortlandt Park-242 St")]
     pub name: String,
+    #[schema(example = 40.889248)]
     pub lat: f32,
+    #[schema(example = -73.89858)]
     pub lon: f32,
     pub route_type: RouteType,
     pub data: D,
-    pub routes: Option<serde_json::Value>,
+    pub routes: R,
 }
 
 #[derive(Serialize)]
@@ -55,7 +59,7 @@ pub enum RouteStopData {
     Bus { headsign: String, direction: i16 },
 }
 
-#[derive(sqlx::Type)]
+#[derive(sqlx::Type, ToSchema, Deserialize)]
 #[sqlx(type_name = "stop_type", rename_all = "snake_case")]
 pub enum StopType {
     FullTime,
@@ -98,7 +102,7 @@ pub fn convert_stop_id(stop_id: String) -> Option<i32> {
     Some(stop_id.parse().unwrap())
 }
 
-impl Stop<StopData> {
+impl Stop<StopData, Option<serde_json::Value>> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
         for chunk in values.chunks(32000 / 12) {
             let mut query_builder = QueryBuilder::new(
@@ -148,7 +152,10 @@ impl Stop<StopData> {
     pub async fn parse_train(
         routes: Vec<String>,
         mut transfers: Vec<Transfer<String>>,
-    ) -> (Vec<Stop<StopData>>, Vec<RouteStop>) {
+    ) -> (
+        Vec<Stop<StopData, Option<serde_json::Value>>>,
+        Vec<RouteStop>,
+    ) {
         let mut stations: Vec<StationResponse> = vec![];
         let mut route_stops: Vec<RouteStop> = vec![];
 
@@ -281,9 +288,11 @@ impl Stop<StopData> {
     //     todo!("return bus stops")
     // }
 
-    pub async fn get_all(pool: &PgPool) -> Result<Vec<Stop<serde_json::Value>>, sqlx::Error> {
+    pub async fn get_all(
+        pool: &PgPool,
+    ) -> Result<Vec<Stop<serde_json::Value, Option<serde_json::Value>>>, sqlx::Error> {
         sqlx::query_as!(
-            Stop::<serde_json::Value>,
+            Stop::<serde_json::Value, Option<serde_json::Value>>,
             r#"
             SELECT
                 s.id,

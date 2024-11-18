@@ -1,7 +1,7 @@
 use super::errors::ServerError;
 use super::json_headers;
 use crate::static_data::route::{self, Route};
-use crate::static_data::stop::Stop;
+use crate::static_data::stop::{Stop, StopType};
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
@@ -9,7 +9,7 @@ use headers::{ETag, HeaderMapExt, IfNoneMatch};
 use http::{header, HeaderMap, StatusCode};
 use redis::AsyncCommands;
 use serde::Deserialize;
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Deserialize, IntoParams)]
 pub struct Parameters {
@@ -94,6 +94,46 @@ pub async fn routes_handler(
     }
 }
 
+#[derive(ToSchema, Deserialize)]
+#[serde(untagged)]
+pub enum ApiStopData {
+    Bus {
+        // TODO: add all possible values
+        #[schema(example = "N")]
+        direction: String,
+    },
+    Train {
+        ada: bool,
+        #[schema(example = "bronx")]
+        borough: String,
+        #[schema(example = "242 St")]
+        north_headsign: String,
+        #[schema(example = "Manhattan")]
+        south_headsign: String,
+        /// List of stop IDs that are transfers
+        transfers: Vec<i32>,
+    },
+}
+
+#[derive(ToSchema, Deserialize)]
+#[serde(untagged)]
+pub enum ApiStopRoute {
+    Bus {
+        #[schema(example = 1)]
+        /// Direction is from MTA's bus API. Can be 0 or 1
+        direction: i8,
+        headsign: String,
+        id: String,
+        stop_sequence: i32,
+    },
+    Train {
+        id: String,
+        stop_sequence: i32,
+        #[serde(rename = "type")]
+        stop_type: StopType,
+    },
+}
+
 // TODO: use struct instead of serde_json value
 #[utoipa::path(
     get,
@@ -103,7 +143,7 @@ pub async fn routes_handler(
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus stops", body = [Stop<serde_json::Value>])
+        (status = 200, description = "Subway and bus stops", body = [Stop<Vec<ApiStopData>, Vec<ApiStopRoute>>])
     )
 )]
 pub async fn stops_handler(
