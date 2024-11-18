@@ -15,12 +15,16 @@ use utoipa::ToSchema;
 
 #[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct Route {
+    #[schema(example = "B44+")]
     pub id: String,
+    #[schema(example = "Sheepshead Bay - Williamsburg")]
     pub long_name: String,
+    #[schema(example = "B44-SBS")]
     pub short_name: String,
+    #[schema(example = "B933AD")]
     pub color: String,
+    #[schema(example = false)]
     pub shuttle: bool,
-    // optional for api response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geom: Option<serde_json::Value>,
     pub route_type: RouteType,
@@ -142,10 +146,14 @@ impl Route {
             .collect::<Vec<Route>>()
     }
 
-    pub async fn parse_bus() -> (Vec<Self>, Vec<Stop<StopData>>, Vec<RouteStop>) {
+    pub async fn parse_bus() -> (
+        Vec<Self>,
+        Vec<Stop<StopData, Option<serde_json::Value>>>,
+        Vec<RouteStop>,
+    ) {
         // It wouldn't make sense to get bus routes and stops at different times bc they are all from the same API
         let mut routes: Vec<Route> = Vec::new();
-        let mut stops: Vec<Stop<StopData>> = Vec::new();
+        let mut stops: Vec<Stop<StopData, Option<serde_json::Value>>> = Vec::new();
         let mut route_stops: Vec<RouteStop> = Vec::new();
 
         let all_routes = AgencyBusRoute::get_all().await;
