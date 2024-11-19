@@ -61,6 +61,7 @@ pub enum RouteStopData {
 
 #[derive(sqlx::Type, ToSchema, Deserialize)]
 #[sqlx(type_name = "stop_type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum StopType {
     FullTime,
     PartTime,

@@ -15,17 +15,19 @@ use utoipa::ToSchema;
 
 #[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct Route {
-    #[schema(example = "B44+")]
+    #[schema(example = "1")]
     pub id: String,
-    #[schema(example = "Sheepshead Bay - Williamsburg")]
+    #[schema(example = "Broadway - 7 Avenue Local")]
     pub long_name: String,
-    #[schema(example = "B44-SBS")]
+    #[schema(example = "1")]
     pub short_name: String,
-    #[schema(example = "B933AD")]
+    #[schema(example = "EE352E")]
     pub color: String,
     #[schema(example = false)]
+    /// This will only be true for shuttle bus routes. It is false for all train routes.
     pub shuttle: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_deserializing)]
     pub geom: Option<serde_json::Value>,
     pub route_type: RouteType,
 }

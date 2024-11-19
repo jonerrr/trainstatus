@@ -16,7 +16,7 @@ pub struct Parameters {
     /// Return in GeoJSON format instead of JSON
     #[serde(default)]
     geojson: bool,
-    /// Filter by route type. If none provided, return all routes
+    /// Filter by route type. If none provided, all routes are returned.
     #[serde(default)]
     route_type: Option<route::RouteType>,
 }
@@ -41,7 +41,7 @@ pub fn cache_headers(hash: String) -> HeaderMap {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus routes", body = [Route])
+        (status = 200, description = "Subway and bus routes. WARNING: SIR geometry is missing.", body = [Route])
     )
 )]
 pub async fn routes_handler(
@@ -103,12 +103,15 @@ pub enum ApiStopData {
         direction: String,
     },
     Train {
+        /// If the stop is ADA accessible
         ada: bool,
         #[schema(example = "bronx")]
         borough: String,
         #[schema(example = "242 St")]
+        /// Headsign for northbound trains
         north_headsign: String,
         #[schema(example = "Manhattan")]
+        /// Headsign for southbound trains
         south_headsign: String,
         /// List of stop IDs that are transfers
         transfers: Vec<i32>,
@@ -133,6 +136,8 @@ pub enum ApiStopRoute {
         stop_type: StopType,
     },
 }
+
+// pub type ApiStop = Stop<Vec<ApiStopData>, Vec<ApiStopRoute>>;
 
 // TODO: use struct instead of serde_json value
 #[utoipa::path(
