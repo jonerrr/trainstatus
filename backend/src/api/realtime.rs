@@ -1,7 +1,6 @@
 use super::errors::ServerError;
 use super::json_headers;
 use crate::api::parse_list;
-use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
 use crate::realtime::trip::Trip;
 use crate::AppState;

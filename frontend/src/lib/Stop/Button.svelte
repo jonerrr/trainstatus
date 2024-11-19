@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NumberFlow from '@number-flow/svelte';
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import {
@@ -60,12 +61,13 @@
 </script>
 
 {#snippet eta(n: number)}
-	{@const eta = n.toFixed(0)}
-	{#key eta}
+	{@const eta = parseInt(n.toFixed(0))}
+	<NumberFlow value={eta} suffix="m" />
+	<!-- {#key eta}
 		<span in:fade={{ duration: 300 }}>
 			{eta}m
 		</span>
-	{/key}
+	{/key} -->
 {/snippet}
 
 <Button
