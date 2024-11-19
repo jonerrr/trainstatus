@@ -5,7 +5,7 @@ use axum::{
     extract::Request,
     response::{IntoResponse, Response},
     routing::get,
-    Router, ServiceExt,
+    ServiceExt,
 };
 use bb8_redis::RedisConnectionManager;
 // use crossbeam::channel::unbounded;
@@ -70,8 +70,6 @@ struct AppState {
     // shutdown_tx: Sender<()>,
     // initial_data: Arc<RwLock<serde_json::Value>>,
 }
-
-const API_DESCRIPTION: &str = concat!("TrainStat.us API v", env!("CARGO_PKG_VERSION"));
 
 #[tokio::main]
 async fn main() {
@@ -147,7 +145,8 @@ async fn main() {
     // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
     // TODO: use env var for email
     #[derive(OpenApi)]
-    #[openapi(info(title = "TrainStat.us API", description = API_DESCRIPTION, contact(email = "jonah@trainstat.us")),
+    #[openapi(info(title = "TrainStat.us API", description = "The TrainStat.us API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds. Historical data and more options for the API are coming soon.", contact(email = "jonah@trainstat.us")),
+    servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts)")

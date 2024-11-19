@@ -7,10 +7,11 @@ use crate::realtime::trip::Trip;
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use redis::AsyncCommands;
 use serde::Deserialize;
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
+use uuid::Uuid;
 
 #[derive(Deserialize, IntoParams)]
 pub struct TripsParameters {
@@ -88,13 +89,44 @@ pub async fn stop_times_handler(
     }
 }
 
+#[derive(ToSchema)]
+pub struct ApiAlert {
+    id: Uuid,
+    #[schema(example = "Boarding Change")]
+    /// Alert type, if planned it will start with "Planned"
+    alert_type: String,
+    /// Alert header in HTML format
+    header_html: String,
+    /// Alert description in HTML format
+    description_html: Option<String>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    /// Start time of alert
+    start_time: DateTime<Utc>,
+    /// End time of alert. If null, there is no end time yet.
+    end_time: Option<DateTime<Utc>>,
+    /// Entities affected by alert
+    entities: Vec<ApiAlertEntity>,
+}
+
+#[derive(ToSchema)]
+pub struct ApiAlertEntity {
+    /// Affected route ID
+    #[schema(example = "A")]
+    route_id: String,
+    /// The priority of the alert for the entity in ascending order
+    sort_order: i32,
+    /// Affected stop ID
+    stop_id: Option<String>,
+}
+
 // TODO: make sure struct matches
 #[utoipa::path(
     get,
     path = "/alerts",
     tag = "REALTIME",
     responses(
-        (status = 200, description = "Subway and bus alerts", body = [Alert])
+        (status = 200, description = "Subway and bus alerts", body = [ApiAlert])
     )
 )]
 pub async fn alerts_handler(

@@ -17,9 +17,9 @@ pub mod static_data;
 
 pub fn router(state: AppState) -> OpenApiRouter {
     OpenApiRouter::new()
-        .routes(routes!(realtime::trips_handler))
-        .routes(routes!(realtime::stop_times_handler))
         .routes(routes!(realtime::alerts_handler))
+        .routes(routes!(realtime::stop_times_handler))
+        .routes(routes!(realtime::trips_handler))
         .routes(routes!(static_data::routes_handler))
         .routes(routes!(static_data::stops_handler))
         .with_state(state)
