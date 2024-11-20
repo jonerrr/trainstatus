@@ -3,7 +3,6 @@
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import {
-		is_bus,
 		is_train,
 		type BusRouteStop,
 		type BusStopData,
@@ -84,7 +83,7 @@
 			stop_times: StopTime<number, TripDirection, string>[]
 		)}
 			<div class="flex flex-col mt-auto">
-				<div class="text-neutral-200 font-semibold table-cell text-left max-w-[85%]">
+				<div class="font-semibold table-cell text-left max-w-[85%]">
 					{headsign}
 				</div>
 				<div class="flex flex-col gap-1">
@@ -145,7 +144,7 @@
 		{@const data = stop.data as BusStopData}
 		{@const stop_routes = stop.routes as BusRouteStop[]}
 
-		<div class="flex flex-col text-left">
+		<div class="flex flex-col text-white">
 			<div class="flex gap-2 items-center">
 				<div>
 					<BusArrow direction={data.direction} />
@@ -163,7 +162,7 @@
 					<div class="flex gap-2 items-center text-wrap text-left rounded p-1">
 						<Icon {route} link={false} express={false} />
 						<div class="flex flex-col">
-							<div class="text-neutral-100 font-semibold">
+							<div class="">
 								{stop_route.headsign}
 							</div>
 							<div class="flex gap-2 pr-1">

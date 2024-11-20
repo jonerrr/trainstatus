@@ -21,7 +21,7 @@
 
 <div {id} class="relative w-full list-item">
 	<button
-		class="hover:bg-neutral-900 active:bg-neutral-900 w-full flex justify-between items-center p-1"
+		class="hover:bg-neutral-900 active:bg-neutral-900 w-full flex justify-between items-center p-1 text-white"
 		transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
 		onclick={() => {
 			pushState('', JSON.parse(JSON.stringify(state)));
@@ -34,7 +34,7 @@
 		<Pin
 			bind:pin_rune
 			id={state.data.id}
-			class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-300 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
+			class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-200 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
 		/>
 	{/if}
 </div>
