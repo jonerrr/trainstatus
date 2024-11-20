@@ -130,12 +130,12 @@
 	bus_data={bus_stops}
 	train_data={train_stops}
 	monitor_routes
-	class="max-h-[calc(100dvh-12.8rem)]"
+	class="max-h-[calc(100dvh-13.1rem)]"
 	auto_scroll
 	bind:selected_tab
 />
 
-<div class="absolute bottom-0 w-full">
+<div class="absolute bottom-1 w-full">
 	<input
 		name="search"
 		bind:value={search_input}

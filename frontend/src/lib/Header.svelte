@@ -1,15 +1,36 @@
 <script lang="ts">
+	import { fade } from 'svelte/transition';
+	import { BookText, GitBranch } from 'lucide-svelte';
+
 	let { offline }: { offline: boolean } = $props();
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative">
-	<div class="gradient-text font-bold">TrainStat.us</div>
-
+	<div class="flex gap-1">
+		<div class="gradient-text font-black">TrainStat.us</div>
+		{#if offline}
+			<div transition:fade class="text-red-500 text-xs self-end">Offline</div>
+		{/if}
+	</div>
 	<!-- <TimeSelect /> -->
-
-	{#if offline}
-		<div class="text-red-500 text-xs">Offline</div>
-	{/if}
+	<div class="flex justify-center items-center gap-2">
+		<a
+			href="/api/docs"
+			target="_blank"
+			class="text-white text-sm hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+		>
+			<BookText class="w-6 h-6" />
+			<span>API</span>
+		</a>
+		<a
+			href="https://github.com/jonerrr/trainstatus"
+			target="_blank"
+			class="text-white text-sm hover:text-green-400 transition-colors duration-300 flex flex-col items-center"
+		>
+			<GitBranch class="w-6 h-6" />
+			<span>Code</span>
+		</a>
+	</div>
 </header>
 
 <style>
