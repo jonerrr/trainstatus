@@ -8,7 +8,7 @@
 	import SearchWorker from './search_worker?worker';
 	// import { untrack } from 'svelte';
 
-	let search_worker: Worker;
+	let search_worker = $state<Worker>();
 	let search = $state<'loading' | 'ready'>('loading');
 
 	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
@@ -99,7 +99,8 @@
 		if (search_input === '') {
 			clear_search();
 		} else {
-			search_worker.postMessage({
+			// worker will be defined bc search is ready
+			search_worker!.postMessage({
 				type: 'search',
 				payload: { search_term: search_input, search_type: selected_tab.value }
 			});
@@ -119,7 +120,6 @@
 	<title>Stops</title>
 </svelte:head>
 
-<!-- TODO: Fix large here -->
 {#snippet stop_button(stop: Stop<'bus' | 'train'>)}
 	<StopButton {stop} pin_rune={stop_pins_rune} />
 {/snippet}

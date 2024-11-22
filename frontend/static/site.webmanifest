@@ -20,5 +20,6 @@
 	"name": "Train Status",
 	"short_name": "TrainStat.us",
 	"start_url": "/",
-	"description": "The best way to view MTA subway (and bus) ETAs and alerts"
+	"description": "The best way to view MTA subway (and bus) ETAs and alerts",
+	"scope": "/"
 }
