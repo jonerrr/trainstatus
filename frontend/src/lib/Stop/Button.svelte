@@ -1,5 +1,5 @@
 <script lang="ts">
-	import NumberFlow from '@number-flow/svelte';
+	// import NumberFlow from '@number-flow/svelte';
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import {
@@ -61,12 +61,13 @@
 
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
-	<NumberFlow value={eta} suffix="m" />
-	<!-- {#key eta}
+	<!-- numberflow was causing a hydration mismatch error -->
+	<!-- <NumberFlow value={eta} suffix="m" /> -->
+	{#key eta}
 		<span in:fade={{ duration: 300 }}>
 			{eta}m
 		</span>
-	{/key} -->
+	{/key}
 {/snippet}
 
 <Button

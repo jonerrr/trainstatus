@@ -86,7 +86,7 @@
 
 					const stop: Stop<'bus' | 'train'> = state.data;
 					if (is_bus(stop)) {
-						console.log('monitoring modal bus routes');
+						// console.log('monitoring modal bus routes');
 						stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
 					}
 					break;
@@ -96,7 +96,7 @@
 					const trip: Trip<TripData> = state.data;
 					const bus_route = $page.data.routes[trip.route_id];
 					if (is_bus_route(bus_route, trip)) {
-						console.log('monitoring modal bus routes');
+						// console.log('monitoring modal bus routes');
 						monitored_bus_routes.add(trip.route_id);
 					}
 
