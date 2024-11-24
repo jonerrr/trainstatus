@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                a.id, ae.route_id, ae.stop_id\n            FROM\n                alert a\n            LEFT JOIN affected_entity ae ON\n                a.id = ae.alert_id\n            WHERE\n                a.mta_id = $1 OR a.created_at = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "stop_id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "2e567b7d73c9ac6c100defe888fd6df8025f4a0bdd0fae25ad55310227d8040f"
+}

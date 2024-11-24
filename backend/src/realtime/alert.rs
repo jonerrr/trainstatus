@@ -76,6 +76,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             updated_at,
             display_before_active,
         };
+
         let alert_exists = alert.find(pool).await?;
         // There could be duplicate alerts in the feed so I need to remove them
         if alert_exists && alerts.iter().any(|a| a.id == alert.id) {
@@ -234,6 +235,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct Alert {
     pub id: Uuid,
     pub mta_id: String,
@@ -358,7 +360,7 @@ impl Alert {
             LEFT JOIN affected_entity ae ON
                 a.id = ae.alert_id
             WHERE
-                a.last_in_feed >= $1 - INTERVAL '5 minutes' AND
+                a.last_in_feed >= $1 - INTERVAL '2 minutes' AND
                 ae.route_id IS NOT NULL
                 AND ap.start_time <= now()
                 AND (ap.end_time >= now()
@@ -383,22 +385,20 @@ impl Alert {
         let res = sqlx::query!(
             "
             SELECT
-                id
+                a.id, ae.route_id, ae.stop_id
             FROM
-                alert
+                alert a
+            LEFT JOIN affected_entity ae ON
+                a.id = ae.alert_id
             WHERE
-                (mta_id = $1
-                    OR header_plain = $2
-                    OR (description_plain IS NOT NULL
-                        AND description_plain = $3))
-                AND created_at::date = $4",
+                a.mta_id = $1 OR a.created_at = $2",
             self.mta_id,
-            self.header_plain,
-            self.description_plain,
-            self.created_at.date_naive()
+            self.created_at
         )
         .fetch_optional(pool)
         .await?;
+
+        // TODO: check if affected entity matches
 
         match res {
             Some(t) => {

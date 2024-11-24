@@ -16,24 +16,26 @@ export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
 	async function update(fetch: Fetch, routes: string[]) {
-		try {
-			const data: StopTime[] = await (
-				await fetch(
-					`/api/v1/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
-				)
-			).json();
-
-			stop_times = data.map((stop_time) => ({
-				...stop_time,
-				arrival: new Date(stop_time.arrival),
-				departure: new Date(stop_time.departure)
-			}));
-
-			return false;
-		} catch (e) {
-			console.error(e);
-			return true;
+		// try {
+		const res = await fetch(
+			`/api/v1/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
+		);
+		if (res.headers.has('x-sw-fallback')) {
+			throw new Error('Offline');
 		}
+		const data: StopTime[] = await res.json();
+
+		stop_times = data.map((stop_time) => ({
+			...stop_time,
+			arrival: new Date(stop_time.arrival),
+			departure: new Date(stop_time.departure)
+		}));
+
+		// return false;
+		// } catch (e) {
+		// 	console.error(e);
+		// 	return true;
+		// }
 	}
 
 	return {

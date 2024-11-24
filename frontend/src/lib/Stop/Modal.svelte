@@ -95,7 +95,7 @@
 		{#each stop.data.transfers as transfer}
 			{@const transfer_stop = $page.data.stops[transfer] as Stop<'train'>}
 			<button
-				class="flex gap-1 rounded border border-neutral-400 shadow-2xl active:border-neutral-700 hover:border-neutral-700"
+				class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
 				onclick={() =>
 					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
 			>

@@ -38,7 +38,11 @@ export function createAlerts() {
 
 	async function update(fetch: Fetch) {
 		try {
-			const data: Alert[] = await (await fetch(`/api/v1/alerts`)).json();
+			const res = await fetch(`/api/v1/alerts`);
+			if (res.headers.has('x-sw-fallback')) {
+				throw new Error('Offline');
+			}
+			const data: Alert[] = await res.json();
 
 			alerts = data.map((alert) => ({
 				...alert,

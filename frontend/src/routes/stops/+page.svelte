@@ -5,47 +5,14 @@
 	import List from '$lib/List.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
-	import SearchWorker from './search_worker?worker';
-	// import { untrack } from 'svelte';
-
-	let search_worker = $state<Worker>();
-	let search = $state<'loading' | 'ready'>('loading');
+	import { StopSearch } from '$lib/search.svelte';
 
 	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
 	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 15));
 
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
-	$effect(() => {
-		if (!search_worker) {
-			// console.log('init search worker');
-			search_worker = new SearchWorker();
-		}
-
-		// listen for messages
-		search_worker.addEventListener('message', (e) => {
-			const { type, payload } = e.data;
-
-			if (type === 'ready') search = 'ready';
-
-			if (type === 'results' && payload.results.length) {
-				if (payload.search_type === 'train') train_stops = payload.results;
-				else if (payload.search_type === 'bus') bus_stops = payload.results;
-
-				// if (payload.results && payload.results.length < 6) {
-				// 	list_el.scrollIntoView();
-				// }
-			}
-		});
-		// initialize when the component mounts
-		search_worker.postMessage({
-			type: 'load',
-			payload: {
-				bus_stops: JSON.parse(JSON.stringify($page.data.bus_stops)),
-				train_stops: JSON.parse(JSON.stringify($page.data.train_stops))
-			}
-		});
-	});
+	const search = new StopSearch($page.data.bus_stops, $page.data.train_stops);
 
 	// let search_el: HTMLInputElement;
 	let search_input: string = $state('');
@@ -59,60 +26,24 @@
 		search_input = '';
 	}
 
-	// let debounce_timeout = $state<number>();
-	// let debounce_timeout: number;
-
-	// $effect(() => {
-	// 	if (search !== 'ready') return;
-
-	// 	if (search_input === '') {
-	// 		clear_search();
-	// 		return;
-	// 	}
-
-	// 	clearTimeout(debounce_timeout);
-
-	// 	debounce_timeout = setTimeout(() => {
-	// 		console.log('updating stops');
-	// 		// if (search_input === '') {
-	// 		// 	clear_search();
-	// 		// } else {
-	// 		search_worker.postMessage({
-	// 			type: 'search',
-	// 			payload: { search_term: search_input, search_type: selected_tab.value }
-	// 		});
-	// 		// }
-	// 	}, 150);
-	// });
-	// if (search === 'ready') {
-	// 	// console.log('searching stops');
-	// 	search_worker.postMessage({
-	// 		type: 'search',
-	// 		payload: { search_term, search_type: selected_tab.value }
-	// 	});
-	// }
-	// });
+	let search_timeout: number;
 
 	$effect(() => {
-		if (search !== 'ready') return;
+		search_input;
+		clearTimeout(search_timeout);
 
-		if (search_input === '') {
-			clear_search();
-		} else {
-			// worker will be defined bc search is ready
-			search_worker!.postMessage({
-				type: 'search',
-				payload: { search_term: search_input, search_type: selected_tab.value }
-			});
-		}
-
-		// if (search === 'ready') {
-		// 	// console.log('searching stops');
-		// 	search_worker.postMessage({
-		// 		type: 'search',
-		// 		payload: { search_term, search_type: selected_tab.value }
-		// 	});
-		// }
+		search_timeout = setTimeout(() => {
+			if (search_input === '') {
+				clear_search();
+			} else {
+				const results = search.search(search_input, selected_tab.value);
+				// not sure if its safe to assume that the results are always the same type
+				if (results.length) {
+					if (selected_tab.value === 'train') train_stops = results as Stop<'train'>[];
+					else if (selected_tab.value === 'bus') bus_stops = results as Stop<'bus'>[];
+				}
+			}
+		}, 250);
 	});
 </script>
 
@@ -140,7 +71,7 @@
 		name="search"
 		bind:value={search_input}
 		type="search"
-		placeholder={search === 'ready' ? 'Search stops' : 'Loading search...'}
+		placeholder="Search stops"
 		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-600 focus:ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
 	/>
 	<button
@@ -155,7 +86,6 @@
 <style lang="postcss">
 	.search-stops {
 		background-image: url('/search.svg');
-
 		background-position: 10px 10px;
 		background-repeat: no-repeat;
 	}

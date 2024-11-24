@@ -10,6 +10,7 @@
 		type Trip
 	} from '$lib/trips.svelte';
 	import Icon from '$lib/Icon.svelte';
+	import { pushState } from '$app/navigation';
 
 	interface TransferProps {
 		stop_time: StopTime;
@@ -65,7 +66,10 @@
 		{#if transfers.length}
 			{#each transfers as st}
 				{@const route = $page.data.routes[st.trip.route_id]}
-				<div class="flex gap-1 items-center">
+				<button
+					onclick={() => pushState('', { modal: 'trip', data: st.trip })}
+					class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
+				>
 					<Icon
 						{route}
 						link={false}
@@ -77,7 +81,7 @@
 						{((st.arrival.getTime() - new Date().getTime()) / 1000 / 60).toFixed(0)}m
 						<!-- {st.arrival - new Date().getTime()} -->
 					{/if}
-				</div>
+				</button>
 			{/each}
 		{:else}
 			<div class="text-neutral-400">No transfers available</div>
