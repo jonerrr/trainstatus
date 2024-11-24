@@ -1,7 +1,7 @@
 use super::errors::ServerError;
 use super::json_headers;
 use crate::static_data::route::{self, Route};
-use crate::static_data::stop::{Stop, StopType};
+use crate::static_data::stop::{Stop, StopData, StopType};
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
@@ -94,29 +94,29 @@ pub async fn routes_handler(
     }
 }
 
-#[derive(ToSchema, Deserialize)]
-#[serde(untagged)]
-pub enum ApiStopData {
-    Bus {
-        // TODO: add all possible values
-        #[schema(example = "N")]
-        direction: String,
-    },
-    Train {
-        /// If the stop is ADA accessible
-        ada: bool,
-        #[schema(example = "bronx")]
-        borough: String,
-        #[schema(example = "242 St")]
-        /// Headsign for northbound trains
-        north_headsign: String,
-        #[schema(example = "Manhattan")]
-        /// Headsign for southbound trains
-        south_headsign: String,
-        /// List of stop IDs that are transfers
-        transfers: Vec<i32>,
-    },
-}
+// #[derive(ToSchema, Deserialize)]
+// #[serde(untagged)]
+// pub enum ApiStopData {
+//     Bus {
+//         // TODO: add all possible values
+//         #[schema(example = "N")]
+//         direction: String,
+//     },
+//     Train {
+//         /// If the stop is ADA accessible
+//         ada: bool,
+//         #[schema(example = "bronx")]
+//         borough: String,
+//         #[schema(example = "242 St")]
+//         /// Headsign for northbound trains
+//         north_headsign: String,
+//         #[schema(example = "Manhattan")]
+//         /// Headsign for southbound trains
+//         south_headsign: String,
+//         /// List of stop IDs that are transfers
+//         transfers: Vec<i32>,
+//     },
+// }
 
 #[derive(ToSchema, Deserialize)]
 #[serde(untagged)]
@@ -137,8 +137,6 @@ pub enum ApiStopRoute {
     },
 }
 
-// pub type ApiStop = Stop<Vec<ApiStopData>, Vec<ApiStopRoute>>;
-
 // TODO: use struct instead of serde_json value
 #[utoipa::path(
     get,
@@ -148,7 +146,7 @@ pub enum ApiStopRoute {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus stops", body = [Stop<Vec<ApiStopData>, Vec<ApiStopRoute>>])
+        (status = 200, description = "Subway and bus stops", body = [Stop<StopData, Vec<ApiStopRoute>>])
     )
 )]
 pub async fn stops_handler(

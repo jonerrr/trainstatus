@@ -28,8 +28,6 @@
 
 		setInterval(async () => {
 			if (is_updating) return;
-			// TODO: update more often if offline
-			// TODO: exponential backoff
 			// console.log('tick');
 			try {
 				is_updating = true;

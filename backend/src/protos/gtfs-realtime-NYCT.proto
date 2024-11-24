@@ -869,7 +869,7 @@ message NyctTripDescriptor {
   optional string train_id = 1;
 
   // This trip has been assigned to a physical train. If true, this trip is
-  // already underway or most likely will depart shortly. 
+  // already underway or most likely will depart shortly.
   //
   // Train Assignment is a function of the Automatic Train Supervision (ATS)
   // office system used by NYCT Rail Operations to monitor and track train
@@ -881,21 +881,21 @@ message NyctTripDescriptor {
   // declared unassigned and is tagged as such. Unassigned trains can be moved
   // to a storage location or assigned a nyct_train_id when a determination for
   // service is made.
-  optional bool is_assigned = 2; 
+  optional bool is_assigned = 2;
 
-  // The direction the train is moving. 
+  // The direction the train is moving.
   enum Direction {
     NORTH = 1;
     EAST = 2;
     SOUTH = 3;
-    WEST = 4; 
+    WEST = 4;
   }
   // Uptown and Bronx-bound trains are moving NORTH.
   // Times Square Shuttle to Grand Central is also northbound.
   //
   // Downtown and Brooklyn-bound trains are moving SOUTH.
   // Times Square Shuttle to Times Square is also southbound.
-  // 
+  //
   // EAST and WEST are not used currently.
   optional Direction direction = 3;
 }

@@ -1,9 +1,21 @@
-CREATE TYPE borough AS enum (
+CREATE TYPE borough AS ENUM (
     'brooklyn',
     'manhattan',
     'staten_island',
     'queens',
     'bronx'
+);
+
+CREATE TYPE bus_direction AS ENUM (
+    'sw',
+    's',
+    'se',
+    'e',
+    'w',
+    'ne',
+    'nw',
+    'n',
+    'unknown'
 );
 
 CREATE TABLE IF NOT EXISTS stop (
@@ -20,7 +32,7 @@ CREATE TABLE IF NOT EXISTS stop (
     notes VARCHAR,
     borough borough,
     -- bus fields
-    direction VARCHAR
+    direction bus_direction
 );
 
 CREATE TYPE stop_type AS enum (

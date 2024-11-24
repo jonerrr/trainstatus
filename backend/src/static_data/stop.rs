@@ -21,23 +21,28 @@ pub struct Stop<D, R> {
     pub routes: R,
 }
 
-#[derive(Serialize)]
-#[serde(tag = "t", content = "c")]
+#[derive(Serialize, ToSchema)]
+#[serde(untagged)]
 pub enum StopData {
+    /// Train
     Train {
         ada: bool,
-        north_headsign: String,
-        south_headsign: String,
-        transfers: Vec<i32>,
+        /// Notes about ADA accessibility at the stop
+        #[schema(example = "Uptown only")]
         notes: Option<String>,
+        #[schema(example = "242 St")]
+        north_headsign: String,
+        #[schema(example = "Manhattan")]
+        south_headsign: String,
+        /// List of stop IDs that are transfers
+        transfers: Vec<i32>,
         borough: Borough,
     },
-    Bus {
-        direction: String,
-    },
+    /// Bus
+    Bus { direction: BusDirection },
 }
 
-#[derive(sqlx::Type, Serialize)]
+#[derive(sqlx::Type, Serialize, ToSchema)]
 #[sqlx(type_name = "borough", rename_all = "snake_case")]
 pub enum Borough {
     Brooklyn,
@@ -45,6 +50,20 @@ pub enum Borough {
     Bronx,
     StatenIsland,
     Manhattan,
+}
+
+#[derive(sqlx::Type, Serialize, Clone, ToSchema)]
+#[sqlx(type_name = "bus_direction", rename_all = "lowercase")]
+pub enum BusDirection {
+    SW,
+    S,
+    SE,
+    E,
+    W,
+    NE,
+    NW,
+    N,
+    Unknown,
 }
 
 pub struct RouteStop {
@@ -105,7 +124,7 @@ pub fn convert_stop_id(stop_id: String) -> Option<i32> {
 
 impl Stop<StopData, Option<serde_json::Value>> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        for chunk in values.chunks(32000 / 12) {
+        for chunk in values.chunks(64000 / 12) {
             let mut query_builder = QueryBuilder::new(
             "INSERT INTO stop (id, name, lat, lon, route_type, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
         );
@@ -140,7 +159,7 @@ impl Stop<StopData, Option<serde_json::Value>> {
                             .push_bind(transfers)
                             .push_bind(notes)
                             .push_bind(borough)
-                            .push_bind(None::<String>);
+                            .push_bind(None::<BusDirection>);
                     }
                 }
             });
