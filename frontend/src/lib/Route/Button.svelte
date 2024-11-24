@@ -5,38 +5,38 @@
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
 
-	interface ButtonProps {
-		route: Route;
+	interface Props {
+		data: Route;
 		pin_rune: PersistedRune<string[]>;
 	}
 
-	let { route, pin_rune = $bindable() }: ButtonProps = $props();
+	let { data }: Props = $props();
 
 	const alerts = $derived(
 		rt_alerts.alerts_by_route
-			.get(route.id)
+			.get(data.id)
 			?.sort(
 				(a, b) =>
-					b.entities.find((e) => e.route_id === route.id)!.sort_order -
-					a.entities.find((e) => e.route_id === route.id)!.sort_order
+					b.entities.find((e) => e.route_id === data.id)!.sort_order -
+					a.entities.find((e) => e.route_id === data.id)!.sort_order
 			) ?? []
 	);
 </script>
 
-<Button state={{ modal: 'route', data: route }} {pin_rune}>
-	<section class="flex gap-1 items-center">
-		<Icon height={32} width={32} express={false} link={true} {route} />
-		{#if alerts.length}
-			<div class="font-semibold">
-				{alerts[0].alert_type}
+<!-- <Button state={{ modal: 'route', data }} {pin_rune}> -->
+<section class="flex gap-1 items-center">
+	<Icon height={32} width={32} express={false} link={true} route={data} />
+	{#if alerts.length}
+		<div class="font-semibold">
+			{alerts[0].alert_type}
+		</div>
+		{#if alerts.length > 1}
+			<div class="bg-neutral-700 text-neutral-50 rounded p-1">
+				+{alerts.length - 1}
 			</div>
-			{#if alerts.length > 1}
-				<div class="bg-neutral-700 text-neutral-50 rounded p-1">
-					+{alerts.length - 1}
-				</div>
-			{/if}
-		{:else}
-			No Alerts
 		{/if}
-	</section>
-</Button>
+	{:else}
+		No Alerts
+	{/if}
+</section>
+<!-- </Button> -->
