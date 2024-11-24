@@ -1,8 +1,3 @@
-// import { persisted_rune } from './util.svelte';
-
-// export const stop_pins = persisted_rune<number[]>('stop_pins', []);
-// export const route_pins = persisted_rune<string[]>('route_pins', []);
-
 export interface Route {
 	id: string;
 	long_name: string;

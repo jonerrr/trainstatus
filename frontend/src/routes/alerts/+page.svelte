@@ -2,7 +2,6 @@
 	import { page } from '$app/stores';
 	import { route_pins_rune } from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
-	import Button from '$lib/Route/Button.svelte';
 	import type { Route } from '$lib/static';
 
 	const { bus_routes, train_routes } = $derived(
@@ -24,14 +23,11 @@
 	<title>Alerts</title>
 </svelte:head>
 
-{#snippet route_button(route: Route)}
-	<Button {route} pin_rune={route_pins_rune} />
-{/snippet}
-
 <List
 	title="Route Alerts"
 	bus_data={bus_routes}
 	train_data={train_routes}
-	button={route_button}
-	class="max-h-[calc(100dvh-10rem)] mb-16"
+	type="route"
+	pin_rune={route_pins_rune}
+	class="max-h-[calc(100dvh-10.2rem)] mb-16"
 />

@@ -94,33 +94,10 @@ pub async fn routes_handler(
     }
 }
 
-// #[derive(ToSchema, Deserialize)]
-// #[serde(untagged)]
-// pub enum ApiStopData {
-//     Bus {
-//         // TODO: add all possible values
-//         #[schema(example = "N")]
-//         direction: String,
-//     },
-//     Train {
-//         /// If the stop is ADA accessible
-//         ada: bool,
-//         #[schema(example = "bronx")]
-//         borough: String,
-//         #[schema(example = "242 St")]
-//         /// Headsign for northbound trains
-//         north_headsign: String,
-//         #[schema(example = "Manhattan")]
-//         /// Headsign for southbound trains
-//         south_headsign: String,
-//         /// List of stop IDs that are transfers
-//         transfers: Vec<i32>,
-//     },
-// }
-
 #[derive(ToSchema, Deserialize)]
 #[serde(untagged)]
 pub enum ApiStopRoute {
+    /// Bus
     Bus {
         #[schema(example = 1)]
         /// Direction is from MTA's bus API. Can be 0 or 1
@@ -129,6 +106,7 @@ pub enum ApiStopRoute {
         id: String,
         stop_sequence: i32,
     },
+    /// Train
     Train {
         id: String,
         stop_sequence: i32,

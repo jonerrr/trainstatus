@@ -150,9 +150,9 @@
 
 <!-- TODO: better initial loading animation -->
 
-{#snippet trip_button(trip: Trip<TrainTripData | BusTripData, Route>)}
+<!-- {#snippet trip_button(trip: Trip<TrainTripData | BusTripData, Route>)}
 	<TripButton {trip} pin_rune={trip_pins_rune} />
-{/snippet}
+{/snippet} -->
 
 {#snippet locate_button()}
 	<button
@@ -173,13 +173,13 @@
 	</button>
 {/snippet}
 
-{#snippet stop_button(stop: Stop<'bus' | 'train'>)}
+<!-- {#snippet stop_button(stop: Stop<'bus' | 'train'>)}
 	<StopButton {stop} pin_rune={stop_pins_rune} />
 {/snippet}
 
 {#snippet route_button(route: Route)}
 	<RouteButton {route} pin_rune={route_pins_rune} />
-{/snippet}
+{/snippet} -->
 
 <!-- <div bind:offsetHeight={pin_list_heights}> -->
 {#if trip_pins_rune.value.length}
@@ -187,7 +187,8 @@
 		title="Pinned Trips"
 		bus_data={pinned_bus_trips}
 		train_data={pinned_train_trips}
-		button={trip_button}
+		pin_rune={trip_pins_rune}
+		type="trip"
 		min_items={2}
 	/>
 {/if}
@@ -197,7 +198,8 @@
 		title="Pinned Routes"
 		bus_data={pinned_bus_routes}
 		train_data={pinned_train_routes}
-		button={route_button}
+		pin_rune={route_pins_rune}
+		type="route"
 		min_items={2}
 	/>
 {/if}
@@ -205,9 +207,10 @@
 {#if stop_pins_rune.value.length}
 	<List
 		title="Pinned stops"
-		button={stop_button}
 		bus_data={pinned_bus_stops}
 		train_data={pinned_train_stops}
+		pin_rune={stop_pins_rune}
+		type="stop"
 		min_items={2}
 		monitor_routes
 	/>
@@ -218,9 +221,10 @@
 <!-- {#if nearby_bus_stops.length || nearby_train_stops.length} -->
 <List
 	title="Nearby Stops"
-	button={stop_button}
+	type="stop"
 	bus_data={nearby_bus_stops}
 	train_data={nearby_train_stops}
+	pin_rune={stop_pins_rune}
 	{locate_button}
 	class="mb-16"
 	monitor_routes

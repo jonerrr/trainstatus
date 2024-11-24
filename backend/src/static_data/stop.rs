@@ -54,6 +54,7 @@ pub enum Borough {
 
 #[derive(sqlx::Type, Serialize, Clone, ToSchema)]
 #[sqlx(type_name = "bus_direction", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum BusDirection {
     SW,
     S,

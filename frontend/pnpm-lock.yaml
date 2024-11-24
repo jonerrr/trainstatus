@@ -11,6 +11,9 @@ importers:
       '@fontsource/inter':
         specifier: ^5.1.0
         version: 5.1.0
+      '@tanstack/svelte-virtual':
+        specifier: ^3.10.9
+        version: 3.10.9(svelte@5.2.7)
       dayjs:
         specifier: ^1.11.13
         version: 1.11.13
@@ -492,6 +495,14 @@ packages:
     resolution: {integrity: sha512-tM4XVr2+UVTxXJzey9Twx48c1gcxFStqn1pQz0tRsX8o3DvxhN5oY5pvyAbUx7VTaZxpej4Zzvc6h+1RJBzpIg==}
     peerDependencies:
       tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1 || >= 4.0.0-alpha.20'
+
+  '@tanstack/svelte-virtual@3.10.9':
+    resolution: {integrity: sha512-QNWWL3OfGeZ3kqYwK7bpTtEznY7xSX2PdHkNnD6Is0GbtR+7J7g+G/OG1SV64JoQoM0Gn1am/nQFFjmYO0Os1g==}
+    peerDependencies:
+      svelte: ^3.48.0 || ^4.0.0 || ^5.0.0
+
+  '@tanstack/virtual-core@3.10.9':
+    resolution: {integrity: sha512-kBknKOKzmeR7lN+vSadaKWXaLS0SZZG+oqpQ/k80Q6g9REn6zRHS/ZYdrIzHnpHgy/eWs00SujveUN/GJT2qTw==}
 
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
@@ -1838,6 +1849,13 @@ snapshots:
     dependencies:
       mini-svg-data-uri: 1.4.4
       tailwindcss: 3.4.15
+
+  '@tanstack/svelte-virtual@3.10.9(svelte@5.2.7)':
+    dependencies:
+      '@tanstack/virtual-core': 3.10.9
+      svelte: 5.2.7
+
+  '@tanstack/virtual-core@3.10.9': {}
 
   '@types/cookie@0.6.0': {}
 
