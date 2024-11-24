@@ -24,6 +24,7 @@ pub struct TripsParameters {
     get,
     path = "/trips",
     tag = "REALTIME",
+    description = "For more information on trips, see the [MTA's documentation](https://api.mta.info/GTFS.pdf).",
     params(
         TripsParameters
     ),
@@ -124,6 +125,7 @@ pub struct ApiAlertEntity {
     get,
     path = "/alerts",
     tag = "REALTIME",
+    description = "For more information on alerts, see the [MTA's documentation](https://new.mta.info/document/90881).",
     responses(
         (status = 200, description = "Subway and bus alerts", body = [ApiAlert])
     )

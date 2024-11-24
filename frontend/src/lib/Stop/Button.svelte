@@ -1,5 +1,4 @@
 <script lang="ts">
-	// import NumberFlow from '@number-flow/svelte';
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import {
@@ -15,7 +14,6 @@
 	import Button from '$lib/Button.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
-	// import { quintOut } from 'svelte/easing';
 
 	interface ButtonProps {
 		stop: Stop<'train' | 'bus'>;

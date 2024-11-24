@@ -13,6 +13,8 @@ use sqlx::{PgPool, QueryBuilder};
 use std::{collections::HashMap, fmt};
 use utoipa::ToSchema;
 
+use super::stop::BusDirection;
+
 #[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct Route {
     #[schema(example = "1")]
@@ -222,7 +224,6 @@ impl Route {
                     route_type: RouteType::Bus,
                     routes: None,
                     data: StopData::Bus {
-                        // this can be a blank string
                         direction: s.direction,
                     },
                     lon: s.lon,
@@ -466,11 +467,30 @@ where
     str.parse().map_err(serde::de::Error::custom)
 }
 
+fn de_str_to_direction<'de, D>(deserializer: D) -> Result<BusDirection, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str = String::deserialize(deserializer)?;
+    match str.as_str() {
+        "SW" => Ok(BusDirection::SW),
+        "S" => Ok(BusDirection::S),
+        "SE" => Ok(BusDirection::SE),
+        "E" => Ok(BusDirection::E),
+        "W" => Ok(BusDirection::W),
+        "NE" => Ok(BusDirection::NE),
+        "NW" => Ok(BusDirection::NW),
+        "N" => Ok(BusDirection::N),
+        _ => Ok(BusDirection::Unknown),
+    }
+}
+
 #[derive(Deserialize, Clone)]
 pub struct BusStopData {
     #[serde(deserialize_with = "de_str_to_i32")]
     code: i32,
-    direction: String,
+    #[serde(deserialize_with = "de_str_to_direction")]
+    direction: BusDirection,
     // id: String,
     lat: f32,
     lon: f32,

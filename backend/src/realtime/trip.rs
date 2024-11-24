@@ -6,20 +6,23 @@ use thiserror::Error;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-// #[serde(skip_serializing_if = "Option::is_none")]
-
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema)]
 pub struct Trip<D> {
     pub id: Uuid,
+    /// This the ID from the MTA feed
     pub mta_id: String,
     pub vehicle_id: String,
     pub route_id: String,
-    // for train, 1 = north and 0 = south
+    /// For trains, 0 is southbound, 1 is northbound.
+    /// For buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
     pub direction: Option<i16>,
-    // for bus, this is start_date + current time bc it doesn't include time
+    /// For trains, this is the start time of the trip.
+    /// For buses, this is the start date of the trip + the current time the trip was first seen in the feed.
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    // currently only for bus but could also be for train too
+    /// This is the deviation from the schedule in seconds.
+    /// It currently only applies to buses.
+    /// A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deviation: Option<i32>,
     pub data: D,
