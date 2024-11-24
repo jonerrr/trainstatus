@@ -15,45 +15,48 @@
 
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
-	// let last_monitored_routes = $state<string>('');
 	let offline = $state(false);
 	let is_updating = $state(false);
 
 	onMount(async () => {
-		const interval = setInterval(async () => {
+		window.addEventListener('offline', (_e) => {
+			offline = true;
+		});
+		window.addEventListener('online', (_e) => {
+			offline = false;
+		});
+
+		setInterval(async () => {
 			if (is_updating) return;
 			// TODO: update more often if offline
 			// TODO: exponential backoff
+			// console.log('tick');
 			try {
 				is_updating = true;
 
-				if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
+				if (new Date().getTime() - last_update.getTime() > 1000 * 15) {
 					console.log('Updating rt data');
 					// TODO: remove return val from trips/alerts/stop_times.update
-					await trips.update(fetch);
-					// .then((o) => {
-					// 	console.log('updated t');
-					// 	offline = o;
-					// });
-					await alerts.update(fetch);
-					// .then((o) => {
-					// 	offline = o;
-					// });
+					trips.update(fetch);
+					alerts.update(fetch);
+					await Promise.all([trips.update(fetch), alerts.update(fetch)]);
 
+					offline = false;
 					last_update = new Date();
 				}
 
-				if (new Date().getTime() - last_st_update.getTime() > 1000 * 60) {
-					// console.log('Updating stop times');
+				if (new Date().getTime() - last_st_update.getTime() > 1000 * 15) {
 					await stop_times.update(fetch, [...monitored_bus_routes]);
 					last_st_update = new Date();
-					// last_monitored_routes = [...monitored_bus_routes].join(',');
+					offline = false;
 				}
-
-				offline = false;
 			} catch (e) {
-				console.error(e, 'offlin');
+				console.error(e);
 				offline = true;
+
+				// update in 3 seconds
+				last_update = new Date(new Date().getTime() - 1000 * 7);
+				last_st_update = new Date(new Date().getTime() - 1000 * 7);
 			} finally {
 				is_updating = false;
 			}
@@ -93,7 +96,9 @@
 			}
 		}
 
-		return () => clearInterval(interval);
+		// return () => {
+		// 	clearInterval(interval);
+		// };
 	});
 
 	let monitor_delay: number;
@@ -101,8 +106,7 @@
 	$effect(() => {
 		clearTimeout(monitor_delay);
 		// need to put offline here so it updates when offline changes
-		// offline;
-
+		if (offline) return;
 		if (monitored_bus_routes.size > 30) {
 			// remove until there are 30 left
 			const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
@@ -111,60 +115,16 @@
 		}
 
 		monitor_delay = setTimeout(async () => {
-			// console.log('updating stop times');
 			try {
 				await stop_times.update(fetch, [...monitored_bus_routes]);
+				last_st_update = new Date();
 				offline = false;
-				// .then((o) => {
-				// 	console.log('updated mbr');
-				// 	last_st_update = new Date();
-				// 	offline = o;
-				// });
 			} catch (e) {
 				console.error(e);
 				offline = true;
 			}
 		}, 50);
 	});
-
-	// $effect(() => {
-	// 	const interval = setInterval(async () => {
-	// 		// TODO: update more often if offline
-	// 		// TODO: exponential backoff
-	// 		try {
-	// 			if (new Date().getTime() - last_update.getTime() > 1000 * 10) {
-	// 				console.log('Updating rt data');
-	// 				await trips.update(fetch);
-	// 				// .then((o) => {
-	// 				// 	console.log('updated t');
-	// 				// 	offline = o;
-	// 				// });
-	// 				await alerts.update(fetch);
-	// 				// .then((o) => {
-	// 				// 	offline = o;
-	// 				// });
-
-	// 				last_update = new Date();
-	// 			}
-
-	// 			if (new Date().getTime() - last_st_update.getTime() > 1000 * 60) {
-	// 				console.log('Updating stop times');
-	// 				await stop_times.update(fetch, [...monitored_bus_routes]);
-	// 				last_st_update = new Date();
-	// 				// last_monitored_routes = [...monitored_bus_routes].join(',');
-	// 			}
-
-	// 			offline = false;
-	// 		} catch (e) {
-	// 			console.error(e);
-	// 			offline = true;
-	// 		}
-	// 	}, 200);
-
-	// 	return () => {
-	// 		clearInterval(interval);
-	// 	};
-	// });
 </script>
 
 <Header {offline} />

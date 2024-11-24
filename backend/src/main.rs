@@ -212,7 +212,7 @@ async fn main() {
 }
 
 async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "not found")
+    (StatusCode::NOT_FOUND, "404 not found :(")
 }
 
 // from https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs

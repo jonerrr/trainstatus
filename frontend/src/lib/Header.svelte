@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import { BookText, GitBranch } from 'lucide-svelte';
+	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
 
 	let { offline }: { offline: boolean } = $props();
 </script>
@@ -9,7 +9,10 @@
 	<div class="flex gap-1">
 		<div class="gradient-text font-black">TrainStat.us</div>
 		{#if offline}
-			<div transition:fade class="text-red-500 text-xs self-end">Offline</div>
+			<div transition:fade class="text-red-500 flex flex-col items-center">
+				<CloudOff class="w-6 h-6" />
+				<div class=" text-xs self-end">Offline</div>
+			</div>
 		{/if}
 	</div>
 	<!-- <TimeSelect /> -->

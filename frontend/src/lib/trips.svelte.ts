@@ -58,23 +58,28 @@ export function createTrips() {
 
 	// this returns true if there was an error (aka offline)
 	async function update(fetch: Fetch) {
-		try {
-			const data: Trip<TripData>[] = await (await fetch('/api/v1/trips')).json();
-			trips.clear();
-
-			data.forEach((trip) => {
-				trips.set(trip.id, {
-					...trip,
-					created_at: new Date(trip.created_at),
-					updated_at: new Date(trip.updated_at)
-				});
-			});
-
-			return false;
-		} catch (e) {
-			console.error(e);
-			return true;
+		// try {
+		const res = await fetch('/api/v1/trips');
+		if (res.headers.has('x-sw-fallback')) {
+			throw new Error('Offline');
 		}
+
+		const data: Trip<TripData>[] = await res.json();
+		trips.clear();
+
+		data.forEach((trip) => {
+			trips.set(trip.id, {
+				...trip,
+				created_at: new Date(trip.created_at),
+				updated_at: new Date(trip.updated_at)
+			});
+		});
+
+		// 	return false;
+		// } catch (e) {
+		// 	console.error(e);
+		// 	return true;
+		// }
 		// .then((res) => res.json())
 		// .then(
 		// 	(data) =>

@@ -74,7 +74,16 @@ sw.addEventListener('fetch', (event) => {
 			const response = await cache.match(event.request);
 
 			if (response) {
-				return response;
+				// add header to indicate that this is a fallback
+				const headers = new Headers(response.headers);
+				headers.append('x-sw-fallback', 'true');
+
+				// return the cached response
+				return new Response(response.body, {
+					status: response.status,
+					statusText: response.statusText,
+					headers
+				});
 			}
 
 			// if there's no cache, then just error out
