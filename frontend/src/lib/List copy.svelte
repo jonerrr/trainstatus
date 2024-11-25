@@ -69,12 +69,12 @@
 		auto_scroll = false
 	}: Props = $props();
 
-	// let list_div = $state<HTMLDivElement | null>(null);
+	let list_div = $state<HTMLDivElement | null>(null);
 
-	// let list_item_els = $state<ListItems>({
-	// 	bus: [],
-	// 	train: []
-	// });
+	let list_item_els = $state<ListItems>({
+		bus: [],
+		train: []
+	});
 
 	// if bus/train data don't have any items, switch tabs
 	$effect(() => {
@@ -82,25 +82,23 @@
 		if (!train_data.length && bus_data.length) selected_tab.value = 'bus';
 	});
 
-	const selected_items = $derived(selected_tab.value === 'train' ? train_data : bus_data);
-
 	// let offset = $state(0);
 
-	// const virtualizer = $derived.by(() => {
-	// 	console.log('creating virtualizer');
-	// 	return createVirtualizer<HTMLDivElement, HTMLDivElement>({
-	// 		count: selected_tab.value === 'train' ? train_data.length : bus_data.length,
-	// 		getScrollElement: () => list_div,
-	// 		estimateSize: () => item_components[type][1],
-	// 		paddingEnd: 5,
-	// 		overscan: 5,
-	// 		initialOffset: 100,
-	// 		debug: false
-	// 	});
-	// });
-	// const virtual_list_items = $derived($virtualizer.getVirtualItems());
+	const virtualizer = $derived.by(() => {
+		console.log('creating virtualizer');
+		return createVirtualizer<HTMLDivElement, HTMLDivElement>({
+			count: selected_tab.value === 'train' ? train_data.length : bus_data.length,
+			getScrollElement: () => list_div,
+			estimateSize: () => item_components[type][1],
+			paddingEnd: 5,
+			overscan: 5,
+			initialOffset: 100,
+			debug: false
+		});
+	});
+	const virtual_list_items = $derived($virtualizer.getVirtualItems());
 
-	// $inspect($virtualizer.scrollOffset);
+	$inspect($virtualizer.scrollOffset);
 	// TODO: fix list height calculation
 	// const list_height = $derived(
 	// 	min_items
@@ -127,29 +125,29 @@
 	// $inspect($virtualizer.getVirtualItems());
 
 	// https://github.com/TanStack/virtual/issues/866
-	// let mounted = $state(false);
-	// $effect(() => {
-	// 	if (!mounted && list_div !== null) {
-	// 		mounted = true;
-	// 		$virtualizer._willUpdate();
-	// 	}
-	// });
+	let mounted = $state(false);
+	$effect(() => {
+		if (!mounted && list_div !== null) {
+			mounted = true;
+			$virtualizer._willUpdate();
+		}
+	});
 
-	// $effect(() => {
-	// 	if (list_item_els[selected_tab.value].length) {
-	// 		list_item_els[selected_tab.value].forEach((el) => $virtualizer.measureElement(el));
-	// 	}
-	// });
+	$effect(() => {
+		if (list_item_els[selected_tab.value].length) {
+			list_item_els[selected_tab.value].forEach((el) => $virtualizer.measureElement(el));
+		}
+	});
 
 	// probably could combine effects
-	// if (auto_scroll) {
-	// 	$effect(() => {
-	// 		if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
-	// 			// console.log('scrolling list into view');
-	// 			list_div.scrollIntoView({ behavior: 'smooth' });
-	// 		}
-	// 	});
-	// }
+	if (auto_scroll) {
+		$effect(() => {
+			if (list_div && (bus_data.length < 8 || train_data.length < 8)) {
+				// console.log('scrolling list into view');
+				list_div.scrollIntoView({ behavior: 'smooth' });
+			}
+		});
+	}
 
 	// $inspect(virtual_list_items);
 
@@ -219,8 +217,6 @@
 		easing: cubicInOut
 	});
 
-	let scrollToOffset = $state(0);
-
 	// $inspect(list_items);
 </script>
 
@@ -265,44 +261,53 @@
 		</div>
 	</div>
 
-	{#key selected_tab.value}
-		<VirtualList
-			items={selected_items}
-			class={class_name ?? ''}
-			onVisibleRangeUpdate={(e) => {
-				if (type === 'stop' && selected_tab.value === 'bus') {
-					const buses_shown = selected_items.slice(e.start, e.end);
-					const bus_routes = buses_shown.flatMap((stop) => stop.routes.map((r) => r.id));
-					bus_routes.forEach((r) => monitored_bus_routes.add(r));
-				}
-			}}
+	{#snippet list_item(data: T | B, idx: number, row_index: number)}
+		<div
+			bind:this={list_item_els[selected_tab.value][idx]}
+			data-index={row_index}
+			class="relative w-full"
 		>
-			{#snippet vl_slot({ index, item })}
-				<Button state={{ data: item, modal: type }} {pin_rune}>
-					<Item data={item} />
-				</Button>
-			{/snippet}
-		</VirtualList>
-	{/key}
+			<Button state={{ data, modal: type }} {pin_rune}>
+				<Item {data} />
+			</Button>
+		</div>
+	{/snippet}
 
-	<!-- {#if selected_tab.value === 'train'}
-		<VirtualList items={train_data} class="h-[calc(100dvh-10.5rem)]">
-			{#snippet vl_slot({ index, item })}
-				<Button state={{ data: item, modal: type }} {pin_rune}>
-					<Item data={item} />
-				</Button>
-			{/snippet}
-		</VirtualList>
-	{:else}
-		<VirtualList items={bus_data} class="h-[calc(100dvh-10.5rem)]">
-			{#snippet vl_slot({ index, item })}
-				<Button state={{ data: item, modal: type }} {pin_rune}>
-					<Item data={item} />
-				</Button>
-			{/snippet}
-		</VirtualList>
-	{/if} -->
-	<!-- {#if virtualListAfter > 0}
+	<div
+		bind:this={list_div}
+		class={`overflow-y-auto overscroll-contain text-base ${class_name ?? ''}`}
+	>
+		<div style="position: relative; height: {$virtualizer.getTotalSize()}px; width: 100%;">
+			<!-- <div style="pdading-top: {virtualListBefore}; padding-bottom: {virtualListAfter}"> -->
+			<div
+				class="divide-y divide-neutral-800 border-y border-neutral-800"
+				style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({virtual_list_items[0]
+					? virtual_list_items[0].start
+					: 0}px);"
+			>
+				<!-- {#if virtualListBefore > 0}
+				<div style="height: {virtualListBefore}px"></div>
+			{/if} -->
+
+				{#if selected_tab.value === 'train'}
+					{#each virtual_list_items as row, idx (row.index)}
+						{@render list_item(train_data[row.index], idx, row.index)}
+					{/each}
+					<!-- {#each train_data as data, i}
+						{@render list_item(data, i)}
+					{/each} -->
+				{:else}
+					{#each virtual_list_items as row, idx (row.index)}
+						{@render list_item(bus_data[row.index], idx, row.index)}
+					{/each}
+					<!-- {#each bus_data as data, i}
+						{@render list_item(data, i)}
+					{/each} -->
+				{/if}
+				<!-- {#if virtualListAfter > 0}
 				<div style="height: {virtualListAfter}px"></div>
 			{/if} -->
+			</div>
+		</div>
+	</div>
 </div>

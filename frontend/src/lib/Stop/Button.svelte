@@ -56,7 +56,8 @@
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
 	{#key eta}
-		<span in:fade={{ duration: 300 }}>
+		<!-- in:fade={{ duration: 300 }} -->
+		<span>
 			{eta}m
 		</span>
 	{/key}

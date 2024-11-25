@@ -39,6 +39,7 @@
 		"@tanstack/svelte-virtual": "^3.10.9",
 		"dayjs": "^1.11.13",
 		"flexsearch": "^0.7.43",
-		"lucide-svelte": "^0.460.1"
+		"lucide-svelte": "^0.460.1",
+		"svelte-virtuallists": "^1.4.0"
 	}
 }

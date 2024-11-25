@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
-	import { page } from '$app/stores';
 	import { untrack } from 'svelte';
+	import { page } from '$app/stores';
 	import { type Route, type Stop, is_bus, is_train } from '$lib/static';
 	import {
 		persisted_rune,
@@ -172,6 +172,18 @@
 <!-- <div class="flex flex-col h-[calc(100dvh-8rem)] overflow-hidden"> -->
 <!-- Pinned items section - no scroll -->
 <!-- <div class="flex-none"> -->
+
+{#if trip_pins_rune.value.length}
+	<List
+		title="Pinned Trips"
+		bus_data={pinned_bus_trips}
+		train_data={pinned_train_trips}
+		type="trip"
+		pin_rune={trip_pins_rune}
+		min_items={2}
+	/>
+{/if}
+
 {#if route_pins_rune.value.length}
 	<List
 		title="Pinned Routes"
