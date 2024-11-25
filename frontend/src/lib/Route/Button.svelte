@@ -25,7 +25,7 @@
 
 <!-- <Button state={{ modal: 'route', data }} {pin_rune}> -->
 <section class="flex gap-1 items-center">
-	<Icon height={32} width={32} express={false} link={true} route={data} />
+	<Icon height={36} width={36} express={false} link={true} route={data} />
 	{#if alerts.length}
 		<div class="font-semibold">
 			{alerts[0].alert_type}

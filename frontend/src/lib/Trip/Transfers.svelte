@@ -68,7 +68,7 @@
 				{@const route = $page.data.routes[st.trip.route_id]}
 				<button
 					onclick={() => pushState('', { modal: 'trip', data: st.trip })}
-					class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
+					class="transition-colors duration-200 flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
 				>
 					<Icon
 						{route}

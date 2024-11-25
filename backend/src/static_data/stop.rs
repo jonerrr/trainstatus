@@ -323,46 +323,33 @@ impl Stop<StopData, Option<serde_json::Value>> {
                 s.route_type as "route_type!: RouteType",
                 CASE
                     WHEN s.route_type = 'train' THEN jsonb_build_object(
-                                        'ada',
-                    s.ada,
-                    'north_headsign',
-                    s.north_headsign,
-                    'south_headsign',
-                    s.south_headsign,
-                    'transfers',
-                    s.transfers,
-                    'notes',
-                    s.notes,
-                    'borough',
-                    s.borough
-                                    )
+                        'ada', s.ada,
+                        'north_headsign', s.north_headsign,
+                        'south_headsign', s.south_headsign,
+                        'transfers', s.transfers,
+                        'notes', s.notes,
+                        'borough', s.borough
+                    )
                     ELSE jsonb_build_object(
-                                        'direction',
-                    s.direction
-                                    )
-                END AS DATA,
+                        'direction', s.direction
+                    )
+                END AS data,
                 json_agg(
-                                    CASE
-                    WHEN s."route_type" = 'train' THEN jsonb_build_object(
-                                            'id',
-                    rs.route_id,
-                    'stop_sequence',
-                    rs.stop_sequence,
-                    'type',
-                    rs."stop_type"
-                                        )
-                    ELSE jsonb_build_object(
-                                            'id',
-                    rs.route_id,
-                    'stop_sequence',
-                    rs.stop_sequence,
-                    'headsign',
-                    rs.headsign,
-                    'direction',
-                    rs.direction
-                                        )
-                END
-                                ) AS routes
+                    CASE
+                        WHEN s.route_type = 'train' THEN jsonb_build_object(
+                            'id', rs.route_id,
+                            'stop_sequence', rs.stop_sequence,
+                            'type', rs.stop_type
+                        )
+                        ELSE jsonb_build_object(
+                            'id', rs.route_id,
+                            'stop_sequence', rs.stop_sequence,
+                            'headsign', rs.headsign,
+                            'direction', rs.direction
+                        )
+                    END
+                    ORDER BY rs.route_id
+                ) AS routes
             FROM
                 stop s
             LEFT JOIN route_stop rs ON

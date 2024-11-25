@@ -1,6 +1,7 @@
 services:
   trainstatus-postgres:
     image: postgres:alpine
+    restart: unless-stopped
     ports:
       - 5432:5432
     environment:
@@ -14,6 +15,7 @@ services:
   valkey:
     image: valkey/valkey:7.2-alpine3.19
     container_name: valkey
+    restart: unless-stopped
     ports:
       - 6379:6379
   # ts-backend:

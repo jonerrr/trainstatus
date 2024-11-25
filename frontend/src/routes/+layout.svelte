@@ -3,7 +3,7 @@
 	import '@fontsource/inter';
 	import { page } from '$app/stores';
 	import { pushState } from '$app/navigation';
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, type Snippet } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
 	import { alerts } from '$lib/alerts.svelte';
@@ -11,12 +11,18 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 
-	let { children } = $props();
+	interface Props {
+		children: Snippet;
+	}
+
+	let { children }: Props = $props();
 
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
 	let offline = $state(false);
 	let is_updating = $state(false);
+
+	// $inspect(main_width);
 
 	onMount(async () => {
 		window.addEventListener('offline', (_e) => {
@@ -101,6 +107,8 @@
 
 	let monitor_delay: number;
 
+	$inspect(monitored_bus_routes, 'monitored_bus_routes');
+
 	$effect(() => {
 		clearTimeout(monitor_delay);
 		// need to put offline here so it updates when offline changes
@@ -126,21 +134,16 @@
 </script>
 
 <Header {offline} />
-<main class="md:w-[60%] m-auto relative h-[calc(100dvh-7.5rem)]">
+<!--  h-[calc(100dvh-7.5rem)] -->
+<main class="max-w-[1000px] relative m-auto tracking-tight">
 	<Modal />
 
-	<!-- {#await data.initial_promise}
-		<div class="text-neutral-50 text-4xl flex justify-center">
-			<LoaderCircle size="4rem" class="animate-spin" />
-		</div>
-	{:then _} -->
 	{@render children()}
-	<!-- {/await} -->
 </main>
 <Navbar />
 
 <style lang="postcss">
 	:global(body) {
-		@apply bg-neutral-950;
+		@apply bg-neutral-900;
 	}
 </style>

@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { pushState } from '$app/navigation';
-	import {
-		stop_times as rt_stop_times,
-		monitored_bus_routes,
-		type StopTime
-	} from '$lib/stop_times.svelte';
+	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import {
 		type Route,
 		type Stop,
@@ -42,20 +38,50 @@
 		trip: Trip<TripData>;
 	}
 
-	let stop_times: StopTimeWithTrip[] = $derived(
-		rt_stop_times.stop_times
-			.filter((st) => st.stop_id === stop.id && rt_trips.trips.has(st.trip_id))
-			.map((st) => {
-				const trip = rt_trips.trips.get(st.trip_id)!;
+	// let stop_times: StopTimeWithTrip[] = $derived(
+	// 	rt_stop_times.stop_times.reduce<StopTimeWithTrip[]>((acc, st) => {
+	// 		if (st.stop_id === stop.id) {
+	// 			const trip = rt_trips.trips.get(st.trip_id);
+	// 			if (trip) {
+	// 				const eta = (st.arrival.getTime() - current_time) / 60000;
+	// 				if (eta >= 0) {
+	// 					acc.push({ ...st, eta, trip });
+	// 				}
+	// 			}
+	// 		}
+	// 		return acc;
+	// 	}, [])
+	// );
 
-				return {
-					...st,
-					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					trip
-				};
-			})
-			.filter((st) => st.eta >= 0)
-	);
+	interface AccumulatedStopTimes {
+		stop_times: StopTimeWithTrip[];
+		active_routes: Set<string>;
+	}
+
+	const { stop_times, active_routes } = $derived.by(() => {
+		const current_time = new Date().getTime();
+		const st = rt_stop_times.stop_times.reduce<AccumulatedStopTimes>(
+			({ stop_times, active_routes }, st) => {
+				if (st.stop_id === stop.id) {
+					const trip = rt_trips.trips.get(st.trip_id);
+					if (trip) {
+						const eta = (st.arrival.getTime() - current_time) / 60000;
+						if (eta >= 0) {
+							// TODO: add a way to disable eta if statement
+							active_routes.add(trip.route_id);
+
+							stop_times.push({ ...st, eta, trip });
+						}
+					}
+				}
+				return { stop_times, active_routes };
+			},
+			{ stop_times: [], active_routes: new Set() }
+		);
+
+		return st;
+	});
+	// $inspect(active_routes);
 
 	// $inspect(stop_times);
 	let selected_direction = persisted_rune('direction', TripDirection.North);
@@ -66,24 +92,31 @@
 			: stop_times
 	);
 
-	// only show routes that stop at this stop
-	let route_stops = main_stop_routes(stop);
+	// only show routes that stop at this stop and sort by id length
+
+	let route_stops = main_stop_routes(stop).sort((a, b) => b.id.length - a.id.length);
 </script>
 
 <div class="flex gap-1 items-center p-1">
+	<!-- class="grid grid-cols-5 grid-rows-4 grid-flow-col gap-1"
+		
+		class:flex-wrap={route_stops.length > 4} -->
+	<!-- class="grid gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(5rem,1fr))] max-w-xs" -->
 	<div class="flex gap-1" class:flex-col={stop.route_type === 'bus'}>
 		{#each route_stops as route}
-			<Icon
-				width={24}
-				height={24}
-				express={false}
-				link={true}
-				route={$page.data.routes[route.id] as Route}
-			/>
+			{#if route_stops.length < 6 || active_routes.has(route.id)}
+				<Icon
+					width={24}
+					height={24}
+					express={false}
+					link={true}
+					route={$page.data.routes[route.id] as Route}
+				/>
+			{/if}
 		{/each}
 	</div>
 
-	<div class="font-medium text-lg">
+	<div class="font-medium text-lg flex-grow">
 		{stop.name}
 	</div>
 </div>
@@ -95,7 +128,7 @@
 		{#each stop.data.transfers as transfer}
 			{@const transfer_stop = $page.data.stops[transfer] as Stop<'train'>}
 			<button
-				class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
+				class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 				onclick={() =>
 					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
 			>

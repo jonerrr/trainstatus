@@ -96,6 +96,25 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	};
 }
 
+interface ItemHeights {
+	[key: string]: number;
+}
+
+// export function list_max_height(init: number = 0) {
+// 	const height = browser
+// 		? document
+// 				.querySelectorAll('.sub-height')
+// 				.values()
+// 				.reduce((acc, el) => {
+// 					acc += (el as HTMLElement).offsetHeight;
+// 					return acc;
+// 				}, init)
+// 		: 124 + init;
+// 	return `max-h-[calc(100dvh-${height}px)]`;
+// }
+
+export const item_heights = $state<ItemHeights>({});
+
 export const stop_pins_rune = persisted_rune<number[]>('stop_pins', [106, 400086]);
 export const route_pins_rune = persisted_rune<string[]>('route_pins', ['4', 'M15']);
 export const trip_pins_rune = persisted_rune<string[]>('trip_pins', []);

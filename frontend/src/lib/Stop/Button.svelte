@@ -1,86 +1,140 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
+	// import { fade } from 'svelte/transition';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { page } from '$app/stores';
-	import {
-		is_bus,
-		is_train,
-		type BusRouteStop,
-		type BusStopData,
-		type Route,
-		type Stop
-	} from '$lib/static';
-	import { type PersistedRune } from '$lib/util.svelte';
+	import { is_bus, is_train, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
-	import Button from '$lib/Button.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
+	import { untrack } from 'svelte';
 
 	interface Props {
 		data: Stop<'train' | 'bus'>;
 	}
 	let { data }: Props = $props();
 
-	let stop_times = $derived(
-		rt_stop_times.stop_times
-			.filter((st) => st.stop_id === data.id)
-			.map((st) => {
-				// const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
-				const trip = rt_trips.trips.get(st.trip_id);
+	type StopTimeByRoute = Map<string, StopTime<number, TripDirection, string>[]>;
 
-				// if (!trip) {
-				// 	$inspect(st);
-				// }
-				return {
-					...st,
-					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					direction: trip?.direction,
-					route_id: trip?.route_id
-				};
-			})
-			// TODO: prevent trips that don't exist from having stop times
-			.filter((st) => st.direction !== undefined && st.eta >= 0) as StopTime<
-			number,
-			TripDirection,
-			string
-		>[]
+	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
+	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
+
+	function debounce(func: () => void, wait: number) {
+		let timeout: ReturnType<typeof setTimeout> | null;
+		return function () {
+			if (timeout) clearTimeout(timeout);
+			timeout = setTimeout(() => {
+				timeout = null;
+				func();
+			}, wait);
+		};
+	}
+
+	$effect(() => {
+		rt_stop_times?.stop_times;
+		rt_trips.trips;
+
+		// console.log('Triggering update for', data.name);
+		untrack(() => updateRouteMaps());
+	});
+
+	// Debounced update function
+	const updateRouteMaps = debounce(() => {
+		// Clear existing maps
+		nb_st_by_route.clear();
+		sb_st_by_route.clear();
+
+		// Early exit if no data
+		if (!rt_stop_times?.stop_times?.length) {
+			return;
+		}
+
+		const now = new Date().getTime();
+
+		// Pre-filter relevant stop times
+		const relevant_stop_times = rt_stop_times.stop_times.filter((st) => st.stop_id === data.id);
+
+		for (const st of relevant_stop_times) {
+			const trip = rt_trips.trips.get(st.trip_id);
+			if (!trip) continue;
+
+			const route_id = trip.route_id;
+			const eta = (st.arrival.getTime() - now) / 1000 / 60;
+
+			const stopTimeData = {
+				...st,
+				eta,
+				direction: trip.direction,
+				route_id
+			};
+
+			if (is_train(data)) {
+				const target_map = trip.direction === TripDirection.North ? nb_st_by_route : sb_st_by_route;
+
+				if (!target_map.has(route_id)) {
+					target_map.set(route_id, []);
+				}
+
+				const times = target_map.get(route_id)!;
+				if (times.length < 2) {
+					times.push(stopTimeData);
+				}
+			} else {
+				if (!nb_st_by_route.has(route_id)) {
+					nb_st_by_route.set(route_id, []);
+				}
+
+				const times = nb_st_by_route.get(route_id)!;
+				if (times.length < 2) {
+					times.push(stopTimeData);
+				}
+			}
+		}
+	}, 100);
+
+	const current_stop_routes = $derived(
+		data.routes.map((route) => $page.data.routes[route.id] as Route)
 	);
-
-	// if its bus, show loading if its in trips but not in stop times
-	// const loading = $derived(
-	// 	() =>
-	// 		is_bus(stop) &&
-	// 		!stop.routes.every((r) => {
-	// 			const trip = rt_trips.trips.values().find((t) => t.route_id === r.id);
-	// 			return trip && stop_times.some((st) => st.trip_id === trip.id);
-	// 		})
-	// );
 </script>
 
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
-	<!-- numberflow was causing a hydration mismatch error -->
-	<!-- <NumberFlow value={eta} suffix="m" /> -->
 	{#key eta}
-		<span in:fade={{ duration: 300 }}>
+		<!-- in:fade={{ duration: 300 }} -->
+		<span>
 			{eta}m
 		</span>
 	{/key}
 {/snippet}
 
 {#if is_train(data)}
-	{#snippet arrivals(
-		headsign: string,
-		routes: Route[],
-		stop_times: StopTime<number, TripDirection, string>[]
-	)}
+	<div class="grid gap-1 w-full grid-cols-1">
+		<div class="flex gap-1 items-center">
+			{#each current_stop_routes as route}
+				<Icon height={24} width={24} express={false} link={false} {route} />
+			{/each}
+
+			<div class="font-medium my-auto text-left text-lg">
+				{data.name}
+			</div>
+		</div>
+		<div class="grid grid-cols-2 gap-8">
+			<!-- {@render arrivals(data.data.north_headsign, all_routes, [])}
+			{@render arrivals(data.data.south_headsign, all_routes, [])} -->
+			{@render arrivals(data.data.north_headsign, current_stop_routes, nb_st_by_route)}
+			{@render arrivals(data.data.south_headsign, current_stop_routes, sb_st_by_route)}
+		</div>
+	</div>
+
+	{#snippet arrivals(headsign: string, routes: Route[], stop_times: StopTimeByRoute)}
 		<div class="flex flex-col mt-auto">
 			<div class="font-semibold table-cell text-left max-w-[85%]">
 				{headsign}
 			</div>
 			<div class="flex flex-col gap-1">
 				{#each routes as route}
-					{@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)}
+					{@const route_stop_times = stop_times.get(route.id) ?? []}
+					<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
 					<div class="flex gap-1 items-center">
 						<Icon height={20} width={20} express={false} link={false} {route} />
 						<div class="flex gap-1 items-center">
@@ -97,58 +151,23 @@
 			</div>
 		</div>
 	{/snippet}
-
-	{@const routes = data.routes}
-	{@const base_routes = routes
-		.filter((r) => r.type === 'full_time' || r.type === 'part_time')
-		.map((r) => r.id)}
-	{@const other_routes = stop_times.map((st) => st.route_id)}
-	{@const all_routes = [...new Set([...base_routes, ...other_routes])].map(
-		(id) => $page.data.routes[id] as Route
-	)}
-
-	<div class="grid gap-1 w-full grid-cols-1" in:fade={{ duration: 300 }}>
-		<div class="flex gap-1 items-center">
-			{#each all_routes as route}
-				<Icon height={24} width={24} express={false} link={false} {route} />
-			{/each}
-
-			<div class="font-medium my-auto text-left text-lg">
-				{stop.name}
-			</div>
-		</div>
-		<div class="grid grid-cols-2 gap-8">
-			{@render arrivals(
-				data.data.north_headsign,
-				all_routes,
-				stop_times.filter((st) => st.direction === TripDirection.North)
-			)}
-			{@render arrivals(
-				data.data.south_headsign,
-				all_routes,
-				stop_times.filter((st) => st.direction === TripDirection.South)
-			)}
-		</div>
-	</div>
 {:else if is_bus(data)}
 	<!-- TODO: make spacing consistent (use grid maybe idk) -->
-	<!-- {@const data = stop.data as BusStopData}
-	{@const stop_routes = stop.routes as BusRouteStop[]} -->
-
 	<div class="flex flex-col text-white">
-		<div class="flex gap-2 items-center">
+		<div class="flex items-center">
 			<div>
 				<BusArrow direction={data.data.direction} />
 			</div>
-			<div class="font-bold">
-				{stop.name}
+			<div class="font-medium text-lg text-left">
+				{data.name}
 			</div>
 		</div>
 
 		<div class="flex flex-col">
 			{#each data.routes as stop_route}
 				{@const route = $page.data.routes[stop_route.id] as Route}
-				{@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)}
+				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
+				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
 
 				<div class="flex gap-2 items-center text-wrap text-left rounded p-1">
 					<Icon {route} link={false} express={false} />
