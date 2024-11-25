@@ -101,6 +101,8 @@
 
 	let monitor_delay: number;
 
+	$inspect(monitored_bus_routes);
+
 	$effect(() => {
 		clearTimeout(monitor_delay);
 		// need to put offline here so it updates when offline changes

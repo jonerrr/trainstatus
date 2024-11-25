@@ -11,9 +11,6 @@
 		route_pins_rune
 	} from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
-	import StopButton from '$lib/Stop/Button.svelte';
-	import RouteButton from '$lib/Route/Button.svelte';
-	import TripButton from '$lib/Trip/Button.svelte';
 	import {
 		type BusTripData,
 		is_bus_route,
@@ -68,11 +65,17 @@
 		pinned_train_trips: Trip<TrainTripData, Route>[];
 	}
 
+	// $inspect(trips.trips.get('01935f9c-a2b8-7b50-884a-a4fb3a175afe'));
+
+	// TODO: prevent pinned trips from updating twice
 	const { pinned_bus_trips, pinned_train_trips } = $derived(
 		trip_pins_rune.value
 			.map((id) => trips.trips.get(id)!)
 			.reduce(
 				(acc: AccumulatedTrips, trip) => {
+					if (!trip) {
+						console.log('trip not found');
+					}
 					const route = $page.data.routes[trip.route_id];
 
 					if (is_bus_route(route, trip)) {
@@ -117,7 +120,7 @@
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 13);
+					.slice(0, 30);
 
 				nearby_bus_stops = $page.data.bus_stops
 					.map((stop: Stop<'bus'>) => {
@@ -130,7 +133,7 @@
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 13);
+					.slice(0, 30);
 
 				location_status.value = 'granted';
 			},
@@ -145,14 +148,8 @@
 		get_nearby_stops();
 	}
 
-	// let pin_list_heights: number = $state(0);
+	let pin_list_heights: number = $state(0);
 </script>
-
-<!-- TODO: better initial loading animation -->
-
-<!-- {#snippet trip_button(trip: Trip<TrainTripData | BusTripData, Route>)}
-	<TripButton {trip} pin_rune={trip_pins_rune} />
-{/snippet} -->
 
 {#snippet locate_button()}
 	<button
@@ -172,27 +169,9 @@
 		{/if}
 	</button>
 {/snippet}
-
-<!-- {#snippet stop_button(stop: Stop<'bus' | 'train'>)}
-	<StopButton {stop} pin_rune={stop_pins_rune} />
-{/snippet}
-
-{#snippet route_button(route: Route)}
-	<RouteButton {route} pin_rune={route_pins_rune} />
-{/snippet} -->
-
-<!-- <div bind:offsetHeight={pin_list_heights}> -->
-{#if trip_pins_rune.value.length}
-	<List
-		title="Pinned Trips"
-		bus_data={pinned_bus_trips}
-		train_data={pinned_train_trips}
-		pin_rune={trip_pins_rune}
-		type="trip"
-		min_items={2}
-	/>
-{/if}
-
+<!-- <div class="flex flex-col h-[calc(100dvh-8rem)] overflow-hidden"> -->
+<!-- Pinned items section - no scroll -->
+<!-- <div class="flex-none"> -->
 {#if route_pins_rune.value.length}
 	<List
 		title="Pinned Routes"
@@ -212,13 +191,13 @@
 		pin_rune={stop_pins_rune}
 		type="stop"
 		min_items={2}
-		monitor_routes
+		monitor_routes={false}
 	/>
 {/if}
 <!-- </div> -->
 
-<!-- by only showing nearby stops only when the nearby stops array is not empty, the list won't automatically switch tabs bc theres no data yet -->
-<!-- {#if nearby_bus_stops.length || nearby_train_stops.length} -->
+<!-- Nearby stops section - scrollable -->
+<!-- <div class="flex-1 overflow-y-auto"> -->
 <List
 	title="Nearby Stops"
 	type="stop"
@@ -226,7 +205,7 @@
 	train_data={nearby_train_stops}
 	pin_rune={stop_pins_rune}
 	{locate_button}
-	class="mb-16"
-	monitor_routes
+	monitor_routes={false}
 />
-<!-- {/if} -->
+<!-- </div> -->
+<!-- </div> -->

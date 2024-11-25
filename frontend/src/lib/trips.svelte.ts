@@ -54,7 +54,7 @@ export enum TripDirection {
 type Fetch = typeof fetch;
 
 export function createTrips() {
-	const trips = $state(new SvelteMap<string, Trip<TripData>>());
+	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
 	async function update(fetch: Fetch) {
@@ -65,15 +65,26 @@ export function createTrips() {
 		}
 
 		const data: Trip<TripData>[] = await res.json();
-		trips.clear();
 
-		data.forEach((trip) => {
-			trips.set(trip.id, {
-				...trip,
-				created_at: new Date(trip.created_at),
-				updated_at: new Date(trip.updated_at)
-			});
-		});
+		trips = new SvelteMap(
+			data.map((trip) => [
+				trip.id,
+				{
+					...trip,
+					created_at: new Date(trip.created_at),
+					updated_at: new Date(trip.updated_at)
+				}
+			])
+		);
+		// trips.clear();
+
+		// data.forEach((trip) => {
+		// 	trips.set(trip.id, {
+		// 		...trip,
+		// 		created_at: new Date(trip.created_at),
+		// 		updated_at: new Date(trip.updated_at)
+		// 	});
+		// });
 
 		// 	return false;
 		// } catch (e) {

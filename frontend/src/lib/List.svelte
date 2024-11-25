@@ -68,8 +68,6 @@
 		auto_scroll = false
 	}: Props = $props();
 
-	let list_height = $state(0);
-	// list_div needs to be wrapped in state so $effect runs
 	let list_div = $state<HTMLDivElement | null>(null);
 
 	let list_item_els = $state<ListItems>({
@@ -87,23 +85,40 @@
 		createVirtualizer<HTMLDivElement, HTMLDivElement>({
 			count: selected_tab.value === 'train' ? train_data.length : bus_data.length,
 			getScrollElement: () => list_div,
-			estimateSize: () => item_components[type][1]
+			estimateSize: () => item_components[type][1],
+			paddingEnd: 5,
+			overscan: 5,
+			debug: false
 		})
 	);
 	const virtual_list_items = $derived($virtualizer.getVirtualItems());
 
+	// TODO: fix list height calculation
+	// const list_height = $derived(
+	// 	min_items
+	// 		? $virtualizer.measurementsCache.slice(0, min_items).reduce((h, e) => e.size, 5) + 'px'
+	// 		: 'auto'
+	// );
+
+	// const max_height = $derived(
+	// 	min_items ? virtual_list_items.slice(0, min_items).reduce((h, e) => e.size + h, 5) : 0
+	// );
+	// $inspect(max_height);
+
 	// Ref: https://github.com/TanStack/virtual/issues/640#issuecomment-1885029911
 	// Ref: https://github.com/TanStack/virtual/discussions/476#discussioncomment-4724139
-	let [virtualListBefore, virtualListAfter] = $derived(
-		virtual_list_items.length > 0
-			? [
-					notUndefined(virtual_list_items[0]).start - $virtualizer.options.scrollMargin,
-					$virtualizer.getTotalSize() -
-						notUndefined(virtual_list_items[virtual_list_items.length - 1]).end
-				]
-			: [0, 0]
-	);
+	// let [virtualListBefore, virtualListAfter] = $derived(
+	// 	virtual_list_items.length > 0
+	// 		? [
+	// 				notUndefined(virtual_list_items[0]).start - $virtualizer.options.scrollMargin,
+	// 				$virtualizer.getTotalSize() -
+	// 					notUndefined(virtual_list_items[virtual_list_items.length - 1]).end
+	// 			]
+	// 		: [0, 0]
+	// );
+	// $inspect($virtualizer.getVirtualItems());
 
+	// https://github.com/TanStack/virtual/issues/866
 	let mounted = $state(false);
 	$effect(() => {
 		if (!mounted && list_div !== null) {
@@ -128,41 +143,59 @@
 		});
 	}
 
-	function get_items() {
-		const list_items = Array.from(list_div!.querySelectorAll('.list-item')) as HTMLDivElement[];
-		// start with 5 prevents scrollbars
-		list_height = list_items.slice(0, min_items).reduce((h, e) => e.offsetHeight + h, 5);
-	}
+	// $inspect(virtual_list_items);
 
-	if (monitor_routes) {
-		const all_bus_routes = $derived(
-			bus_data
-				//@ts-expect-error
-				.flatMap((stop: Stop<'bus'>) => {
-					return stop.routes.map((r) => r.id);
-				})
-		);
+	// we will monitor bus routes if it is a stop list
+	// $effect(() => {
+	// 	if (type === 'stop' && selected_tab.value === 'bus') {
+	// 		console.log('monitoring bus routes');
+	// 		const buses_shown = virtual_list_items.map((row) => bus_data[row.index]);
+	// 		//@ts-expect-error
+	// 		const bus_routes = buses_shown.flatMap((stop) => stop.routes.map((r) => r.id));
+	// 		bus_routes.forEach((r) => monitored_bus_routes.add(r));
+	// 	}
+	// });
+	// if (type === 'stop') {
+	// const all_bus_routes = $derived(
+	// 	bus_data
+	// 		//@ts-expect-error
+	// 		.flatMap((stop: Stop<'bus'>) => {
+	// 			return stop.routes.map((r) => r.id);
+	// 		})
+	// );
+	// const visible_bus_routes = $derived.by(() => {
+	// 	if (selected_tab.value === 'bus') {
+	// 		const bus_data_shown = virtual_list_items.map((row) => bus_data[row.index]);
+	// 		//@ts-expect-error
+	// 		return bus_data_shown.flatMap((stop) => stop.routes.map((r) => r.id));
+	// 	}
+	// 	return [];
+	// });
+	// $inspect(visible_bus_routes);
+	// $effect(() => {
+	// 	// console.log('adding routes');
+	// 	visible_bus_routes.forEach((r) => monitored_bus_routes.add(r));
+	// });
+	// }
+	// function get_items() {
+	// 	const list_items = Array.from(list_div!.querySelectorAll('.list-item')) as HTMLDivElement[];
+	// 	// start with 5 prevents scrollbars
+	// 	list_height = list_items.slice(0, min_items).reduce((h, e) => e.offsetHeight + h, 5);
+	// }
+	// if (min_items) {
+	// 	$effect(() => {
+	// 		// initial height calculation
+	// 		get_items();
 
-		$effect(() => {
-			// console.log('adding routes');
-			all_bus_routes.forEach((r) => monitored_bus_routes.add(r));
-		});
-	}
-
-	if (min_items) {
-		$effect(() => {
-			// initial height calculation
-			get_items();
-
-			// whenever list changes, recalculate height
-			const observer = new MutationObserver(() => {
-				// console.log('list mutation');
-				// if (min_items)
-				get_items();
-			});
-			observer.observe(list_div!, { childList: true, subtree: true, characterData: true });
-		});
-	}
+	// 		// whenever list changes, recalculate height
+	// 		const observer = new MutationObserver(() => {
+	// 			// console.log('list mutation');
+	// 			// if (min_items)
+	// 			get_items();
+	// 		});
+	// 		observer.observe(list_div!, { childList: true, subtree: true, characterData: true });
+	// 	});
+	// }
 
 	// let large = persisted_rune(`${title.toLowerCase()}_large`, false);
 
@@ -226,7 +259,7 @@
 		<div
 			bind:this={list_item_els[selected_tab.value][idx]}
 			data-index={row_index}
-			class="relative w-full list-item"
+			class="relative w-full"
 		>
 			<Button state={{ data, modal: type }} {pin_rune}>
 				<Item {data} />
@@ -234,11 +267,12 @@
 		</div>
 	{/snippet}
 
-	<!-- style:height={min_items ? `${list_height}px` : 'auto'} -->
-
-	<div bind:this={list_div} class={`overflow-y-auto text-base ${class_name ?? ''}`}>
+	<div
+		bind:this={list_div}
+		class={`overflow-y-auto overscroll-contain text-base ${class_name ?? ''}`}
+	>
 		<div style="position: relative; height: {$virtualizer.getTotalSize()}px; width: 100%;">
-			<!-- <div style="padding-top: {virtualListBefore}; padding-bottom: {virtualListAfter}"> -->
+			<!-- <div style="pdading-top: {virtualListBefore}; padding-bottom: {virtualListAfter}"> -->
 			<div
 				class="divide-y divide-neutral-800 border-y border-neutral-800"
 				style="position: absolute; top: 0; left: 0; width: 100%; transform: translateY({virtual_list_items[0]

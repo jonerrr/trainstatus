@@ -1,18 +1,9 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
-	import {
-		is_bus,
-		is_train,
-		type BusRouteStop,
-		type BusStopData,
-		type Route,
-		type Stop
-	} from '$lib/static';
-	import { type PersistedRune } from '$lib/util.svelte';
+	import { is_bus, is_train, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
-	import Button from '$lib/Button.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
 
@@ -21,30 +12,35 @@
 	}
 	let { data }: Props = $props();
 
-	let stop_times = $derived(
-		rt_stop_times.stop_times
-			.filter((st) => st.stop_id === data.id)
-			.map((st) => {
-				// const trip = rt_trips.trips.find((t) => t.id === st.trip_id);
-				const trip = rt_trips.trips.get(st.trip_id);
+	const stop_times = $derived.by(() => {
+		const stop_times = [];
 
-				// if (!trip) {
-				// 	$inspect(st);
-				// }
-				return {
-					...st,
-					eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
-					direction: trip?.direction,
-					route_id: trip?.route_id
-				};
-			})
-			// TODO: prevent trips that don't exist from having stop times
-			.filter((st) => st.direction !== undefined && st.eta >= 0) as StopTime<
-			number,
-			TripDirection,
-			string
-		>[]
-	);
+		const totals = {
+			[TripDirection.North]: 0,
+			[TripDirection.South]: 0
+		};
+
+		for (const st of rt_stop_times.stop_times) {
+			if (Object.values(totals).every((t) => t > 1)) break;
+
+			if (st.stop_id === data.id) {
+				const trip = rt_trips.trips.get(st.trip_id);
+				// TODO: figure out why some stop times don't have trips
+				if (trip) {
+					stop_times.push({
+						...st,
+						eta: (st.arrival.getTime() - new Date().getTime()) / 1000 / 60,
+						direction: trip.direction,
+						route_id: trip.route_id
+					});
+
+					totals[trip.direction]++;
+				}
+			}
+		}
+
+		return stop_times as StopTime<number, TripDirection, string>[];
+	});
 
 	// if its bus, show loading if its in trips but not in stop times
 	// const loading = $derived(
@@ -59,8 +55,6 @@
 
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
-	<!-- numberflow was causing a hydration mismatch error -->
-	<!-- <NumberFlow value={eta} suffix="m" /> -->
 	{#key eta}
 		<span in:fade={{ duration: 300 }}>
 			{eta}m
@@ -114,7 +108,7 @@
 			{/each}
 
 			<div class="font-medium my-auto text-left text-lg">
-				{stop.name}
+				{data.name}
 			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-8">
@@ -141,7 +135,7 @@
 				<BusArrow direction={data.data.direction} />
 			</div>
 			<div class="font-bold">
-				{stop.name}
+				{data.name}
 			</div>
 		</div>
 

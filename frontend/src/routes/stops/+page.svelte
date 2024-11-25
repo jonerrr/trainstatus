@@ -3,12 +3,11 @@
 	import { page } from '$app/stores';
 	import { type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
-	import StopButton from '$lib/Stop/Button.svelte';
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 
-	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
-	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 15));
+	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops);
+	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops);
 
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
@@ -20,8 +19,8 @@
 	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
-		bus_stops = $page.data.bus_stops.slice(0, 15);
-		train_stops = $page.data.train_stops.slice(0, 15);
+		bus_stops = $page.data.bus_stops;
+		train_stops = $page.data.train_stops;
 
 		search_input = '';
 	}
@@ -29,6 +28,7 @@
 	let search_timeout: number;
 
 	$effect(() => {
+		selected_tab;
 		search_input;
 		clearTimeout(search_timeout);
 
@@ -51,19 +51,15 @@
 	<title>Stops</title>
 </svelte:head>
 
-{#snippet stop_button(stop: Stop<'bus' | 'train'>)}
-	<StopButton {stop} pin_rune={stop_pins_rune} />
-{/snippet}
-
 <List
 	title="Stops"
-	button={stop_button}
+	type="stop"
 	bus_data={bus_stops}
 	train_data={train_stops}
+	pin_rune={stop_pins_rune}
 	monitor_routes
 	class="max-h-[calc(100dvh-13.1rem)]"
 	auto_scroll
-	bind:selected_tab
 />
 
 <div class="absolute bottom-1 w-full">
