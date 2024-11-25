@@ -2,10 +2,14 @@
 	import { fade } from 'svelte/transition';
 	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
 
-	let { offline }: { offline: boolean } = $props();
+	interface Props {
+		offline: boolean;
+	}
+
+	let { offline }: Props = $props();
 </script>
 
-<header class="text-4xl p-2 font-bold flex justify-between relative">
+<header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
 	<div class="flex gap-1">
 		<div class="gradient-text font-black">TrainStat.us</div>
 		{#if offline}
@@ -74,7 +78,6 @@
 	}
 
 	.gradient-text {
-		/* background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); */
 		background: linear-gradient(-45deg, #03045e, #0077b6, #00b4d8, #e73c7e, #23d5ab);
 		background-size: 400% 400%;
 		animation: gradient 15s ease infinite;

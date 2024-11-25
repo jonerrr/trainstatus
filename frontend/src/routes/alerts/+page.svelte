@@ -29,5 +29,7 @@
 	train_data={train_routes}
 	type="route"
 	pin_rune={route_pins_rune}
-	class="max-h-[calc(100dvh-10.2rem)] mb-16"
+	class="max-h-[calc(100dvh-10.5rem)]"
+	height_calc={() => 45}
+	ssr_min={20}
 />

@@ -1,18 +1,19 @@
 <script lang="ts">
-	import { CircleX } from 'lucide-svelte';
+	import { CircleX, Search } from 'lucide-svelte';
 	import { page } from '$app/stores';
-	import { type Stop } from '$lib/static';
+	import { calculate_stop_height, type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
-	import StopButton from '$lib/Stop/Button.svelte';
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 
-	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops.slice(0, 15));
-	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops.slice(0, 15));
+	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops);
+	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops);
 
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
 	const search = new StopSearch($page.data.bus_stops, $page.data.train_stops);
+
+	// console.log(calculate_stop_height($page.data.train_stops[0]), 'sheight');
 
 	// let search_el: HTMLInputElement;
 	let search_input: string = $state('');
@@ -20,8 +21,10 @@
 	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
-		bus_stops = $page.data.bus_stops.slice(0, 15);
-		train_stops = $page.data.train_stops.slice(0, 15);
+		bus_stops = $page.data.bus_stops;
+		// $page.data.bus_stops.sort((a, b) => b.name.length - a.name.length).slice(0, 200);
+
+		train_stops = $page.data.train_stops;
 
 		search_input = '';
 	}
@@ -29,6 +32,7 @@
 	let search_timeout: number;
 
 	$effect(() => {
+		selected_tab.value;
 		search_input;
 		clearTimeout(search_timeout);
 
@@ -43,52 +47,75 @@
 					else if (selected_tab.value === 'bus') bus_stops = results as Stop<'bus'>[];
 				}
 			}
-		}, 250);
+		}, 150);
 	});
 </script>
 
 <svelte:head>
 	<title>Stops</title>
 </svelte:head>
-
-{#snippet stop_button(stop: Stop<'bus' | 'train'>)}
-	<StopButton {stop} pin_rune={stop_pins_rune} />
-{/snippet}
-
-<List
-	title="Stops"
-	button={stop_button}
-	bus_data={bus_stops}
-	train_data={train_stops}
-	monitor_routes
-	class="max-h-[calc(100dvh-13.1rem)]"
-	auto_scroll
-	bind:selected_tab
-/>
-
-<div class="absolute bottom-1 w-full">
-	<input
-		name="search"
-		bind:value={search_input}
-		type="search"
-		placeholder="Search stops"
-		class="search-stops w-full h-12 text-neutral-200 pl-10 rounded bg-neutral-900 border-neutral-800 ring-1 ring-inset ring-neutral-600 focus:ring-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-inset placeholder:text-neutral-400"
+<!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
+<div class="flex flex-col h-full">
+	<List
+		title="Stops"
+		type="stop"
+		bus_data={bus_stops}
+		train_data={train_stops}
+		pin_rune={stop_pins_rune}
+		auto_scroll
+		class="max-h-[calc(100dvh-13.5rem)] flex-grow"
+		bind:selected_tab
+		height_calc={calculate_stop_height}
 	/>
-	<button
-		aria-label="Clear search"
-		class="z-30 w-6 h-6 text-neutral-200 hover:text-neutral-400 active:text-neutral-400 absolute right-2 my-auto top-1/2 transform -translate-y-1/2"
-		onclick={clear_search}
-	>
-		<CircleX />
-	</button>
+
+	<div class="w-full">
+		<div class="relative">
+			<Search
+				class="z-20 absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 group-focus-within:text-neutral-200 transition-colors duration-200"
+			/>
+
+			<input
+				name="search"
+				bind:value={search_input}
+				type="search"
+				placeholder="Search stops"
+				class="w-full h-12 pl-10 pr-10
+			   text-neutral-200
+			   bg-neutral-900
+			   backdrop-blur-sm
+			   rounded
+			   border border-neutral-800/50
+			   shadow-lg shadow-black/10
+			   ring-1 ring-inset ring-neutral-600/30
+			   placeholder:text-neutral-500
+			   focus:ring-2
+			   focus:ring-neutral-500/50
+			   focus:border-neutral-500/50
+			   focus:bg-neutral-900"
+			/>
+
+			<button
+				aria-label="Clear search"
+				class="absolute right-3 top-1/2 -translate-y-1/2
+			   w-6 h-6
+			   text-neutral-400
+			   hover:text-neutral-200
+			   active:scale-95
+			   transition-all duration-200"
+				onclick={clear_search}
+			>
+				<CircleX />
+			</button>
+		</div>
+	</div>
 </div>
 
 <style lang="postcss">
-	.search-stops {
+	/* .search-stops {
 		background-image: url('/search.svg');
 		background-position: 10px 10px;
 		background-repeat: no-repeat;
-	}
+	} */
 
 	/* Remove default styles from search */
 	input[type='search']::-webkit-search-decoration,

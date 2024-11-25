@@ -68,8 +68,8 @@
 <div class="flex flex-col gap-1 items-center text-left">
 	<div class="flex gap-1 items-center self-start">
 		<Icon
-			width={32}
-			height={32}
+			width={36}
+			height={36}
 			route={data.route}
 			link={false}
 			express={is_train_route(data.route, data) && data.data.express}

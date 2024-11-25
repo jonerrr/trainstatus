@@ -105,3 +105,20 @@ export const main_stop_routes = (stop: Stop<'bus' | 'train'>) => {
 		(r) => !is_train(stop) || always_stop.includes((r as TrainRouteStop).type!)
 	);
 };
+
+export const calculate_route_height = () => 52;
+
+export function calculate_stop_height(item: Stop<'bus'> | Stop<'train'>) {
+	let height = 44; // stop name height (28px) + 16px padding
+	if (is_bus(item)) {
+		height += item.routes.length * 56;
+	} else {
+		// headsign height
+		height += 24;
+		// route arrivals height
+		height += item.routes.length * 24;
+	}
+
+	return height;
+	// each bus route has height of 80
+}
