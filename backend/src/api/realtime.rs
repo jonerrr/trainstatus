@@ -52,6 +52,9 @@ pub struct StopTimesParameters {
     /// Comma-separated list of bus route IDs to include in response. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     bus_route_ids: Vec<String>,
+    /// Only return bus stop times. Must specify bus_route_ids.
+    #[serde(default)]
+    only_bus: bool,
 }
 
 #[utoipa::path(
@@ -82,8 +85,13 @@ pub async fn stop_times_handler(
         }
         false => {
             // TODO: improve this (cache stop_times by route_id)
-            let stop_times =
-                StopTime::get_all(&state.pg_pool, Utc::now(), Some(&params.bus_route_ids)).await?;
+            let stop_times = StopTime::get_all(
+                &state.pg_pool,
+                Utc::now(),
+                Some(&params.bus_route_ids),
+                params.only_bus,
+            )
+            .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))
         }
     }

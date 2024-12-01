@@ -43,72 +43,110 @@ impl StopTime {
         pool: &PgPool,
         at: DateTime<Utc>,
         bus_route_ids: Option<&Vec<String>>,
+        only_bus: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        match bus_route_ids {
-            Some(bus_route_ids) => {
-                sqlx::query_as!(
-                    StopTime,
-                    r#"
+        // match bus_route_ids {
+        //     Some(bus_route_ids) => {
+        //         sqlx::query_as!(
+        //             StopTime,
+        //             r#"
+        //             SELECT
+        //                 st.trip_id,
+        //                 st.stop_id,
+        //                 st.arrival,
+        //                 st.departure
+        //             FROM
+        //                 stop_time st
+        //             WHERE
+        //                 st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+        //                 AND st.trip_id IN (
+        //                     SELECT
+        //                         t.id
+        //                     FROM
+        //                         trip t
+        //                     WHERE
+        //                         t.updated_at >= $1 - INTERVAL '5 minutes' AND
+        //                         (t.assigned IS NOT NULL
+        //                         OR t.route_id = ANY($2))
+        //                 )
+        //             ORDER BY
+        //                 st.arrival
+        //             "#,
+        //             at,
+        //             bus_route_ids
+        //         )
+        //         .fetch_all(pool)
+        //         .await
+        //     }
+        //     // If there are no bus route ids, only send back train stop times
+        //     None => {
+        //         sqlx::query_as!(
+        //             StopTime,
+        //             r#"
+        //             SELECT
+        //                 st.trip_id,
+        //                 st.stop_id,
+        //                 st.arrival,
+        //                 st.departure
+        //             FROM
+        //                 stop_time st
+        //             WHERE
+        //                 st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+        //                 AND st.trip_id IN (
+        //                     SELECT
+        //                         t.id
+        //                     FROM
+        //                         trip t
+        //                     WHERE
+        //                         t.updated_at >= $1 - INTERVAL '5 minutes' AND
+        //                         t.assigned IS NOT NULL
+        //                 )
+        //             ORDER BY
+        //                 st.arrival
+        //             "#,
+        //             at
+        //         )
+        //         .fetch_all(pool)
+        //         .await
+        //     }
+        // }
+        let default_routes = Vec::new();
+        let bus_routes = bus_route_ids.unwrap_or(&default_routes);
+
+        sqlx::query_as!(
+            StopTime,
+            r#"
+            SELECT
+                st.trip_id,
+                st.stop_id,
+                st.arrival,
+                st.departure
+            FROM
+                stop_time st
+            WHERE
+                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                AND st.trip_id IN (
                     SELECT
-                        st.trip_id,
-                        st.stop_id,
-                        st.arrival,
-                        st.departure
+                        t.id
                     FROM
-                        stop_time st
+                        trip t
                     WHERE
-                        st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                        AND st.trip_id IN (
-                            SELECT
-                                t.id
-                            FROM
-                                trip t
-                            WHERE
-                                t.updated_at >= $1 - INTERVAL '5 minutes' AND
-                                (t.assigned IS NOT NULL
-                                OR t.route_id = ANY($2))
+                        t.updated_at >= $1 - INTERVAL '5 minutes'
+                        AND (
+                            ($3 = TRUE AND t.route_id = ANY($2))
+                            OR
+                            ($3 = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY($2)))
                         )
-                    ORDER BY
-                        st.arrival
-                    "#,
-                    at,
-                    bus_route_ids
                 )
-                .fetch_all(pool)
-                .await
-            }
-            // If there are no bus route ids, only send back train stop times
-            None => {
-                sqlx::query_as!(
-                    StopTime,
-                    r#"
-                    SELECT
-                        st.trip_id,
-                        st.stop_id,
-                        st.arrival,
-                        st.departure
-                    FROM
-                        stop_time st
-                    WHERE
-                        st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                        AND st.trip_id IN (
-                            SELECT
-                                t.id
-                            FROM
-                                trip t
-                            WHERE
-                                t.updated_at >= $1 - INTERVAL '5 minutes' AND
-                                t.assigned IS NOT NULL
-                        )
-                    ORDER BY
-                        st.arrival
-                    "#,
-                    at
-                )
-                .fetch_all(pool)
-                .await
-            }
-        }
+            ORDER BY
+                st.arrival;
+            "#,
+            at,         // $1: Timestamp
+            bus_routes, // $2: Array of bus_route_ids (can be empty)
+            only_bus,   // $3: only_bus flag
+        )
+        .fetch_all(pool)
+        .await
     }
 
     // pub async fn get_all(

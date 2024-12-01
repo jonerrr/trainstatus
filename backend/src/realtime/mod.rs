@@ -119,7 +119,9 @@ pub async fn import(
     tokio::spawn(async move {
         loop {
             match trip::Trip::<serde_json::Value>::get_all(&c_pool, Utc::now()).await {
-                Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None).await {
+                Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None, false)
+                    .await
+                {
                     Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now()).await {
                         Ok(alerts) => {
                             match trip::Trip::<serde_json::Value>::to_geojson(&trips).await {
