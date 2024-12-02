@@ -231,7 +231,7 @@
 		];
 	});
 
-	$inspect(visible_items.length);
+	// $inspect(visible_items.length);
 
 	// TODO: fix buses requests not batching
 	// add bus routes to monitored bus routes

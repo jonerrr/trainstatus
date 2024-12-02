@@ -2,7 +2,7 @@
 	// import { fade } from 'svelte/transition';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { page } from '$app/stores';
-	import { is_bus, is_train, type Route, type Stop } from '$lib/static';
+	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
 	import BusArrow from './BusArrow.svelte';
@@ -92,9 +92,7 @@
 		}
 	}, 100);
 
-	const current_stop_routes = $derived(
-		data.routes.map((route) => $page.data.routes[route.id] as Route)
-	);
+	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
 </script>
 
 {#snippet eta(n: number)}
@@ -119,8 +117,6 @@
 			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-8">
-			<!-- {@render arrivals(data.data.north_headsign, all_routes, [])}
-			{@render arrivals(data.data.south_headsign, all_routes, [])} -->
 			{@render arrivals(data.data.north_headsign, current_stop_routes, nb_st_by_route)}
 			{@render arrivals(data.data.south_headsign, current_stop_routes, sb_st_by_route)}
 		</div>

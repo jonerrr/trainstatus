@@ -10,31 +10,13 @@ export const load: LayoutLoad = async ({ fetch }) => {
 
 	// TODO: preload bus route ids using search param
 
-	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, boolean] =
-		await Promise.all([
-			stops_promise,
-			routes_promise,
-			trips.update(fetch),
-			stop_times.update(fetch, []),
-			alerts.update(fetch)
-		]);
-
-	// let longest_bus_route_name = routes.reduce((acc, route) => {
-	// 	if (route.short_name.length > acc.length) {
-	// 		return route.short_name;
-	// 	}
-	// 	return acc;
-	// }, '');
-	// console.log(longest_bus_route_name);
-	// const longest_stop_name = stops.reduce((acc, stop) => {
-	// 	if (stop.name.length > acc.length) {
-	// 		return stop.name;
-	// 	}
-	// 	return acc;
-	// }, '');
-	// console.log(longest_stop_name);
-	// const sorted_stop_names = stops.map((stop) => stop.name.length).sort((a, b) => b - a);
-	// console.log(sorted_stop_names);
+	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
+		stops_promise,
+		routes_promise,
+		trips.update(fetch),
+		stop_times.update(fetch, []),
+		alerts.update(fetch)
+	]);
 
 	const routes_obj: {
 		[id: string]: Route;

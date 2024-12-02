@@ -37,53 +37,31 @@ export function createAlerts() {
 	const alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
 
 	async function update(fetch: Fetch) {
-		try {
-			const res = await fetch(`/api/v1/alerts`);
-			if (res.headers.has('x-sw-fallback')) {
-				throw new Error('Offline');
-			}
-			const data: Alert[] = await res.json();
-
-			alerts = data.map((alert) => ({
-				...alert,
-				header_html: parse_html(alert.header_html),
-				description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
-				start_time: new Date(alert.start_time),
-				end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-				updated_at: new Date(alert.updated_at),
-				created_at: new Date(alert.created_at)
-			}));
-			alerts_by_route.clear();
-			// alerts_by_route = new SvelteMap<string, Alert[]>();
-			for (const alert of alerts) {
-				for (const entity of alert.entities) {
-					if (!alerts_by_route.has(entity.route_id)) {
-						alerts_by_route.set(entity.route_id, []);
-					}
-					alerts_by_route.get(entity.route_id)!.push(alert);
-				}
-			}
-
-			return false;
-		} catch (e) {
-			console.error(e);
-			return true;
+		const res = await fetch(`/api/v1/alerts`);
+		if (res.headers.has('x-sw-fallback')) {
+			throw new Error('Offline');
 		}
+		const data: Alert[] = await res.json();
 
-		// fetch(
-		// 	`/api/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}`
-		// )
-		// 	.then((res) => res.json())
-		// 	.then(e
-		// 		(data) =>
-		// 			// convert dates from strings to Date objects
-		// 			(stop_times = data.map((stop_time: StopTime) => ({
-		// 				...stop_time,
-		// 				arrival: new Date(stop_time.arrival),
-		// 				departure: new Date(stop_time.departure)
-		// 			})))
-		// 	);
-		// TODO: add error handling and set offline status
+		alerts = data.map((alert) => ({
+			...alert,
+			header_html: parse_html(alert.header_html),
+			description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+			start_time: new Date(alert.start_time),
+			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
+			updated_at: new Date(alert.updated_at),
+			created_at: new Date(alert.created_at)
+		}));
+		alerts_by_route.clear();
+		// alerts_by_route = new SvelteMap<string, Alert[]>();
+		for (const alert of alerts) {
+			for (const entity of alert.entities) {
+				if (!alerts_by_route.has(entity.route_id)) {
+					alerts_by_route.set(entity.route_id, []);
+				}
+				alerts_by_route.get(entity.route_id)!.push(alert);
+			}
+		}
 	}
 
 	return {

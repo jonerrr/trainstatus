@@ -36,7 +36,6 @@
 	"type": "module",
 	"dependencies": {
 		"@fontsource/inter": "^5.1.0",
-		"@tanstack/svelte-virtual": "^3.10.9",
 		"dayjs": "^1.11.13",
 		"flexsearch": "^0.7.43",
 		"lucide-svelte": "^0.462.0"

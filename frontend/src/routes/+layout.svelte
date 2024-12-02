@@ -122,9 +122,11 @@
 
 		monitor_delay = setTimeout(async () => {
 			try {
-				await stop_times.update(fetch, [...monitored_bus_routes]);
-				last_st_update = new Date();
-				offline = false;
+				if (monitored_bus_routes.size) {
+					await stop_times.update(fetch, [...monitored_bus_routes], true);
+					last_st_update = new Date();
+					offline = false;
+				}
 			} catch (e) {
 				console.error(e);
 				offline = true;
