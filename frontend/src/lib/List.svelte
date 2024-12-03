@@ -4,6 +4,7 @@
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
 	import { monitored_bus_routes } from './stop_times.svelte';
 	import TripButton from './Trip/Button.svelte';
@@ -12,7 +13,6 @@
 	import Pin from './Pin.svelte';
 	import type { Route, Stop } from './static';
 	import type { BusTripData, TrainTripData, Trip } from './trips.svelte';
-	import { browser } from '$app/environment';
 
 	// [ element, estimated size]
 	interface ItemComponents {
@@ -55,6 +55,8 @@
 		ssr_min?: number;
 		// extra items to render before and after visible items
 		overscan?: number;
+		// css style for list
+		style?: string;
 	}
 
 	let {
@@ -72,7 +74,8 @@
 		auto_scroll = false,
 		items_before_scroll,
 		ssr_min = 10,
-		overscan = 10
+		overscan = 10,
+		style: style_
 	}: Props = $props();
 
 	// if bus/train data don't have any items, switch tabs
@@ -82,15 +85,6 @@
 	});
 
 	const items = $derived(selected_tab.value === 'train' ? train_data : bus_data);
-
-	// Mounted flag to detect client-side rendering
-	// let mounted = $state(false);
-
-	// onMount(() => {
-	// 	mounted = true;
-	// });
-
-	// $inspect(items.length);
 
 	const Item = item_components[type][0];
 
@@ -180,30 +174,59 @@
 	}
 
 	// Functions to calculate start and end index
+	// function calculateStartIndex() {
+	// 	let start = 0;
+	// 	let position = 0;
+	// 	while (start < items.length) {
+	// 		const item = items[start];
+	// 		const height = item_heights[item.id] || height_calc(item);
+	// 		if (position + height > scroll_top - overscan * height) break;
+	// 		position += height;
+	// 		start++;
+	// 	}
+	// 	return start;
+	// }
+
+	// function calculateEndIndex(start: number) {
+	// 	let end = start;
+	// 	let position = getItemOffset(start);
+	// 	while (end < items.length) {
+	// 		const item = items[end];
+	// 		const height = item_heights[item.id] || height_calc(item);
+	// 		position += height;
+	// 		if (position > scroll_top + viewport_height + overscan * height) break;
+	// 		end++;
+	// 	}
+	// 	return end;
+	// }
+
+	// Calculate start index
 	function calculateStartIndex() {
 		let start = 0;
 		let position = 0;
 		while (start < items.length) {
 			const item = items[start];
-			const height = item_heights[item.id] || height_calc(item);
+			const height = item_heights[item.id] || height_calc(item) || 50;
 			if (position + height > scroll_top - overscan * height) break;
 			position += height;
 			start++;
 		}
-		return start;
+		return Math.max(0, start);
 	}
 
+	// TODO: check for when height_calc is huge difference from actual height
+	// Calculate end index
 	function calculateEndIndex(start: number) {
 		let end = start;
 		let position = getItemOffset(start);
 		while (end < items.length) {
 			const item = items[end];
-			const height = item_heights[item.id] || height_calc(item);
+			const height = item_heights[item.id] || height_calc(item) || 50;
 			position += height;
 			if (position > scroll_top + viewport_height + overscan * height) break;
 			end++;
 		}
-		return end;
+		return Math.min(end, items.length); // Clamp to items.length
 	}
 
 	const [visible_items, start, visible_bus_routes] = $derived.by(() => {
@@ -263,6 +286,24 @@
 	}
 
 	let total_height = $derived.by(calculate_total_height);
+
+	// TODO: use resize observer
+	// 	function measureHeight(item, el: HTMLDivElement) {
+	//     if (el) {
+	//       const resizeObserver = new ResizeObserver((entries) => {
+	//         for (let entry of entries) {
+	//           const height = entry.contentRect.height;
+	//           item_heights[item.id] = height;
+	//           item_offsets = {}; // Reset offsets
+	//           total_height = calculate_total_height();
+	//         }
+	//       });
+	//       resizeObserver.observe(el);
+
+	//       // Cleanup
+	//       onDestroy(() => resizeObserver.unobserve(el));
+	//     }
+	//   }
 </script>
 
 <!-- TODO: back to top button in header -->
@@ -325,8 +366,8 @@
 			await tick();
 			scroll_top = e.currentTarget.scrollTop;
 		}}
-		style="-webkit-overflow-scrolling: touch;"
-		class="overflow-y-auto text-base {class_name ?? ''}"
+		style="-webkit-overflow-scrolling: touch; {style_ ?? ''}"
+		class="relative overflow-y-auto text-base {class_name ?? ''}"
 	>
 		<div style:height="{total_height}px" class="relative">
 			<div class="will-change-transform" style:transform="translateY({getItemOffset(start)}px)">
