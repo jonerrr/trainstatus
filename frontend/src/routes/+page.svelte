@@ -127,8 +127,7 @@
 						);
 						return { ...stop, distance };
 					})
-					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 30);
+					.sort((a, b) => a.distance - b.distance);
 
 				nearby_bus_stops = $page.data.bus_stops
 					.map((stop: Stop<'bus'>) => {
@@ -140,8 +139,8 @@
 						);
 						return { ...stop, distance };
 					})
-					.sort((a, b) => a.distance - b.distance)
-					.slice(0, 30);
+					.sort((a, b) => a.distance - b.distance);
+				// .slice(0, 70);
 
 				location_status.value = 'granted';
 			},
@@ -155,6 +154,15 @@
 	if (location_status.value === 'granted' || location_status.value === 'loading') {
 		get_nearby_stops();
 	}
+
+	// use this to calculate the height for the nearby stops list
+	let list_height = $state(0);
+	let pin_list_height = $state(0);
+	const nearby_list_height = $derived(list_height - pin_list_height);
+
+	// $inspect(pin_list_height);
+
+	// $inspect({ nearby_list_height });
 </script>
 
 {#snippet locate_button()}
@@ -181,9 +189,9 @@
 {/snippet}
 
 <!--  overflow-hidden -->
-<div class="flex flex-col max-h-[calc(100dvh-7.8rem)]">
+<div class="flex flex-col max-h-[calc(100dvh-10.5rem)]" bind:offsetHeight={list_height}>
 	<!-- Pinned items section - no scroll -->
-	<div class="flex-none max-h-[50%] overflow-hidden">
+	<div class="flex-none max-h-[50%] overflow-hidden" bind:offsetHeight={pin_list_height}>
 		{#if trip_pins_rune.value.length}
 			<List
 				title="Pinned Trips"
@@ -222,10 +230,11 @@
 	</div>
 
 	<!-- Nearby stops section - scrollable -->
-	<div class="flex-1 overflow-y-auto">
+	<div class="">
 		<List
 			title="Nearby Stops"
 			type="stop"
+			style="max-height: {nearby_list_height}px"
 			bus_data={nearby_bus_stops}
 			train_data={nearby_train_stops}
 			pin_rune={stop_pins_rune}
