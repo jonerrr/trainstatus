@@ -1,0 +1,74 @@
+# this is broken bc frontend can't access backend
+services:
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    command: --api.insecure=true --providers.docker
+    ports:
+      - "8000:80" # HTTP
+      - "8080:8080" # Traefik Dashboard
+    volumes:
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:z
+    networks:
+      - trainstatus-network
+
+  backend:
+    restart: unless-stopped
+    image: ghcr.io/jonerrr/trainstatus-backend:staging
+    container_name: backend
+    environment:
+      - REDIS_URL=redis://valkey:6379
+      - DATABASE_URL=postgres://trains:trains@postgres:5432/trains
+      - ADDRESS=0.0.0.0:3055
+      - API_KEY=bustime_api_key
+    depends_on:
+      - postgres
+      - valkey
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=3055"
+      - "traefik.http.routers.backend.middlewares=strip-api-prefix"
+      - "traefik.http.middlewares.strip-api-prefix.stripprefix.prefixes=/api"
+
+  frontend:
+    restart: unless-stopped
+    image: ghcr.io/jonerrr/trainstatus-frontend:staging
+    container_name: frontend
+    networks:
+      - trainstatus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+
+  postgres:
+    image: postgres:alpine
+    restart: unless-stopped
+    container_name: postgres
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=trains
+      - POSTGRES_PASSWORD=trains
+      - POSTGRES_DB=trains
+    volumes:
+      - postgres-trainstatus:/var/lib/postgresql/data:z
+    networks:
+      - trainstatus-network
+
+  valkey:
+    image: valkey/valkey:alpine
+    container_name: valkey
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    networks:
+      - trainstatus-network
+
+volumes:
+  postgres-trainstatus:
+
+networks:
+  trainstatus-network:
+    driver: bridge

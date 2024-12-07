@@ -93,30 +93,38 @@
 	);
 
 	// only show routes that stop at this stop and sort by id length
-
-	let route_stops = main_stop_routes(stop).sort((a, b) => b.id.length - a.id.length);
+	// let route_stops = $derived(main_stop_routes(stop).sort((a, b) => b.id.length - a.id.length));
+	const main_rs = $derived(main_stop_routes(stop));
+	const route_stops = $derived.by(() => {
+		if (main_rs.length < 6) {
+			return main_rs;
+		} else {
+			return main_rs.filter((route) => active_routes.has(route.id));
+		}
+	});
 </script>
 
 <div class="flex gap-1 items-center p-1">
-	<!-- class="grid grid-cols-5 grid-rows-4 grid-flow-col gap-1"
-		
-		class:flex-wrap={route_stops.length > 4} -->
-	<!-- class="grid gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(5rem,1fr))] max-w-xs" -->
-	<div class="flex gap-1" class:flex-col={stop.route_type === 'bus'}>
-		{#each route_stops as route}
-			{#if route_stops.length < 6 || active_routes.has(route.id)}
-				<Icon
-					width={24}
-					height={24}
-					express={false}
-					link={true}
-					route={$page.data.routes[route.id] as Route}
-				/>
-			{/if}
-		{/each}
-	</div>
+	<!-- grid gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(4rem,1fr))] max-w-xs -->
+	<!-- grid gap-1 grid-cols-5 grid-rows-3 grid-flow-col -->
 
-	<div class="font-medium text-lg flex-grow">
+	<div class="flex flex-wrap gap-1 max-h-36 max-w-36 items-center">
+		{#each route_stops.slice(0, 5) as route}
+			<Icon
+				width={24}
+				height={24}
+				express={false}
+				link={true}
+				route={$page.data.routes[route.id] as Route}
+			/>
+		{/each}
+		{#if route_stops.length > 5}
+			<div class="font-semibold rounded bg-neutral-700 p-1">+{main_rs.length - 5}</div>
+		{/if}
+
+		<!-- </div> -->
+	</div>
+	<div class="font-medium text-lg">
 		{stop.name}
 	</div>
 </div>
