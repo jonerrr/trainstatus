@@ -18,8 +18,6 @@
 	import Pin from './Pin.svelte';
 	import { is_bus_route, type Trip, type TripData } from './trips.svelte';
 
-	// let last_focused: HTMLElement | null = null;
-
 	let dialog_el = $state<HTMLDialogElement>();
 
 	function close() {
@@ -29,29 +27,6 @@
 
 	function manage_modal(node: HTMLDialogElement) {
 		document.body.style.overflow = 'hidden';
-		// last_focused = document.activeElement as HTMLElement;
-
-		function trap_focus(event: KeyboardEvent) {
-			if (event.key === 'Tab') {
-				const focusable = Array.from(
-					node.querySelectorAll(
-						'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-					)
-				) as HTMLElement[];
-				const first = focusable[0];
-				const last = focusable[focusable.length - 1];
-
-				if (event.shiftKey && document.activeElement === first) {
-					last.focus();
-					event.preventDefault();
-				} else if (!event.shiftKey && document.activeElement === last) {
-					first.focus();
-					event.preventDefault();
-				}
-			}
-		}
-
-		// document.addEventListener('keydown', trap_focus);
 
 		// watch for clicks outside the dialog to close it
 		function handle_click(event: MouseEvent) {
@@ -96,28 +71,21 @@
 				node.removeEventListener('mousedown', handle_mouse_down);
 				node.removeEventListener('mouseup', handle_mouse_up);
 				node.removeEventListener('click', handle_click);
-				// document.removeEventListener('keydown', trap_focus);
-
-				// if (last_focused) {
-				// 	last_focused.focus();
-				// }
 			}
 		};
 	}
 
-	// manage title changes and monitored bus routes
+	// manage title changes, dialog el, and monitored bus routes
 	onMount(() => {
 		const unsubscribe = page.subscribe(({ state, route }) => {
 			// console.log(route, state.modal);
 			switch (state.modal) {
 				case 'route':
 					dialog_el?.showModal();
-
 					document.title = `Alerts for ${state.data.id}`;
 					break;
 				case 'stop':
 					dialog_el?.showModal();
-
 					document.title = `Arrivals at ${state.data.name}`;
 
 					const stop: Stop<'bus' | 'train'> = state.data;
@@ -128,7 +96,6 @@
 					break;
 				case 'trip':
 					dialog_el?.showModal();
-
 					document.title = `${state.data.route_id} Trip`;
 
 					const trip: Trip<TripData> = state.data;
@@ -251,15 +218,6 @@
 	</div>
 {/snippet}
 
-<!-- close modal on escape key -->
-<!-- <svelte:window onkeydown={($event) => $page.state.modal && $event.key == 'Escape' && close()} /> -->
-
-<!-- {#if $page.state.modal}
-	<div
-		use:manage_modal
-		class="fixed top-0 left-0 flex flex-col justify-center items-center w-[100dvw] h-[100dvh] z-50 bg-black/50 bg-opacity-10 text-neutral-100"
-	> -->
-<!-- transition:slide={{ duration: 150 }} -->
 <dialog
 	bind:this={dialog_el}
 	use:manage_modal
@@ -297,8 +255,6 @@
 		)}
 	{/if}
 </dialog>
-<!-- </div>
-{/if} -->
 
 <!-- <style>
 	@keyframes spin {

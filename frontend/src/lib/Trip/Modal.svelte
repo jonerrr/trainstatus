@@ -26,8 +26,7 @@
 
 	const { trip, show_previous, time_format }: ModalProps = $props();
 
-	// should this be in $derived?
-	const route = $page.data.routes[trip.route_id];
+	const route = $derived($page.data.routes[trip.route_id]);
 
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 	const last_stop = $derived.by(() => {
