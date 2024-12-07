@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{static_data::cache_all, AppState};
 use axum::{
     async_trait,
     extract::{FromRequestParts, Query},
@@ -6,6 +6,7 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use http::{request::Parts, HeaderMap};
+use redis::AsyncCommands;
 use serde::{Deserialize, Deserializer};
 use std::sync::OnceLock;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -45,6 +46,53 @@ where
         .split(',')
         .map(|item| item.to_owned())
         .collect())
+}
+
+impl AppState {
+    // wrapper for redis get that handles when the cache is reset
+    // only use for getting static data
+    pub async fn get_from_cache(&self, key: &str) -> Result<String, errors::ServerError> {
+        let mut conn = self.redis_pool.get().await?;
+        let value: String = match conn.get(key).await {
+            Ok(value) => value,
+            Err(err) => {
+                // if theres a type error, that means the cache probably got reset
+                if err.kind() == redis::ErrorKind::TypeError {
+                    // recache static data
+                    cache_all(&self.pg_pool, &self.redis_pool).await?;
+
+                    // conn.get(key).await?
+                    return Box::pin(self.get_from_cache(key)).await;
+                }
+                return Err(errors::ServerError::Redis(err));
+            }
+        };
+        Ok(value)
+    }
+
+    // same as above but for mget
+    // currently only used for getting stop/route and hash
+    pub async fn mget_from_cache(
+        &self,
+        keys: &[&str; 2],
+    ) -> Result<(String, String), errors::ServerError> {
+        let mut conn = self.redis_pool.get().await?;
+        let values: (String, String) = match conn.mget(keys).await {
+            Ok(values) => values,
+            Err(err) => {
+                // if theres a type error, that means the cache probably got reset
+                if err.kind() == redis::ErrorKind::TypeError {
+                    // recache static data
+                    cache_all(&self.pg_pool, &self.redis_pool).await?;
+
+                    // conn.mget(keys).await?
+                    return Box::pin(self.mget_from_cache(keys)).await;
+                }
+                return Err(errors::ServerError::Redis(err));
+            }
+        };
+        Ok(values)
+    }
 }
 
 // this represents the current time to use for sql queries. default is current time, bool represents if user specified a time

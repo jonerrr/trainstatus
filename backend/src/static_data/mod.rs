@@ -126,7 +126,7 @@ pub async fn import(
                 .await
                 .unwrap();
 
-            cache_all(pool.clone(), redis_pool.clone()).await.unwrap();
+            cache_all(&pool, &redis_pool).await.unwrap();
 
             tracing::info!("Data updated");
             notify.notify_one();
@@ -135,11 +135,11 @@ pub async fn import(
 }
 
 pub async fn cache_all(
-    pool: PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    pool: &PgPool,
+    redis_pool: &bb8::Pool<RedisConnectionManager>,
 ) -> Result<(), sqlx::Error> {
-    let stops = stop::Stop::get_all(&pool).await?;
-    let mut routes = route::Route::get_all(&pool, None, true).await?;
+    let stops = stop::Stop::get_all(pool).await?;
+    let mut routes = route::Route::get_all(pool, None, true).await?;
 
     // cache geojson
     // let routes_w_geom = route::Route::get_all(&pool, None, true).await?;

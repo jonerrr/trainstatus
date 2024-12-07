@@ -7,7 +7,6 @@ use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use headers::{ETag, HeaderMapExt, IfNoneMatch};
 use http::{header, HeaderMap, StatusCode};
-use redis::AsyncCommands;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
@@ -41,7 +40,8 @@ pub fn cache_headers(hash: String) -> HeaderMap {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus routes. WARNING: SIR geometry is missing.", body = [Route])
+        (status = 200, description = "Subway and bus routes. WARNING: SIR geometry is missing.", body = [Route]),
+        (status = 304, description = "If no parameters are provided and the etag matches the request")
     )
 )]
 pub async fn routes_handler(
@@ -49,13 +49,15 @@ pub async fn routes_handler(
     params: Query<Parameters>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ServerError> {
-    let mut conn = state.redis_pool.get().await?;
-
     match (params.geojson, &params.route_type) {
         (true, route_type) => {
             let geojson: String = match route_type {
-                Some(route_type) => conn.get(format!("routes_geojson_{}", route_type)).await?,
-                None => conn.get("routes_geojson").await?,
+                Some(route_type) => {
+                    state
+                        .get_from_cache(&format!("routes_geojson_{}", route_type))
+                        .await?
+                }
+                None => state.get_from_cache("routes_geojson").await?,
             };
 
             // browsers still assume json with this header so im just gonna use application/json
@@ -72,13 +74,17 @@ pub async fn routes_handler(
             Ok((StatusCode::OK, json_headers().clone(), geojson))
         }
         (false, Some(route_type)) => {
-            let routes: String = conn.get(format!("routes_{}", route_type)).await?;
+            // let routes: String = conn.get(format!("routes_{}", route_type)).await?;
+            let routes: String = state
+                .get_from_cache(&format!("routes_{}", route_type))
+                .await?;
 
             Ok((StatusCode::OK, json_headers().clone(), routes))
         }
         _ => {
-            let (routes, routes_hash): (String, String) =
-                conn.mget(&["routes", "routes_hash"]).await?;
+            // let (routes, routes_hash): (String, String) =
+            //     conn.mget(&["routes", "routes_hash"]).await?;
+            let (routes, routes_hash) = state.mget_from_cache(&["routes", "routes_hash"]).await?;
 
             if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
                 let etag = routes_hash.parse::<ETag>().unwrap();
@@ -124,7 +130,8 @@ pub enum ApiStopRoute {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus stops", body = [Stop<StopData, Vec<ApiStopRoute>>])
+        (status = 200, description = "Subway and bus stops", body = [Stop<StopData, Vec<ApiStopRoute>>]),
+        (status = 304, description = "If no parameters are provided and the etag matches the request")
     )
 )]
 pub async fn stops_handler(
@@ -132,21 +139,23 @@ pub async fn stops_handler(
     params: Query<Parameters>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ServerError> {
-    let mut conn = state.redis_pool.get().await?;
-
     match (params.geojson, &params.route_type) {
         (true, Some(route_type)) => {
-            let geojson: String = conn.get(format!("stops_geojson_{}", route_type)).await?;
+            let geojson = state
+                .get_from_cache(&format!("stops_geojson_{}", route_type))
+                .await?;
 
             Ok((StatusCode::OK, json_headers().clone(), geojson))
         }
         (false, Some(route_type)) => {
-            let stops: String = conn.get(format!("stops_{}", route_type)).await?;
+            let stops = state
+                .get_from_cache(&format!("stops_{}", route_type))
+                .await?;
 
             Ok((StatusCode::OK, json_headers().clone(), stops))
         }
         _ => {
-            let (stops, stops_hash): (String, String) = conn.mget(&["stops", "stops_hash"]).await?;
+            let (stops, stops_hash) = state.mget_from_cache(&["stops", "stops_hash"]).await?;
 
             if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
                 let etag = stops_hash.parse::<ETag>().unwrap();
