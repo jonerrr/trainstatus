@@ -119,9 +119,7 @@ async fn main() {
     notify2.notified().await;
 
     // cache static data. It will also cache after each refresh
-    static_data::cache_all(pg_pool.clone(), redis_pool.clone())
-        .await
-        .unwrap();
+    static_data::cache_all(&pg_pool, &redis_pool).await.unwrap();
 
     // This will store alerts and trips for initial websocket load
     // null in rust :explode:
