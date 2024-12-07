@@ -230,7 +230,7 @@
 	</div>
 
 	<!-- Nearby stops section - scrollable -->
-	<div class="">
+	<div>
 		<List
 			title="Nearby Stops"
 			type="stop"
