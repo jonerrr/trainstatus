@@ -68,15 +68,6 @@
 		alert_els[i].scrollIntoView({ behavior: 'smooth' });
 	}
 
-	// function debounce(callback: Function, wait = 75) {
-	// 	let timeout: ReturnType<typeof setTimeout>;
-
-	// 	return (...args: any[]) => {
-	// 		clearTimeout(timeout);
-	// 		timeout = setTimeout(() => callback(...args), wait);
-	// 	};
-	// }
-
 	function debounce_scroll_to_alert(i: number) {
 		debounce(scroll_to_alert)(i);
 	}

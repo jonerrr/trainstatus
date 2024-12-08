@@ -45,8 +45,16 @@ export function createStopTimes() {
 		}
 	}
 
+	// async function add_bus_routes(fetch: Fetch, routes: Set<string>) {
+	// 	const new_routes = routes.difference(monitored_bus_routes);
+
+	// 	if (new_routes.size === 0) return;
+	// 	console.log('adding ', new_routes);
+	// }
+
 	return {
 		update,
+		// add_bus_routes,
 
 		get stop_times() {
 			return stop_times;

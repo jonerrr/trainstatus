@@ -61,10 +61,11 @@
 	);
 
 	$effect.pre(() => {
+		trips.trips;
+		const valid_trips = untrack(() => trip_pins_rune.value.filter((id) => trips.trips.has(id)));
+
 		// console.log('removing old trip pins');
-		untrack(
-			() => (trip_pins_rune.value = trip_pins_rune.value.filter((id) => trips.trips.has(id)))
-		);
+		trip_pins_rune.value = valid_trips;
 	});
 
 	// need to define interface here bc my IDE was acting up
@@ -72,8 +73,6 @@
 		pinned_bus_trips: Trip<BusTripData, Route>[];
 		pinned_train_trips: Trip<TrainTripData, Route>[];
 	}
-
-	// $inspect(trips.trips.get('01935f9c-a2b8-7b50-884a-a4fb3a175afe'));
 
 	// TODO: prevent pinned trips from updating twice
 	const { pinned_bus_trips, pinned_train_trips } = $derived(
@@ -159,8 +158,6 @@
 	let list_height = $state(0);
 	let pin_list_height = $state(0);
 	const nearby_list_height = $derived(list_height - pin_list_height);
-
-	// $inspect(pin_list_height);
 
 	// $inspect({ nearby_list_height });
 </script>

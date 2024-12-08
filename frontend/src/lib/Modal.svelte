@@ -221,7 +221,7 @@
 <dialog
 	bind:this={dialog_el}
 	use:manage_modal
-	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0"
+	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0 focus:outline-none focus:ring-2 focus:ring-neutral-700"
 >
 	{#if $page.state.modal === 'stop'}
 		<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />

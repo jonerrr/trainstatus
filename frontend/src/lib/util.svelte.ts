@@ -19,13 +19,14 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-export function debounce(callback: Function, wait = 75) {
-	let timeout: ReturnType<typeof setTimeout>;
-
-	return (...args: unknown[]) => {
-		clearTimeout(timeout);
-		timeout = setTimeout(() => callback(...args), wait);
+export function debounce<T extends (...args: never[]) => void>(func: T, wait: number = 75) {
+	let timeout: ReturnType<typeof setTimeout> | null;
+	return function (...args: Parameters<T>) {
+		if (timeout) clearTimeout(timeout);
+		timeout = setTimeout(() => {
+			timeout = null;
+			func(...args);
+		}, wait);
 	};
 }
 

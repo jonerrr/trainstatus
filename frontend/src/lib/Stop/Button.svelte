@@ -1,13 +1,14 @@
 <script lang="ts">
 	// import { fade } from 'svelte/transition';
+	import { untrack } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { page } from '$app/stores';
 	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
+	import { debounce } from '$lib/util.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
-	import { untrack } from 'svelte';
 
 	interface Props {
 		data: Stop<'train' | 'bus'>;
@@ -18,17 +19,6 @@
 
 	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
-
-	function debounce(func: () => void, wait: number) {
-		let timeout: ReturnType<typeof setTimeout> | null;
-		return function () {
-			if (timeout) clearTimeout(timeout);
-			timeout = setTimeout(() => {
-				timeout = null;
-				func();
-			}, wait);
-		};
-	}
 
 	$effect(() => {
 		rt_stop_times?.stop_times;
@@ -90,7 +80,7 @@
 				}
 			}
 		}
-	}, 100);
+	}, 75);
 
 	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
 </script>

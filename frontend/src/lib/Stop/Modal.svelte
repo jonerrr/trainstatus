@@ -23,6 +23,7 @@
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
+	import BusArrow from './BusArrow.svelte';
 
 	interface ModalProps {
 		show_previous: boolean;
@@ -37,21 +38,6 @@
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TripData>;
 	}
-
-	// let stop_times: StopTimeWithTrip[] = $derived(
-	// 	rt_stop_times.stop_times.reduce<StopTimeWithTrip[]>((acc, st) => {
-	// 		if (st.stop_id === stop.id) {
-	// 			const trip = rt_trips.trips.get(st.trip_id);
-	// 			if (trip) {
-	// 				const eta = (st.arrival.getTime() - current_time) / 60000;
-	// 				if (eta >= 0) {
-	// 					acc.push({ ...st, eta, trip });
-	// 				}
-	// 			}
-	// 		}
-	// 		return acc;
-	// 	}, [])
-	// );
 
 	interface AccumulatedStopTimes {
 		stop_times: StopTimeWithTrip[];
@@ -93,13 +79,25 @@
 	);
 
 	// only show routes that stop at this stop and sort by id length
-	// let route_stops = $derived(main_stop_routes(stop).sort((a, b) => b.id.length - a.id.length));
 	const main_rs = $derived(main_stop_routes(stop));
 	const route_stops = $derived.by(() => {
 		if (main_rs.length < 6) {
 			return main_rs;
 		} else {
-			return main_rs.filter((route) => active_routes.has(route.id));
+			return main_rs.sort((a, b) => {
+				const a_active = active_routes.has(a.id);
+				const b_active = active_routes.has(b.id);
+
+				if (a_active && !b_active) {
+					return -1;
+				} else if (!a_active && b_active) {
+					return 1;
+				} else {
+					return a.id.length - b.id.length;
+				}
+			});
+
+			// return main_rs.filter((route) => active_routes.has(route.id));
 		}
 	});
 </script>
@@ -109,22 +107,37 @@
 	<!-- grid gap-1 grid-cols-5 grid-rows-3 grid-flow-col -->
 
 	<div class="flex flex-wrap gap-1 max-h-36 max-w-36 items-center">
-		{#each route_stops.slice(0, 5) as route}
-			<Icon
-				width={24}
-				height={24}
-				express={false}
-				link={true}
-				route={$page.data.routes[route.id] as Route}
-			/>
-		{/each}
-		{#if route_stops.length > 5}
+		{#if route_stops.length > 6}
+			{#each route_stops.slice(0, 5) as route}
+				<Icon
+					width={24}
+					height={24}
+					express={false}
+					link={true}
+					route={$page.data.routes[route.id] as Route}
+				/>
+			{/each}
+			<!-- {#if route_stops.length > 5} -->
 			<div class="font-semibold rounded bg-neutral-700 p-1">+{main_rs.length - 5}</div>
+			<!-- {/if} -->
+		{:else}
+			{#each route_stops as route}
+				<Icon
+					width={24}
+					height={24}
+					express={false}
+					link={true}
+					route={$page.data.routes[route.id] as Route}
+				/>
+			{/each}
 		{/if}
 
 		<!-- </div> -->
 	</div>
-	<div class="font-medium text-lg">
+	<div class="font-medium text-lg flex gap-1 items-center">
+		{#if is_bus_stop(stop)}
+			<BusArrow direction={stop.data.direction} />
+		{/if}
 		{stop.name}
 	</div>
 </div>

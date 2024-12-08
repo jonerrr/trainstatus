@@ -52,7 +52,7 @@ pub struct StopTimesParameters {
     /// Comma-separated list of bus route IDs to include in response. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     bus_route_ids: Vec<String>,
-    /// Only return bus stop times. Must specify bus_route_ids.
+    /// Only return bus stop times. If bus_route_ids is not specified, this will return all TRAIN stop times.
     #[serde(default)]
     only_bus: bool,
 }
