@@ -2,7 +2,6 @@
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import { slide } from 'svelte/transition';
-	import { cubicInOut } from 'svelte/easing';
 	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import type { Stop } from '$lib/static';
 	import {
@@ -47,6 +46,7 @@
 		[stop_id: number]: boolean;
 	}
 
+	// Should open transfers be reset when changing trips?
 	const open_transfers = $state<OpenTransfers>({});
 </script>
 
@@ -144,7 +144,7 @@
 		</div>
 
 		{#if open_transfers[st.stop_id]}
-			<div transition:slide={{ easing: cubicInOut, duration: 250 }}>
+			<div transition:slide>
 				<Transfers stop_time={st} {trip} {time_format} />
 			</div>
 		{/if}
