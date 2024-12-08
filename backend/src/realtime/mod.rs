@@ -118,6 +118,7 @@ pub async fn import(
     // cache data in redis
     tokio::spawn(async move {
         loop {
+            // callback hell alert
             match trip::Trip::<serde_json::Value>::get_all(&c_pool, Utc::now()).await {
                 Ok(trips) => match stop_time::StopTime::get_all(&c_pool, Utc::now(), None, false)
                     .await
@@ -126,7 +127,11 @@ pub async fn import(
                         Ok(alerts) => {
                             match trip::Trip::<serde_json::Value>::to_geojson(&trips).await {
                                 Ok(geojson) => {
-                                    let mut conn = redis_pool.get().await.unwrap();
+                                    let Ok(mut conn) = redis_pool.get().await else {
+                                        tracing::error!("failed to get redis connection");
+                                        sleep(Duration::from_secs(35)).await;
+                                        continue;
+                                    };
                                     let items = [
                                         ("trips", serde_json::to_string(&trips).unwrap()),
                                         ("stop_times", serde_json::to_string(&stop_times).unwrap()),
@@ -136,7 +141,11 @@ pub async fn import(
                                             serde_json::to_string(&geojson).unwrap(),
                                         ),
                                     ];
-                                    let _: () = conn.mset(&items).await.unwrap();
+                                    if let Err(err) = conn.mset::<&str, String, ()>(&items).await {
+                                        tracing::error!("failed to cache data in redis: {}", err);
+                                        sleep(Duration::from_secs(35)).await;
+                                        continue;
+                                    }
                                 }
                                 Err(err) => {
                                     tracing::error!("failed to cache geojson: {}", err);

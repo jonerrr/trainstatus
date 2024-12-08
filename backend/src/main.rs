@@ -38,14 +38,9 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
-// mod alerts;
 mod api;
-// mod bus;
-// mod gtfs;
 mod realtime;
-// mod routes;
 mod static_data;
-// mod train;
 
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
