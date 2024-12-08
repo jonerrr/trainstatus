@@ -24,7 +24,7 @@
 
 	// $inspect(main_width);
 
-	onMount(async () => {
+	onMount(() => {
 		window.addEventListener('offline', (_e) => {
 			offline = true;
 		});
@@ -32,24 +32,26 @@
 			offline = false;
 		});
 
-		setInterval(async () => {
+		const interval = setInterval(async () => {
+			// prevent multiple updates at the same time
 			if (is_updating) return;
-			// console.log('tick');
+
 			try {
 				is_updating = true;
+				const now = new Date().getTime();
 
-				if (new Date().getTime() - last_update.getTime() > 1000 * 15) {
-					console.log('Updating rt data');
-					// TODO: remove return val from trips/alerts/stop_times.update
-					trips.update(fetch);
-					alerts.update(fetch);
+				// update alerts and trips every 15 seconds
+				if (now - last_update.getTime() > 1000 * 15) {
+					// console.log('Updating rt data');
+
 					await Promise.all([trips.update(fetch), alerts.update(fetch)]);
 
 					offline = false;
 					last_update = new Date();
 				}
 
-				if (new Date().getTime() - last_st_update.getTime() > 1000 * 15) {
+				// update stop times every 15 seconds
+				if (now - last_st_update.getTime() > 1000 * 15) {
 					await stop_times.update(fetch, [...monitored_bus_routes]);
 					last_st_update = new Date();
 					offline = false;
@@ -58,7 +60,7 @@
 				console.error(e);
 				offline = true;
 
-				// update in 3 seconds
+				// update in 3 seconds if offline
 				last_update = new Date(new Date().getTime() - 1000 * 7);
 				last_st_update = new Date(new Date().getTime() - 1000 * 7);
 			} finally {
@@ -75,34 +77,31 @@
 			$page.url.searchParams.get('t');
 		// console.log(id);
 		if (id) {
-			// check what type of id it is
-			if (id in $page.data.routes) {
-				await tick();
-				pushState('', {
-					modal: 'route',
-					data: $page.data.routes[id]
-				});
-			} else if (id in $page.data.stops) {
-				await tick();
-				pushState('', {
-					modal: 'stop',
-					data: $page.data.stops[parseInt(id)]
-				});
-			} else if (trips.trips.has(id)) {
-				await tick();
-				pushState('', {
-					modal: 'trip',
-					data: trips.trips.get(id)
-				});
-			} else {
-				console.error('Invalid ID', id);
-				alert('Invalid ID');
-			}
+			tick().then(() => {
+				// check what type of id it is
+				if (id in $page.data.routes) {
+					pushState('', {
+						modal: 'route',
+						data: $page.data.routes[id]
+					});
+				} else if (id in $page.data.stops) {
+					pushState('', {
+						modal: 'stop',
+						data: $page.data.stops[parseInt(id)]
+					});
+				} else if (trips.trips.has(id)) {
+					pushState('', {
+						modal: 'trip',
+						data: trips.trips.get(id)
+					});
+				} else {
+					console.error('Invalid ID', id);
+					alert('Invalid ID');
+				}
+			});
 		}
 
-		// return () => {
-		// 	clearInterval(interval);
-		// };
+		return () => clearInterval(interval);
 	});
 
 	let monitor_delay: number;

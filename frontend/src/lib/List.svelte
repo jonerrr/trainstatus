@@ -5,8 +5,8 @@
 	import { cubicInOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
-	import { monitored_bus_routes } from './stop_times.svelte';
+	import { debounce, item_heights, persisted_rune, type PersistedRune } from './util.svelte';
+	import { monitored_bus_routes, stop_times } from './stop_times.svelte';
 	import TripButton from './Trip/Button.svelte';
 	import StopButton from './Stop/Button.svelte';
 	import RouteButton from './Route/Button.svelte';
@@ -151,7 +151,6 @@
 
 	$effect(() => {
 		selected_tab.value;
-		// total_items;
 
 		reset_scroll();
 	});
@@ -173,40 +172,13 @@
 		return offset;
 	}
 
-	// Functions to calculate start and end index
-	// function calculateStartIndex() {
-	// 	let start = 0;
-	// 	let position = 0;
-	// 	while (start < items.length) {
-	// 		const item = items[start];
-	// 		const height = item_heights[item.id] || height_calc(item);
-	// 		if (position + height > scroll_top - overscan * height) break;
-	// 		position += height;
-	// 		start++;
-	// 	}
-	// 	return start;
-	// }
-
-	// function calculateEndIndex(start: number) {
-	// 	let end = start;
-	// 	let position = getItemOffset(start);
-	// 	while (end < items.length) {
-	// 		const item = items[end];
-	// 		const height = item_heights[item.id] || height_calc(item);
-	// 		position += height;
-	// 		if (position > scroll_top + viewport_height + overscan * height) break;
-	// 		end++;
-	// 	}
-	// 	return end;
-	// }
-
 	// Calculate start index
 	function calculateStartIndex() {
 		let start = 0;
 		let position = 0;
 		while (start < items.length) {
 			const item = items[start];
-			const height = item_heights[item.id] || height_calc(item) || 50;
+			const height = item_heights[item.id] || height_calc(item);
 			if (position + height > scroll_top - overscan * height) break;
 			position += height;
 			start++;
@@ -254,18 +226,28 @@
 		];
 	});
 
-	// $inspect(visible_items.length);
+	// const update_bus_routes = debounce(() => {
+	// 	stop_times.add_bus_routes(fetch, new Set(visible_bus_routes));
+	// }, 75);
+
+	// $effect(() => {
+	// 	visible_bus_routes;
+	// 	update_bus_routes();
+	// });
 
 	// TODO: fix buses requests not batching
 	// add bus routes to monitored bus routes
-	let timer: number;
+	// let timer: number;
 	$effect(() => {
 		visible_bus_routes;
-		clearTimeout(timer);
-		timer = setTimeout(() => visible_bus_routes.forEach((r) => monitored_bus_routes.add(r)), 100);
-		// console.log('updating monitored bus routes');
+		debounce(() => {
+			visible_bus_routes.forEach((r) => monitored_bus_routes.add(r));
+		}, 100)();
+		// clearTimeout(timer);
+		// timer = setTimeout(() => visible_bus_routes.forEach((r) => monitored_bus_routes.add(r)), 100);
+		// // // console.log('updating monitored bus routes');
 
-		return () => clearTimeout(timer);
+		// return () => clearTimeout(timer);
 	});
 
 	function calculate_total_height() {

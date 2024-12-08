@@ -102,8 +102,14 @@ async fn main() {
     let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
     // Test Redis connection
-    let mut conn = redis_pool.get_owned().await.unwrap();
-    let s = conn.send_packed_command(&redis::cmd("PING")).await.unwrap();
+    let mut conn = redis_pool
+        .get_owned()
+        .await
+        .expect("Failed to get redis connection");
+    let s = conn
+        .send_packed_command(&redis::cmd("PING"))
+        .await
+        .expect("Failed to ping redis");
     match s {
         redis::Value::SimpleString(s) => {
             assert_eq!(s, "PONG");
@@ -119,7 +125,9 @@ async fn main() {
     notify2.notified().await;
 
     // cache static data. It will also cache after each refresh
-    static_data::cache_all(&pg_pool, &redis_pool).await.unwrap();
+    static_data::cache_all(&pg_pool, &redis_pool)
+        .await
+        .expect("Failed to cache static data");
 
     // This will store alerts and trips for initial websocket load
     // null in rust :explode:

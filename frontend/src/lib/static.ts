@@ -50,22 +50,11 @@ export interface TrainStopData {
 	// borough: string
 }
 
-// TODO: replace enum with string literal type
 export interface BusStopData {
 	direction: BusStopDirection;
 }
 
-export enum BusStopDirection {
-	SW = 'SW',
-	S = 'S',
-	SE = 'SE',
-	E = 'E',
-	W = 'W',
-	NW = 'NW',
-	NE = 'NE',
-	N = 'N',
-	Blank = ''
-}
+export type BusStopDirection = 'sw' | 's' | 'se' | 'e' | 'w' | 'ne' | 'nw' | 'n' | 'unknown';
 
 // type RouteStop = BusRouteStop | TrainRouteStop;
 

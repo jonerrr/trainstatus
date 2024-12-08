@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BusStopDirection } from '$lib/static';
+	import { type BusStopDirection } from '$lib/static';
 	import {
 		ArrowDownLeft,
 		ArrowDown,
@@ -12,26 +12,24 @@
 	} from 'lucide-svelte';
 
 	const { direction }: { direction: BusStopDirection } = $props();
-
-	// possible directions: SW, S, "", SE, E, W , NW, NE, N
 </script>
 
 <div>
-	{#if direction === 'SW'}
+	{#if direction === 'sw'}
 		<ArrowDownLeft size="1.5rem" />
-	{:else if direction === 'S'}
+	{:else if direction === 's'}
 		<ArrowDown size="1.5rem" />
-	{:else if direction === 'SE'}
+	{:else if direction === 'se'}
 		<ArrowDownRight size="1.5rem" />
-	{:else if direction === 'E'}
+	{:else if direction === 'e'}
 		<ArrowRight size="1.5rem" />
-	{:else if direction === 'W'}
+	{:else if direction === 'w'}
 		<ArrowLeft size="1.5rem" />
-	{:else if direction === 'NW'}
+	{:else if direction === 'nw'}
 		<ArrowUpLeft size="1.5rem" />
-	{:else if direction === 'NE'}
+	{:else if direction === 'ne'}
 		<ArrowUpRight size="1.5rem" />
-	{:else if direction === 'N'}
+	{:else if direction === 'n'}
 		<ArrowUp size="1.5rem" />
 	{/if}
 </div>
