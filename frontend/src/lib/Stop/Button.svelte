@@ -1,7 +1,7 @@
 <script lang="ts">
 	// import { fade } from 'svelte/transition';
 	import { untrack } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/stores';
 	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
@@ -19,6 +19,7 @@
 
 	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
+	const active_routes = $state(new SvelteSet<Route>());
 
 	$effect(() => {
 		rt_stop_times?.stop_times;
@@ -49,6 +50,8 @@
 			if (!trip) continue;
 
 			const route_id = trip.route_id;
+			active_routes.add($page.data.routes[route_id]);
+
 			const eta = (st.arrival.getTime() - now) / 1000 / 60;
 
 			const stopTimeData = {
@@ -80,9 +83,11 @@
 				}
 			}
 		}
-	}, 75);
+	}, 35);
 
 	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
+	// combine current stop routes with other active routes at stop
+	const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
 </script>
 
 {#snippet eta(n: number)}
@@ -107,8 +112,8 @@
 			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-8">
-			{@render arrivals(data.data.north_headsign, current_stop_routes, nb_st_by_route)}
-			{@render arrivals(data.data.south_headsign, current_stop_routes, sb_st_by_route)}
+			{@render arrivals(data.data.north_headsign, all_stop_routes, nb_st_by_route)}
+			{@render arrivals(data.data.south_headsign, all_stop_routes, sb_st_by_route)}
 		</div>
 	</div>
 
