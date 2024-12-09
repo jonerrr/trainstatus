@@ -1,5 +1,5 @@
 use super::errors::ServerError;
-use super::json_headers;
+use super::{json_headers, CurrentTime};
 use crate::api::parse_list;
 use crate::realtime::stop_time::StopTime;
 use crate::realtime::trip::Trip;
@@ -71,29 +71,30 @@ pub struct StopTimesParameters {
 pub async fn stop_times_handler(
     State(state): State<AppState>,
     params: Query<StopTimesParameters>,
+    current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     // let stop_times = if params.bus_route_ids.is_empty() {
     //     StopTime::get_all(&state.pg_pool, Utc::now(), None).await?
     // } else {
     //     StopTime::get_all(&state.pg_pool, Utc::now(), Some(&params.bus_route_ids)).await?
     // };
-    match params.bus_route_ids.is_empty() {
-        true => {
+    match (params.bus_route_ids.is_empty(), current_time.user_specified) {
+        (true, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
             Ok((json_headers().clone(), stop_times))
         }
-        false => {
+        _ => {
             // TODO: improve this (cache stop_times by route_id)
             let stop_times = StopTime::get_all(
                 &state.pg_pool,
-                Utc::now(),
+                current_time.time,
                 Some(&params.bus_route_ids),
                 params.only_bus,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))
-        }
+        } // _ => todo!("return all stop times"),
     }
 }
 
