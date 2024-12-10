@@ -4,18 +4,20 @@ import { stop_times } from '$lib/stop_times.svelte';
 import type { LayoutLoad } from './$types';
 import { alerts } from '$lib/alerts.svelte';
 
-export const load: LayoutLoad = async ({ fetch }) => {
+export const load: LayoutLoad = async ({ fetch, url }) => {
 	const stops_promise = fetch('/api//v1/stops').then((res) => res.json());
 	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
 
 	// TODO: preload bus route ids using search param
+	const at = url.searchParams.get('at');
+	const current_time = at ? parseInt(at) : undefined;
 
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
 		stops_promise,
 		routes_promise,
-		trips.update(fetch),
-		stop_times.update(fetch, []),
-		alerts.update(fetch)
+		trips.update(fetch, current_time),
+		stop_times.update(fetch, [], false, current_time),
+		alerts.update(fetch, current_time)
 	]);
 
 	const routes_obj: {

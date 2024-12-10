@@ -3,7 +3,7 @@
 	import '@fontsource/inter';
 	import { page } from '$app/stores';
 	import { pushState } from '$app/navigation';
-	import { onMount, tick, type Snippet } from 'svelte';
+	import { onMount, setContext, tick, type Snippet } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
 	import { alerts } from '$lib/alerts.svelte';
@@ -22,9 +22,20 @@
 	let offline = $state(false);
 	let is_updating = $state(false);
 
-	// $inspect(main_width);
+	// unix timestamp that gets sent to backend
+	let current_time = $state<number>();
+
+	$effect(() => {
+		console.log('updating context');
+		setContext('current_time', current_time);
+	});
 
 	onMount(() => {
+		const at = $page.url.searchParams.get('at');
+		if (at && !isNaN(parseInt(at))) {
+			current_time = parseInt(at);
+		}
+
 		window.addEventListener('offline', (_e) => {
 			offline = true;
 		});
@@ -44,7 +55,10 @@
 				if (now - last_update.getTime() > 1000 * 15) {
 					// console.log('Updating rt data');
 
-					await Promise.all([trips.update(fetch), alerts.update(fetch)]);
+					await Promise.all([
+						trips.update(fetch, current_time),
+						alerts.update(fetch, current_time)
+					]);
 
 					offline = false;
 					last_update = new Date();
@@ -52,7 +66,7 @@
 
 				// update stop times every 15 seconds
 				if (now - last_st_update.getTime() > 1000 * 15) {
-					await stop_times.update(fetch, [...monitored_bus_routes]);
+					await stop_times.update(fetch, [...monitored_bus_routes], false, current_time);
 					last_st_update = new Date();
 					offline = false;
 				}
@@ -75,7 +89,7 @@
 			$page.url.searchParams.get('r') ||
 			// trip
 			$page.url.searchParams.get('t');
-		// console.log(id);
+
 		if (id) {
 			tick().then(() => {
 				// check what type of id it is
@@ -122,7 +136,7 @@
 		monitor_delay = setTimeout(async () => {
 			try {
 				if (monitored_bus_routes.size) {
-					await stop_times.update(fetch, [...monitored_bus_routes], true);
+					await stop_times.update(fetch, [...monitored_bus_routes], true, current_time);
 					last_st_update = new Date();
 					offline = false;
 				}
@@ -134,14 +148,14 @@
 	});
 </script>
 
-<Header {offline} />
+<Header {current_time} {offline} />
 <!--  h-[calc(100dvh-7.5rem)] -->
 <main class="max-w-[1000px] relative m-auto tracking-tight">
-	<Modal />
+	<Modal {current_time} />
 
 	{@render children()}
 </main>
-<Navbar />
+<Navbar {current_time} />
 
 <style lang="postcss">
 	:global(body) {

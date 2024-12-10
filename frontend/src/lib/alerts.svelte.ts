@@ -36,8 +36,8 @@ export function createAlerts() {
 	let alerts: Alert[] = $state([]);
 	const alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
 
-	async function update(fetch: Fetch) {
-		const res = await fetch(`/api/v1/alerts`);
+	async function update(fetch: Fetch, current_time?: number) {
+		const res = await fetch(`/api/v1/alerts${current_time ? `?at=${current_time}` : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}

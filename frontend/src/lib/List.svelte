@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { BusFront, TrainFront } from 'lucide-svelte';
-	import { tick, type Snippet } from 'svelte';
+	import { getContext, tick, type Snippet } from 'svelte';
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
@@ -57,6 +57,8 @@
 		overscan?: number;
 		// css style for list
 		style?: string;
+		// current time gets passed to items
+		// current_time?: number;
 	}
 
 	let {
@@ -77,6 +79,8 @@
 		overscan = 10,
 		style: style_
 	}: Props = $props();
+
+	const current_time = getContext<number | undefined>('current_time');
 
 	// if bus/train data don't have any items, switch tabs
 	$effect(() => {
@@ -268,29 +272,10 @@
 	}
 
 	let total_height = $derived.by(calculate_total_height);
-
-	// TODO: use resize observer
-	// 	function measureHeight(item, el: HTMLDivElement) {
-	//     if (el) {
-	//       const resizeObserver = new ResizeObserver((entries) => {
-	//         for (let entry of entries) {
-	//           const height = entry.contentRect.height;
-	//           item_heights[item.id] = height;
-	//           item_offsets = {}; // Reset offsets
-	//           total_height = calculate_total_height();
-	//         }
-	//       });
-	//       resizeObserver.observe(el);
-
-	//       // Cleanup
-	//       onDestroy(() => resizeObserver.unobserve(el));
-	//     }
-	//   }
 </script>
 
 <!-- TODO: back to top button in header -->
 
-<!-- 	transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }} -->
 <div class="flex flex-col text-neutral-200 relative w-full z-30">
 	<div
 		class="flex sticky top-0 bg-neutral-900/95 backdrop-blur-sm shadow-lg shadow-black/10 items-center justify-between w-full z-30"
@@ -364,7 +349,7 @@
 								pushState('', { modal: type, data: JSON.parse(JSON.stringify(data)) });
 							}}
 						>
-							<Item {data} />
+							<Item {data} {current_time} />
 						</button>
 
 						{#if pin_rune}

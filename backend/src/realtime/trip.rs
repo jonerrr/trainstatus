@@ -271,7 +271,7 @@ impl Trip<serde_json::Value> {
         LEFT JOIN "position" p ON
             t.vehicle_id = p.vehicle_id
         WHERE
-            t.updated_at >= (now() - INTERVAL '5 minutes')
+            t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
             AND
                         t.id = ANY(
             SELECT

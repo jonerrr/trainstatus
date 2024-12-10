@@ -16,7 +16,8 @@
 		is_bus,
 		is_train,
 		type Trip,
-		type TripData
+		type TripData,
+		trips
 	} from '$lib/trips.svelte';
 	import { persisted_rune } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
@@ -25,15 +26,16 @@
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import BusArrow from './BusArrow.svelte';
 
-	interface ModalProps {
+	interface Props {
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		stop: Stop<'bus' | 'train'>;
+		current_time?: number;
 	}
 
 	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
 
-	let { stop, show_previous, time_format }: ModalProps = $props();
+	let { stop, show_previous, time_format, current_time }: Props = $props();
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TripData>;
@@ -45,13 +47,13 @@
 	}
 
 	const { stop_times, active_routes } = $derived.by(() => {
-		const current_time = new Date().getTime();
+		const now = current_time ? current_time * 1000 : new Date().getTime();
 		const st = rt_stop_times.stop_times.reduce<AccumulatedStopTimes>(
 			({ stop_times, active_routes }, st) => {
 				if (st.stop_id === stop.id) {
 					const trip = rt_trips.trips.get(st.trip_id);
 					if (trip) {
-						const eta = (st.arrival.getTime() - current_time) / 60000;
+						const eta = (st.arrival.getTime() - now) / 60000;
 						if (eta >= 0) {
 							// TODO: add a way to disable eta if statement
 							active_routes.add(trip.route_id);

@@ -15,8 +15,9 @@
 
 	interface Props {
 		data: Trip<TrainTripData | BusTripData, Route>;
+		current_time?: number;
 	}
-	let { data }: Props = $props();
+	let { data, current_time }: Props = $props();
 
 	// TODO: maybe move this to List.svelte
 	onMount(() => {
@@ -47,14 +48,32 @@
 		if (!stop_times.length) return { current_status: 'Unknown', current_stop: 'Unknown' };
 
 		// check if trip has been updated in past 3 minutes
+		// TODO: check if stop_id has already passed as well
 		if (
-			data.updated_at.getTime() > new Date().getTime() - 3 * 60 * 1000 &&
+			data.updated_at.getTime() >
+				(current_time ? current_time * 1000 : new Date().getTime()) - 3 * 60 * 1000 &&
 			data.data.status !== 'none' &&
 			data.data.stop_id
 		) {
-			// TODO: better stop status formatting
+			let status_text = '';
+			switch (data.data.status) {
+				case 'incoming':
+					status_text = 'Arriving at:';
+					break;
+				case 'at_stop':
+					status_text = 'At stop:';
+					break;
+				case 'in_transit_to':
+					status_text = 'En route to:';
+					break;
+				// TODO: this is not how layovers work i think
+				case 'layover':
+					status_text = 'Layover at:';
+					break;
+			}
+
 			return {
-				current_status: data.data.status.toString(),
+				current_status: data.data.status,
 				current_stop: $page.data.stops[data.data.stop_id].name
 			};
 		}

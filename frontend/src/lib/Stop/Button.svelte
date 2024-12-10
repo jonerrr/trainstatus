@@ -12,8 +12,9 @@
 
 	interface Props {
 		data: Stop<'train' | 'bus'>;
+		current_time?: number;
 	}
-	let { data }: Props = $props();
+	let { data, current_time }: Props = $props();
 
 	type StopTimeByRoute = Map<string, StopTime<number, TripDirection, string>[]>;
 
@@ -40,7 +41,7 @@
 			return;
 		}
 
-		const now = new Date().getTime();
+		const now = current_time ? current_time * 1000 : new Date().getTime();
 
 		// Pre-filter relevant stop times
 		const relevant_stop_times = rt_stop_times.stop_times.filter((st) => st.stop_id === data.id);
@@ -87,6 +88,7 @@
 
 	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
 	// combine current stop routes with other active routes at stop
+	// TODO: use nb_st_by_route and sb_st_by_route to get active routes instead of creating new set
 	const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
 </script>
 

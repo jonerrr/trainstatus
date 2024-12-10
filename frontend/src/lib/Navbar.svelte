@@ -6,6 +6,12 @@
 		[key: string]: [Icon: typeof Home | typeof Clock | typeof CircleAlert, href: string];
 	}
 
+	interface Props {
+		current_time?: number;
+	}
+
+	const { current_time } = $props();
+
 	const routes: Routes = {
 		Home: [Home, '/'],
 		Alerts: [CircleAlert, '/alerts'],
@@ -18,7 +24,7 @@
 	<a
 		aria-label={label}
 		title={label}
-		{href}
+		href="{href}{current_time ? `?at=${current_time}` : ''}"
 		class="nav-button"
 		class:nav-button-active={href === $page.url.pathname}
 		class:text-neutral-400={href !== $page.url.pathname}

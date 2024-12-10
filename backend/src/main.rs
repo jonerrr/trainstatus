@@ -75,7 +75,7 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    tracing::info!("Starting TrainStat.us API v{}", VERSION);
+    tracing::info!("Starting Train Status API v{}", VERSION);
 
     let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
         .expect("DATABASE_URL env not set")
@@ -146,7 +146,7 @@ async fn main() {
     // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
     // TODO: use env var for email
     #[derive(OpenApi)]
-    #[openapi(info(title = "TrainStat.us API", description = "The TrainStat.us API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds. Historical data and more options for the API are coming soon.", contact(email = "jonah@trainstat.us")),
+    #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds. Historical data and more options for the API are coming soon.", contact(email = "jonah@trainstat.us")),
     servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
@@ -176,7 +176,7 @@ async fn main() {
             "/",
             get(|| async {
                 let res =
-                    Response::new(Body::from(format!("TrainStat.us API\nVersion: {VERSION}")));
+                    Response::new(Body::from(format!("Train Status API\nVersion: {VERSION}")));
                 Ok::<_, Infallible>(res)
             }),
         )

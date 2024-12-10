@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
-	import { untrack } from 'svelte';
+	import { getContext, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import {
 		type Route,
@@ -60,6 +60,7 @@
 			)
 	);
 
+	// TODO: maybe shouldn't remove trips if current_time was specified
 	$effect.pre(() => {
 		trips.trips;
 		const valid_trips = untrack(() => trip_pins_rune.value.filter((id) => trips.trips.has(id)));
@@ -96,13 +97,6 @@
 				{ pinned_bus_trips: [], pinned_train_trips: [] }
 			)
 	);
-
-	// $effect(() => {
-	// 	if (monitored_trip_routes.length) {
-	// 		console.log('monitoring pinned trip bus routes');
-	// 		monitored_routes.set('pinned_trip', monitored_trip_routes);
-	// 	}
-	// });
 
 	let nearby_train_stops = $state<Stop<'train'>[]>([]);
 	let nearby_bus_stops = $state<Stop<'bus'>[]>([]);
@@ -159,6 +153,7 @@
 	let pin_list_height = $state(0);
 	const nearby_list_height = $derived(list_height - pin_list_height);
 
+	const current_time = getContext<number | undefined>('current_time');
 	// $inspect({ nearby_list_height });
 </script>
 
@@ -226,7 +221,6 @@
 		{/if}
 	</div>
 
-	<!-- Nearby stops section - scrollable -->
 	<div>
 		<List
 			title="Nearby Stops"

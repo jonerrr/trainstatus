@@ -57,9 +57,9 @@ export function createTrips() {
 	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
-	async function update(fetch: Fetch) {
+	async function update(fetch: Fetch, current_time?: number) {
 		// try {
-		const res = await fetch('/api/v1/trips');
+		const res = await fetch(`/api/v1/trips${current_time ? `?at=${current_time}` : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}
