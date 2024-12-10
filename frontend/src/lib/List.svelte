@@ -80,7 +80,7 @@
 		style: style_
 	}: Props = $props();
 
-	const current_time = getContext<number | undefined>('current_time');
+	let current_time = $state(getContext<number | undefined>('current_time'));
 
 	// if bus/train data don't have any items, switch tabs
 	$effect(() => {
