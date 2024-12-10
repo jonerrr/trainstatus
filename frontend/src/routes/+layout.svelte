@@ -25,8 +25,9 @@
 	// unix timestamp that gets sent to backend
 	let current_time = $state<number>();
 
-	$effect(() => {
-		console.log('updating context');
+	// TODO: don't use context bc the initial value is undefined so the list items are broken
+	$effect.pre(() => {
+		console.log('updating current_time');
 		setContext('current_time', current_time);
 	});
 
@@ -148,7 +149,7 @@
 	});
 </script>
 
-<Header {current_time} {offline} />
+<Header bind:current_time {offline} />
 <!--  h-[calc(100dvh-7.5rem)] -->
 <main class="max-w-[1000px] relative m-auto tracking-tight">
 	<Modal {current_time} />
