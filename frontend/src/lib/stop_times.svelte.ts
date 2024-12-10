@@ -16,10 +16,25 @@ export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
 	// must specify routes if only_bus is true
-	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false) {
-		const res = await fetch(
-			`/api/v1/stop_times${routes.length ? `?bus_route_ids=${encodeURIComponent(routes.join(','))}` : ''}${only_bus ? '&only_bus=true' : ''}`
-		);
+	async function update(
+		fetch: Fetch,
+		routes: string[],
+		only_bus: boolean = false,
+		current_time?: number
+	) {
+		// TODO: if only_bus was fetched too recently, don't include buses in next request
+		const params = new URLSearchParams();
+		if (routes.length) {
+			params.set('bus_route_ids', routes.join(','));
+			if (only_bus) {
+				params.set('only_bus', 'true');
+			}
+		}
+		if (current_time) {
+			params.set('at', current_time.toString());
+		}
+
+		const res = await fetch(`/api/v1/stop_times${params.size ? '?' + params.toString() : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}

@@ -17,13 +17,14 @@
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import Transfers from './Transfers.svelte';
 
-	interface ModalProps {
+	interface Props {
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		trip: Trip<TrainTripData | BusTripData>;
+		current_time?: number;
 	}
 
-	const { trip, show_previous, time_format }: ModalProps = $props();
+	const { trip, show_previous, time_format, current_time }: Props = $props();
 
 	const route = $derived($page.data.routes[trip.route_id]);
 
@@ -134,7 +135,12 @@
 								{#if time_format === 'time'}
 									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
 								{:else}
-									{((st.arrival.getTime() - new Date().getTime()) / 1000 / 60).toFixed(0)}m
+									{(
+										(st.arrival.getTime() -
+											(current_time ? current_time * 1000 : new Date().getTime())) /
+										1000 /
+										60
+									).toFixed(0)}m
 								{/if}
 							</div>
 						</div>

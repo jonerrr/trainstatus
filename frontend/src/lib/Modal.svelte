@@ -17,6 +17,14 @@
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import Pin from './Pin.svelte';
 	import { is_bus_route, type Trip, type TripData } from './trips.svelte';
+	// import { Tween } from 'svelte/motion';
+	// import { cubicOut } from 'svelte/easing';
+
+	interface Props {
+		current_time?: number;
+	}
+
+	const { current_time }: Props = $props();
 
 	let dialog_el = $state<HTMLDialogElement>();
 
@@ -116,7 +124,7 @@
 							document.title = 'Alerts';
 							break;
 						default:
-							document.title = 'TrainStat.us';
+							document.title = 'Train Status';
 							break;
 					}
 					break;
@@ -127,6 +135,11 @@
 			unsubscribe();
 		};
 	});
+
+	// const rotation = new Tween(0, {
+	// 	duration: 300,
+	// 	easing: cubicOut
+	// });
 
 	let copied = $state(false);
 	// show stops/trips before current datetime
@@ -154,7 +167,7 @@
 
 		<div class="flex gap-1 items-center text-xs">
 			<!-- TODO: make history button work -->
-			<!-- {#if history}
+			{#if history}
 				<button
 					class:text-neutral-400={!show_previous}
 					class:text-neutral-50={show_previous}
@@ -165,7 +178,35 @@
 				>
 					<History size="2rem" />
 				</button>
-			{/if} -->
+			{/if}
+
+			<!-- <style>
+				@keyframes spin-forward {
+					from {
+						transform: rotate(0deg);
+					}
+					to {
+						transform: rotate(360deg);
+					}
+				}
+
+				@keyframes spin-backward {
+					from {
+						transform: rotate(0deg);
+					}
+					to {
+						transform: rotate(-360deg);
+					}
+				}
+
+				.spin-forward {
+					animation: spin-forward 0.3s linear;
+				}
+
+				.spin-backward {
+					animation: spin-backward 0.3s linear;
+				}
+			</style> -->
 
 			<button
 				class="flex flex-col items-center"
@@ -188,7 +229,7 @@
 					aria-label="Share"
 					title="Share"
 					onclick={() => {
-						const url = `${window.location.origin}/?${param_name}=${id}`;
+						const url = `${window.location.origin}/?${param_name}=${id}${current_time ? `&at=${current_time}` : ''}`;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
@@ -224,7 +265,12 @@
 	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0 focus:outline-none focus:ring-2 focus:ring-neutral-700"
 >
 	{#if $page.state.modal === 'stop'}
-		<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />
+		<StopModal
+			{current_time}
+			{show_previous}
+			time_format={time_format.value}
+			stop={$page.state.data}
+		/>
 
 		{@render actions(
 			true,
@@ -244,7 +290,12 @@
 			route_pins_rune
 		)}
 	{:else if $page.state.modal === 'trip'}
-		<TripModal trip={$page.state.data} {show_previous} time_format={time_format.value} />
+		<TripModal
+			{current_time}
+			trip={$page.state.data}
+			{show_previous}
+			time_format={time_format.value}
+		/>
 
 		{@render actions(
 			true,

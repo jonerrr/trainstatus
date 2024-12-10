@@ -1,21 +1,31 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
+	import dayjs from 'dayjs';
 	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
+	import { fade } from 'svelte/transition';
 
 	interface Props {
 		offline: boolean;
+		current_time?: number;
 	}
 
-	let { offline }: Props = $props();
+	let { offline, current_time }: Props = $props();
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
 	<div class="flex gap-1">
-		<div class="gradient-text font-black">TrainStat.us</div>
+		<div class="gradient-text font-black">Train Status</div>
 		{#if offline}
 			<div transition:fade class="text-red-500 flex flex-col items-center">
 				<CloudOff class="w-6 h-6" />
 				<div class=" text-xs self-end">Offline</div>
+			</div>
+		{/if}
+		<!-- TODO: clicking on it opens input -->
+		{#if current_time}
+			{@const time = dayjs.unix(current_time)}
+			<div class="text-neutral-400 text-xs flex flex-col justify-center items-center">
+				<span>{time.format('DD/MM')}</span>
+				<span>{time.format('h:m A')}</span>
 			</div>
 		{/if}
 	</div>

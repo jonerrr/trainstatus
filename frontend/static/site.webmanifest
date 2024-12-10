@@ -18,7 +18,7 @@
 	"dir": "auto",
 	"lang": "en-US",
 	"name": "Train Status",
-	"short_name": "TrainStat.us",
+	"short_name": "Train Status",
 	"start_url": "/",
 	"description": "The best way to view MTA subway (and bus) ETAs and alerts",
 	"scope": "/"
