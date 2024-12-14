@@ -1,4 +1,4 @@
-FROM node:22-alpine as build
+FROM node:23-alpine as build
 
 RUN npm install -g pnpm
 
@@ -9,7 +9,7 @@ COPY . .
 RUN pnpm build
 RUN pnpm prune --production
 
-FROM node:22-alpine
+FROM node:23-alpine
 
 WORKDIR /app
 COPY --from=build /app/build build/

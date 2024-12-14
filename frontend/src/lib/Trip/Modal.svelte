@@ -58,8 +58,8 @@
 		{/if}
 
 		<Icon
-			width={24}
-			height={24}
+			width={36}
+			height={36}
 			express={is_train_route(route, trip) && trip.data.express}
 			link={true}
 			{route}
@@ -68,7 +68,7 @@
 
 	<ArrowBigRight class="w-8" />
 
-	<div class="font-medium text-lg">
+	<div class="text-xl font-semibold">
 		{last_stop}
 	</div>
 </div>
