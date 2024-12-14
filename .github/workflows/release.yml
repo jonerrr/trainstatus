@@ -64,11 +64,11 @@ jobs:
 
       - name: Create Git Tag
         run: |
-          git tag ${{ env.VERSION }}
+          git tag -a ${{ env.VERSION }}
 
       - name: Push changes
         run: |
-          git push origin HEAD:main --follow-tags
+          git push origin HEAD:master --follow-tags
 
       - name: Create a Release
         uses: elgohr/Github-Release-Action@v5
