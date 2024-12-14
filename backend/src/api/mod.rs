@@ -9,6 +9,7 @@ use http::{request::Parts, HeaderMap};
 use redis::AsyncCommands;
 use serde::{Deserialize, Deserializer};
 use std::sync::OnceLock;
+use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod errors;
@@ -102,8 +103,11 @@ pub struct CurrentTime {
     pub user_specified: bool,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct QueryParams {
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct TimeParams {
+    /// Unix timestamp to use as the current time. If not specified, the current time is used.
+    #[serde(default)]
     pub at: Option<i64>,
 }
 
@@ -119,7 +123,7 @@ where
         //  if there is, parse it as a datetime
         //  if there isn't, use the current time
 
-        let query = Query::<QueryParams>::from_request_parts(parts, state)
+        let query = Query::<TimeParams>::from_request_parts(parts, state)
             .await
             .map_err(|err| err.into_response())?;
 
@@ -132,6 +136,7 @@ where
                         user_specified: true,
                     },
                     _ => {
+                        // TODO: maybe return a 400 instead of logging
                         tracing::error!("Invalid timestamp: {}", at);
                         CurrentTime {
                             time: Utc::now(),
