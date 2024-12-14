@@ -1,6 +1,6 @@
 use super::errors::ServerError;
 use super::{json_headers, CurrentTime};
-use crate::api::parse_list;
+use crate::api::{parse_list, TimeParams};
 use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
 use crate::realtime::trip::Trip;
@@ -27,7 +27,7 @@ pub struct TripsParameters {
     tag = "REALTIME",
     description = "For more information on trips, see the [MTA's documentation](https://api.mta.info/GTFS.pdf).",
     params(
-        TripsParameters
+        TripsParameters, TimeParams
     ),
     responses(
         (status = 200, description = "Subway and bus trips", body = [Trip<serde_json::Value>])
@@ -80,7 +80,7 @@ pub struct StopTimesParameters {
     path = "/stop_times",
     tag = "REALTIME",
     params(
-        StopTimesParameters
+        StopTimesParameters, TimeParams
     ),
     responses(
         (status = 200, description = "Subway and bus stop times. Unlike other routes, by default this will ONLY return train routes unless specified.", body = [StopTime])
@@ -147,6 +147,9 @@ pub struct ApiAlertEntity {
     get,
     path = "/alerts",
     tag = "REALTIME",
+    params(
+        TimeParams
+    ),
     description = "For more information on alerts, see the [MTA's documentation](https://new.mta.info/document/90881).",
     responses(
         (status = 200, description = "Subway and bus alerts", body = [ApiAlert])
