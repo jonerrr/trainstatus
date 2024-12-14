@@ -153,7 +153,6 @@
 	let pin_list_height = $state(0);
 	const nearby_list_height = $derived(list_height - pin_list_height);
 
-	const current_time = getContext<number | undefined>('current_time');
 	// $inspect({ nearby_list_height });
 </script>
 

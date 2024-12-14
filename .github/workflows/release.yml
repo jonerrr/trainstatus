@@ -1,54 +1,74 @@
-name: Build and Push docker images
+name: Release
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      type:
+        required: true
+        default: "patch"
+        description: "Bump type"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  packages: write
+  contents: write
 
 jobs:
-  build-and-push:
+  bump-version:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - context: ./backend
-            image: ghcr.io/${{ github.repository_owner }}/trainstatus-backend
-            tags: |
-              latest
-              ${{ github.event.release.tag_name }}
-          - context: ./frontend
-            image: ghcr.io/${{ github.repository_owner }}/trainstatus-frontend
-            tags: |
-              latest
-              ${{ github.event.release.tag_name }}
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
-      # don't think i need checkout bc build-push-action does it
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.2.0
+      - uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          node-version: 23.x
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install cargo-edit
+        run: cargo install -f --no-default-features --features "set-version" cargo-edit
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5.5.1
-        with:
-          images: ${{ matrix.image }}
-          tags: ${{ matrix.tags }}
+      - name: Setup git
+        run: |
+          git config --global user.name 'Jonah'
+          git config --global user.email '73760377+jonerrr@users.noreply.github.com'
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5.3.0
+      - name: Bump frontend version
+        # id: bump_frontend_version
+        working-directory: ./frontend
+        run: |
+          pnpm version ${{ github.event.inputs.type }} --no-git-tag-version
+          echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Bump backend version
+        working-directory: ./backend
+        run: |
+          cargo set-version ${{ env.VERSION }}
+
+      - name: Commit version changes
+        run: |
+          git add frontend/package.json backend/Cargo.toml backend/Cargo.lock
+          git commit -m "ci: bump versions to ${{ env.VERSION }}"
+
+      - name: Create Git Tag
+        run: |
+          git tag ${{ env.VERSION }}
+
+      - name: Push changes
+        run: |
+          git push origin main --follow-tags
+
+      - name: Create a Release
+        uses: elgohr/Github-Release-Action@v5
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          context: ${{ matrix.context }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          title: ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}
