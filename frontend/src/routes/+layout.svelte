@@ -33,6 +33,7 @@
 
 	onMount(() => {
 		const at = $page.url.searchParams.get('at');
+
 		if (at && !isNaN(parseInt(at))) {
 			current_time = parseInt(at);
 		}

@@ -1,0 +1,75 @@
+name: Build and Push docker images
+
+# on:
+#   release:
+#     types: [published]
+# Turns out on release does not actually run on release. thanks microsoft
+# See https://github.com/orgs/community/discussions/25281
+# on:
+#   release:
+#     types: [published]
+on:
+  workflow_run:
+    workflows: ['Release']
+    types:
+      - completed
+
+jobs:
+  build-and-push:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast: false
+      matrix:
+        include:
+          - context: ./backend
+            image: ghcr.io/${{ github.repository_owner }}/trainstatus-backend
+            # tags: |
+            #   latest
+            #   # ${{ github.event.release.tag_name }}
+          - context: ./frontend
+            image: ghcr.io/${{ github.repository_owner }}/trainstatus-frontend
+            # tags: |
+            #   latest
+            #   ${{ github.event.release.tag_name }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # don't think i need checkout bc build-push-action does it
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Release Tag
+        id: get_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release view --json tagName -q .tagName)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5.5.1
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            latest
+            ${{ env.TAG }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5.3.0
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
