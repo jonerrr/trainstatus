@@ -112,8 +112,8 @@
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route}
 				<Icon
-					width={24}
-					height={24}
+					width={36}
+					height={36}
 					express={false}
 					link={true}
 					route={$page.data.routes[route.id] as Route}
@@ -125,8 +125,8 @@
 		{:else}
 			{#each route_stops as route}
 				<Icon
-					width={24}
-					height={24}
+					width={36}
+					height={36}
 					express={false}
 					link={true}
 					route={$page.data.routes[route.id] as Route}
@@ -136,7 +136,7 @@
 
 		<!-- </div> -->
 	</div>
-	<div class="font-medium text-lg flex gap-1 items-center">
+	<div class="text-xl font-semibold flex gap-1 items-center">
 		{#if is_bus_stop(stop)}
 			<BusArrow direction={stop.data.direction} />
 		{/if}

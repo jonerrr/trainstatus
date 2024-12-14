@@ -81,9 +81,9 @@
 </script>
 
 <header class="flex gap-1 p-1 items-center">
-	<Icon width={32} height={32} express={false} link={false} {route} />
+	<Icon width={36} height={36} express={false} link={false} {route} />
 
-	<div class="font-medium text-lg flex items-center gap-1">
+	<div class="text-xl font-semibold flex items-center gap-1">
 		{#if alerts.length && idx < alerts.length}
 			{alerts[idx].alert_type}
 		{:else}
@@ -122,7 +122,7 @@
 			</div>
 			<div class="text-sm text-neutral-400 px-1 w-full flex justify-between">
 				<div class="text-left">
-					Updated
+					Updated:
 					{#if time_format === 'countdown'}
 						{dayjs(alert.updated_at).fromNow()}
 					{:else}
@@ -131,9 +131,14 @@
 				</div>
 				{#if alert.end_time}
 					<div class="text-right">
-						End
+						End:
 						{#if time_format === 'countdown'}
 							{dayjs(alert.end_time).fromNow()}
+						{:else if !dayjs(alert.end_time).isSame(dayjs(), 'day')}
+							{dayjs(alert.end_time).format('M/D')}
+							<!-- {#if !dayjs(alert.end_time).isSame(dayjs(), 'day')}
+								{dayjs(alert.end_time).format('M/D')}
+							{/if} -->
 						{:else}
 							{dayjs(alert.end_time).format('h:mm A')}
 						{/if}
