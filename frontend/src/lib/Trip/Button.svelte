@@ -72,7 +72,7 @@
 			}
 
 			return {
-				current_status: data.data.status,
+				current_status: status_text,
 				current_stop: $page.data.stops[data.data.stop_id].name
 			};
 		}
