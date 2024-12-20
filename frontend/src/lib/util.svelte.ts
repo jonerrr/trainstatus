@@ -1,4 +1,3 @@
-import { tick } from 'svelte';
 import { browser } from '$app/environment';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
