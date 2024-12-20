@@ -160,7 +160,7 @@
 				onclick={() =>
 					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
 			>
-				{#each transfer_stop.routes as route}
+				{#each main_stop_routes(transfer_stop) as route}
 					<Icon
 						width={24}
 						height={24}
