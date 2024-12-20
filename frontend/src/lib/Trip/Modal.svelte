@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { slide } from 'svelte/transition';
 	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
+	import { current_time } from '$lib/util.svelte';
 	import type { Stop } from '$lib/static';
 	import {
 		is_bus_route,
@@ -21,10 +22,9 @@
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		trip: Trip<TrainTripData | BusTripData>;
-		current_time?: number;
 	}
 
-	const { trip, show_previous, time_format, current_time }: Props = $props();
+	const { trip, show_previous, time_format }: Props = $props();
 
 	const route = $derived($page.data.routes[trip.route_id]);
 
@@ -135,12 +135,7 @@
 								{#if time_format === 'time'}
 									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
 								{:else}
-									{(
-										(st.arrival.getTime() -
-											(current_time ? current_time * 1000 : new Date().getTime())) /
-										1000 /
-										60
-									).toFixed(0)}m
+									{((st.arrival.getTime() - current_time.ms) / 1000 / 60).toFixed(0)}m
 								{/if}
 							</div>
 						</div>

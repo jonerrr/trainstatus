@@ -3,21 +3,30 @@ import { trips } from '$lib/trips.svelte';
 import { stop_times } from '$lib/stop_times.svelte';
 import type { LayoutLoad } from './$types';
 import { alerts } from '$lib/alerts.svelte';
+import { current_time } from '$lib/util.svelte';
 
 export const load: LayoutLoad = async ({ fetch, url }) => {
 	const stops_promise = fetch('/api//v1/stops').then((res) => res.json());
 	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
 
 	// TODO: preload bus route ids using search param
+	// try {
 	const at = url.searchParams.get('at');
-	const current_time = at ? parseInt(at) : undefined;
+	if (at) {
+		current_time.value = parseInt(at);
+	}
+	// } catch (e) {
+	// 	console.error('error parsing at', e);
+	// }
+	// current_time.value = at ? parseInt(at) : undefined;
+	// const current_time = at ? parseInt(at) : undefined;
 
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
 		stops_promise,
 		routes_promise,
-		trips.update(fetch, current_time),
-		stop_times.update(fetch, [], false, current_time),
-		alerts.update(fetch, current_time)
+		trips.update(fetch),
+		stop_times.update(fetch, [], false),
+		alerts.update(fetch)
 	]);
 
 	const routes_obj: {

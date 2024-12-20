@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
+import { current_time } from './util.svelte';
 
 export interface Trip<T extends TripData, R = never> {
 	id: string;
@@ -57,9 +58,11 @@ export function createTrips() {
 	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
-	async function update(fetch: Fetch, current_time?: number) {
+	async function update(fetch: Fetch) {
 		// try {
-		const res = await fetch(`/api/v1/trips${current_time ? `?at=${current_time}` : ''}`);
+		const res = await fetch(
+			`/api/v1/trips${current_time.value ? `?at=${current_time.value}` : ''}`
+		);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}
@@ -76,41 +79,6 @@ export function createTrips() {
 				}
 			])
 		);
-		// trips.clear();
-
-		// data.forEach((trip) => {
-		// 	trips.set(trip.id, {
-		// 		...trip,
-		// 		created_at: new Date(trip.created_at),
-		// 		updated_at: new Date(trip.updated_at)
-		// 	});
-		// });
-
-		// 	return false;
-		// } catch (e) {
-		// 	console.error(e);
-		// 	return true;
-		// }
-		// .then((res) => res.json())
-		// .then(
-		// 	(data) =>
-		// 		// convert dates from strings to Date objects and put into map
-		// (trips = new Map(
-		// 	data.map((trip: Trip<TripData>) => [
-		// 		trip.id,
-		// 		{
-		// 			...trip,
-		// 			created_at: new Date(trip.created_at),
-		// 			updated_at: new Date(trip.updated_at)
-		// 		}
-		// 	])
-		// ))
-		// (trips = data.map((trip: Trip<TripData>) => ({
-		// 	...trip,
-		// 	created_at: new Date(trip.created_at),
-		// 	updated_at: new Date(trip.updated_at)
-		// })))
-		// );
 	}
 
 	return {

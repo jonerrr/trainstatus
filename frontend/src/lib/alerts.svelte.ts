@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import icons from './icons';
+import { current_time } from './util.svelte';
 
 export interface Alert {
 	id: string;
@@ -36,8 +37,10 @@ export function createAlerts() {
 	let alerts: Alert[] = $state([]);
 	const alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
 
-	async function update(fetch: Fetch, current_time?: number) {
-		const res = await fetch(`/api/v1/alerts${current_time ? `?at=${current_time}` : ''}`);
+	async function update(fetch: Fetch) {
+		const res = await fetch(
+			`/api/v1/alerts${current_time.value ? `?at=${current_time.value}` : ''}`
+		);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}

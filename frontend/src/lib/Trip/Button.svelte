@@ -11,13 +11,13 @@
 	} from '$lib/trips.svelte';
 	import { stop_times as rt_stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
 	import type { Route, Stop } from '$lib/static';
+	import { current_time } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
 
 	interface Props {
 		data: Trip<TrainTripData | BusTripData, Route>;
-		current_time?: number;
 	}
-	let { data, current_time }: Props = $props();
+	let { data }: Props = $props();
 
 	// TODO: maybe move this to List.svelte
 	onMount(() => {
@@ -50,8 +50,7 @@
 		// check if trip has been updated in past 3 minutes
 		// TODO: check if stop_id has already passed as well
 		if (
-			data.updated_at.getTime() >
-				(current_time ? current_time * 1000 : new Date().getTime()) - 3 * 60 * 1000 &&
+			data.updated_at.getTime() > current_time.ms - 3 * 60 * 1000 &&
 			data.data.status !== 'none' &&
 			data.data.stop_id
 		) {

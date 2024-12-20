@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { Home, Clock, CircleAlert } from 'lucide-svelte';
 	import { page } from '$app/stores';
-
+	import { current_time } from '$lib/util.svelte';
 	interface Routes {
 		[key: string]: [Icon: typeof Home | typeof Clock | typeof CircleAlert, href: string];
 	}
 
-	interface Props {
-		current_time?: number;
-	}
+	// interface Props {
+	// 	current_time?: number;
+	// }
 
-	const { current_time } = $props();
+	// const { current_time } = $props();
 
 	const routes: Routes = {
 		Home: [Home, '/'],
@@ -24,7 +24,7 @@
 	<a
 		aria-label={label}
 		title={label}
-		href="{href}{current_time ? `?at=${current_time}` : ''}"
+		href="{href}{current_time ? `?at=${current_time.value}` : ''}"
 		class="nav-button"
 		class:nav-button-active={href === $page.url.pathname}
 		class:text-neutral-400={href !== $page.url.pathname}

@@ -8,7 +8,8 @@
 		trip_pins_rune,
 		route_pins_rune,
 		type PersistedRune,
-		persisted_rune
+		persisted_rune,
+		current_time
 	} from '$lib/util.svelte';
 	import { is_bus, type Stop } from './static';
 	import { monitored_bus_routes } from './stop_times.svelte';
@@ -20,11 +21,11 @@
 	// import { Tween } from 'svelte/motion';
 	// import { cubicOut } from 'svelte/easing';
 
-	interface Props {
-		current_time?: number;
-	}
+	// interface Props {
+	// 	current_time?: number;
+	// }
 
-	const { current_time }: Props = $props();
+	// const { current_time }: Props = $props();
 
 	let dialog_el = $state<HTMLDialogElement>();
 
@@ -229,7 +230,7 @@
 					aria-label="Share"
 					title="Share"
 					onclick={() => {
-						const url = `${window.location.origin}/?${param_name}=${id}${current_time ? `&at=${current_time}` : ''}`;
+						const url = `${window.location.origin}/?${param_name}=${id}${current_time.value ? `&at=${current_time.value}` : ''}`;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
@@ -265,12 +266,7 @@
 	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0 focus:outline-none focus:ring-2 focus:ring-neutral-700"
 >
 	{#if $page.state.modal === 'stop'}
-		<StopModal
-			{current_time}
-			{show_previous}
-			time_format={time_format.value}
-			stop={$page.state.data}
-		/>
+		<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />
 
 		{@render actions(
 			true,
@@ -290,12 +286,7 @@
 			route_pins_rune
 		)}
 	{:else if $page.state.modal === 'trip'}
-		<TripModal
-			{current_time}
-			trip={$page.state.data}
-			{show_previous}
-			time_format={time_format.value}
-		/>
+		<TripModal trip={$page.state.data} {show_previous} time_format={time_format.value} />
 
 		{@render actions(
 			true,

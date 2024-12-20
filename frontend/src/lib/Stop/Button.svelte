@@ -6,15 +6,14 @@
 	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
-	import { debounce } from '$lib/util.svelte';
+	import { debounce, current_time } from '$lib/util.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
 
 	interface Props {
 		data: Stop<'train' | 'bus'>;
-		current_time?: number;
 	}
-	let { data, current_time }: Props = $props();
+	let { data }: Props = $props();
 
 	type StopTimeByRoute = Map<string, StopTime<number, TripDirection, string>[]>;
 
@@ -41,7 +40,7 @@
 			return;
 		}
 
-		const now = current_time ? current_time * 1000 : new Date().getTime();
+		const now = current_time.ms;
 
 		// Pre-filter relevant stop times
 		const relevant_stop_times = rt_stop_times.stop_times.filter((st) => st.stop_id === data.id);

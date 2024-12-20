@@ -2,13 +2,13 @@
 	import dayjs from 'dayjs';
 	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
+	import { current_time } from '$lib/util.svelte';
 
 	interface Props {
 		offline: boolean;
-		current_time?: number;
 	}
 
-	let { offline, current_time = $bindable() }: Props = $props();
+	let { offline }: Props = $props();
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
@@ -20,7 +20,7 @@
 				<div class=" text-xs self-end">Offline</div>
 			</div>
 		{/if}
-		{#if current_time}
+		{#if current_time.value}
 			<!-- <div
 				class="text-neutral-400 text-xs flex flex-col justify-center items-center hover:underline"
 			>
@@ -32,8 +32,9 @@
 			<!-- TODO: update url param with user's input -->
 			<input
 				type="datetime-local"
-				bind:value={() => (current_time ? dayjs.unix(current_time).format('YYYY-MM-DDTHH:mm') : ''),
-				(v) => (current_time = dayjs(v).unix())}
+				bind:value={() =>
+					current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
+				(v) => (current_time.value = dayjs(v).unix())}
 				class="text-neutral-400 text-sm bg-transparent border-b border-neutral-400"
 			/>
 		{/if}
