@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { BusFront, TrainFront } from 'lucide-svelte';
-	import { getContext, tick, type Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { debounce, item_heights, persisted_rune, type PersistedRune } from './util.svelte';
-	import { monitored_bus_routes, stop_times } from './stop_times.svelte';
+	import { monitored_bus_routes } from './stop_times.svelte';
 	import TripButton from './Trip/Button.svelte';
 	import StopButton from './Stop/Button.svelte';
 	import RouteButton from './Route/Button.svelte';
@@ -79,8 +79,6 @@
 		overscan = 10,
 		style: style_
 	}: Props = $props();
-
-	let current_time = $state(getContext<number | undefined>('current_time'));
 
 	// if bus/train data don't have any items, switch tabs
 	$effect(() => {
@@ -349,7 +347,7 @@
 								pushState('', { modal: type, data: JSON.parse(JSON.stringify(data)) });
 							}}
 						>
-							<Item {data} {current_time} />
+							<Item {data} />
 						</button>
 
 						{#if pin_rune}

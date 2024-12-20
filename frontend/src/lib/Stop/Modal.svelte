@@ -16,10 +16,9 @@
 		is_bus,
 		is_train,
 		type Trip,
-		type TripData,
-		trips
+		type TripData
 	} from '$lib/trips.svelte';
-	import { persisted_rune } from '$lib/util.svelte';
+	import { persisted_rune, current_time } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
@@ -30,44 +29,37 @@
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		stop: Stop<'bus' | 'train'>;
-		current_time?: number;
 	}
 
 	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
 
-	let { stop, show_previous, time_format, current_time }: Props = $props();
+	let { stop, show_previous, time_format }: Props = $props();
 
 	interface StopTimeWithTrip extends StopTime<number> {
 		trip: Trip<TripData>;
 	}
 
-	interface AccumulatedStopTimes {
-		stop_times: StopTimeWithTrip[];
-		active_routes: Set<string>;
-	}
-
 	const { stop_times, active_routes } = $derived.by(() => {
-		const now = current_time ? current_time * 1000 : new Date().getTime();
-		const st = rt_stop_times.stop_times.reduce<AccumulatedStopTimes>(
-			({ stop_times, active_routes }, st) => {
-				if (st.stop_id === stop.id) {
-					const trip = rt_trips.trips.get(st.trip_id);
-					if (trip) {
-						const eta = (st.arrival.getTime() - now) / 60000;
-						if (eta >= 0) {
-							// TODO: add a way to disable eta if statement
-							active_routes.add(trip.route_id);
+		const now = current_time.ms;
+		const stop_times: StopTimeWithTrip[] = [];
+		const active_routes: Set<string> = new Set();
 
-							stop_times.push({ ...st, eta, trip });
-						}
+		for (const st of rt_stop_times.stop_times) {
+			if (st.stop_id === stop.id) {
+				const trip = rt_trips.trips.get(st.trip_id);
+				if (trip) {
+					const eta = (st.arrival.getTime() - now) / 60000;
+					if (eta >= 0) {
+						// TODO: add a way to disable eta if statement
+						active_routes.add(trip.route_id);
+
+						stop_times.push({ ...st, eta, trip });
 					}
 				}
-				return { stop_times, active_routes };
-			},
-			{ stop_times: [], active_routes: new Set() }
-		);
+			}
+		}
 
-		return st;
+		return { stop_times, active_routes };
 	});
 	// $inspect(active_routes);
 

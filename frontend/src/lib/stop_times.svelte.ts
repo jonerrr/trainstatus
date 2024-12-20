@@ -1,4 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
+import { current_time } from './util.svelte';
 
 export interface StopTime<T = never, D = never, R = never> {
 	trip_id: string;
@@ -16,12 +17,7 @@ export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
 	// must specify routes if only_bus is true
-	async function update(
-		fetch: Fetch,
-		routes: string[],
-		only_bus: boolean = false,
-		current_time?: number
-	) {
+	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false) {
 		// TODO: if only_bus was fetched too recently, don't include buses in next request
 		const params = new URLSearchParams();
 		if (routes.length) {
@@ -30,8 +26,9 @@ export function createStopTimes() {
 				params.set('only_bus', 'true');
 			}
 		}
-		if (current_time) {
-			params.set('at', current_time.toString());
+		if (current_time.value) {
+			// convert back to seconds from ms
+			params.set('at', current_time.value.toString());
 		}
 
 		const res = await fetch(`/api/v1/stop_times${params.size ? '?' + params.toString() : ''}`);

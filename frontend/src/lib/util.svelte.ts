@@ -97,6 +97,29 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	};
 }
 
+// if user specified unix timestamp, it is stored here.
+function currentTime() {
+	let time = $state<number | undefined>();
+
+	return {
+		// returns undefined here bc some components need to know if it was user specified
+		get value(): number | undefined {
+			return time;
+		},
+
+		get ms(): number {
+			return time ? time * 1000 : new Date().getTime();
+		},
+
+		set value(newValue: number) {
+			// js time is in milliseconds
+			time = newValue;
+		}
+	};
+}
+
+export const current_time = currentTime();
+
 interface ItemHeights {
 	[key: string]: number;
 }
