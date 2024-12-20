@@ -2,13 +2,21 @@
 	import dayjs from 'dayjs';
 	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time, debounce } from '$lib/util.svelte';
 
 	interface Props {
 		offline: boolean;
 	}
 
 	let { offline }: Props = $props();
+
+	// update rt data after value change
+	// $effect(() => {
+	// 	current_time.value;
+	// 	debounce(() => {
+	// 		console.log('time change, updating rt data');
+	// 	}, 500)();
+	// });
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
@@ -21,21 +29,16 @@
 			</div>
 		{/if}
 		{#if current_time.value}
-			<!-- <div
-				class="text-neutral-400 text-xs flex flex-col justify-center items-center hover:underline"
-			>
-				<span>{time.format('DD/MM')}</span>
-				<span>{time.format('h:m A')}</span>
-			</div> -->
 			<!-- TODO: update rt data after value change  -->
 			<!-- TODO: show input even if user didn't specify in query param -->
 			<!-- TODO: update url param with user's input -->
 			<input
+				style="color-scheme: dark"
 				type="datetime-local"
 				bind:value={() =>
 					current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
 				(v) => (current_time.value = dayjs(v).unix())}
-				class="text-neutral-400 text-sm bg-transparent border-b border-neutral-400"
+				class="text-neutral-400 text-sm bg-transparent border-b border-neutral-400 ml-2"
 			/>
 		{/if}
 	</div>

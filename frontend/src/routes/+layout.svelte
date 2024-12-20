@@ -10,6 +10,7 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
+	import { current_time, debounce } from '$lib/util.svelte';
 
 	interface Props {
 		children: Snippet;
@@ -21,6 +22,28 @@
 	let last_st_update = $state<Date>(new Date());
 	let offline = $state(false);
 	let is_updating = $state(false);
+
+	$effect(() => {
+		current_time.value;
+		debounce(() => {
+			console.log('time change, updating rt data');
+			try {
+				is_updating = true;
+				Promise.all([
+					trips.update(fetch),
+					alerts.update(fetch),
+					stop_times.update(fetch, [...monitored_bus_routes], false)
+				]);
+				last_update = new Date();
+				last_st_update = new Date();
+			} catch (e) {
+				console.error(e);
+				offline = true;
+			} finally {
+				is_updating = false;
+			}
+		}, 500)();
+	});
 
 	onMount(() => {
 		// const at = $page.url.searchParams.get('at');
