@@ -333,6 +333,7 @@ impl Alert {
     pub async fn get_all(
         pool: &PgPool,
         at: DateTime<Utc>,
+        stop_alerts: bool,
     ) -> Result<serde_json::Value, sqlx::Error> {
         let alerts: (Option<serde_json::Value>,) = sqlx::query_as(
             r#"
@@ -361,7 +362,7 @@ impl Alert {
                 a.id = ae.alert_id
             WHERE
                 a.last_in_feed >= $1 - INTERVAL '2 minutes' AND
-                ae.route_id IS NOT NULL
+                (ae.route_id IS NOT NULL OR ($2 = FALSE OR ae.stop_id IS NOT NULL))
                 AND ap.start_time <= now()
                 AND (ap.end_time >= now()
                     OR ap.end_time IS NULL)
@@ -372,6 +373,7 @@ impl Alert {
             ) AS result"#,
         )
         .bind(at)
+        .bind(stop_alerts)
         .fetch_one(pool)
         .await?;
 

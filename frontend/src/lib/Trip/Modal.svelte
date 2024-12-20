@@ -61,8 +61,9 @@
 			width={36}
 			height={36}
 			express={is_train_route(route, trip) && trip.data.express}
-			link={true}
 			{route}
+			link
+			show_alerts
 		/>
 	</div>
 

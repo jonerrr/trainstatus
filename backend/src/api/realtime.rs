@@ -143,6 +143,7 @@ pub struct ApiAlertEntity {
 }
 
 // TODO: make sure struct matches
+// TODO: add option to disable stop_alerts
 #[utoipa::path(
     get,
     path = "/alerts",
@@ -161,7 +162,7 @@ pub async fn alerts_handler(
 ) -> Result<impl IntoResponse, ServerError> {
     match current_time.user_specified {
         true => {
-            let alerts = Alert::get_all(&state.pg_pool, current_time.time).await?;
+            let alerts = Alert::get_all(&state.pg_pool, current_time.time, true).await?;
             Ok((json_headers().clone(), serde_json::to_string(&alerts)?))
         }
         false => {
