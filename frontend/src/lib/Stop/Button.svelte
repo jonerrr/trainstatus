@@ -1,5 +1,4 @@
 <script lang="ts">
-	// import { fade } from 'svelte/transition';
 	import { untrack } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/stores';
@@ -24,6 +23,7 @@
 	$effect(() => {
 		rt_stop_times?.stop_times;
 		rt_trips.trips;
+		data;
 
 		// console.log('Triggering update for', data.name);
 		untrack(() => updateRouteMaps());
@@ -85,10 +85,12 @@
 		}
 	}, 35);
 
+	// TODO: fix 1 train showing up at dekalb ave for some reason
 	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
 	// combine current stop routes with other active routes at stop
 	// TODO: use nb_st_by_route and sb_st_by_route to get active routes instead of creating new set
 	const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
+	// const all_stop_routes = $derived(current_stop_routes);
 </script>
 
 {#snippet eta(n: number)}
@@ -104,7 +106,7 @@
 {#if is_train(data)}
 	<div class="grid gap-1 w-full grid-cols-1">
 		<div class="flex gap-1 items-center">
-			{#each current_stop_routes as route}
+			{#each current_stop_routes as route (route.id)}
 				<Icon height={24} width={24} express={false} link={false} {route} />
 			{/each}
 
@@ -124,7 +126,7 @@
 				{headsign}
 			</div>
 			<div class="flex flex-col gap-1">
-				{#each routes as route}
+				{#each routes as route (route.id)}
 					{@const route_stop_times = stop_times.get(route.id) ?? []}
 					<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
 					<div class="flex gap-1 items-center">
@@ -156,7 +158,7 @@
 		</div>
 
 		<div class="flex flex-col">
-			{#each data.routes as stop_route}
+			{#each data.routes as stop_route (stop_route.id)}
 				{@const route = $page.data.routes[stop_route.id] as Route}
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
 				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
@@ -169,7 +171,7 @@
 						</div>
 						<div class="flex gap-2 pr-1">
 							{#if route_stop_times.length}
-								{#each route_stop_times.slice(0, 2) as stop_time}
+								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 									{@render eta(stop_time.eta)}
 								{/each}
 								<!-- check if trips contains trip with route_id and that there are no stop times -->

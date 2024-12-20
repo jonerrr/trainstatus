@@ -18,6 +18,7 @@
 		type Trip,
 		type TripData
 	} from '$lib/trips.svelte';
+	import { alerts } from '$lib/alerts.svelte';
 	import { persisted_rune, current_time } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
@@ -94,13 +95,20 @@
 			// return main_rs.filter((route) => active_routes.has(route.id));
 		}
 	});
+
+	// show indicator if there is an alert at the stop TODO: maybe make map of stop_id to alert
+	const show_alert_icon = $derived.by(() => {
+		return alerts.alerts.some((alert) => alert.entities.some((e) => e.stop_id === stop.id));
+	});
+
+	// $inspect(show_alert_icon);
 </script>
 
 <div class="flex gap-1 items-center p-1">
 	<!-- grid gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(4rem,1fr))] max-w-xs -->
 	<!-- grid gap-1 grid-cols-5 grid-rows-3 grid-flow-col -->
 
-	<div class="flex flex-wrap gap-1 max-h-36 max-w-36 items-center">
+	<div class="flex flex-wrap gap-1 max-h-36 max-w-40 md:max-w-xs items-center">
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route}
 				<Icon
@@ -128,11 +136,16 @@
 
 		<!-- </div> -->
 	</div>
-	<div class="text-xl font-semibold flex gap-1 items-center">
+	<div class="relative text-xl font-semibold flex gap-1 items-center">
 		{#if is_bus_stop(stop)}
 			<BusArrow direction={stop.data.direction} />
 		{/if}
 		{stop.name}
+
+		{#if show_alert_icon}
+			<!-- TODO: make less ugly -->
+			<div class="absolute -top-1 -right-1 size-3 rounded-full bg-orange-400"></div>
+		{/if}
 	</div>
 </div>
 

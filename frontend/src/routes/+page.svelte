@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
-	import { getContext, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import {
 		type Route,
@@ -207,6 +207,7 @@
 			/>
 		{/if}
 
+		<!-- TODO: loading pinned stops in SSR always puts the 1 as the first -->
 		{#if stop_pins_rune.value.length}
 			<List
 				title="Pinned stops"
@@ -216,6 +217,7 @@
 				type="stop"
 				height_calc={calculate_stop_height}
 				items_before_scroll={2}
+				ssr_min={0}
 			/>
 		{/if}
 	</div>

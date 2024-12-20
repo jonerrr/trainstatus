@@ -17,7 +17,7 @@ export interface Alert {
 export interface Entity {
 	route_id: string;
 	sort_order: number;
-	stop_id?: string;
+	stop_id?: number;
 }
 
 type Fetch = typeof fetch;

@@ -1,3 +1,4 @@
+import { tick } from 'svelte';
 import { browser } from '$app/environment';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
@@ -40,7 +41,7 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	let storedValue: T;
 
 	try {
-		const item = localStorage.getItem(key);
+		const item = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
 		storedValue = item ? JSON.parse(item) : init_value;
 	} catch (e) {
 		// localStorage won't be defined so this will always throw on init load
@@ -97,6 +98,103 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	};
 }
 
+// ref: https://github.com/Rich-Harris/local-storage-test/blob/main/src/lib/storage.svelte.ts
+// export class LocalStorage<T> {
+// 	#key: string;
+// 	#version = $state(0);
+// 	#listeners = 0;
+// 	#value: T | undefined;
+
+// 	#handler = (e: StorageEvent) => {
+// 		if (e.storageArea !== localStorage) return;
+// 		if (e.key !== this.#key) return;
+
+// 		this.#version += 1;
+// 	};
+
+// 	constructor(key: string, initial?: T) {
+// 		this.#key = key;
+// 		this.#value = initial;
+
+// 		if (typeof localStorage !== 'undefined') {
+// 			if (localStorage.getItem(key) === null) {
+// 				localStorage.setItem(key, JSON.stringify(initial));
+// 			}
+// 		}
+// 	}
+
+// 	get current() {
+// 		this.#version;
+
+// 		const root =
+// 			typeof localStorage !== 'undefined'
+// 				? JSON.parse(localStorage.getItem(this.#key) as any)
+// 				: this.#value;
+
+// 		const proxies = new WeakMap();
+
+// 		const proxy = (value: unknown) => {
+// 			if (typeof value !== 'object' || value === null) {
+// 				return value;
+// 			}
+
+// 			let p = proxies.get(value);
+
+// 			if (!p) {
+// 				p = new Proxy(value, {
+// 					get: (target, property) => {
+// 						this.#version;
+// 						return proxy(Reflect.get(target, property));
+// 					},
+// 					set: (target, property, value) => {
+// 						this.#version += 1;
+// 						Reflect.set(target, property, value);
+
+// 						if (typeof localStorage !== 'undefined') {
+// 							localStorage.setItem(this.#key, JSON.stringify(root));
+// 						}
+
+// 						return true;
+// 					}
+// 				});
+
+// 				proxies.set(value, p);
+// 			}
+
+// 			return p;
+// 		};
+
+// 		if ($effect.tracking()) {
+// 			$effect(() => {
+// 				if (this.#listeners === 0) {
+// 					window.addEventListener('storage', this.#handler);
+// 				}
+
+// 				this.#listeners += 1;
+
+// 				return () => {
+// 					tick().then(() => {
+// 						this.#listeners -= 1;
+// 						if (this.#listeners === 0) {
+// 							window.removeEventListener('storage', this.#handler);
+// 						}
+// 					});
+// 				};
+// 			});
+// 		}
+
+// 		return proxy(root);
+// 	}
+
+// 	set current(value) {
+// 		if (typeof localStorage !== 'undefined') {
+// 			localStorage.setItem(this.#key, JSON.stringify(value));
+// 		}
+
+// 		this.#version += 1;
+// 	}
+// }
+
 // if user specified unix timestamp, it is stored here.
 function currentTime() {
 	let time = $state<number | undefined>();
@@ -138,6 +236,18 @@ interface ItemHeights {
 // }
 
 export const item_heights = $state<ItemHeights>({});
+
+// interface PinStorage {
+// 	stops: number[];
+// 	routes: string[];
+// 	trips: string[];
+// }
+
+// export const pins = new LocalStorage<PinStorage>('pins', {
+// 	stops: [106, 400086],
+// 	routes: ['4', 'M15'],
+// 	trips: []
+// });
 
 export const stop_pins_rune = persisted_rune<number[]>('stop_pins', [106, 400086]);
 export const route_pins_rune = persisted_rune<string[]>('route_pins', ['4', 'M15']);

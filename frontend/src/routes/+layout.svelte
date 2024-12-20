@@ -26,6 +26,7 @@
 	$effect(() => {
 		current_time.value;
 		debounce(() => {
+			if (!current_time.value) return;
 			console.log('time change, updating rt data');
 			try {
 				is_updating = true;
