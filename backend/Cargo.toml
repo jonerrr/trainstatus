@@ -58,4 +58,4 @@ uuid = { version = "1.11.0", features = ["serde", "v7"] }
 zip = "2.2.0"
 
 [build-dependencies]
-prost-build = "0.13.3"
+prost-build = "0.13.4"
