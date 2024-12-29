@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { CircleX, Search } from 'lucide-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { calculate_stop_height, type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
 	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 
-	let bus_stops = $state<Stop<'bus'>[]>($page.data.bus_stops);
-	let train_stops = $state<Stop<'train'>[]>($page.data.train_stops);
+	let bus_stops = $state<Stop<'bus'>[]>(page.data.bus_stops);
+	let train_stops = $state<Stop<'train'>[]>(page.data.train_stops);
 
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
-	const search = new StopSearch($page.data.bus_stops, $page.data.train_stops);
+	const search = new StopSearch(page.data.bus_stops, page.data.train_stops);
 
-	// console.log(calculate_stop_height($page.data.train_stops[0]), 'sheight');
+	// console.log(calculate_stop_height(page.data.train_stops[0]), 'sheight');
 
 	// let search_el: HTMLInputElement;
 	let search_input: string = $state('');
@@ -21,10 +21,10 @@
 	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
-		bus_stops = $page.data.bus_stops;
-		// $page.data.bus_stops.sort((a, b) => b.name.length - a.name.length).slice(0, 200);
+		bus_stops = page.data.bus_stops;
+		// page.data.bus_stops.sort((a, b) => b.name.length - a.name.length).slice(0, 200);
 
-		train_stops = $page.data.train_stops;
+		train_stops = page.data.train_stops;
 
 		search_input = '';
 	}

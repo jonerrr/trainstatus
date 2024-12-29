@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { slide } from 'svelte/transition';
 	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
@@ -26,7 +26,7 @@
 
 	const { trip, show_previous, time_format }: Props = $props();
 
-	const route = $derived($page.data.routes[trip.route_id]);
+	const route = $derived(page.data.routes[trip.route_id]);
 
 	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 	const last_stop = $derived.by(() => {
@@ -35,11 +35,11 @@
 		if (is_bus_route(route, trip)) {
 			// TODO: get actual last stop instead of headsign
 			// get stop in the direction of trip and get headsign
-			const stop = $page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
+			const stop = page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
 			return stop.routes.find((r) => r.id === route.id)!.headsign;
 		} else {
 			const last_st = stop_times[stop_times.length - 1];
-			return $page.data.stops[last_st.stop_id].name;
+			return page.data.stops[last_st.stop_id].name;
 		}
 	});
 
@@ -72,6 +72,12 @@
 	<div class="text-xl font-semibold">
 		{last_stop}
 	</div>
+
+	{#if is_bus_route(route, trip) && trip.data.deviation && Math.abs(trip.data.deviation) > 120}
+		<div class="text-xs {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
+			{(trip.data.deviation / 60).toFixed(0)}m
+		</div>
+	{/if}
 </div>
 
 <!-- <div class="text-left">
@@ -100,7 +106,7 @@
 
 <ModalList>
 	{#each stop_times as st}
-		{@const stop = $page.data.stops[st.stop_id]}
+		{@const stop = page.data.stops[st.stop_id]}
 		<div class="relative text-base">
 			<button
 				tabindex="0"

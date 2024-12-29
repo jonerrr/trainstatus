@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
 	import { untrack } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import {
 		type Route,
 		type Stop,
@@ -30,7 +30,7 @@
 
 	const { pinned_bus_stops, pinned_train_stops } = $derived(
 		stop_pins_rune.value
-			.map((id) => $page.data.stops[id])
+			.map((id) => page.data.stops[id])
 			.reduce(
 				(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
 					if (is_bus(stop)) {
@@ -46,7 +46,7 @@
 
 	const { pinned_bus_routes, pinned_train_routes } = $derived(
 		route_pins_rune.value
-			.map((id) => $page.data.routes[id])
+			.map((id) => page.data.routes[id])
 			.reduce(
 				(acc: { pinned_bus_routes: Route[]; pinned_train_routes: Route[] }, route) => {
 					if (route.route_type === 'bus') {
@@ -84,7 +84,7 @@
 					if (!trip) {
 						console.log('trip not found');
 					}
-					const route = $page.data.routes[trip.route_id];
+					const route = page.data.routes[trip.route_id];
 
 					if (is_bus_route(route, trip)) {
 						acc.pinned_bus_trips.push({ ...trip, route });
@@ -110,7 +110,7 @@
 		location_status.value = 'loading';
 		navigator.geolocation.getCurrentPosition(
 			(position) => {
-				nearby_train_stops = $page.data.train_stops
+				nearby_train_stops = page.data.train_stops
 					.map((stop: Stop<'train'>) => {
 						const distance = haversine(
 							position.coords.latitude,
@@ -122,7 +122,7 @@
 					})
 					.sort((a, b) => a.distance - b.distance);
 
-				nearby_bus_stops = $page.data.bus_stops
+				nearby_bus_stops = page.data.bus_stops
 					.map((stop: Stop<'bus'>) => {
 						const distance = haversine(
 							position.coords.latitude,
