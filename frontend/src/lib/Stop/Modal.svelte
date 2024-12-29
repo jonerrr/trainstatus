@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { pushState } from '$app/navigation';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import {
@@ -116,7 +116,7 @@
 					height={36}
 					express={false}
 					link={true}
-					route={$page.data.routes[route.id] as Route}
+					route={page.data.routes[route.id] as Route}
 				/>
 			{/each}
 			<!-- {#if route_stops.length > 5} -->
@@ -129,7 +129,7 @@
 					height={36}
 					express={false}
 					link={true}
-					route={$page.data.routes[route.id] as Route}
+					route={page.data.routes[route.id] as Route}
 				/>
 			{/each}
 		{/if}
@@ -154,7 +154,7 @@
 	<div class="flex gap-1 items-center pb-1 pl-1">
 		<div>Transfers:</div>
 		{#each stop.data.transfers as transfer}
-			{@const transfer_stop = $page.data.stops[transfer] as Stop<'train'>}
+			{@const transfer_stop = page.data.stops[transfer] as Stop<'train'>}
 			<button
 				class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 				onclick={() =>
@@ -166,7 +166,7 @@
 						height={24}
 						express={false}
 						link={false}
-						route={$page.data.routes[route.id]}
+						route={page.data.routes[route.id]}
 					/>
 				{/each}
 			</button>
@@ -191,7 +191,7 @@
 						height={20}
 						express={is_train(stop, st.trip) && st.trip.data.express}
 						link={false}
-						route={$page.data.routes[st.trip.route_id] as Route}
+						route={page.data.routes[st.trip.route_id] as Route}
 					/>
 				</div>
 
@@ -200,7 +200,7 @@
 						{@const last_stop_time = rt_stop_times.stop_times
 							.filter((trip_st) => trip_st.trip_id === st.trip.id)
 							.pop()!}
-						{$page.data.stops[last_stop_time.stop_id].name}
+						{page.data.stops[last_stop_time.stop_id].name}
 					{:else if is_bus_stop(stop)}
 						{stop.routes.find((r) => r.id === st.trip.route_id)?.headsign}
 					{/if}
@@ -219,7 +219,7 @@
 			>
 				<!-- if bus trip and theres a deviation more than 2 min -->
 				{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
-					<div class={`text-xs ${st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}`}>
+					<div class="text-xs {st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
 						{(st.trip.data.deviation / 60).toFixed(0)}m
 					</div>
 				{/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Home, Clock, CircleAlert } from 'lucide-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { current_time } from '$lib/util.svelte';
 
 	interface Routes {
@@ -21,8 +21,8 @@
 		title={label}
 		href="{href}{current_time.value ? `?at=${current_time.value}` : ''}"
 		class="nav-button"
-		class:nav-button-active={href === $page.url.pathname}
-		class:text-neutral-400={href !== $page.url.pathname}
+		class:nav-button-active={href === page.url.pathname}
+		class:text-neutral-400={href !== page.url.pathname}
 	>
 		<Icon class="nav-icon" />
 		<span>{label}</span>

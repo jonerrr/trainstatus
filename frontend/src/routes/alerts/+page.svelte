@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { route_pins_rune } from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
 	import type { Route } from '$lib/static';
 
 	const { bus_routes, train_routes } = $derived(
-		Object.values($page.data.routes).reduce(
+		Object.values(page.data.routes).reduce(
 			(acc: { bus_routes: Route[]; train_routes: Route[] }, route) => {
 				if (route.route_type === 'bus') {
 					acc.bus_routes.push(route);

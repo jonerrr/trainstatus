@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import '@fontsource/inter';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { pushState } from '$app/navigation';
 	import { onMount, tick, type Snippet } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
@@ -47,7 +47,7 @@
 	});
 
 	onMount(() => {
-		// const at = $page.url.searchParams.get('at');
+		// const at = page.url.searchParams.get('at');
 
 		// if (at && !isNaN(parseInt(at))) {
 		// 	current_time = parseInt(at);
@@ -98,24 +98,24 @@
 
 		const id =
 			// stop
-			$page.url.searchParams.get('s') ||
+			page.url.searchParams.get('s') ||
 			// route
-			$page.url.searchParams.get('r') ||
+			page.url.searchParams.get('r') ||
 			// trip
-			$page.url.searchParams.get('t');
+			page.url.searchParams.get('t');
 
 		if (id) {
 			tick().then(() => {
 				// check what type of id it is
-				if (id in $page.data.routes) {
+				if (id in page.data.routes) {
 					pushState('', {
 						modal: 'route',
-						data: $page.data.routes[id]
+						data: page.data.routes[id]
 					});
-				} else if (id in $page.data.stops) {
+				} else if (id in page.data.stops) {
 					pushState('', {
 						modal: 'stop',
-						data: $page.data.stops[parseInt(id)]
+						data: page.data.stops[parseInt(id)]
 					});
 				} else if (trips.trips.has(id)) {
 					pushState('', {

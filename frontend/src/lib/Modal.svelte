@@ -2,7 +2,7 @@
 	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { pushState } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import {
 		stop_pins_rune,
 		trip_pins_rune,
@@ -85,56 +85,50 @@
 	}
 
 	// manage title changes, dialog el, and monitored bus routes
-	onMount(() => {
-		const unsubscribe = page.subscribe(({ state, route }) => {
-			// console.log(route, state.modal);
-			switch (state.modal) {
-				case 'route':
-					dialog_el?.showModal();
-					document.title = `Alerts for ${state.data.id}`;
-					break;
-				case 'stop':
-					dialog_el?.showModal();
-					document.title = `Arrivals at ${state.data.name}`;
+	$effect(() => {
+		// console.log('modal effect');
+		switch (page.state.modal) {
+			case 'route':
+				dialog_el?.showModal();
+				document.title = `Alerts for ${page.state.data.id}`;
+				break;
+			case 'stop':
+				dialog_el?.showModal();
+				document.title = `Arrivals at ${page.state.data.name}`;
 
-					const stop: Stop<'bus' | 'train'> = state.data;
-					if (is_bus(stop)) {
-						// console.log('monitoring modal bus routes');
-						stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
-					}
-					break;
-				case 'trip':
-					dialog_el?.showModal();
-					document.title = `${state.data.route_id} Trip`;
+				const stop: Stop<'bus' | 'train'> = page.state.data;
+				if (is_bus(stop)) {
+					// console.log('monitoring modal bus routes');
+					stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
+				}
+				break;
+			case 'trip':
+				dialog_el?.showModal();
+				document.title = `${page.state.data.route_id} Trip`;
 
-					const trip: Trip<TripData> = state.data;
-					const bus_route = $page.data.routes[trip.route_id];
-					if (is_bus_route(bus_route, trip)) {
-						// console.log('monitoring modal bus routes');
-						monitored_bus_routes.add(trip.route_id);
-					}
+				const trip: Trip<TripData> = page.state.data;
+				const bus_route = page.data.routes[trip.route_id];
+				if (is_bus_route(bus_route, trip)) {
+					// console.log('monitoring modal bus routes');
+					monitored_bus_routes.add(trip.route_id);
+				}
 
-					break;
-				default:
-					dialog_el?.close();
-					switch (route.id) {
-						case '/stops':
-							document.title = 'Stops';
-							break;
-						case '/alerts':
-							document.title = 'Alerts';
-							break;
-						default:
-							document.title = 'Train Status';
-							break;
-					}
-					break;
-			}
-		});
-
-		return () => {
-			unsubscribe();
-		};
+				break;
+			default:
+				dialog_el?.close();
+				switch (page.route.id) {
+					case '/stops':
+						document.title = 'Stops';
+						break;
+					case '/alerts':
+						document.title = 'Alerts';
+						break;
+					default:
+						document.title = 'Train Status';
+						break;
+				}
+				break;
+		}
 	});
 
 	// const rotation = new Tween(0, {
@@ -265,34 +259,34 @@
 	use:manage_modal
 	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0 focus:outline-none focus:ring-2 focus:ring-neutral-700"
 >
-	{#if $page.state.modal === 'stop'}
-		<StopModal {show_previous} time_format={time_format.value} stop={$page.state.data} />
+	{#if page.state.modal === 'stop'}
+		<StopModal {show_previous} time_format={time_format.value} stop={page.state.data} />
 
 		{@render actions(
 			true,
 			's',
-			$page.state.data.id,
-			`Arrivals at ${$page.state.data.name}`,
+			page.state.data.id,
+			`Arrivals at ${page.state.data.name}`,
 			stop_pins_rune
 		)}
-	{:else if $page.state.modal === 'route'}
-		<RouteModal route={$page.state.data} time_format={time_format.value} />
+	{:else if page.state.modal === 'route'}
+		<RouteModal route={page.state.data} time_format={time_format.value} />
 
 		{@render actions(
 			true,
 			'r',
-			$page.state.data.id,
-			`Alerts for ${$page.state.data.id}`,
+			page.state.data.id,
+			`Alerts for ${page.state.data.id}`,
 			route_pins_rune
 		)}
-	{:else if $page.state.modal === 'trip'}
-		<TripModal trip={$page.state.data} {show_previous} time_format={time_format.value} />
+	{:else if page.state.modal === 'trip'}
+		<TripModal trip={page.state.data} {show_previous} time_format={time_format.value} />
 
 		{@render actions(
 			true,
 			't',
-			$page.state.data.id,
-			`${$page.state.data.route_id} Trip`,
+			page.state.data.id,
+			`${page.state.data.route_id} Trip`,
 			trip_pins_rune
 		)}
 	{/if}

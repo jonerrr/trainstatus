@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ArrowBigRight } from 'lucide-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import {
 		is_bus_route,
@@ -36,11 +36,11 @@
 		if (is_bus_route(data.route, data)) {
 			// TODO: get actual last stop instead of headsign
 			// get stop in the direction of trip and get headsign
-			const stop = $page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
+			const stop = page.data.stops[stop_times[0].stop_id] as Stop<'bus'>;
 			return stop.routes.find((r) => r.id === data.route_id)!.headsign;
 		} else {
 			const last_st = stop_times[stop_times.length - 1];
-			return $page.data.stops[last_st.stop_id].name;
+			return page.data.stops[last_st.stop_id].name;
 		}
 	});
 
@@ -73,12 +73,12 @@
 
 			return {
 				current_status: status_text,
-				current_stop: $page.data.stops[data.data.stop_id].name
+				current_stop: page.data.stops[data.data.stop_id].name
 			};
 		}
 		return {
 			current_status: 'Next stop:',
-			current_stop: $page.data.stops[stop_times[0].stop_id].name
+			current_stop: page.data.stops[stop_times[0].stop_id].name
 		};
 	});
 </script>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
@@ -50,7 +50,7 @@
 			if (!trip) continue;
 
 			const route_id = trip.route_id;
-			active_routes.add($page.data.routes[route_id]);
+			active_routes.add(page.data.routes[route_id]);
 
 			const eta = (st.arrival.getTime() - now) / 1000 / 60;
 
@@ -86,7 +86,7 @@
 	}, 35);
 
 	// TODO: fix 1 train showing up at dekalb ave for some reason
-	const current_stop_routes = $derived(main_stop_routes(data).map((r) => $page.data.routes[r.id]));
+	const current_stop_routes = $derived(main_stop_routes(data).map((r) => page.data.routes[r.id]));
 	// combine current stop routes with other active routes at stop
 	// TODO: use nb_st_by_route and sb_st_by_route to get active routes instead of creating new set
 	const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
@@ -159,7 +159,7 @@
 
 		<div class="flex flex-col">
 			{#each data.routes as stop_route (stop_route.id)}
-				{@const route = $page.data.routes[stop_route.id] as Route}
+				{@const route = page.data.routes[stop_route.id] as Route}
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
 				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
 

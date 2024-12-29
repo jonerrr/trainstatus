@@ -1,6 +1,6 @@
 <script lang="ts">
 	// import { slide } from 'svelte/transition';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { type StopTime, stop_times } from '$lib/stop_times.svelte';
 	import {
 		is_train_route,
@@ -27,7 +27,7 @@
 		// stop_times.stop_times
 		// this should prob be a while loop (or map)
 		for (const st of stop_times.stop_times) {
-			// if ($page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) {
+			// if (page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) {
 			// 	console.log('transfer stop');
 			// }
 			if (transfers.length >= 3) {
@@ -37,7 +37,7 @@
 			if (
 				st.trip_id === stop_time.trip_id ||
 				(st.stop_id !== stop_time.stop_id &&
-					!$page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) ||
+					!page.data.train_stops[st.stop_id]?.data.transfers.includes(stop_time.stop_id)) ||
 				st.arrival < stop_time.arrival
 			) {
 				continue;
@@ -65,7 +65,7 @@
 	<div class="flex gap-2 items-center justify-evenly">
 		{#if transfers.length}
 			{#each transfers as st}
-				{@const route = $page.data.routes[st.trip.route_id]}
+				{@const route = page.data.routes[st.trip.route_id]}
 				<button
 					onclick={() => pushState('', { modal: 'trip', data: st.trip })}
 					class="transition-colors duration-200 flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
