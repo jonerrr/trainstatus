@@ -32,7 +32,7 @@ export class StopSearch {
 	}
 
 	search(search_term: string, type: 'bus' | 'train') {
-		const results = this.indexes[type].search(search_term, 15);
+		const results = this.indexes[type].search(search_term);
 
 		return results.map((i) => this.stops[type][i as number]);
 	}

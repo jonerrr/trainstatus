@@ -1,6 +1,5 @@
 use crate::{static_data::cache_all, AppState};
 use axum::{
-    async_trait,
     extract::{FromRequestParts, Query},
     response::{IntoResponse, Response},
 };
@@ -111,7 +110,6 @@ pub struct TimeParams {
     pub at: Option<i64>,
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for CurrentTime
 where
     S: Send + Sync + Clone,
