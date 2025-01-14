@@ -47,6 +47,7 @@ impl StopTime {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let default_routes = Vec::new();
         let bus_routes = bus_route_ids.unwrap_or(&default_routes);
+        // st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours') AND
 
         sqlx::query_as!(
             StopTime,
@@ -59,14 +60,13 @@ impl StopTime {
             FROM
                 stop_time st
             WHERE
-                st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                AND st.trip_id IN (
+                st.trip_id IN (
                     SELECT
                         t.id
                     FROM
                         trip t
                     WHERE
-                        t.updated_at >= $1 - INTERVAL '5 minutes'
+                        t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
                         AND (
                             ($3 = TRUE AND t.route_id = ANY($2))
                             OR

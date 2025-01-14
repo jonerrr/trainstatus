@@ -40,19 +40,16 @@
 			return;
 		}
 
-		const now = current_time.ms;
-
 		// Pre-filter relevant stop times
-		const relevant_stop_times = rt_stop_times.stop_times.filter((st) => st.stop_id === data.id);
-
-		for (const st of relevant_stop_times) {
+		for (const st of rt_stop_times.stop_times) {
+			if (st.stop_id !== data.id || st.arrival.getTime() < current_time.ms) continue;
 			const trip = rt_trips.trips.get(st.trip_id);
 			if (!trip) continue;
 
 			const route_id = trip.route_id;
 			active_routes.add(page.data.routes[route_id]);
 
-			const eta = (st.arrival.getTime() - now) / 1000 / 60;
+			const eta = (st.arrival.getTime() - current_time.ms) / 1000 / 60;
 
 			const stopTimeData = {
 				...st,

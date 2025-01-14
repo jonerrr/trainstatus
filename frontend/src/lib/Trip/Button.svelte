@@ -27,7 +27,9 @@
 	});
 
 	const stop_times = $derived(
-		rt_stop_times.stop_times.filter((st) => st.trip_id === data.id && st.arrival > new Date())!
+		rt_stop_times.stop_times.filter(
+			(st) => st.trip_id === data.id && st.arrival.getTime() > current_time.ms
+		)!
 	);
 
 	const last_stop = $derived.by(() => {
