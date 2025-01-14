@@ -86,7 +86,7 @@
 </script>
 
 <div class="flex flex-col gap-1 items-center text-left">
-	<div class="flex gap-1 items-center self-start">
+	<div class="flex gap-1 items-center self-start max-w-[95%]">
 		<Icon
 			width={36}
 			height={36}

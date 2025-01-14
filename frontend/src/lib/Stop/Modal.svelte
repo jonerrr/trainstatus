@@ -25,6 +25,7 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import BusArrow from './BusArrow.svelte';
+	import { CircleAlert } from 'lucide-svelte';
 
 	interface Props {
 		show_previous: boolean;
@@ -117,6 +118,7 @@
 					express={false}
 					link={true}
 					route={page.data.routes[route.id] as Route}
+					show_alerts
 				/>
 			{/each}
 			<!-- {#if route_stops.length > 5} -->
@@ -130,6 +132,7 @@
 					express={false}
 					link={true}
 					route={page.data.routes[route.id] as Route}
+					show_alerts
 				/>
 			{/each}
 		{/if}
@@ -144,7 +147,8 @@
 
 		{#if show_alert_icon}
 			<!-- TODO: make less ugly -->
-			<div class="absolute -top-1 -right-1 size-3 rounded-full bg-orange-400"></div>
+			<CircleAlert size="1.5rem" class="text-red-800" />
+			<!-- <div class="absolute -top-1 -right-1 size-3 rounded-full bg-orange-400"></div> -->
 		{/if}
 	</div>
 </div>
