@@ -162,7 +162,7 @@
 
 		<div class="flex gap-1 items-center text-xs">
 			<!-- TODO: make history button work -->
-			<!-- {#if history}
+			{#if history}
 				<button
 					class:text-neutral-400={!show_previous}
 					class:text-neutral-50={show_previous}
@@ -173,7 +173,7 @@
 				>
 					<History size="2rem" />
 				</button>
-			{/if} -->
+			{/if}
 
 			<!-- <style>
 				@keyframes spin-forward {
@@ -273,7 +273,7 @@
 		<RouteModal route={page.state.data} time_format={time_format.value} />
 
 		{@render actions(
-			true,
+			false,
 			'r',
 			page.state.data.id,
 			`Alerts for ${page.state.data.id}`,

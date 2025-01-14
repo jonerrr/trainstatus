@@ -28,7 +28,16 @@
 
 	const route = $derived(page.data.routes[trip.route_id]);
 
-	const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
+	// const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
+	const stop_times = $derived.by(() => {
+		const stop_times = [];
+		for (const st of rt_stop_times.stop_times) {
+			if (st.trip_id === trip.id && (st.arrival.getTime() > current_time.ms || show_previous)) {
+				stop_times.push(st);
+			}
+		}
+		return stop_times;
+	});
 	const last_stop = $derived.by(() => {
 		if (!stop_times.length) return 'Unknown';
 
@@ -131,7 +140,10 @@
 			</button>
 
 			<Button state={{ modal: 'stop', data: stop }}>
-				<div class="flex flex-col w-full">
+				<div
+					class="flex flex-col w-full"
+					class:text-neutral-400={st.arrival.getTime() < current_time.ms}
+				>
 					<div class="flex items-center justify-between">
 						<div class="text-left pl-10">
 							{stop.name}

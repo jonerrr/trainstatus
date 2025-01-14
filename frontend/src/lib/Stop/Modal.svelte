@@ -50,7 +50,7 @@
 				const trip = rt_trips.trips.get(st.trip_id);
 				if (trip) {
 					const eta = (st.arrival.getTime() - now) / 60000;
-					if (eta >= 0) {
+					if (eta >= 0 || show_previous) {
 						// TODO: add a way to disable eta if statement
 						active_routes.add(trip.route_id);
 
@@ -195,7 +195,7 @@
 					/>
 				</div>
 
-				<div class="text-left">
+				<div class="text-left" class:text-neutral-400={st.arrival.getTime() < current_time.ms}>
 					{#if is_train_stop(stop)}
 						{@const last_stop_time = rt_stop_times.stop_times
 							.filter((trip_st) => trip_st.trip_id === st.trip.id)
@@ -216,6 +216,7 @@
 			<div
 				class="flex flex-col items-center"
 				class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}
+				class:text-neutral-400={st.arrival.getTime() < current_time.ms}
 			>
 				<!-- if bus trip and theres a deviation more than 2 min -->
 				{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
