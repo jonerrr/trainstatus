@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(PartialEq, Serialize, Hash, Eq, FromRow, ToSchema)]
+#[derive(PartialEq, Serialize, Deserialize, Hash, Eq, FromRow, ToSchema)]
 pub struct StopTime {
     pub trip_id: Uuid,
     pub stop_id: i32,
@@ -44,6 +44,7 @@ impl StopTime {
         at: DateTime<Utc>,
         bus_route_ids: Option<&Vec<String>>,
         only_bus: bool,
+        filter_arrival: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let default_routes = Vec::new();
         let bus_routes = bus_route_ids.unwrap_or(&default_routes);
@@ -73,12 +74,17 @@ impl StopTime {
                             ($3 = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY($2)))
                         )
                 )
+                AND (
+                    $4 = FALSE OR
+                    (st.arrival BETWEEN $1 AND $1 + INTERVAL '4 hours')
+                )
             ORDER BY
                 st.arrival;
             "#,
-            at,         // $1: Timestamp
-            bus_routes, // $2: Array of bus_route_ids (can be empty)
-            only_bus,   // $3: only_bus flag
+            at,             // $1: Timestamp
+            bus_routes,     // $2: Array of bus_route_ids (can be empty)
+            only_bus,       // $3: only_bus flag
+            filter_arrival  // $4: make sure arrival is > current time
         )
         .fetch_all(pool)
         .await

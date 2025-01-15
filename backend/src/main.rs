@@ -150,7 +150,7 @@ async fn main() {
     servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
-        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts)")
+        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between the current time and 4 hours from the current_time.")
     )
     )]
     struct ApiDoc;

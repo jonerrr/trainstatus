@@ -1,20 +1,40 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { current_time } from './util.svelte';
+import type { Trip } from './trips.svelte';
 
-export interface StopTime<T = never, D = never, R = never> {
+export interface StopTime<T = never | Trip> {
 	trip_id: string;
 	stop_id: number;
 	arrival: Date;
 	departure: Date;
-	eta: T;
-	direction: D;
-	route_id: R;
+	trip: T;
+	// eta: T;
+	// direction: D;
+	// route_id: R;
 }
 
 type Fetch = typeof fetch;
 
+// type ById<K extends string | number> = {
+// 	[P in K]: number[];
+// };
+type ByStopId = {
+	[stop_id: number]: StopTime[];
+};
+
+type ByTripId = {
+	[trip_id: string]: StopTime[];
+};
+
 export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
+
+	// let filter_arrivals = $state(false);
+	// <trip_id, index in array above>
+	const st_by_trip_id: ByTripId = $state({});
+	// const by_stop_id: ByStopId = $state({});
+	// let by_trip_id = $state(new SvelteMap<string, number[]>());
+	// let by_stop_id = $state(new SvelteMap<number, number[]>());
 
 	// must specify routes if only_bus is true
 	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false) {
@@ -35,25 +55,51 @@ export function createStopTimes() {
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}
-		const data: StopTime[] = (await res.json()).map((stop_time: StopTime) => ({
-			...stop_time,
-			arrival: new Date(stop_time.arrival),
-			departure: new Date(stop_time.departure)
-		}));
+		const data: StopTime[] = await res.json();
+		// const data: StopTime[] = (await res.json()).map((stop_time: StopTime) => ({
+		// 	...stop_time,
+		// 	arrival: new Date(stop_time.arrival),
+		// 	departure: new Date(stop_time.departure)
+		// }));
 
-		const remove_stop_ids = new Set(data.map((st) => st.trip_id));
+		// TODO: maybe move this to below
+		for (let i = 0; i < data.length; i++) {
+			const stop_time = data[i];
+			stop_time.arrival = new Date(stop_time.arrival);
+			stop_time.departure = new Date(stop_time.departure);
 
-		// if only_bus, we need to preserve stop_times for train
+			// if (!by_stop_id[stop_time.stop_id]) {
+			// 	by_stop_id[stop_time.stop_id] = [];
+			// } else {
+			// 	by_stop_id[stop_time.stop_id].push(stop_time);
+			// }
+
+			if (!st_by_trip_id[stop_time.trip_id]) {
+				st_by_trip_id[stop_time.trip_id] = [];
+			}
+
+			st_by_trip_id[stop_time.trip_id].push(stop_time);
+		}
+		// console.log(st_by_trip_id);
 		if (only_bus) {
-			const not_updated = stop_times.filter((st) => !remove_stop_ids.has(st.trip_id));
-			stop_times = data.concat(not_updated);
+			const result: StopTime[] = [];
+			const trip_ids = new Set(data.map((st) => st.trip_id));
+
+			// Keep existing non-bus stop times
+			for (const st of stop_times) {
+				if (!trip_ids.has(st.trip_id)) {
+					result.push(st);
+				}
+			}
+
+			// Add new bus stop times
+			for (const st of data) {
+				result.push(st);
+			}
+
+			stop_times = result;
 		} else {
 			stop_times = data;
-			// stop_times = data.map((stop_time) => ({
-			// 	...stop_time,
-			// 	arrival: new Date(stop_time.arrival),
-			// 	departure: new Date(stop_time.departure)
-			// }));
 		}
 	}
 
@@ -67,6 +113,20 @@ export function createStopTimes() {
 	return {
 		update,
 		// add_bus_routes,
+		get by_trip_id() {
+			return st_by_trip_id;
+		},
+
+		// set filter_arrivals(value: boolean) {
+		// 	// can only be set once, if user spams button we don't want to keep updating
+		// 	// TODO: maybe debounce this instead
+		// 	if (filter_arrivals) return;
+		// 	filter_arrivals = value;
+		// },
+
+		// get filter_arrivals() {
+		// 	return filter_arrivals;
+		// },
 
 		get stop_times() {
 			return stop_times;
