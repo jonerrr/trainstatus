@@ -14,7 +14,13 @@
 	}
 	let { data }: Props = $props();
 
-	type StopTimeByRoute = Map<string, StopTime<number, TripDirection, string>[]>;
+	interface StopTimeData extends StopTime {
+		eta: number;
+		direction: TripDirection;
+		route_id: string;
+	}
+
+	type StopTimeByRoute = Map<string, StopTimeData[]>;
 
 	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());

@@ -2,20 +2,14 @@
 	import { ArrowBigRight } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import {
-		is_bus_route,
-		is_train_route,
-		type BusTripData,
-		type TrainTripData,
-		type Trip
-	} from '$lib/trips.svelte';
+	import { is_bus_route, is_train_route, type Trip, type TripData } from '$lib/trips.svelte';
 	import { stop_times as rt_stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
 	import type { Route, Stop } from '$lib/static';
 	import { current_time } from '$lib/util.svelte';
 	import Icon from '$lib/Icon.svelte';
 
 	interface Props {
-		data: Trip<TrainTripData | BusTripData, Route>;
+		data: Trip<TripData, Route>;
 	}
 	let { data }: Props = $props();
 

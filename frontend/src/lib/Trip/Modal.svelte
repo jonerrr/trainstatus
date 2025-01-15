@@ -5,13 +5,7 @@
 	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
 	import type { Stop } from '$lib/static';
-	import {
-		is_bus_route,
-		is_train_route,
-		type BusTripData,
-		type TrainTripData,
-		type Trip
-	} from '$lib/trips.svelte';
+	import { is_bus_route, is_train_route, type Trip, type TripData } from '$lib/trips.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
@@ -21,7 +15,7 @@
 	interface Props {
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
-		trip: Trip<TrainTripData | BusTripData>;
+		trip: Trip<TripData>;
 	}
 
 	const { trip, show_previous, time_format }: Props = $props();

@@ -37,29 +37,32 @@
 
 	let { stop, show_previous, time_format }: Props = $props();
 
-	interface StopTimeWithTrip extends StopTime<number> {
-		trip: Trip<TripData>;
+	interface StopTimeWithTrip extends StopTime<Trip> {
+		eta: number;
+		route: Route;
+		// last_stop: StopTime<Trip>;
 	}
 
 	const { stop_times, active_routes } = $derived.by(() => {
 		const now = current_time.ms;
 		const stop_times: StopTimeWithTrip[] = [];
 		const active_routes: Set<string> = new Set();
-
+		// const start = performance.now();
+		// console.log(rt_stop_times.by_trip_id);
 		for (const st of rt_stop_times.stop_times) {
 			if (st.stop_id === stop.id) {
 				const trip = rt_trips.trips.get(st.trip_id);
 				if (trip) {
 					const eta = (st.arrival.getTime() - now) / 60000;
 					if (eta >= 0 || show_previous) {
-						// TODO: add a way to disable eta if statement
 						active_routes.add(trip.route_id);
-
-						stop_times.push({ ...st, eta, trip });
+						stop_times.push({ ...st, eta, trip, route: page.data.routes[trip.route_id] });
 					}
 				}
 			}
 		}
+
+		// console.log(`Stop times loop took ${performance.now() - start}ms`);
 
 		return { stop_times, active_routes };
 	});
@@ -201,10 +204,11 @@
 
 				<div class="text-left" class:text-neutral-400={st.arrival.getTime() < current_time.ms}>
 					{#if is_train_stop(stop)}
-						{@const last_stop_time = rt_stop_times.stop_times
-							.filter((trip_st) => trip_st.trip_id === st.trip.id)
-							.pop()!}
+						{@const last_stop_time =
+							rt_stop_times.by_trip_id[st.trip_id][rt_stop_times.by_trip_id[st.trip_id].length - 1]}
 						{page.data.stops[last_stop_time.stop_id].name}
+
+						<!-- {page.data.stops[last_stop_time.stop_id].name} -->
 					{:else if is_bus_stop(stop)}
 						{stop.routes.find((r) => r.id === st.trip.route_id)?.headsign}
 					{/if}

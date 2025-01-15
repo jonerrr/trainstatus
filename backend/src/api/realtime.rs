@@ -73,6 +73,9 @@ pub struct StopTimesParameters {
     /// Only return bus stop times. If bus_route_ids is not specified, this will return all TRAIN stop times.
     #[serde(default)]
     only_bus: bool,
+    /// Make sure trip.updated_at and stop_time.arrival are after the current time. By default, this only checks trip.updated_at.
+    #[serde(default)]
+    filter_arrival: bool,
 }
 
 #[utoipa::path(
@@ -95,6 +98,18 @@ pub async fn stop_times_handler(
         (true, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
+
+            // filter out where arrival is before current time if filter_arrival is true
+            if params.filter_arrival {
+                tracing::debug!("Filtering out stop times where arrival is before current time");
+                let stop_times: Vec<StopTime> = serde_json::from_str(&stop_times)?;
+                let stop_times = stop_times
+                    .into_iter()
+                    .filter(|st| st.arrival > current_time.time)
+                    .collect::<Vec<StopTime>>();
+                return Ok((json_headers().clone(), serde_json::to_string(&stop_times)?));
+            }
+
             Ok((json_headers().clone(), stop_times))
         }
         _ => {
@@ -104,6 +119,7 @@ pub async fn stop_times_handler(
                 current_time.time,
                 Some(&params.bus_route_ids),
                 params.only_bus,
+                params.filter_arrival,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))

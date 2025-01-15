@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
 import { current_time } from './util.svelte';
 
-export interface Trip<T extends TripData, R = never> {
+export interface Trip<T = TripData, R = never> {
 	id: string;
 	mta_id: string;
 	route_id: string;
