@@ -67,7 +67,8 @@ impl StopTime {
                     FROM
                         trip t
                     WHERE
-                        t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
+                        t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'
+                        AND ($1)::timestamp with time zone + INTERVAL '4 hours'
                         AND (
                             ($3 = TRUE AND t.route_id = ANY($2))
                             OR
