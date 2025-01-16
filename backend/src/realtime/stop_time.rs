@@ -48,7 +48,6 @@ impl StopTime {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let default_routes = Vec::new();
         let bus_routes = bus_route_ids.unwrap_or(&default_routes);
-        // st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours') AND
 
         sqlx::query_as!(
             StopTime,
