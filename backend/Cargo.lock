@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "0.9.4"
+version = "0.9.5"
 dependencies = [
  "axum",
  "bb8",
