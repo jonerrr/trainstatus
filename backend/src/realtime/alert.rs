@@ -363,8 +363,8 @@ impl Alert {
             WHERE
                 a.last_in_feed >= $1 - INTERVAL '2 minutes' AND
                 (ae.route_id IS NOT NULL OR ($2 = FALSE OR ae.stop_id IS NOT NULL))
-                AND ap.start_time <= now()
-                AND (ap.end_time >= now()
+                AND ap.start_time BETWEEN $1 AND $1 + INTERVAL '4 hours'
+                AND (ap.end_time >= $1
                     OR ap.end_time IS NULL)
             GROUP BY
                 a.id,
