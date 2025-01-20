@@ -202,7 +202,7 @@ impl SiriPosition {
         sqlx::query!(
             r#"
             WITH updated_values AS (
-                SELECT 
+                SELECT
                     unnest($1::text[]) AS vehicle_id,
                     unnest($2::text[]) AS mta_id,
                     unnest($3::status[]) AS status,
@@ -210,7 +210,7 @@ impl SiriPosition {
                     unnest($5::int[]) AS capacity
             )
             UPDATE position
-            SET 
+            SET
                 status = updated_values.status,
                 passengers = updated_values.passengers,
                 capacity = updated_values.capacity
@@ -234,7 +234,10 @@ impl SiriPosition {
 #[derive(Debug)]
 pub enum IntoPositionError {
     StopId,
-    FakeStop,
+    FakeStop {
+        // vehicle id to remove position from
+        vehicle_id: String,
+    },
     Timestamp,
     UpdatedAt,
     Trip,

@@ -50,7 +50,7 @@ pub mod feed {
 pub fn api_key() -> &'static str {
     // you need bustime api key to run this
     static API_KEY: OnceLock<String> = OnceLock::new();
-    API_KEY.get_or_init(|| var("API_KEY").unwrap())
+    API_KEY.get_or_init(|| var("API_KEY").expect("Missing API_KEY "))
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -93,7 +93,7 @@ async fn main() {
 
     // Connect to redis and create a pool
     let manager =
-        RedisConnectionManager::new(var("REDIS_URL").expect("Missing REDIS_URL")).unwrap();
+        RedisConnectionManager::new(var("REDIS_URL").expect("REDIS_URL env not set")).unwrap();
     let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
     // Test Redis connection
@@ -104,12 +104,12 @@ async fn main() {
     let s = conn
         .send_packed_command(&redis::cmd("PING"))
         .await
-        .expect("Failed to ping redis");
+        .expect("Failed send ping to redis");
     match s {
         redis::Value::SimpleString(s) => {
             assert_eq!(s, "PONG");
         }
-        _ => panic!("Failed to ping redis"),
+        _ => panic!("Failed read redis ping response"),
     }
 
     let notify = Arc::new(Notify::new());

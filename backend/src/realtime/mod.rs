@@ -63,6 +63,8 @@ pub enum ImportError {
     Reqwest(#[from] reqwest::Error),
     #[error("protobuf decode error: {0}")]
     Decode(#[from] prost::DecodeError),
+    #[error("Failed to parse: {0}")]
+    Parse(String),
 }
 
 pub async fn import(
