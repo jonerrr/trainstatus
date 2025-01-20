@@ -3,7 +3,6 @@ use crate::static_data::stop::convert_stop_id;
 use chrono::{DateTime, Utc};
 use rayon::prelude::*;
 use sqlx::PgPool;
-use std::collections::HashSet;
 use uuid::Uuid;
 
 // pub const ROUTES: [&str; 26] = [
@@ -19,11 +18,11 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     .await?;
 
     // This is used to set alerts not in feed to false
-    let mut in_feed_ids = HashSet::new();
+    let mut in_feed_ids = vec![];
     // This will be used to delete the cloned alerts
     let mut cloned_mta_ids: Vec<String> = vec![];
     // This is used to delete existing active periods and affected entities for alerts that already exist. Otherwise there may be duplicates
-    let mut existing_alert_ids: HashSet<Uuid> = HashSet::new();
+    let mut existing_alert_ids: Vec<Uuid> = vec![];
 
     let mut alerts: Vec<Alert> = vec![];
     let mut active_periods: Vec<ActivePeriod> = vec![];
@@ -82,18 +81,20 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             display_before_active,
         };
 
-        // this will also update the id if the alert already exists
         let alert_exists = alert.find(pool).await?;
-
         // There could be duplicate alerts in the feed so I need to remove them
-        if alert_exists && in_feed_ids.contains(&alert.id) {
+        if alert_exists && alerts.iter().any(|a| a.id == alert.id) {
             tracing::debug!("Skipping duplicate alert in feed");
             continue;
         }
+        if alert_exists {
+            existing_alert_ids.push(alert.id);
+        }
 
-        // in_feed_ids.push(alert.id);
+        in_feed_ids.push(alert.id);
 
         // Check if this was cloned. If it was we will remove the old one from the DB
+        // TODO: test this
         if let Some(clone_id) = mercury_alert.clone_id {
             cloned_mta_ids.push(clone_id);
             // cloned_ids.push(alert.id);
@@ -173,25 +174,24 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             })
             .collect::<Vec<_>>();
 
-        in_feed_ids.insert(alert.id);
         alerts.push(alert);
         active_periods.append(&mut alert_active_periods);
         affected_entities.append(&mut alert_affected_entities);
     }
 
-    // Remove cloned alerts and their active periods and affected entities
-    // let mut cloned_ids = vec![];
-    // alerts.retain(|a| {
-    //     if cloned_mta_ids.contains(&a.mta_id) {
-    //         cloned_ids.push(a.id);
-    //         false
-    //     } else {
-    //         true
-    //     }
-    // });
-
-    // active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
-    // affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
+    // Remove duplicate alerts and their active periods and affected entities
+    // TODO: check if this is required still
+    let mut cloned_ids = vec![];
+    alerts.retain(|a| {
+        if cloned_mta_ids.contains(&a.mta_id) {
+            cloned_ids.push(a.id);
+            false
+        } else {
+            true
+        }
+    });
+    active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
+    affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
 
     let mut transaction = pool.begin().await?;
 
@@ -202,56 +202,37 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // )
     // .execute(&mut *transaction)
     // .await?;
-
-    let existing_alert_ids = Vec::from_iter(existing_alert_ids);
-    let in_feed_ids = Vec::from_iter(in_feed_ids);
     // Set end time for active periods that are no longer active
-    // sqlx::query!(
-    //     "UPDATE
-    //     active_period
-    // SET
-    //     end_time = NOW()
-    // WHERE
-    //     alert_id = ANY($1)
-    //     AND end_time IS NULL
-    //     AND start_time NOT IN (
-    //         SELECT
-    //             start_time
-    //         FROM
-    //             active_period
-    //         WHERE
-    //             alert_id = ANY($1)
-    //     )",
-    //     &in_feed_ids
-    // )
-    // .execute(&mut *transaction)
-    // .await?;
+    sqlx::query!(
+        "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_period WHERE alert_id = ANY($1))",
+        &in_feed_ids
+    ).execute(&mut *transaction).await?;
+
+    // delete cloned ids
+    sqlx::query!("DELETE FROM alert WHERE mta_id = ANY($1)", &cloned_mta_ids)
+        .execute(&mut *transaction)
+        .await?;
 
     // Delete existing active periods and affected entities
     sqlx::query!(
         "DELETE FROM affected_entity WHERE alert_id = ANY($1)",
-        &in_feed_ids
+        &existing_alert_ids
     )
     .execute(&mut *transaction)
     .await?;
     sqlx::query!(
         "DELETE FROM active_period WHERE alert_id = ANY($1)",
-        &in_feed_ids
+        &existing_alert_ids
     )
     .execute(&mut *transaction)
     .await?;
 
+    // tracing::info!("inserting alerts");
     Alert::insert(alerts, &mut transaction).await?;
-    tracing::debug!("alerts inserted");
+    // tracing::info!("inserting active periods");
     ActivePeriod::insert(active_periods, &mut transaction).await?;
-    tracing::debug!("active periods inserted");
+    // tracing::info!("inserting affected entities");
     AffectedEntity::insert(affected_entities, &mut transaction).await?;
-    tracing::debug!("affected entities inserted");
-    // delete cloned ids TODO: maybe check if there are duplicate mta ids and only delete the latest one
-    // put after insert so we delete cloned alerts that are reinserted
-    sqlx::query!("DELETE FROM alert WHERE mta_id = ANY($1)", &cloned_mta_ids)
-        .execute(&mut *transaction)
-        .await?;
 
     transaction.commit().await?;
 

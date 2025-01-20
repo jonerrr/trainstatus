@@ -76,6 +76,10 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
     tracing::info!("Starting Train Status API v{}", VERSION);
+    let read_only = var("READ_ONLY").is_ok();
+    if read_only {
+        tracing::info!("Running in read-only mode");
+    }
 
     let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
         .expect("DATABASE_URL env not set")
@@ -112,13 +116,14 @@ async fn main() {
         _ => panic!("Failed read redis ping response"),
     }
 
-    let notify = Arc::new(Notify::new());
-    let notify2 = notify.clone();
+    if !read_only {
+        let notify = Arc::new(Notify::new());
+        let notify2 = notify.clone();
 
-    static_data::import(pg_pool.clone(), notify, redis_pool.clone()).await;
-    // Wait for static data to be loaded
-    notify2.notified().await;
-
+        static_data::import(pg_pool.clone(), notify, redis_pool.clone()).await;
+        // Wait for static data to be loaded
+        notify2.notified().await;
+    }
     // cache static data. It will also cache after each refresh
     static_data::cache_all(&pg_pool, &redis_pool)
         .await
@@ -130,7 +135,8 @@ async fn main() {
 
     // let (tx, rx) = unbounded::<Vec<Update>>();
     // tx, initial_data.clone()
-    realtime::import(pg_pool.clone(), redis_pool.clone()).await;
+
+    realtime::import(pg_pool.clone(), redis_pool.clone(), read_only).await;
 
     let cors_layer =
         CorsLayer::new()
