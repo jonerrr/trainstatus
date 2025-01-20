@@ -1,4 +1,4 @@
-# TrainStat.us
+# Train Status
 
 The best website to check the status of your train (and bus).
 
@@ -8,7 +8,7 @@ A realtime bus map is available at <a href="https://map.trainstat.us" target="_b
 
 ## Features
 
-- Blazingly fast
+- Blazingly fast 😼😼😼😼
 - Real-time alerts and arrivals for MTA subways and buses
 - Works offline
 - Installable as a PWA
