@@ -247,7 +247,7 @@
 		}, 100)();
 		// clearTimeout(timer);
 		// timer = setTimeout(() => visible_bus_routes.forEach((r) => monitored_bus_routes.add(r)), 100);
-		// // // console.log('updating monitored bus routes');
+		// console.log('updating monitored bus routes');
 
 		// return () => clearTimeout(timer);
 	});

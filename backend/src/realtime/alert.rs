@@ -335,6 +335,7 @@ impl Alert {
         at: DateTime<Utc>,
         stop_alerts: bool,
     ) -> Result<serde_json::Value, sqlx::Error> {
+        // TODO: maybe if time is specified, dont include alerts where end time is null
         let alerts: (Option<serde_json::Value>,) = sqlx::query_as(
             r#"
             SELECT json_agg(result) FROM

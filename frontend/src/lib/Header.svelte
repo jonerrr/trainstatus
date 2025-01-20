@@ -3,20 +3,36 @@
 	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
 	import { current_time, debounce } from '$lib/util.svelte';
+	import { pushState, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+	import { tick } from 'svelte';
 
 	interface Props {
 		offline: boolean;
 	}
 
 	let { offline }: Props = $props();
+	// $eff
+	let last_at = current_time.value;
 
-	// update rt data after value change
-	// $effect(() => {
-	// 	current_time.value;
-	// 	debounce(() => {
-	// 		console.log('time change, updating rt data');
-	// 	}, 500)();
-	// });
+	$effect(() => {
+		current_time.value;
+		tick().then(() => {
+			if (!current_time.value || last_at === current_time.value) return;
+			// use existing url because we don't want to lose other query params
+			const url = new URL(window.location.href);
+			url.searchParams.set('at', current_time.value.toString());
+			// Users can't change the time if they are in a modal, so it will always be null (hopefully).
+			replaceState(url.toString(), {
+				modal: null,
+				at: current_time.value
+			});
+		});
+
+		// debounce(() => {
+		// 	console.log('time change, updating rt data');
+		// }, 500)();
+	});
 </script>
 
 <header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
@@ -33,11 +49,14 @@
 			<!-- TODO: show input even if user didn't specify in query param -->
 			<!-- TODO: update url param with user's input -->
 			<input
+				max={dayjs().format('YYYY-MM-DDTHH:mm')}
 				style="color-scheme: dark"
 				type="datetime-local"
-				bind:value={() =>
-					current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
-				(v) => (current_time.value = dayjs(v).unix())}
+				bind:value={
+					() =>
+						current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
+					(v) => (current_time.value = dayjs(v).unix())
+				}
 				class="text-neutral-400 text-sm bg-transparent border-b border-neutral-400 ml-2"
 			/>
 		{/if}

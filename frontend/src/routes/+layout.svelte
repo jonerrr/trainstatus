@@ -2,7 +2,7 @@
 	import '../app.css';
 	import '@fontsource/inter';
 	import { page } from '$app/state';
-	import { pushState } from '$app/navigation';
+	import { pushState, replaceState } from '$app/navigation';
 	import { onMount, tick, type Snippet } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
@@ -23,10 +23,11 @@
 	let offline = $state(false);
 	let is_updating = $state(false);
 
+	let last_at = current_time.value;
 	$effect(() => {
 		current_time.value;
 		debounce(() => {
-			if (!current_time.value) return;
+			if (!current_time.value || last_at === current_time.value) return;
 			console.log('time change, updating rt data');
 			try {
 				is_updating = true;
@@ -47,12 +48,6 @@
 	});
 
 	onMount(() => {
-		// const at = page.url.searchParams.get('at');
-
-		// if (at && !isNaN(parseInt(at))) {
-		// 	current_time = parseInt(at);
-		// }
-
 		window.addEventListener('offline', (_e) => {
 			offline = true;
 		});
@@ -111,18 +106,28 @@
 					pushState('', {
 						modal: 'route',
 						data: page.data.routes[id]
+						// at: at ? parseInt(at) : undefined
 					});
 				} else if (id in page.data.stops) {
 					pushState('', {
 						modal: 'stop',
 						data: page.data.stops[parseInt(id)]
+						// at: at ? parseInt(at) : undefined
 					});
 				} else if (trips.trips.has(id)) {
 					pushState('', {
 						modal: 'trip',
 						data: trips.trips.get(id)
+						// at: at ? parseInt(at) : undefined
 					});
 				} else {
+					// if (at) {
+					// 	console.log('pushing state with at', at);
+					// 	replaceState(`?at=${at}`, {
+					// 		modal: null,
+					// 		at: parseInt(at)
+					// 	});
+					// }
 					console.error('Invalid ID', id);
 					alert('Invalid ID');
 				}

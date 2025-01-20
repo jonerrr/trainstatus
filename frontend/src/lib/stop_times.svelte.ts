@@ -31,8 +31,8 @@ export function createStopTimes() {
 
 	// let filter_arrivals = $state(false);
 	// <trip_id, index in array above>
-	const st_by_trip_id: ByTripId = $state({});
-	// const by_stop_id: ByStopId = $state({});
+	let st_by_trip_id: ByTripId = $state({});
+	let st_by_stop_id: ByStopId = $state({});
 	// let by_trip_id = $state(new SvelteMap<string, number[]>());
 	// let by_stop_id = $state(new SvelteMap<number, number[]>());
 
@@ -62,33 +62,42 @@ export function createStopTimes() {
 		// 	departure: new Date(stop_time.departure)
 		// }));
 
+		const st_by_trip_id_new: ByTripId = {};
+		const st_by_stop_id_new: ByStopId = {};
 		// TODO: maybe move this to below
 		for (let i = 0; i < data.length; i++) {
 			const stop_time = data[i];
 			stop_time.arrival = new Date(stop_time.arrival);
 			stop_time.departure = new Date(stop_time.departure);
 
-			// if (!by_stop_id[stop_time.stop_id]) {
-			// 	by_stop_id[stop_time.stop_id] = [];
-			// } else {
-			// 	by_stop_id[stop_time.stop_id].push(stop_time);
-			// }
-
-			if (!st_by_trip_id[stop_time.trip_id]) {
-				st_by_trip_id[stop_time.trip_id] = [];
+			if (!st_by_trip_id_new[stop_time.trip_id]) {
+				st_by_trip_id_new[stop_time.trip_id] = [];
+			}
+			if (!st_by_stop_id_new[stop_time.stop_id]) {
+				st_by_stop_id_new[stop_time.stop_id] = [];
 			}
 
-			st_by_trip_id[stop_time.trip_id].push(stop_time);
+			st_by_trip_id_new[stop_time.trip_id].push(stop_time);
+			st_by_stop_id_new[stop_time.stop_id].push(stop_time);
 		}
 		// console.log(st_by_trip_id);
 		if (only_bus) {
 			const result: StopTime[] = [];
-			const trip_ids = new Set(data.map((st) => st.trip_id));
+			const trip_ids = new Set<string>();
+			const stop_ids = new Set<number>();
+			for (const st of data) {
+				trip_ids.add(st.trip_id);
+				stop_ids.add(st.stop_id);
+			}
 
 			// Keep existing non-bus stop times
 			for (const st of stop_times) {
 				if (!trip_ids.has(st.trip_id)) {
 					result.push(st);
+					st_by_trip_id_new[st.trip_id] = st_by_trip_id[st.trip_id];
+				}
+				if (!stop_ids.has(st.stop_id)) {
+					st_by_stop_id_new[st.stop_id] = st_by_stop_id[st.stop_id];
 				}
 			}
 
@@ -101,6 +110,8 @@ export function createStopTimes() {
 		} else {
 			stop_times = data;
 		}
+		st_by_trip_id = st_by_trip_id_new;
+		st_by_stop_id = st_by_stop_id_new;
 	}
 
 	// async function add_bus_routes(fetch: Fetch, routes: Set<string>) {
@@ -115,6 +126,10 @@ export function createStopTimes() {
 		// add_bus_routes,
 		get by_trip_id() {
 			return st_by_trip_id;
+		},
+
+		get by_stop_id() {
+			return st_by_stop_id;
 		},
 
 		// set filter_arrivals(value: boolean) {

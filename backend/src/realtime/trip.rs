@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
@@ -36,15 +38,6 @@ pub enum TripData {
 
 impl Trip<TripData> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
-        // check if there are duplicate ids
-        let mut ids_test = vec![];
-        for v in &values {
-            if ids_test.contains(&v.id) {
-                dbg!(v);
-            }
-            ids_test.push(v.id);
-        }
-
         // using UNNEST to insert multiple rows at once https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
         let ids = values.iter().map(|v| v.id).collect::<Vec<Uuid>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();

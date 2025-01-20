@@ -55,7 +55,7 @@ pub async fn import(
             tracing::info!("Updating static data");
 
             let gtfs = reqwest::Client::new()
-                .get("http://web.mta.info/developers/data/nyct/subway/google_transit.zip")
+                .get("https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip")
                 .send()
                 .await
                 .unwrap()

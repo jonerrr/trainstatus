@@ -40,9 +40,12 @@ pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, ImportError> {
         .bytes()
         .await?;
 
-    let feed = FeedMessage::decode(data)?;
+    // TODO: remove clone
+    let feed = FeedMessage::decode(data.clone())?;
 
     if *debug_gtfs() {
+        let debug_path = format!("./gtfs/{}.pb", name);
+        write(&debug_path, data).await.unwrap();
         let msgs = format!("{:#?}", feed);
         create_dir("./gtfs").await.ok();
         write(format!("./gtfs/{}.txt", name), msgs).await.unwrap();
@@ -77,7 +80,7 @@ pub async fn import(
         loop {
             let _ = alert::import(&pool)
                 .await
-                .inspect_err(|e| tracing::error!("alert::import: {}", e));
+                .inspect_err(|e| tracing::error!("alert::import: {:#?}", e));
             sleep(Duration::from_secs(35)).await;
         }
     });
@@ -86,7 +89,7 @@ pub async fn import(
         loop {
             let _ = train::import(&t_pool)
                 .await
-                .inspect_err(|e| tracing::error!("train::import: {}", e));
+                .inspect_err(|e| tracing::error!("train::import: {:#?}", e));
             sleep(Duration::from_secs(35)).await;
         }
     });
@@ -95,7 +98,7 @@ pub async fn import(
         loop {
             let _ = bus::import(&b_pool)
                 .await
-                .inspect_err(|e| tracing::error!("bus::import: {}", e));
+                .inspect_err(|e| tracing::error!("bus::import: {:#?}", e));
 
             sleep(Duration::from_secs(35)).await;
         }
