@@ -338,6 +338,7 @@ impl Alert {
         pool: &PgPool,
         at: DateTime<Utc>,
         stop_alerts: bool,
+        // limit_start_time: bool,
     ) -> Result<serde_json::Value, sqlx::Error> {
         // TODO: maybe if time is specified, dont include alerts where end time is null
         let alerts: (Option<serde_json::Value>,) = sqlx::query_as(
@@ -368,7 +369,7 @@ impl Alert {
             WHERE
                 a.last_in_feed >= $1 - INTERVAL '2 minutes' AND
                 (ae.route_id IS NOT NULL OR ($2 = FALSE OR ae.stop_id IS NOT NULL))
-                AND ap.start_time BETWEEN $1 AND $1 + INTERVAL '4 hours'
+                AND ap.start_time <= $1
                 AND (ap.end_time >= $1
                     OR ap.end_time IS NULL)
             GROUP BY
@@ -379,6 +380,7 @@ impl Alert {
         )
         .bind(at)
         .bind(stop_alerts)
+        // .bind(limit_start_time)
         .fetch_one(pool)
         .await?;
 
