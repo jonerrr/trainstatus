@@ -68,6 +68,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let mut trips: Vec<Trip<TripData>> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
+    // if there was an error parsing position, we delete existing position
+    let mut delete_position_vehicle_ids = vec![];
 
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
@@ -129,6 +131,12 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 Ok(p) => p,
                 Err(e) => {
                     tracing::debug!("Error parsing position: {:?}", e);
+                    match e {
+                        IntoPositionError::FakeStop { vehicle_id } => {
+                            delete_position_vehicle_ids.push(vehicle_id);
+                        }
+                        _ => {}
+                    }
                     continue;
                 }
             };
@@ -147,6 +155,14 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     StopTime::insert(stop_times, pool).await?;
     tracing::debug!("stop times inserted");
     Position::insert(positions, pool).await?;
+
+    sqlx::query!(
+        "DELETE FROM position WHERE vehicle_id = ANY($1)",
+        &delete_position_vehicle_ids
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 
@@ -388,13 +404,15 @@ impl TryFrom<VehiclePosition> for Position {
     type Error = IntoPositionError;
 
     fn try_from(value: VehiclePosition) -> Result<Self, Self::Error> {
+        let trip = value.trip.ok_or(IntoPositionError::Trip)?;
+        let mut trip: Trip<TripData> = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
+
         let mut stop_id = value.stop_id.ok_or(IntoPositionError::StopId)?;
         // Remove N or S from stop id
         let direction = stop_id.pop();
-        let stop_id = convert_stop_id(stop_id).ok_or(IntoPositionError::FakeStop)?;
-
-        let trip = value.trip.ok_or(IntoPositionError::Trip)?;
-        let mut trip: Trip<TripData> = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
+        let stop_id = convert_stop_id(stop_id).ok_or(IntoPositionError::FakeStop {
+            vehicle_id: trip.vehicle_id.clone(),
+        })?;
 
         if trip.direction.is_none() {
             trip.direction = match direction {

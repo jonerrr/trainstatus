@@ -158,7 +158,9 @@ pub async fn stops_handler(
             let (stops, stops_hash) = state.mget_from_cache(&["stops", "stops_hash"]).await?;
 
             if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-                let etag = stops_hash.parse::<ETag>().unwrap();
+                let etag = stops_hash
+                    .parse::<ETag>()
+                    .map_err(|_| ServerError::BadRequest("Failed to parse ETag".into()))?;
 
                 // if the etag matches the request, return 304
                 if !if_none_match.precondition_passes(&etag) {

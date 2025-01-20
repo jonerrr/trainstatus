@@ -21,8 +21,8 @@ pub enum ServerError {
     // Broadcast(#[from] BroadcastStreamRecvError),
     #[error("{0}")]
     SerdeJson(#[from] serde_json::Error),
-    // #[error("Bad request")]
-    // BadRequest,
+    #[error("Bad request: {0}")]
+    BadRequest(String),
     // #[error("Not found")]
     // NotFound,
 }
@@ -31,15 +31,17 @@ impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
         tracing::error!("{:#?}", self);
 
-        let (status_code, message) = match self {
-            ServerError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "database error"),
-            ServerError::Redis(_) | ServerError::RedisPool(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "cache error")
+        let (status_code, message): (StatusCode, String) = match self {
+            ServerError::Database(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "database error".into())
             }
-            ServerError::SerdeJson(_) => (StatusCode::INTERNAL_SERVER_ERROR, "json error"),
+            ServerError::Redis(_) | ServerError::RedisPool(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "cache error".into())
+            }
+            ServerError::SerdeJson(_) => (StatusCode::INTERNAL_SERVER_ERROR, "json error".into()),
             // ServerError::Broadcast(_) => (StatusCode::INTERNAL_SERVER_ERROR, "broadcast error"),
-            ServerError::Axum(_) => (StatusCode::INTERNAL_SERVER_ERROR, "stream error"),
-            // ServerError::BadRequest => (StatusCode::BAD_REQUEST, "bad request"),
+            ServerError::Axum(_) => (StatusCode::INTERNAL_SERVER_ERROR, "stream error".into()),
+            ServerError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             // ServerError::NotFound => (StatusCode::NOT_FOUND, "not found"),
         };
 
