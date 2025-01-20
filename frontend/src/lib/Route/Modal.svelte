@@ -6,6 +6,7 @@
 	import { debounce } from '$lib/util.svelte';
 	import { type Route } from '$lib/static';
 	import Icon from '$lib/Icon.svelte';
+	import { updated } from '$app/state';
 	dayjs.extend(relativeTime);
 
 	interface ModalProps {
@@ -120,28 +121,27 @@
 					{@html alert.description_html}
 				{/if}
 			</div>
+
+			{#snippet alert_time(time: Date)}
+				{@const dt = dayjs(time)}
+				{#if time_format === 'countdown'}
+					{dt.fromNow()}
+				{:else if !dt.isSame(dayjs(), 'day')}
+					{dt.format('h:mm A M/D')}
+				{:else}
+					{dt.format('h:mm A')}
+				{/if}
+			{/snippet}
+
 			<div class="text-sm text-neutral-400 px-1 w-full flex justify-between">
 				<div class="text-left">
 					Updated:
-					{#if time_format === 'countdown'}
-						{dayjs(alert.updated_at).fromNow()}
-					{:else}
-						{dayjs(alert.updated_at).format('h:mm A')}
-					{/if}
+					{@render alert_time(alert.updated_at)}
 				</div>
 				{#if alert.end_time}
 					<div class="text-right">
 						End:
-						{#if time_format === 'countdown'}
-							{dayjs(alert.end_time).fromNow()}
-						{:else if !dayjs(alert.end_time).isSame(dayjs(), 'day')}
-							{dayjs(alert.end_time).format('M/D')}
-							<!-- {#if !dayjs(alert.end_time).isSame(dayjs(), 'day')}
-								{dayjs(alert.end_time).format('M/D')}
-							{/if} -->
-						{:else}
-							{dayjs(alert.end_time).format('h:mm A')}
-						{/if}
+						{@render alert_time(alert.end_time)}
 					</div>
 				{/if}
 			</div>
