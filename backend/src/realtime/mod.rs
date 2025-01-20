@@ -70,52 +70,55 @@ pub enum ImportError {
 pub async fn import(
     pool: PgPool,
     redis_pool: bb8::Pool<RedisConnectionManager>,
+    read_only: bool,
     // tx: Sender<Vec<Update>>,
     // initial_data: Arc<RwLock<serde_json::Value>>,
 ) {
-    let t_pool = pool.clone();
-    let b_pool = pool.clone();
-    let s_pool = pool.clone();
     let c_pool = pool.clone();
+    if !read_only {
+        let t_pool = pool.clone();
+        let b_pool = pool.clone();
+        let s_pool = pool.clone();
 
-    tokio::spawn(async move {
-        loop {
-            let _ = alert::import(&pool)
-                .await
-                .inspect_err(|e| tracing::error!("alert::import: {:#?}", e));
-            sleep(Duration::from_secs(35)).await;
-        }
-    });
+        tokio::spawn(async move {
+            loop {
+                let _ = alert::import(&pool)
+                    .await
+                    .inspect_err(|e| tracing::error!("alert::import: {:#?}", e));
+                sleep(Duration::from_secs(35)).await;
+            }
+        });
 
-    tokio::spawn(async move {
-        loop {
-            let _ = train::import(&t_pool)
-                .await
-                .inspect_err(|e| tracing::error!("train::import: {:#?}", e));
-            sleep(Duration::from_secs(35)).await;
-        }
-    });
+        tokio::spawn(async move {
+            loop {
+                let _ = train::import(&t_pool)
+                    .await
+                    .inspect_err(|e| tracing::error!("train::import: {:#?}", e));
+                sleep(Duration::from_secs(35)).await;
+            }
+        });
 
-    tokio::spawn(async move {
-        loop {
-            let _ = bus::import(&b_pool)
-                .await
-                .inspect_err(|e| tracing::error!("bus::import: {:#?}", e));
+        tokio::spawn(async move {
+            loop {
+                let _ = bus::import(&b_pool)
+                    .await
+                    .inspect_err(|e| tracing::error!("bus::import: {:#?}", e));
 
-            sleep(Duration::from_secs(35)).await;
-        }
-    });
+                sleep(Duration::from_secs(35)).await;
+            }
+        });
 
-    tokio::spawn(async move {
-        loop {
-            let _ = bus::import_siri(&s_pool).await.inspect_err(|e| match e {
-                // ignore decode errors because they happen often. I think this happens bc sometimes the API takes longer than 30 seconds to respond.
-                ImportError::SiriDecode(_) => (),
-                e => tracing::error!("bus::import_siri: {}", e),
-            });
-            sleep(Duration::from_secs(45)).await;
-        }
-    });
+        tokio::spawn(async move {
+            loop {
+                let _ = bus::import_siri(&s_pool).await.inspect_err(|e| match e {
+                    // ignore decode errors because they happen often. I think this happens bc sometimes the API takes longer than 30 seconds to respond.
+                    ImportError::SiriDecode(_) => (),
+                    e => tracing::error!("bus::import_siri: {}", e),
+                });
+                sleep(Duration::from_secs(45)).await;
+            }
+        });
+    }
 
     // sleep 10 seconds to wait for the feeds to be imported before caching
     // sleep(Duration::from_secs(10)).await;

@@ -9,9 +9,10 @@
 
 ## Config
 
-| Environmental Variable | Usage                                                     |
-| ---------------------- | --------------------------------------------------------- |
-| `FORCE_UPDATE`         | Force update static bus and train data                    |
-| `DEBUG_GTFS`           | Save all GTFS data as a txt file to `./gtfs/`             |
-| `DATABASE_URL`         | PostgreSQL database URL                                   |
-| `ADDRESS`              | Address for axum to bind to. Defaults to `127.0.0.1:3055` |
+| Environmental Variable | Usage                                                                  | Required |
+| ---------------------- | ---------------------------------------------------------------------- | -------- |
+| `DATABASE_URL`         | PostgreSQL database URL                                                | Yes      |
+| `ADDRESS`              | Address for axum to bind to. Defaults to `127.0.0.1:3055`              | Yes      |
+| `FORCE_UPDATE`         | If set, static data will update on startup                             | No       |
+| `DEBUG_GTFS`           | If set, saves all realtime GTFS data as a txt and pb file to `./gtfs/` | No       |
+| `READ_ONLY`            | If set, the backend will not update any realtime or static data        | No       |

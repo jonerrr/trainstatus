@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::{
     decode,
     position::{IntoPositionError, Position, PositionData, Status},
@@ -152,6 +154,33 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     Trip::insert(trips, pool).await?;
     tracing::debug!("trips inserted");
+    // TODO: figure out why tf there are duplicate stop times rarely
+    let mut seen = HashSet::new();
+    let mut duplicates = Vec::new();
+    let mut dupe_st = HashSet::new();
+
+    for v in &stop_times {
+        let stop_id_and_trip_id = (v.stop_id, v.trip_id);
+        if !seen.insert(stop_id_and_trip_id) {
+            duplicates.push(stop_id_and_trip_id);
+            dupe_st.insert(v.clone());
+        }
+    }
+
+    // for d in &duplicates {
+    //     tracing::warn!(
+    //         "Ignoring duplicate stop_id and trip_id found in stop_time\n{:?}\n{:?}",
+    //         d,
+    //         reverse_convert_stop_id(d.0)
+    //     );
+    // }
+    if !duplicates.is_empty() {
+        tracing::warn!("Ignoring duplicate train stop times\n{:?}", duplicates);
+        // dbg!(stop_times.len());
+        stop_times.retain(|v| !dupe_st.contains(v));
+        // dbg!(stop_times.len());
+    }
+
     StopTime::insert(stop_times, pool).await?;
     tracing::debug!("stop times inserted");
     Position::insert(positions, pool).await?;
