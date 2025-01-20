@@ -1,8 +1,12 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+use crate::realtime::train::reverse_convert_stop_id;
 
 #[derive(PartialEq, Serialize, Deserialize, Hash, Eq, FromRow, ToSchema)]
 pub struct StopTime {
@@ -90,11 +94,33 @@ impl StopTime {
         .await
     }
 
-    pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn insert(mut values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         let trip_ids = values.iter().map(|v| v.trip_id).collect::<Vec<_>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
         let arrivals = values.iter().map(|v| v.arrival).collect::<Vec<_>>();
         let departures = values.iter().map(|v| v.departure).collect::<Vec<_>>();
+
+        // check if there are duplicate ids
+        let mut seen = HashSet::new();
+        let mut duplicates = Vec::new();
+
+        for v in &values {
+            let stop_id_and_trip_id = (v.stop_id, v.trip_id);
+            if !seen.insert(stop_id_and_trip_id) {
+                duplicates.push(stop_id_and_trip_id);
+            }
+        }
+
+        for d in &duplicates {
+            tracing::warn!(
+                "Ignoring duplicate stop_id and trip_id found in stop_time\n{:?}\n{:?}",
+                d,
+                reverse_convert_stop_id(d.0)
+            );
+        }
+
+        values.retain(|v| !duplicates.contains(&(v.stop_id, v.trip_id)));
+        // dbg!(duplicates);
 
         sqlx::query!(
             r#"

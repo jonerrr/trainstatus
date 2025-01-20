@@ -27,7 +27,7 @@
 	const active_routes = $state(new SvelteSet<Route>());
 
 	$effect(() => {
-		rt_stop_times?.stop_times;
+		rt_stop_times?.by_stop_id;
 		rt_trips.trips;
 		data;
 
@@ -42,13 +42,13 @@
 		sb_st_by_route.clear();
 
 		// Early exit if no data
-		if (!rt_stop_times?.stop_times?.length) {
-			return;
-		}
+		// if (!rt_stop_times?.stop_times?.length) {
+		// 	return;
+		// }
+		const stop_times = rt_stop_times.by_stop_id[data.id] ?? [];
 
-		// Pre-filter relevant stop times
-		for (const st of rt_stop_times.stop_times) {
-			if (st.stop_id !== data.id || st.arrival.getTime() < current_time.ms) continue;
+		for (const st of stop_times) {
+			if (st.arrival.getTime() < current_time.ms) continue;
 			const trip = rt_trips.trips.get(st.trip_id);
 			if (!trip) continue;
 

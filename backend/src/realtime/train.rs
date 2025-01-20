@@ -143,7 +143,9 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // let trips = trips.into_par_iter().map(|t| t.0).collect::<Vec<Trip>>();
 
     Trip::insert(trips, pool).await?;
+    tracing::debug!("trips inserted");
     StopTime::insert(stop_times, pool).await?;
+    tracing::debug!("stop times inserted");
     Position::insert(positions, pool).await?;
     Ok(())
 }
@@ -281,6 +283,59 @@ fn parse_route_id(route_id: String) -> (String, bool) {
 //     "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
 //     "S12", "S10",
 // ];
+
+/// Reverses the `convert_stop_id` function, converting an `i32` back to the original `stop_id` string.
+///
+/// # Arguments
+///
+/// * `stop_num` - An `i32` representing the converted `stop_id`.
+///
+/// # Returns
+///
+/// * `Option<String>` - The original `stop_id` string if successful, otherwise `None`.
+pub fn reverse_convert_stop_id(stop_num: i32) -> Option<String> {
+    let stop_num_str = stop_num.to_string();
+    let mut original_stop_id = String::new();
+    let mut index = 0;
+
+    while index < stop_num_str.len() {
+        // Attempt to parse the next two digits as a potential ASCII character
+        if index + 2 <= stop_num_str.len() {
+            let two_digits = &stop_num_str[index..index + 2];
+            if let Ok(num) = two_digits.parse::<u32>() {
+                // Check if the number corresponds to an uppercase or lowercase ASCII character
+                if (65..=90).contains(&num) || (97..=122).contains(&num) {
+                    if let Some(c) = char::from_u32(num) {
+                        original_stop_id.push(c);
+                        index += 2;
+                        continue;
+                    } else {
+                        // Invalid Unicode scalar value
+                        return None;
+                    }
+                }
+            }
+        }
+
+        // If not a two-digit character, attempt to parse a single digit as a numeric character
+        let one_digit = &stop_num_str[index..index + 1];
+        if let Ok(num) = one_digit.parse::<u32>() {
+            if let Some(c) = char::from_digit(num, 10) {
+                original_stop_id.push(c);
+                index += 1;
+                continue;
+            } else {
+                // Invalid digit
+                return None;
+            }
+        }
+
+        // If neither condition is met, the input is malformed
+        return None;
+    }
+
+    Some(original_stop_id)
+}
 
 struct StopTimeUpdateWithTrip<'a> {
     stop_time: StopTimeUpdate,

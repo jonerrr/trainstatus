@@ -11,7 +11,7 @@ services:
     volumes:
       - trainstatus-db:/var/lib/postgresql/data:z
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:z
-
+    shm_size: 1g
   valkey:
     image: valkey/valkey:alpine
     container_name: valkey

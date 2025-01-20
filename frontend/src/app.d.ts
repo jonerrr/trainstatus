@@ -29,6 +29,8 @@ declare global {
 			// null is not open
 			modal: 'stop' | 'trip' | 'route' | null;
 			data?: Stop | Trip | Route;
+			// time used for api requests.
+			at?: number;
 		}
 		// interface Platform {}
 	}
