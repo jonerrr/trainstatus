@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};

@@ -133,11 +133,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 Ok(p) => p,
                 Err(e) => {
                     tracing::debug!("Error parsing position: {:?}", e);
-                    match e {
-                        IntoPositionError::FakeStop { vehicle_id } => {
-                            delete_position_vehicle_ids.push(vehicle_id);
-                        }
-                        _ => {}
+                    if let IntoPositionError::FakeStop { vehicle_id } = e {
+                        delete_position_vehicle_ids.push(vehicle_id);
                     }
                     continue;
                 }
