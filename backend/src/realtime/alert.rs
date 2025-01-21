@@ -1,7 +1,6 @@
 use super::{decode, ImportError};
 use crate::static_data::stop::convert_stop_id;
 use chrono::{DateTime, Utc};
-use rayon::prelude::*;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -102,7 +101,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
         let mut alert_active_periods = feed_alert
             .active_period
-            .par_iter()
+            .iter()
             .map(|ap| {
                 let start = DateTime::from_timestamp(ap.start.unwrap() as i64, 0).unwrap();
                 let end = ap
@@ -115,10 +114,11 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 }
             })
             .collect::<Vec<_>>();
+        // tracing::info!("active period: {:?}", end - start);
 
         let mut alert_affected_entities = feed_alert
             .informed_entity
-            .par_iter()
+            .iter()
             // Remove all MNR and LIRR alerts
             .filter(|entity| {
                 entity.agency_id != Some("MNR".to_string())
