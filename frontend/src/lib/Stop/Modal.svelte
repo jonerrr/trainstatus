@@ -45,22 +45,23 @@
 
 	const { stop_times, active_routes } = $derived.by(() => {
 		const now = current_time.ms;
-		const stop_times: StopTimeWithTrip[] = [];
+		// const stop_times: StopTimeWithTrip[] = [];
 		const active_routes: Set<string> = new Set();
 		// const start = performance.now();
 		// console.log(rt_stop_times.by_trip_id);
-		for (const st of rt_stop_times.stop_times) {
-			if (st.stop_id === stop.id) {
+		const stop_times = (rt_stop_times.by_stop_id[stop.id] ?? [])
+			.filter((st) => st.arrival.getTime() > now || show_previous)
+			.map((st) => {
 				const trip = rt_trips.trips.get(st.trip_id);
 				if (trip) {
 					const eta = (st.arrival.getTime() - now) / 60000;
 					if (eta >= 0 || show_previous) {
 						active_routes.add(trip.route_id);
-						stop_times.push({ ...st, eta, trip, route: page.data.routes[trip.route_id] });
+						return { ...st, eta, trip, route: page.data.routes[trip.route_id] };
 					}
 				}
-			}
-		}
+			})
+			.filter(Boolean) as StopTimeWithTrip[];
 
 		// console.log(`Stop times loop took ${performance.now() - start}ms`);
 

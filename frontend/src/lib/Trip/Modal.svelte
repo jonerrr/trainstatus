@@ -24,12 +24,10 @@
 
 	// const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
 	const stop_times = $derived.by(() => {
-		const stop_times = [];
-		for (const st of rt_stop_times.stop_times) {
-			if (st.trip_id === trip.id && (st.arrival.getTime() > current_time.ms || show_previous)) {
-				stop_times.push(st);
-			}
-		}
+		const stop_times = (rt_stop_times.by_trip_id[trip.id] || []).filter(
+			(st) => st.arrival.getTime() > current_time.ms || show_previous
+		);
+
 		return stop_times;
 	});
 	const last_stop = $derived.by(() => {

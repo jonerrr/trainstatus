@@ -172,8 +172,9 @@ pub async fn cache_all(
         },
     );
 
+    // TODO: remove extra filter once we have all routes with geom
     let (bus_route_features, train_route_features) =
-        routes.iter().filter(|r| &r.id != "SI").fold(
+        routes.iter().filter(|r| &r.id != "SI" && serde_json::from_value::<geo::MultiLineString>(r.geom.clone().unwrap()).is_ok()).fold(
             (Vec::new(), Vec::new()),
             |(mut bus_acc, mut train_acc), r| {
                 let geom: geo::MultiLineString =
