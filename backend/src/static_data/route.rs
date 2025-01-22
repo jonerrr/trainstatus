@@ -93,14 +93,16 @@ impl Route {
     }
 
     pub async fn parse_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
-        let train_geom = reqwest::Client::new()
-            .get("https://data.cityofnewyork.us/resource/s7zz-qmyz.json")
-            .send()
-            .await
-            .unwrap()
-            .json::<Vec<TrainLine>>()
-            .await
-            .unwrap();
+        // TODO: find new endpoint
+        // let train_geom = reqwest::Client::new()
+        //     .get("https://data.cityofnewyork.us/resource/s7zz-qmyz.json")
+        //     .send()
+        //     .await
+        //     .unwrap()
+        //     .json::<Vec<TrainLine>>()
+        //     .await
+        //     .unwrap();
+        let train_geom: Vec<TrainLine> = vec![];
 
         let mut line_geom: HashMap<String, Vec<LineString<f32>>> = HashMap::new();
         for train in train_geom {

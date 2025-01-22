@@ -100,9 +100,9 @@ pub async fn import(
 
         tokio::spawn(async move {
             loop {
-                let _ = bus::import(&b_pool)
-                    .await
-                    .inspect_err(|e| tracing::error!("bus::import: {:#?}", e));
+                let _ = bus::import(&b_pool).await.inspect_err(|e| {
+                    tracing::error!("bus::import: {:#?}", e);
+                });
 
                 sleep(Duration::from_secs(35)).await;
             }
