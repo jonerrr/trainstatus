@@ -79,6 +79,7 @@ pub async fn import(
         let t_pool = pool.clone();
         let b_pool = pool.clone();
         let s_pool = pool.clone();
+        let redis_pool = redis_pool.clone();
 
         tokio::spawn(async move {
             loop {
@@ -100,9 +101,32 @@ pub async fn import(
 
         tokio::spawn(async move {
             loop {
-                let _ = bus::import(&b_pool).await.inspect_err(|e| {
+                if let Err(e) = bus::import(&b_pool).await {
                     tracing::error!("bus::import: {:#?}", e);
-                });
+                    if let ImportError::Sqlx(err) = e {
+                        // This error probably means theres a new bus stop, so we will update static data
+                        if err.to_string().contains("stop_time_stop_id_fkey") {
+                            tracing::warn!("updating static data for new bus stop");
+
+                            crate::static_data::import(
+                                b_pool.clone(),
+                                None,
+                                redis_pool.clone(),
+                                true,
+                            )
+                            .await;
+                        }
+                    }
+                }
+                // let _ = bus::import(&b_pool).await.inspect_err(async move |e| {
+                //     tracing::error!("bus::import: {:#?}", e);
+                //     if let ImportError::Sqlx(err) = e {
+                //         // This error probably means theres a new bus stop, so we will update static data
+                //         if err.to_string().contains("stop_time_stop_id_fkey") {
+                //             crate::static_data::cache_all(&b_pool, &redis_pool).await;
+                //         }
+                //     }
+                // });
 
                 sleep(Duration::from_secs(35)).await;
             }

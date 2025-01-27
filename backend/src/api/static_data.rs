@@ -40,7 +40,7 @@ pub fn cache_headers(hash: String) -> HeaderMap {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus routes. WARNING: SIR geometry is missing.", body = [Route]),
+        (status = 200, description = "Subway and bus routes. WARNING: W train geometry is missing.", body = [Route]),
         (status = 304, description = "If no parameters are provided and the etag matches the request")
     )
 )]
