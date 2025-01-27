@@ -17,9 +17,12 @@ pub mod stop;
 
 pub async fn import(
     pool: PgPool,
-    notify: Arc<Notify>,
+    notify: Option<Arc<Notify>>,
     redis_pool: bb8::Pool<RedisConnectionManager>,
+    force_update: bool,
 ) {
+    // let pool = pool.clone();
+    // let redis_pool = redis_pool.clone();
     tokio::spawn(async move {
         loop {
             let last_updated = sqlx::query!("SELECT update_at FROM last_update")
@@ -28,13 +31,15 @@ pub async fn import(
                 .unwrap();
 
             // If user wants to FORCE_UPDATE, then don't check for last updated
-            if var("FORCE_UPDATE").is_err() {
+            if !force_update {
                 // Data should be refreshed every 3 days
                 if let Some(last_updated) = last_updated {
                     tracing::info!("Last updated at: {}", last_updated.update_at);
 
                     // if there is a last updated that means theres already data and the rest of the app can start
-                    notify.notify_one();
+                    if let Some(notify) = &notify {
+                        notify.notify_one();
+                    }
 
                     let duration_since_last_update =
                         Utc::now().signed_duration_since(last_updated.update_at);
@@ -50,7 +55,9 @@ pub async fn import(
                 }
             } else {
                 // Remove the FORCE_UPDATE env variable so it doesn't keep updating
-                remove_var("FORCE_UPDATE");
+                if let Ok(_) = var("FORCE_UPDATE") {
+                    remove_var("FORCE_UPDATE");
+                }
             }
             tracing::info!("Updating static data");
 
@@ -63,42 +70,43 @@ pub async fn import(
                 .await
                 .unwrap();
 
-            // bc the zip crate doesn't support tokio, we need to read it all here (I think i can remove this and the issue i was having was just bc i forgot to clone the archive)
-            let (gtfs_routes, gtfs_transfers) = tokio::task::spawn_blocking(move || {
-                let reader = Cursor::new(gtfs);
-                let mut archive = zip::ZipArchive::new(reader).unwrap();
-                let mut archive2 = archive.clone();
-                // let mut archive3 = archive.clone();
+            // TODO: figure out a cleaner way to extract multiple files from zip (without cloning)
+            let (gtfs_routes, gtfs_transfers, gtfs_shapes) =
+                tokio::task::spawn_blocking(move || {
+                    let reader = Cursor::new(gtfs);
+                    let mut archive = zip::ZipArchive::new(reader).unwrap();
+                    let mut archive2 = archive.clone();
+                    let mut archive3 = archive.clone();
 
-                let routes_file = archive.by_name("routes.txt").unwrap();
-                let transfers_file = archive2.by_name("transfers.txt").unwrap();
-                // let shape_file = archive3.by_name("shapes.txt").unwrap();
+                    let routes_file = archive.by_name("routes.txt").unwrap();
+                    let transfers_file = archive2.by_name("transfers.txt").unwrap();
+                    let shape_file = archive3.by_name("shapes.txt").unwrap();
 
-                let mut routes_rdr = csv::Reader::from_reader(routes_file);
-                let mut transfers_rdr = csv::Reader::from_reader(transfers_file);
-                // let mut shape_rdr = csv::Reader::from_reader(shape_file);
+                    let mut routes_rdr = csv::Reader::from_reader(routes_file);
+                    let mut transfers_rdr = csv::Reader::from_reader(transfers_file);
+                    let mut shape_rdr = csv::Reader::from_reader(shape_file);
 
-                let routes = routes_rdr
-                    .deserialize()
-                    .collect::<Result<Vec<route::GtfsRoute>, csv::Error>>()
-                    .unwrap();
+                    let routes = routes_rdr
+                        .deserialize()
+                        .collect::<Result<Vec<route::GtfsRoute>, csv::Error>>()
+                        .unwrap();
 
-                let transfers = transfers_rdr
-                    .deserialize()
-                    .collect::<Result<Vec<stop::Transfer<String>>, csv::Error>>()
-                    .unwrap();
+                    let transfers = transfers_rdr
+                        .deserialize()
+                        .collect::<Result<Vec<stop::Transfer<String>>, csv::Error>>()
+                        .unwrap();
 
-                // let geom = shape_rdr
-                //     .deserialize()
-                //     .collect::<Result<Vec<route::GtfsRouteGeom>, csv::Error>>()
-                //     .unwrap();
+                    let shapes = shape_rdr
+                        .deserialize()
+                        .collect::<Result<Vec<route::GtfsShape>, csv::Error>>()
+                        .unwrap();
 
-                (routes, transfers)
-            })
-            .await
-            .unwrap();
+                    (routes, transfers, shapes)
+                })
+                .await
+                .unwrap();
 
-            let mut routes = route::Route::parse_train(gtfs_routes).await;
+            let mut routes = route::Route::parse_train(gtfs_routes, gtfs_shapes).await;
             let (mut stops, mut route_stops) = stop::Stop::parse_train(
                 routes.iter().map(|r| r.id.clone()).collect(),
                 gtfs_transfers,
@@ -129,7 +137,9 @@ pub async fn import(
             cache_all(&pool, &redis_pool).await.unwrap();
 
             tracing::info!("Data updated");
-            notify.notify_one();
+            if let Some(notify) = &notify {
+                notify.notify_one();
+            }
         }
     });
 }
@@ -174,7 +184,7 @@ pub async fn cache_all(
 
     // TODO: remove extra filter once we have all routes with geom
     let (bus_route_features, train_route_features) =
-        routes.iter().filter(|r| &r.id != "SI" && serde_json::from_value::<geo::MultiLineString>(r.geom.clone().unwrap()).is_ok()).fold(
+        routes.iter().filter(|r| serde_json::from_value::<geo::MultiLineString>(r.geom.clone().unwrap()).is_ok()).fold(
             (Vec::new(), Vec::new()),
             |(mut bus_acc, mut train_acc), r| {
                 let geom: geo::MultiLineString =

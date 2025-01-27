@@ -5,6 +5,7 @@ use crate::{
 use geo::{LineString, MultiLineString};
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use itertools::Itertools;
 use polyline::decode_polyline;
 use rayon::prelude::*;
 use regex::Regex;
@@ -92,35 +93,67 @@ impl Route {
         query.build_query_as().fetch_all(pool).await
     }
 
-    pub async fn parse_train(gtfs_routes: Vec<GtfsRoute>) -> Vec<Self> {
-        // TODO: find new endpoint
-        // let train_geom = reqwest::Client::new()
-        //     .get("https://data.cityofnewyork.us/resource/s7zz-qmyz.json")
-        //     .send()
-        //     .await
-        //     .unwrap()
-        //     .json::<Vec<TrainLine>>()
-        //     .await
-        //     .unwrap();
-        let train_geom: Vec<TrainLine> = vec![];
+    fn parse_shapes(shapes: Vec<GtfsShape>) -> HashMap<String, MultiLineString<f32>> {
+        let mut geom = HashMap::new();
 
-        let mut line_geom: HashMap<String, Vec<LineString<f32>>> = HashMap::new();
-        for train in train_geom {
-            let lines = train.name.split('-').collect::<Vec<_>>();
-
-            for line in lines {
-                let geom = train
-                    .the_geom
-                    .coordinates
-                    .iter()
-                    .map(|c| (c[0], c[1]))
-                    .collect::<Vec<_>>();
-                line_geom
-                    .entry(line.to_string())
-                    .or_default()
-                    .push(LineString::from(geom));
-            }
+        let mut shapes_by_route = vec![];
+        for (key, chunk) in &shapes
+            .iter()
+            .chunk_by(|s| s.shape_id.split_once('.').unwrap().0)
+        {
+            shapes_by_route.push((key, chunk.collect::<Vec<_>>()));
         }
+
+        // TODO: use first and last stop coords to determine the right shape id to use
+        // because some of the first shapes for routes are not the main service pattern (see R and A)
+        for (route, group) in shapes_by_route {
+            let first_shape_id = &group[0].shape_id;
+            let first_shapes = group
+                .iter()
+                .filter(|s| &s.shape_id == first_shape_id)
+                .collect::<Vec<_>>();
+            let mut line = Vec::new();
+            for (i, shape) in first_shapes.iter().enumerate() {
+                // TODO: find better way to handle final shape
+                let Some(next_shape) = first_shapes.get(i + 1) else {
+                    tracing::debug!("out of shapes");
+                    break;
+                };
+
+                let segment: LineString<f32> = vec![
+                    (shape.shape_pt_lon, shape.shape_pt_lat),
+                    (next_shape.shape_pt_lon, next_shape.shape_pt_lat),
+                ]
+                .into();
+                line.push(segment);
+            }
+            geom.insert(route.to_string(), MultiLineString::new(line));
+        }
+
+        // J and Z share the same geometry
+        geom.insert("Z".to_string(), geom.get("J").unwrap().clone());
+
+        // TODO: cut R whitehall unil 57th and combine with N from 57th until astoria to create W line
+        // let r = geom.get("R").unwrap().clone();
+        // let n = geom.get("N").unwrap().clone();
+        // let mut w_geom = vec![];
+        // for r_geom in r.0 {
+        //     w_geom.push(r_geom);
+        //     // TODO: prob shouldn't hardcode this
+        //     if r_geom.0[0] == -73.980658 && r_geom.0[1] == 40.764664 {
+        //         tracing::debug!("found 57th st");
+        //         break;
+        //     }
+        // }
+
+        geom
+    }
+
+    pub async fn parse_train(
+        gtfs_routes: Vec<GtfsRoute>,
+        gtfs_shapes: Vec<GtfsShape>,
+    ) -> Vec<Self> {
+        let shapes = Self::parse_shapes(gtfs_shapes);
 
         gtfs_routes
             .into_iter()
@@ -129,20 +162,27 @@ impl Route {
                 if r.route_id.ends_with("X") {
                     None
                 } else {
-                    let geom = line_geom
-                        .get(&r.route_short_name)
-                        .map(|lines| MultiLineString::new(lines.to_vec()))
+                    let geom = shapes
+                        .get(&r.route_id)
+                        // .map(|lines| MultiLineString::new(lines.to_vec()))
                         .map(|g| serde_json::to_value(g).unwrap())
                         .unwrap_or_else(|| {
-                            tracing::warn!("no geometry for route {}", r.route_short_name);
+                            tracing::warn!("no geometry for route {}", r.route_id);
                             serde_json::json!(null)
                         });
+
+                    // SI route color is blank in GTFS, so manually setting to one I found in wikipedia SVG
+                    let route_color = if r.route_id == "SI" {
+                        "0078C6".into()
+                    } else {
+                        r.route_color
+                    };
 
                     Some(Route {
                         id: r.route_id,
                         long_name: r.route_long_name,
                         short_name: r.route_short_name,
-                        color: r.route_color,
+                        color: route_color,
                         shuttle: false,
                         geom: Some(geom),
                         route_type: RouteType::Train,
@@ -286,6 +326,14 @@ pub struct GtfsRoute {
     route_color: String,
 }
 
+#[derive(Deserialize)]
+pub struct GtfsShape {
+    shape_id: String,
+    // shape_pt_sequence: String,
+    shape_pt_lat: f32,
+    shape_pt_lon: f32,
+}
+
 // fn de_split_id<'de, D>(deserializer: D) -> Result<String, D::Error>
 // where
 //     D: Deserializer<'de>,
@@ -296,17 +344,6 @@ pub struct GtfsRoute {
 //         .ok_or("failed to split id")
 //         .map_err(serde::de::Error::custom)
 // }
-
-#[derive(Deserialize, Clone)]
-pub struct TrainLine {
-    name: String,
-    the_geom: TrainGeom,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct TrainGeom {
-    coordinates: Vec<[f32; 2]>,
-}
 
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]

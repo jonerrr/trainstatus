@@ -120,7 +120,13 @@ async fn main() {
         let notify = Arc::new(Notify::new());
         let notify2 = notify.clone();
 
-        static_data::import(pg_pool.clone(), notify, redis_pool.clone()).await;
+        static_data::import(
+            pg_pool.clone(),
+            Some(notify),
+            redis_pool.clone(),
+            var("FORCE_UPDATE").is_ok(),
+        )
+        .await;
         // Wait for static data to be loaded
         notify2.notified().await;
     }
