@@ -1,3 +1,4 @@
+use super::stop::BusDirection;
 use crate::{
     api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
@@ -11,10 +12,9 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
+use std::collections::HashSet;
 use std::{collections::HashMap, fmt};
 use utoipa::ToSchema;
-
-use super::stop::BusDirection;
 
 #[derive(Serialize, sqlx::FromRow, ToSchema)]
 pub struct Route {
@@ -107,6 +107,8 @@ impl Route {
         // TODO: use first and last stop coords to determine the right shape id to use
         // because some of the first shapes for routes are not the main service pattern (see R and A)
         for (route, group) in shapes_by_route {
+            // let mut unique = HashSet::new();
+            // group.retain(|shape| unique.insert((&shape.shape_pt_lat, &shape.shape_pt_lon)));
             let first_shape_id = &group[0].shape_id;
             let first_shapes = group
                 .iter()
@@ -119,10 +121,20 @@ impl Route {
                     tracing::debug!("out of shapes");
                     break;
                 };
+                // skip next shape if its a different shape_id. Otherwise the lines will be wrong
+                if shape.shape_id != next_shape.shape_id {
+                    continue;
+                }
 
                 let segment: LineString<f32> = vec![
-                    (shape.shape_pt_lon, shape.shape_pt_lat),
-                    (next_shape.shape_pt_lon, next_shape.shape_pt_lat),
+                    (
+                        shape.shape_pt_lon.parse().unwrap(),
+                        shape.shape_pt_lat.parse().unwrap(),
+                    ),
+                    (
+                        next_shape.shape_pt_lon.parse().unwrap(),
+                        next_shape.shape_pt_lat.parse().unwrap(),
+                    ),
                 ]
                 .into();
                 line.push(segment);
@@ -330,8 +342,9 @@ pub struct GtfsRoute {
 pub struct GtfsShape {
     shape_id: String,
     // shape_pt_sequence: String,
-    shape_pt_lat: f32,
-    shape_pt_lon: f32,
+    // Need to read it as a string so we can remove duplicates (f32 isn't hashable)
+    shape_pt_lat: String,
+    shape_pt_lon: String,
 }
 
 // fn de_split_id<'de, D>(deserializer: D) -> Result<String, D::Error>

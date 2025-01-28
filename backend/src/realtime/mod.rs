@@ -8,8 +8,9 @@ use prost::Message;
 use redis::AsyncCommands;
 // use serde_json::json;
 use sqlx::PgPool;
+use tokio::sync::Notify;
 // use std::collections::HashSet;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::{env::var, time::Duration};
 use thiserror::Error;
 // use tokio::sync::RwLock;
@@ -108,13 +109,20 @@ pub async fn import(
                         if err.to_string().contains("stop_time_stop_id_fkey") {
                             tracing::warn!("updating static data for new bus stop");
 
+                            let notify = Arc::new(Notify::new());
+                            let notify2 = notify.clone();
+
                             crate::static_data::import(
                                 b_pool.clone(),
-                                None,
+                                notify,
                                 redis_pool.clone(),
+                                true,
                                 true,
                             )
                             .await;
+
+                            // Wait for static data to be loaded before continuing
+                            notify2.notified().await;
                         }
                     }
                 }

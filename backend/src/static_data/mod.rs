@@ -17,29 +17,28 @@ pub mod stop;
 
 pub async fn import(
     pool: PgPool,
-    notify: Option<Arc<Notify>>,
+    notify: Arc<Notify>,
     redis_pool: bb8::Pool<RedisConnectionManager>,
     force_update: bool,
+    update_once: bool,
 ) {
-    // let pool = pool.clone();
-    // let redis_pool = redis_pool.clone();
     tokio::spawn(async move {
+        // prevent infinite loops when force update is true
+        let mut force_update_flag = force_update;
+
         loop {
             let last_updated = sqlx::query!("SELECT update_at FROM last_update")
                 .fetch_optional(&pool)
                 .await
                 .unwrap();
 
-            // If user wants to FORCE_UPDATE, then don't check for last updated
-            if !force_update {
+            // If force update, then don't check for last updated
+            if !force_update_flag {
                 // Data should be refreshed every 3 days
                 if let Some(last_updated) = last_updated {
                     tracing::info!("Last updated at: {}", last_updated.update_at);
 
-                    // if there is a last updated that means theres already data and the rest of the app can start
-                    if let Some(notify) = &notify {
-                        notify.notify_one();
-                    }
+                    notify.notify_one();
 
                     let duration_since_last_update =
                         Utc::now().signed_duration_since(last_updated.update_at);
@@ -54,11 +53,10 @@ pub async fn import(
                     }
                 }
             } else {
-                // Remove the FORCE_UPDATE env variable so it doesn't keep updating
-                if let Ok(_) = var("FORCE_UPDATE") {
-                    remove_var("FORCE_UPDATE");
-                }
+                // prevent infinite loops when force update is true
+                force_update_flag = false;
             }
+
             tracing::info!("Updating static data");
 
             let gtfs = reqwest::Client::new()
@@ -137,8 +135,10 @@ pub async fn import(
             cache_all(&pool, &redis_pool).await.unwrap();
 
             tracing::info!("Data updated");
-            if let Some(notify) = &notify {
-                notify.notify_one();
+            notify.notify_one();
+
+            if update_once {
+                break;
             }
         }
     });
