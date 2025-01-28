@@ -122,9 +122,10 @@ async fn main() {
 
         static_data::import(
             pg_pool.clone(),
-            Some(notify),
+            notify,
             redis_pool.clone(),
             var("FORCE_UPDATE").is_ok(),
+            false,
         )
         .await;
         // Wait for static data to be loaded
