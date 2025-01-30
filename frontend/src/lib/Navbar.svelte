@@ -37,7 +37,9 @@
 	{@render nav_button('Stops')}
 </nav>
 
-<style lang="postcss">
+<style>
+	@reference "../app.css";
+
 	.nav-button {
 		@apply flex flex-col items-center justify-center gap-1
 			 p-2  transition-all duration-200
@@ -52,6 +54,6 @@
 	nav::before {
 		content: '';
 		@apply absolute top-0 left-0 right-0 h-[1px]
-			 bg-gradient-to-r from-transparent via-neutral-700 to-transparent;
+			 bg-linear-to-r from-transparent via-neutral-700 to-transparent;
 	}
 </style>

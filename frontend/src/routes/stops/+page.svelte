@@ -63,7 +63,7 @@
 		train_data={train_stops}
 		pin_rune={stop_pins_rune}
 		auto_scroll
-		class="max-h-[calc(100dvh-13.5rem)] flex-grow"
+		class="max-h-[calc(100dvh-13.5rem)] grow"
 		bind:selected_tab
 		height_calc={calculate_stop_height}
 	/>
@@ -82,7 +82,7 @@
 				class="w-full h-12 pl-10 pr-10
 			   text-neutral-200
 			   bg-neutral-900
-			   backdrop-blur-sm
+			   backdrop-blur-xs
 			   rounded
 			   border border-neutral-800/50
 			   shadow-lg shadow-black/10
@@ -110,7 +110,7 @@
 	</div>
 </div>
 
-<style lang="postcss">
+<style>
 	/* .search-stops {
 		background-image: url('/search.svg');
 		background-position: 10px 10px;

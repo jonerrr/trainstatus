@@ -236,7 +236,9 @@
 	</div>
 </div>
 
-<style lang="postcss">
+<style>
+	@reference "../app.css";
+
 	.locate-button {
 		@apply relative flex items-center justify-center
 			 p-1 rounded-lg

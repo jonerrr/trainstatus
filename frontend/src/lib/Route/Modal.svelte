@@ -181,3 +181,14 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.scrollbar-hidden {
+		/* Chrome, Safari and Opera */
+		&::-webkit-scrollbar {
+			display: none;
+		}
+		scrollbar-width: none; /* Firefox */
+		-ms-overflow-style: none; /* IE and Edge */
+	}
+</style>
