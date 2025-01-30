@@ -176,8 +176,8 @@
 </main>
 <Navbar />
 
-<style lang="postcss">
+<style>
 	:global(body) {
-		@apply bg-neutral-900;
+		background-color: var(--color-neutral-900);
 	}
 </style>

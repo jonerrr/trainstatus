@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from 'lucide-svelte';
-	import { onMount } from 'svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
@@ -161,7 +160,6 @@
 		</button>
 
 		<div class="flex gap-1 items-center text-xs">
-			<!-- TODO: make history button work -->
 			{#if history}
 				<button
 					class:text-neutral-400={!show_previous}
@@ -253,11 +251,11 @@
 		</div>
 	</div>
 {/snippet}
-
+<!-- fixed bottom-0 left-0 right-0 -->
 <dialog
 	bind:this={dialog_el}
 	use:manage_modal
-	class="text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded flex flex-col backdrop:bg-black/50 mb-0 focus:outline-none focus:ring-2 focus:ring-neutral-700"
+	class="m-auto text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded-t-sm flex flex-col backdrop:bg-black/50 mb-0 focus:outline-hidden focus:ring-2 focus:ring-neutral-700"
 >
 	{#if page.state.modal === 'stop'}
 		<StopModal {show_previous} time_format={time_format.value} stop={page.state.data} />

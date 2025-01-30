@@ -166,7 +166,7 @@
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
 				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
 
-				<div class="flex gap-2 items-center text-wrap text-left rounded p-1">
+				<div class="flex gap-2 items-center text-wrap text-left rounded-sm p-1">
 					<Icon {route} link={false} express={false} />
 					<div class="flex flex-col">
 						<div class="">

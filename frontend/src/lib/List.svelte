@@ -276,7 +276,7 @@
 
 <div class="flex flex-col text-neutral-200 relative w-full z-30">
 	<div
-		class="flex sticky top-0 bg-neutral-900/95 backdrop-blur-sm shadow-lg shadow-black/10 items-center justify-between w-full z-30"
+		class="flex sticky top-0 bg-neutral-900/95 backdrop-blur-xs shadow-lg shadow-black/10 items-center justify-between w-full z-30"
 	>
 		<h1 class="flex gap-2 items-center font-bold text-xl pl-2">
 			<span>
@@ -322,7 +322,7 @@
 			</div>
 		</div>
 	</div>
-	<div class="h-px bg-gradient-to-r from-transparent via-neutral-700/50 to-transparent"></div>
+	<div class="h-px bg-linear-to-r from-transparent via-neutral-700/50 to-transparent"></div>
 
 	<div
 		bind:this={viewport_el}
@@ -339,7 +339,7 @@
 				{#each visible_items as { data, id } (id)}
 					<div
 						bind:offsetHeight={item_heights[data.id]}
-						class="relative w-full list-item will-change-transform bg-neutral-950 border border-neutral-800/50 rounded"
+						class="relative w-full list-item will-change-transform bg-neutral-950 border border-neutral-800/50 rounded-sm"
 					>
 						<button
 							class="w-full flex justify-between items-center p-2 hover:bg-neutral-800/50 active:bg-neutral-700/50 transition-colors duration-200"

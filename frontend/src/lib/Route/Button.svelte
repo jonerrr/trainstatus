@@ -31,7 +31,7 @@
 			{alerts[0].alert_type}
 		</div>
 		{#if alerts.length > 1}
-			<div class="bg-neutral-700 text-neutral-50 rounded p-1">
+			<div class="bg-neutral-700 text-neutral-50 rounded-sm p-1">
 				+{alerts.length - 1}
 			</div>
 		{/if}

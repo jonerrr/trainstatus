@@ -119,7 +119,7 @@
 					}
 				}}
 				aria-label="Show transfers at stop"
-				class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded"
+				class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded-sm"
 			>
 				<div class="flex items-center mx-1">
 					<!-- Transfers -->

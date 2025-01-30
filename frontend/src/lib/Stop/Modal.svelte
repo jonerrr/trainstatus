@@ -126,7 +126,7 @@
 				/>
 			{/each}
 			<!-- {#if route_stops.length > 5} -->
-			<div class="font-semibold rounded bg-neutral-700 p-1">+{main_rs.length - 5}</div>
+			<div class="font-semibold rounded-sm bg-neutral-700 p-1">+{main_rs.length - 5}</div>
 			<!-- {/if} -->
 		{:else}
 			{#each route_stops as route}
@@ -164,7 +164,7 @@
 		{#each stop.data.transfers as transfer}
 			{@const transfer_stop = page.data.stops[transfer] as Stop<'train'>}
 			<button
-				class="flex rounded bg-neutral-800 shadow-2xl gap-1 p-1 items-center transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
+				class="flex rounded-sm bg-neutral-800 shadow-2xl gap-1 p-1 items-center transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 				onclick={() =>
 					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
 			>
