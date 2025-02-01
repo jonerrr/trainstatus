@@ -53,9 +53,12 @@
 </script>
 
 <div class="flex gap-1 items-center p-1">
-	<div class="flex flex-col gap-1 items-center">
-		{#if is_bus_route(route, trip) && trip.data.passengers && trip.data.capacity}
-			<BusCapacity passengers={trip.data.passengers} capacity={trip.data.capacity} />
+	<div class="flex flex-col gap-1 items-start">
+		{#if is_bus_route(route, trip)}
+			{#if trip.data.passengers && trip.data.capacity}
+				<BusCapacity passengers={trip.data.passengers} capacity={trip.data.capacity} />
+			{/if}
+			<div>#{trip.vehicle_id}</div>
 		{/if}
 
 		<Icon
@@ -75,8 +78,8 @@
 	</div>
 
 	{#if is_bus_route(route, trip) && trip.data.deviation && Math.abs(trip.data.deviation) > 120}
-		<div class="text-xs {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
-			{(trip.data.deviation / 60).toFixed(0)}m
+		<div class="text-sm ml-auto {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
+			{trip.data.deviation > 0 ? '+' : ''}{(trip.data.deviation / 60).toFixed(0)}m
 		</div>
 	{/if}
 </div>

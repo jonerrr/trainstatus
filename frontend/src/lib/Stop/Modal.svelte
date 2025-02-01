@@ -143,7 +143,7 @@
 
 		<!-- </div> -->
 	</div>
-	<div class="relative text-xl font-semibold flex gap-1 items-center">
+	<div class="text-xl font-semibold flex gap-1 items-center">
 		{#if is_bus_stop(stop)}
 			<BusArrow direction={stop.data.direction} />
 		{/if}
@@ -185,6 +185,7 @@
 {#if !selected_stop_times.length}
 	<div class="text-neutral-400 text-center font-semibold">No upcoming trips</div>
 {/if}
+
 <ModalList>
 	{#each selected_stop_times as st}
 		<Button state={{ modal: 'trip', data: st.trip }}>
@@ -223,18 +224,18 @@
 			</div>
 
 			<div
-				class="flex flex-col items-center"
+				class="flex flex-col items-end"
 				class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}
 				class:text-neutral-400={st.arrival.getTime() < current_time.ms}
 			>
 				<!-- if bus trip and theres a deviation more than 2 min -->
 				{#if is_bus(stop, st.trip) && st.trip.data.deviation && Math.abs(st.trip.data.deviation) > 120}
 					<div class="text-xs {st.trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
-						{(st.trip.data.deviation / 60).toFixed(0)}m
+						{st.trip.data.deviation > 0 ? '+' : ''}{(st.trip.data.deviation / 60).toFixed(0)}m
 					</div>
 				{/if}
 
-				<div class="text-right">
+				<div>
 					{#if time_format === 'time'}
 						{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
 					{:else}

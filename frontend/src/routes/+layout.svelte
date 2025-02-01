@@ -137,7 +137,7 @@
 		return () => clearInterval(interval);
 	});
 
-	let monitor_delay: number;
+	let monitor_delay: NodeJS.Timeout;
 
 	$inspect(monitored_bus_routes, 'monitored_bus_routes');
 
