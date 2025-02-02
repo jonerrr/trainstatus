@@ -111,6 +111,7 @@
 <ModalList>
 	{#each stop_times as st}
 		{@const stop = page.data.stops[st.stop_id]}
+		<!-- {#if rt_stop_times.by_stop_id[]} -->
 		<div class="relative text-base">
 			<button
 				tabindex="0"
