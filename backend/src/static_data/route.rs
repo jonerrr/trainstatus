@@ -183,11 +183,14 @@ impl Route {
                             serde_json::json!(null)
                         });
 
-                    // SI route color is blank in GTFS, so manually setting to one I found in wikipedia SVG
-                    let route_color = if r.route_id == "SI" {
-                        "0078C6".into()
-                    } else {
-                        r.route_color
+                    // Some routes are missing colors, so we need to fill them in
+                    // TODO: maybe check if blank and then fill in
+                    let route_color = match r.route_id.as_str() {
+                        // SI Color from MTA website
+                        "SI" => "0F61A9".to_string(),
+                        // From GS route color in static GTFS
+                        "FS" | "H" => "6D6E71".to_string(),
+                        _ => r.route_color,
                     };
 
                     Some(Route {
@@ -248,6 +251,11 @@ impl Route {
                     .map(|p| p.points.clone())
                     .collect::<Vec<LineString>>(),
             );
+
+            if route.color.is_empty() {
+                tracing::warn!("no color for bus route {}. Setting to white", route.id);
+                route.color = "FFFFFF".to_string();
+            }
 
             // add routes to the routes vector that gets inserted to db
             routes.push(Route {
