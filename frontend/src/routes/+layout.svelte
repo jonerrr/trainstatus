@@ -28,7 +28,7 @@
 		current_time.value;
 		debounce(() => {
 			if (!current_time.value || last_at === current_time.value) return;
-			console.log('time change, updating rt data');
+			// console.log('time change, updating rt data');
 			try {
 				is_updating = true;
 				Promise.all([
@@ -140,9 +140,10 @@
 	let monitor_delay: NodeJS.Timeout;
 
 	$inspect(monitored_bus_routes, 'monitored_bus_routes');
+	let updating_monitored_routes = $state(false);
 
 	$effect(() => {
-		clearTimeout(monitor_delay);
+		// clearTimeout(monitor_delay);
 		// need to put offline here so it updates when offline changes
 		if (offline) return;
 		if (monitored_bus_routes.size > 30) {
@@ -152,8 +153,11 @@
 			to_remove.forEach((r) => monitored_bus_routes.delete(r));
 		}
 
-		monitor_delay = setTimeout(async () => {
+		// monitor_delay = setTimeout(async () => {
+		debounce(async () => {
+			if (updating_monitored_routes) return;
 			try {
+				updating_monitored_routes = true;
 				if (monitored_bus_routes.size) {
 					await stop_times.update(fetch, [...monitored_bus_routes], true);
 					last_st_update = new Date();
@@ -162,8 +166,12 @@
 			} catch (e) {
 				console.error(e);
 				offline = true;
+			} finally {
+				updating_monitored_routes = false;
 			}
-		}, 50);
+		}, 150)();
+
+		// }, 50);
 	});
 </script>
 

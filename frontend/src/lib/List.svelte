@@ -5,7 +5,7 @@
 	import { cubicInOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { debounce, item_heights, persisted_rune, type PersistedRune } from './util.svelte';
+	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
 	import { monitored_bus_routes } from './stop_times.svelte';
 	import TripButton from './Trip/Button.svelte';
 	import StopButton from './Stop/Button.svelte';
@@ -228,28 +228,9 @@
 		];
 	});
 
-	// const update_bus_routes = debounce(() => {
-	// 	stop_times.add_bus_routes(fetch, new Set(visible_bus_routes));
-	// }, 75);
-
-	// $effect(() => {
-	// 	visible_bus_routes;
-	// 	update_bus_routes();
-	// });
-
-	// TODO: fix buses requests not batching
-	// add bus routes to monitored bus routes
-	// let timer: number;
 	$effect(() => {
-		visible_bus_routes;
-		debounce(() => {
-			visible_bus_routes.forEach((r) => monitored_bus_routes.add(r));
-		}, 100)();
-		// clearTimeout(timer);
-		// timer = setTimeout(() => visible_bus_routes.forEach((r) => monitored_bus_routes.add(r)), 100);
-		// console.log('updating monitored bus routes');
-
-		// return () => clearTimeout(timer);
+		// visible_bus_routes;
+		visible_bus_routes.forEach((r) => monitored_bus_routes.add(r));
 	});
 
 	function calculate_total_height() {

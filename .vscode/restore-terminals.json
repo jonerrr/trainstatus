@@ -1,0 +1,19 @@
+{
+  "artificialDelayMilliseconds": 800,
+  "keepExistingTerminalsOpen": false,
+  "runOnStartup": true,
+  "terminals": [
+    {
+      "splitTerminals": [
+        {
+          "name": "backend",
+          "commands": ["cd backend", "pd up -d", "cargo r"]
+        },
+        {
+          "name": "frontend",
+          "commands": ["cd frontend", "pnpm dev"]
+        }
+      ]
+    }
+  ]
+}

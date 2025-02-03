@@ -1,19 +1,24 @@
 <script lang="ts">
 	import { CircleX, Search } from 'lucide-svelte';
 	import { page } from '$app/state';
-	import { calculate_stop_height, type Stop } from '$lib/static';
+	import { always_stop, calculate_stop_height, type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
-	import { persisted_rune, stop_pins_rune } from '$lib/util.svelte';
+	import { debounce, persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 
-	let bus_stops = $state<Stop<'bus'>[]>(page.data.bus_stops);
-	let train_stops = $state<Stop<'train'>[]>(page.data.train_stops);
+	interface StopObj {
+		train: Stop<'train'>[];
+		bus: Stop<'bus'>[];
+	}
+
+	const stops: StopObj = $state({
+		bus: page.data.bus_stops,
+		train: page.data.train_stops
+	});
 
 	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 
 	const search = new StopSearch(page.data.bus_stops, page.data.train_stops);
-
-	// console.log(calculate_stop_height(page.data.train_stops[0]), 'sheight');
 
 	// let search_el: HTMLInputElement;
 	let search_input: string = $state('');
@@ -21,33 +26,83 @@
 	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
-		bus_stops = page.data.bus_stops;
+		stops['bus'] = page.data.bus_stops;
+		stops['train'] = page.data.train_stops;
+		// bus_stops = page.data.bus_stops;
 		// page.data.bus_stops.sort((a, b) => b.name.length - a.name.length).slice(0, 200);
 
-		train_stops = page.data.train_stops;
+		// train_stops = page.data.train_stops;
 
 		search_input = '';
 	}
 
-	let search_timeout: number;
+	interface StopWithRouteSequence extends Stop<'train' | 'bus'> {
+		route_stop_sequence: number;
+	}
 
 	$effect(() => {
 		selected_tab.value;
 		search_input;
-		clearTimeout(search_timeout);
 
-		search_timeout = setTimeout(() => {
+		// TODO: figure out how to safely set the type of stops and remove ts-ignore-error
+		debounce(() => {
 			if (search_input === '') {
 				clear_search();
 			} else {
-				const results = search.search(search_input, selected_tab.value);
-				// not sure if its safe to assume that the results are always the same type
-				if (results.length) {
-					if (selected_tab.value === 'train') train_stops = results as Stop<'train'>[];
-					else if (selected_tab.value === 'bus') bus_stops = results as Stop<'bus'>[];
+				// try searching for a stop id
+				const as_stop_id = parseInt(search_input);
+				// shortest stop id is 3
+				if (search_input.length > 2 && !isNaN(as_stop_id)) {
+					console.log('searching for stop id', as_stop_id);
+					const stop = page.data.stops[as_stop_id];
+					if (stop && stop.route_type === selected_tab.value) {
+						//@ts-expect-error
+						stops[selected_tab.value] = [stop];
+					}
+				} else {
+					const search_route = page.data.routes[search_input.toUpperCase()];
+					if (search_route && search_route.route_type === selected_tab.value) {
+						console.log('searching for route id', search_route);
+
+						// sort by route stop_sequence
+						if (selected_tab.value === 'bus') {
+							const new_stops: StopWithRouteSequence[] = [];
+							for (const s of page.data.bus_stops) {
+								const route = s.routes.find((r) => r.id === search_route.id);
+								if (route) {
+									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
+								}
+							}
+
+							// sort the new stops and convert back to Stop<'bus'> type
+							stops['bus'] = new_stops
+								.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
+								.map(({ route_stop_sequence, ...stop }) => stop) as Stop<'bus'>[];
+						} else {
+							const new_stops: StopWithRouteSequence[] = [];
+							for (const s of page.data.train_stops) {
+								const route = s.routes.find((r) => r.id === search_route.id);
+								if (route && always_stop.includes(route.type ?? '')) {
+									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
+								}
+							}
+							// sort the new stops and convert back to Stop<'train'> type
+							stops['train'] = new_stops
+								.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
+								.map(({ route_stop_sequence, ...stop }) => stop) as Stop<'train'>[];
+						}
+					} else {
+						// search for stops
+						const results = search.search(search_input, selected_tab.value);
+						// not sure if its safe to assume that the results are always the same type
+						if (results.length) {
+							//@ts-expect-error
+							stops[selected_tab.value] = results;
+						}
+					}
 				}
 			}
-		}, 150);
+		}, 150)();
 	});
 </script>
 
@@ -59,8 +114,8 @@
 	<List
 		title="Stops"
 		type="stop"
-		bus_data={bus_stops}
-		train_data={train_stops}
+		bus_data={stops.bus}
+		train_data={stops.train}
 		pin_rune={stop_pins_rune}
 		auto_scroll
 		class="max-h-[calc(100dvh-13.5rem)] grow"
