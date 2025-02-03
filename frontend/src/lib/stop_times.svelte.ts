@@ -29,6 +29,7 @@ type ByTripId = {
 export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
+	// const monitored_bus_routes: string[] = $state([]);
 	// let filter_arrivals = $state(false);
 	// <trip_id, index in array above>
 	let st_by_trip_id: ByTripId = $state({});
@@ -56,11 +57,6 @@ export function createStopTimes() {
 			throw new Error('Offline');
 		}
 		const data: StopTime[] = await res.json();
-		// const data: StopTime[] = (await res.json()).map((stop_time: StopTime) => ({
-		// 	...stop_time,
-		// 	arrival: new Date(stop_time.arrival),
-		// 	departure: new Date(stop_time.departure)
-		// }));
 
 		const st_by_trip_id_new: ByTripId = {};
 		const st_by_stop_id_new: ByStopId = {};
@@ -114,6 +110,12 @@ export function createStopTimes() {
 		st_by_stop_id = st_by_stop_id_new;
 	}
 
+	// function add_routes(routes: string[]) {
+	// 	// add routes and remove duplicates too
+	// 	monitored_bus_routes.push(...new Set(routes));
+	// 	// monitored_bus_routes.add(route);
+	// }
+
 	// async function add_bus_routes(fetch: Fetch, routes: Set<string>) {
 	// 	const new_routes = routes.difference(monitored_bus_routes);
 
@@ -131,6 +133,10 @@ export function createStopTimes() {
 		get by_stop_id() {
 			return st_by_stop_id;
 		},
+
+		// get monitored_routes() {
+		// 	return monitored_bus_routes;
+		// },
 
 		// set filter_arrivals(value: boolean) {
 		// 	// can only be set once, if user spams button we don't want to keep updating

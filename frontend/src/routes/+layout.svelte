@@ -2,7 +2,7 @@
 	import '../app.css';
 	import '@fontsource/inter';
 	import { page } from '$app/state';
-	import { pushState, replaceState } from '$app/navigation';
+	import { pushState } from '$app/navigation';
 	import { onMount, tick, type Snippet } from 'svelte';
 	import { trips } from '$lib/trips.svelte';
 	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
@@ -11,6 +11,7 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import { current_time, debounce } from '$lib/util.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	interface Props {
 		children: Snippet;
@@ -20,6 +21,7 @@
 
 	let last_update = $state<Date>(new Date());
 	let last_st_update = $state<Date>(new Date());
+	let last_monitored_routes = $state(new SvelteSet<string>());
 	let offline = $state(false);
 	let is_updating = $state(false);
 
@@ -73,10 +75,30 @@
 					last_update = new Date();
 				}
 
+				if (monitored_bus_routes.size > 30) {
+					// remove until there are 30 left
+					const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
+					// console.log('removing', to_remove);
+					to_remove.forEach((r) => monitored_bus_routes.delete(r));
+				}
+
+				const new_routes =
+					monitored_bus_routes.size !== last_monitored_routes.size ||
+					!monitored_bus_routes.isSubsetOf(last_monitored_routes);
+				const update_st = now - last_st_update.getTime() > 1000 * 15;
+				if (new_routes && !update_st) {
+					// if monitored routes have changed, update stop times
+					await stop_times.update(fetch, [...monitored_bus_routes], true);
+					// TODO: should we set last_st_update here?
+					// last_st_update = new Date();
+					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
+					offline = false;
+				}
 				// update stop times every 15 seconds
-				if (now - last_st_update.getTime() > 1000 * 15) {
+				if (update_st) {
 					await stop_times.update(fetch, [...monitored_bus_routes], false);
 					last_st_update = new Date();
+					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
 					offline = false;
 				}
 			} catch (e) {
@@ -90,6 +112,8 @@
 				is_updating = false;
 			}
 		}, 200);
+
+		// $inspect(monitored_bus_routes);
 
 		const id =
 			// stop
@@ -135,43 +159,6 @@
 		}
 
 		return () => clearInterval(interval);
-	});
-
-	let monitor_delay: NodeJS.Timeout;
-
-	$inspect(monitored_bus_routes, 'monitored_bus_routes');
-	let updating_monitored_routes = $state(false);
-
-	$effect(() => {
-		// clearTimeout(monitor_delay);
-		// need to put offline here so it updates when offline changes
-		if (offline) return;
-		if (monitored_bus_routes.size > 30) {
-			// remove until there are 30 left
-			const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
-			// console.log('removing', to_remove);
-			to_remove.forEach((r) => monitored_bus_routes.delete(r));
-		}
-
-		// monitor_delay = setTimeout(async () => {
-		debounce(async () => {
-			if (updating_monitored_routes) return;
-			try {
-				updating_monitored_routes = true;
-				if (monitored_bus_routes.size) {
-					await stop_times.update(fetch, [...monitored_bus_routes], true);
-					last_st_update = new Date();
-					offline = false;
-				}
-			} catch (e) {
-				console.error(e);
-				offline = true;
-			} finally {
-				updating_monitored_routes = false;
-			}
-		}, 150)();
-
-		// }, 50);
 	});
 </script>
 
