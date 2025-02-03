@@ -76,7 +76,7 @@
 		auto_scroll = false,
 		items_before_scroll,
 		ssr_min = 10,
-		overscan = 10,
+		overscan = 5,
 		style: style_
 	}: Props = $props();
 

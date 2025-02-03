@@ -20,18 +20,11 @@
 
 	const search = new StopSearch(page.data.bus_stops, page.data.train_stops);
 
-	// let search_el: HTMLInputElement;
 	let search_input: string = $state('');
-	// let search_term = $derived.by(debounce(() => search_input, 300));
-	// $inspect(search_term);
 	function clear_search() {
 		// reset stop ids
 		stops['bus'] = page.data.bus_stops;
 		stops['train'] = page.data.train_stops;
-		// bus_stops = page.data.bus_stops;
-		// page.data.bus_stops.sort((a, b) => b.name.length - a.name.length).slice(0, 200);
-
-		// train_stops = page.data.train_stops;
 
 		search_input = '';
 	}
@@ -53,7 +46,6 @@
 				const as_stop_id = parseInt(search_input);
 				// shortest stop id is 3
 				if (search_input.length > 2 && !isNaN(as_stop_id)) {
-					console.log('searching for stop id', as_stop_id);
 					const stop = page.data.stops[as_stop_id];
 					if (stop && stop.route_type === selected_tab.value) {
 						//@ts-expect-error
@@ -62,8 +54,6 @@
 				} else {
 					const search_route = page.data.routes[search_input.toUpperCase()];
 					if (search_route && search_route.route_type === selected_tab.value) {
-						console.log('searching for route id', search_route);
-
 						// sort by route stop_sequence
 						if (selected_tab.value === 'bus') {
 							const new_stops: StopWithRouteSequence[] = [];
@@ -110,6 +100,7 @@
 	<title>Stops</title>
 </svelte:head>
 <!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
+<!-- TODO: maybe show indicator when filtered for specific route / stop -->
 <div class="flex flex-col h-full">
 	<List
 		title="Stops"
