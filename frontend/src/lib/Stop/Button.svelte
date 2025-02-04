@@ -35,8 +35,7 @@
 		untrack(() => updateRouteMaps());
 	});
 
-	// Debounced update function
-	const updateRouteMaps = debounce(() => {
+	const updateRouteMaps = () => {
 		// Clear existing maps
 		nb_st_by_route.clear();
 		sb_st_by_route.clear();
@@ -86,7 +85,7 @@
 				}
 			}
 		}
-	}, 35);
+	};
 
 	// TODO: fix 1 train showing up at dekalb ave for some reason
 	const current_stop_routes = $derived(main_stop_routes(data).map((r) => page.data.routes[r.id]));
