@@ -224,8 +224,9 @@
 			</div>
 
 			<div
-				class="flex flex-col items-end"
-				class:italic={is_train(stop, st.trip) && !st.trip.data.assigned}
+				class="flex flex-col items-end {is_train(stop, st.trip) &&
+					!st.trip.data.assigned &&
+					'italic'}"
 				class:text-neutral-400={st.arrival.getTime() < current_time.ms}
 			>
 				<!-- if bus trip and theres a deviation more than 2 min -->

@@ -145,6 +145,7 @@
 							{stop.name}
 						</div>
 
+						<!-- TODO: maybe italicize if trip isn't assigned -->
 						<div class="flex gap-1 items-center text-right">
 							<div class="text-left">
 								{#if time_format === 'time'}
