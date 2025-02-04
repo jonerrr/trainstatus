@@ -162,8 +162,7 @@
 			</button>
 			{#each alerts as _alert, i}
 				<button
-					class="rounded-full bg-neutral-300 size-3"
-					class:bg-neutral-500={i !== idx}
+					class="rounded-full bg-neutral-300 size-3 {i !== idx && 'bg-neutral-500'}"
 					aria-label="Scroll to alert"
 					onclick={() => scroll_to_alert(i)}
 				>

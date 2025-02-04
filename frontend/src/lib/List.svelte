@@ -273,13 +273,9 @@
 			{#snippet tab_button(value: 'train' | 'bus', data: unknown[])}
 				{@const Icon = tab_icons[value]}
 				<button
-					class="relative px-4 py-1 rounded-full transition-all duration-200 flex items-center gap-2"
-					class:text-neutral-100={selected_tab.value === value && data.length}
-					class:text-neutral-400={selected_tab.value !== value && data.length}
-					class:text-neutral-500={!data.length}
-					class:font-medium={selected_tab.value === value}
-					class:opacity-40={!data.length}
-					class:cursor-not-allowed={!data.length}
+					class="relative px-4 py-1 rounded-full transition-all duration-200 flex items-center gap-2 {!data.length &&
+						'cursor-not-allowed opacity-40 text-neutral-500'} {selected_tab.value === value &&
+						'text-neutral-100 font-medium'} {selected_tab.value !== value && 'text-neutral-400'}"
 					onclick={() => (selected_tab.value = value)}
 					disabled={!data.length}
 					aria-label={`Show ${value} stops`}

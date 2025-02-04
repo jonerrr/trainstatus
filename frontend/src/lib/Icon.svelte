@@ -8,7 +8,7 @@
 		route,
 		link,
 		express,
-		class: className,
+		class: class_name,
 		width = 16,
 		height = 16,
 		show_alerts = false
@@ -64,7 +64,7 @@
 			if (link) pushState('', { modal: 'route', data: route });
 		}}
 	>
-		<svg class={className} {width} {height} viewBox="0 0 90 90">
+		<svg class={class_name} {width} {height} viewBox="0 0 90 90">
 			{@html icon.svg}
 		</svg>
 

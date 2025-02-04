@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CircleX, Search } from 'lucide-svelte';
 	import { page } from '$app/state';
-	import { always_stop, calculate_stop_height, type Stop } from '$lib/static';
+	import { calculate_stop_height, type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';
 	import { debounce, persisted_rune, stop_pins_rune } from '$lib/util.svelte';
 	import { StopSearch } from '$lib/search.svelte';
@@ -44,6 +44,7 @@
 			} else {
 				// try searching for a stop id
 				const as_stop_id = parseInt(search_input);
+				const as_route = page.data.routes[search_input.toUpperCase()];
 				// shortest stop id is 3
 				if (search_input.length > 2 && !isNaN(as_stop_id)) {
 					const stop = page.data.stops[as_stop_id];
@@ -51,44 +52,40 @@
 						//@ts-expect-error
 						stops[selected_tab.value] = [stop];
 					}
-				} else {
-					const search_route = page.data.routes[search_input.toUpperCase()];
-					if (search_route && search_route.route_type === selected_tab.value) {
-						// sort by route stop_sequence
-						if (selected_tab.value === 'bus') {
-							const new_stops: StopWithRouteSequence[] = [];
+				} else if (as_route && as_route.route_type === selected_tab.value) {
+					const new_stops: StopWithRouteSequence[] = [];
+					// sort by route stop_sequence
+					switch (selected_tab.value) {
+						case 'bus':
 							for (const s of page.data.bus_stops) {
-								const route = s.routes.find((r) => r.id === search_route.id);
+								const route = s.routes.find((r) => r.id === as_route.id);
 								if (route) {
 									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
 								}
 							}
-
-							// sort the new stops and convert back to Stop<'bus'> type
-							stops['bus'] = new_stops
-								.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
-								.map(({ route_stop_sequence, ...stop }) => stop) as Stop<'bus'>[];
-						} else {
-							const new_stops: StopWithRouteSequence[] = [];
+							break;
+						case 'train':
 							for (const s of page.data.train_stops) {
-								const route = s.routes.find((r) => r.id === search_route.id);
-								if (route && always_stop.includes(route.type ?? '')) {
+								const route = s.routes.find((r) => r.id === as_route.id);
+								if (route && ['full_time', 'part_time', 'rush_hour'].includes(route.type ?? '')) {
 									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
 								}
 							}
-							// sort the new stops and convert back to Stop<'train'> type
-							stops['train'] = new_stops
-								.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
-								.map(({ route_stop_sequence, ...stop }) => stop) as Stop<'train'>[];
-						}
-					} else {
-						// search for stops
-						const results = search.search(search_input, selected_tab.value);
-						// not sure if its safe to assume that the results are always the same type
-						if (results.length) {
-							//@ts-expect-error
-							stops[selected_tab.value] = results;
-						}
+							break;
+					}
+					if (new_stops.length) {
+						//@ts-expect-error
+						stops[selected_tab.value] = new_stops
+							.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
+							.map(({ route_stop_sequence, ...stop }) => stop);
+					}
+				} else {
+					// search for stops
+					const results = search.search(search_input, selected_tab.value);
+					// not sure if its safe to assume that the results are always the same type
+					if (results.length) {
+						//@ts-expect-error
+						stops[selected_tab.value] = results;
 					}
 				}
 			}
