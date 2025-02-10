@@ -1,7 +1,7 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
 	import { BookText, GitBranch, CloudOff, Hourglass } from 'lucide-svelte';
-	import { fade } from 'svelte/transition';
+	import { fade, slide } from 'svelte/transition';
 	import { current_time } from '$lib/util.svelte';
 	import { replaceState } from '$app/navigation';
 	import { tick } from 'svelte';
@@ -31,49 +31,61 @@
 		// 	console.log('time change, updating rt data');
 		// }, 500)();
 	});
+
+	let show_input = $state(!!current_time.value);
+
+	// TODO: fix min width calculation
+	let always_visible_width = $state(0);
+	let links_width = $state(0);
+	let show_links_min_width = $derived(always_visible_width + links_width + 10);
 </script>
 
-<header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
-	<div class="flex gap-1">
-		<div class="gradient-text font-black">Train Status</div>
-		<!-- <button
-			class="text-white text-sm hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+<header
+	class="text-3xl md:text-4xl p-2 font-medium flex justify-between relative bg-neutral-900 overflow-x-scroll"
+>
+	<div class="flex gap-1 items-center" bind:offsetWidth={always_visible_width}>
+		<div class="gradient-text text-nowrap">Train Status</div>
+		<button
+			title="Change time"
+			onclick={() => (show_input = !show_input)}
+			class="text-sm hover:text-cyan-400 transition-colors duration-300 flex flex-col items-center {show_input
+				? 'text-cyan-400'
+				: 'text-white'}"
 		>
-			<Hourglass class="w-6 h-6" />
+			<Hourglass class="size-6" />
 			<span>Time</span>
-		</button> -->
-		{#if offline}
-			<div transition:fade class="text-red-500 flex flex-col items-center">
-				<CloudOff class="w-6 h-6" />
-				<div class=" text-xs self-end">Offline</div>
-			</div>
-		{/if}
-
-		{#if current_time.value}
-			<!-- TODO: update rt data after value change  -->
-			<!-- TODO: show input even if user didn't specify in query param -->
-			<!-- TODO: update url param with user's input -->
+		</button>
+		{#if show_input}
 			<input
+				transition:slide={{ axis: 'x' }}
 				max={dayjs().format('YYYY-MM-DDTHH:mm')}
-				style="color-scheme: dark"
+				style="color-scheme: dark; font-size: 0.75rem"
 				type="datetime-local"
 				bind:value={
 					() =>
 						current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
 					(v) => (current_time.value = dayjs(v).unix())
 				}
-				class="text-neutral-400 text-sm bg-transparent border-b border-neutral-400 ml-2"
+				class="text-neutral-400 bg-transparent border-b border-neutral-400 p-0 leading-6"
 			/>
 		{/if}
+		{#if offline}
+			<div transition:fade class="text-red-500 flex flex-col items-center">
+				<CloudOff class="size-6" />
+				<div class="text-xs self-end">Offline</div>
+			</div>
+		{/if}
 	</div>
-	<!-- <TimeSelect /> -->
-	<div class="flex justify-center items-center gap-2">
+	<div
+		bind:offsetWidth={links_width}
+		class="justify-center items-center gap-2 flex {show_input ? 'hidden sm:flex' : ''}"
+	>
 		<a
 			href="/api/docs"
 			target="_blank"
 			class="text-white text-sm hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
 		>
-			<BookText class="w-6 h-6" />
+			<BookText class="size-6" />
 			<span>API</span>
 		</a>
 		<a
@@ -81,7 +93,7 @@
 			target="_blank"
 			class="text-white text-sm hover:text-green-400 transition-colors duration-300 flex flex-col items-center"
 		>
-			<GitBranch class="w-6 h-6" />
+			<GitBranch class="size-6" />
 			<span>Code</span>
 		</a>
 	</div>
