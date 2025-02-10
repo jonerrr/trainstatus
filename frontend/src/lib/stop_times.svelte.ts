@@ -1,5 +1,4 @@
 import { SvelteSet } from 'svelte/reactivity';
-import { current_time } from './util.svelte';
 import type { Trip } from './trips.svelte';
 
 export interface StopTime<T = never | Trip> {
@@ -29,16 +28,21 @@ type ByTripId = {
 export function createStopTimes() {
 	let stop_times: StopTime[] = $state([]);
 
-	// const monitored_bus_routes: string[] = $state([]);
 	// let filter_arrivals = $state(false);
 	// <trip_id, index in array above>
 	let st_by_trip_id: ByTripId = $state({});
 	let st_by_stop_id: ByStopId = $state({});
-	// let by_trip_id = $state(new SvelteMap<string, number[]>());
-	// let by_stop_id = $state(new SvelteMap<number, number[]>());
+
+	// there are way too many bus routes to load all at once, so we only fetch the routes that the user is looking at.
+	// const monitored_bus_routes = $state(new SvelteSet<string>());
+	// used to show skeleton loader while updating
+	let updating_bus_routes = $state(new SvelteSet<string>());
 
 	// must specify routes if only_bus is true
-	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false) {
+	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false, at?: string) {
+		if (only_bus) {
+			updating_bus_routes = new SvelteSet(routes);
+		}
 		// TODO: if only_bus was fetched too recently, don't include buses in next request
 		const params = new URLSearchParams();
 		if (routes.length) {
@@ -47,9 +51,9 @@ export function createStopTimes() {
 				params.set('only_bus', 'true');
 			}
 		}
-		if (current_time.value) {
+		if (at) {
 			// convert back to seconds from ms
-			params.set('at', current_time.value.toString());
+			params.set('at', at.toString());
 		}
 
 		const res = await fetch(`/api/v1/stop_times${params.size ? '?' + params.toString() : ''}`);
@@ -108,6 +112,7 @@ export function createStopTimes() {
 		}
 		st_by_trip_id = st_by_trip_id_new;
 		st_by_stop_id = st_by_stop_id_new;
+		updating_bus_routes = new SvelteSet();
 	}
 
 	// function add_routes(routes: string[]) {
@@ -134,9 +139,18 @@ export function createStopTimes() {
 			return st_by_stop_id;
 		},
 
+		// set monitored_routes(routes: string[]) {
+		// 	monitored_bus_routes.clear();
+		// 	monitored_bus_routes.add(...routes);
+		// },
+
 		// get monitored_routes() {
 		// 	return monitored_bus_routes;
 		// },
+
+		get updating_routes() {
+			return updating_bus_routes;
+		},
 
 		// set filter_arrivals(value: boolean) {
 		// 	// can only be set once, if user spams button we don't want to keep updating

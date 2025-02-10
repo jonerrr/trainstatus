@@ -1,6 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
-import { current_time } from './util.svelte';
 
 export interface Trip<T = TripData, R = never> {
 	id: string;
@@ -58,11 +57,9 @@ export function createTrips() {
 	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
-	async function update(fetch: Fetch) {
+	async function update(fetch: Fetch, at?: string) {
 		// try {
-		const res = await fetch(
-			`/api/v1/trips${current_time.value ? `?at=${current_time.value}` : ''}`
-		);
+		const res = await fetch(`/api/v1/trips${at ? `?at=${at}` : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}

@@ -18,6 +18,8 @@ declare global {
 			};
 			bus_stops: Stop<'bus'>[];
 			train_stops: Stop<'train'>[];
+			// initial current_time.value (can't set in layout load bc SSR)
+			at?: string;
 			// used to keep track of the current monitored
 			// current_monitored_routes: string[];
 			// initial_promise: Promise<[void, void]>;
@@ -30,7 +32,7 @@ declare global {
 			modal: 'stop' | 'trip' | 'route' | null;
 			data?: Stop | Trip | Route;
 			// time used for api requests.
-			at?: number;
+			// at?: number;
 		}
 		// interface Platform {}
 	}

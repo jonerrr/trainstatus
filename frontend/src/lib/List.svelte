@@ -3,7 +3,6 @@
 	import { tick, type Snippet } from 'svelte';
 	import { crossfade } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
-	import { pushState } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
 	import { monitored_bus_routes } from './stop_times.svelte';
@@ -13,6 +12,7 @@
 	import Pin from './Pin.svelte';
 	import type { Route, Stop } from './static';
 	import type { BusTripData, TrainTripData, Trip } from './trips.svelte';
+	import { pushState } from '$app/navigation';
 
 	// [ element, estimated size]
 	interface ItemComponents {
@@ -57,8 +57,6 @@
 		overscan?: number;
 		// css style for list
 		style?: string;
-		// current time gets passed to items
-		// current_time?: number;
 	}
 
 	let {
@@ -102,7 +100,6 @@
 
 	let viewport_el = $state<HTMLDivElement>();
 
-	// TODO: fix scroll reset on tab change
 	function reset_scroll() {
 		if (viewport_el) {
 			viewport_el.scrollTop = 0;
