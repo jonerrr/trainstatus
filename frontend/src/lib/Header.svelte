@@ -1,10 +1,9 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
-	import { BookText, GitBranch, CloudOff } from 'lucide-svelte';
+	import { BookText, GitBranch, CloudOff, Hourglass } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
-	import { current_time, debounce } from '$lib/util.svelte';
-	import { pushState, replaceState } from '$app/navigation';
-	import { page } from '$app/state';
+	import { current_time } from '$lib/util.svelte';
+	import { replaceState } from '$app/navigation';
 	import { tick } from 'svelte';
 
 	interface Props {
@@ -24,8 +23,7 @@
 			url.searchParams.set('at', current_time.value.toString());
 			// Users can't change the time if they are in a modal, so it will always be null (hopefully).
 			replaceState(url.toString(), {
-				modal: null,
-				at: current_time.value
+				modal: null
 			});
 		});
 
@@ -38,12 +36,19 @@
 <header class="text-4xl p-2 font-bold flex justify-between relative bg-neutral-900">
 	<div class="flex gap-1">
 		<div class="gradient-text font-black">Train Status</div>
+		<!-- <button
+			class="text-white text-sm hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+		>
+			<Hourglass class="w-6 h-6" />
+			<span>Time</span>
+		</button> -->
 		{#if offline}
 			<div transition:fade class="text-red-500 flex flex-col items-center">
 				<CloudOff class="w-6 h-6" />
 				<div class=" text-xs self-end">Offline</div>
 			</div>
 		{/if}
+
 		{#if current_time.value}
 			<!-- TODO: update rt data after value change  -->
 			<!-- TODO: show input even if user didn't specify in query param -->

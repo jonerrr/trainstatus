@@ -5,7 +5,7 @@
 	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
-	import { debounce, current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/util.svelte';
 	import BusArrow from './BusArrow.svelte';
 	import Icon from '$lib/Icon.svelte';
 
@@ -168,11 +168,16 @@
 				<div class="flex gap-2 items-center text-wrap text-left rounded-sm p-1">
 					<Icon {route} link={false} express={false} />
 					<div class="flex flex-col">
-						<div class="">
+						<div>
 							{stop_route.headsign}
 						</div>
 						<div class="flex gap-2 pr-1">
-							{#if route_stop_times.length}
+							{#if rt_stop_times.updating_routes.has(route.id)}
+								<div class="flex items-center gap-1 py-1">
+									<div class="animate-pulse bg-neutral-700 h-[1em] w-6"></div>
+									<div class="animate-pulse bg-neutral-700 h-[1em] w-6"></div>
+								</div>
+							{:else if route_stop_times.length}
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 									{@render eta(stop_time.eta)}
 								{/each}
