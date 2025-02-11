@@ -1,6 +1,6 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
-	import { BookText, GitBranch, CloudOff, Hourglass } from 'lucide-svelte';
+	import { BookText, GitBranch, CloudOff, Hourglass, CircleX } from 'lucide-svelte';
 	import { fade, slide } from 'svelte/transition';
 	import { current_time } from '$lib/util.svelte';
 	import { replaceState } from '$app/navigation';
@@ -35,7 +35,9 @@
 	let show_links_min_width = $derived(always_visible_width + links_width + 10);
 </script>
 
-<header class="p-2 text-sm flex justify-between relative bg-neutral-900 overflow-x-scroll">
+<header
+	class="p-2 text-sm flex text-white justify-between relative bg-neutral-900 overflow-x-scroll"
+>
 	<div class="flex gap-1 items-center" bind:offsetWidth={always_visible_width}>
 		<div class="gradient-text text-nowrap text-3xl md:text-4xl font-semibold tracking-tight">
 			Train Status
@@ -43,27 +45,35 @@
 		<button
 			title="Change time"
 			onclick={() => (show_input = !show_input)}
-			class="hover:text-fuchsia-300 transition-colors duration-300 flex flex-col items-center {show_input ||
-			current_time.value
-				? 'text-fuchsia-300'
-				: 'text-white'}"
+			class="hover:text-fuchsia-300 transition-colors duration-300 flex flex-col items-center {show_input &&
+				'text-fuchsia-400'}"
 		>
 			<Hourglass class="size-6" />
 			<span>Time</span>
 		</button>
 		{#if show_input}
-			<input
-				transition:slide={{ axis: 'x' }}
-				max={dayjs().format('YYYY-MM-DDTHH:mm')}
-				style="color-scheme: dark; font-size: 0.75rem"
-				type="datetime-local"
-				bind:value={
-					() =>
-						current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
-					(v) => (current_time.value = dayjs(v).unix())
-				}
-				class="text-neutral-400 bg-transparent border-b border-neutral-400 p-0 leading-6"
-			/>
+			<div transition:slide={{ axis: 'x' }} class="flex gap-1 items-center">
+				<input
+					max={dayjs().format('YYYY-MM-DDTHH:mm')}
+					style="color-scheme: dark; font-size: 0.75rem"
+					type="datetime-local"
+					bind:value={
+						() =>
+							current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
+						(v) => (current_time.value = dayjs(v).unix())
+					}
+					class="text-neutral-400 bg-transparent border-b border-neutral-400 p-0 leading-6"
+				/>
+				{#if current_time.value}
+					<button
+						title="Clear time"
+						onclick={() => (current_time.value = undefined)}
+						class="hover:text-fuchsia-300 transition-colors duration-300"
+					>
+						<CircleX class="size-6" />
+					</button>
+				{/if}
+			</div>
 		{/if}
 		{#if offline}
 			<div transition:fade class="text-red-500 flex flex-col items-center">
@@ -79,7 +89,7 @@
 		<a
 			href="/api/docs"
 			target="_blank"
-			class="text-white hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+			class=" hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
 		>
 			<BookText class="size-6" />
 			<span>API</span>
@@ -87,7 +97,7 @@
 		<a
 			href="https://github.com/jonerrr/trainstatus"
 			target="_blank"
-			class="text-white text-sm hover:text-green-400 transition-colors duration-300 flex flex-col items-center"
+			class="hover:text-green-400 transition-colors duration-300 flex flex-col items-center"
 		>
 			<GitBranch class="size-6" />
 			<span>Code</span>
