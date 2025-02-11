@@ -111,7 +111,7 @@ function currentTime() {
 			return time ? time * 1000 : new Date().getTime();
 		},
 
-		set value(newValue: number) {
+		set value(newValue: number | undefined) {
 			// js time is in milliseconds
 			time = newValue;
 		}
