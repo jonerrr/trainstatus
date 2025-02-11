@@ -11,7 +11,6 @@
 	}
 
 	let { offline }: Props = $props();
-	// $eff
 	let last_at = current_time.value;
 
 	$effect(() => {
@@ -26,10 +25,6 @@
 				modal: null
 			});
 		});
-
-		// debounce(() => {
-		// 	console.log('time change, updating rt data');
-		// }, 500)();
 	});
 
 	let show_input = $state(!!current_time.value);
@@ -40,16 +35,17 @@
 	let show_links_min_width = $derived(always_visible_width + links_width + 10);
 </script>
 
-<header
-	class="text-3xl md:text-4xl p-2 font-medium flex justify-between relative bg-neutral-900 overflow-x-scroll"
->
+<header class="p-2 text-sm flex justify-between relative bg-neutral-900 overflow-x-scroll">
 	<div class="flex gap-1 items-center" bind:offsetWidth={always_visible_width}>
-		<div class="gradient-text text-nowrap">Train Status</div>
+		<div class="gradient-text text-nowrap text-3xl md:text-4xl font-semibold tracking-tight">
+			Train Status
+		</div>
 		<button
 			title="Change time"
 			onclick={() => (show_input = !show_input)}
-			class="text-sm hover:text-cyan-400 transition-colors duration-300 flex flex-col items-center {show_input
-				? 'text-cyan-400'
+			class="hover:text-fuchsia-300 transition-colors duration-300 flex flex-col items-center {show_input ||
+			current_time.value
+				? 'text-fuchsia-300'
 				: 'text-white'}"
 		>
 			<Hourglass class="size-6" />
@@ -72,7 +68,7 @@
 		{#if offline}
 			<div transition:fade class="text-red-500 flex flex-col items-center">
 				<CloudOff class="size-6" />
-				<div class="text-xs self-end">Offline</div>
+				<div class="self-end">Offline</div>
 			</div>
 		{/if}
 	</div>
@@ -83,7 +79,7 @@
 		<a
 			href="/api/docs"
 			target="_blank"
-			class="text-white text-sm hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+			class="text-white hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
 		>
 			<BookText class="size-6" />
 			<span>API</span>
