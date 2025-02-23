@@ -43,7 +43,7 @@
 		aria-label={link ? route.short_name : undefined}
 		style:background-color={`#${route.color}`}
 		class="relative text-lg w-fit p-1 text-white rounded font-bold shadow-2xl flex text-center justify-center [text-shadow:_1px_1px_2px_rgb(0_0_0_/_60%),_-1px_-1px_2px_rgb(0_0_0_/_60%)] {show_alert_icon
-			? 'ring-2 ring-red-800'
+			? 'ring-3 ring-red-800'
 			: ''}"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });
@@ -59,7 +59,7 @@
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
-		class="appearance-none relative {show_alert_icon ? 'ring-2 ring-red-800 rounded-full' : ''}"
+		class="appearance-none relative {show_alert_icon ? 'ring-3 ring-red-800 rounded-full' : ''}"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });
 		}}

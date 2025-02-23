@@ -2,10 +2,10 @@
 	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { slide } from 'svelte/transition';
-	import { stop_times as rt_stop_times } from '$lib/stop_times.svelte';
+	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
-	import type { Stop } from '$lib/static';
-	import { is_bus_route, is_train_route, type Trip, type TripData } from '$lib/trips.svelte';
+	import { is_train, type Stop } from '$lib/static';
+	import { is_bus_route, is_train_route, trips, type Trip, type TripData } from '$lib/trips.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import Button from '$lib/Button.svelte';
@@ -22,14 +22,11 @@
 
 	const route = $derived(page.data.routes[trip.route_id]);
 
-	// const stop_times = $derived(rt_stop_times.stop_times.filter((st) => st.trip_id === trip.id)!);
-	const stop_times = $derived.by(() => {
-		const stop_times = (rt_stop_times.by_trip_id[trip.id] || []).filter(
+	const stop_times = $derived(
+		(rt_stop_times.by_trip_id[trip.id] || []).filter(
 			(st) => st.arrival.getTime() > current_time.ms || show_previous
-		);
-
-		return stop_times;
-	});
+		)
+	);
 	const last_stop = $derived.by(() => {
 		if (!stop_times.length) return 'Unknown';
 
@@ -42,6 +39,73 @@
 			const last_st = stop_times[stop_times.length - 1];
 			return page.data.stops[last_st.stop_id].name;
 		}
+	});
+
+	interface StopTransfers {
+		[stop_id: number]: StopTime<Trip>[];
+	}
+
+	const transfer_stop_times = $derived.by(() => {
+		const transfers: StopTransfers = {};
+		// TODO: maybe only get stop_times that are in the future
+		for (const st of stop_times) {
+			transfers[st.stop_id] = [];
+
+			// only show 1 transfer for each route
+			const added_routes = new Set<string>();
+
+			const stop = page.data.stops[st.stop_id];
+			const transfer_stop_times = rt_stop_times.by_stop_id[stop.id] || [];
+
+			for (let transfer_st of transfer_stop_times) {
+				if (transfers[st.stop_id].length > 3) break;
+				if (transfer_st.trip_id === st.trip_id || transfer_st.arrival < st.arrival) continue;
+
+				const transfer_trip = trips.trips.get(transfer_st.trip_id);
+				if (
+					!transfer_trip ||
+					transfer_trip.route_id === trip.route_id ||
+					transfer_trip.direction !== trip.direction ||
+					added_routes.has(transfer_trip.route_id)
+				)
+					continue;
+
+				// need to snapshot transfer so theres no unsafe state mutation error
+				transfer_st = $state.snapshot(transfer_st);
+				transfer_st.trip = transfer_trip;
+				transfers[st.stop_id].push(transfer_st);
+				added_routes.add(transfer_trip.route_id);
+			}
+
+			// only train routes have stop.transfers
+			if (is_train(stop) && stop.data.transfers.length) {
+				for (const transfer of stop.data.transfers) {
+					if (transfers[st.stop_id].length > 3) break;
+
+					const transfer_stop_times = rt_stop_times.by_stop_id[transfer] || [];
+					for (let transfer_st of transfer_stop_times) {
+						if (transfer_st.arrival < st.arrival) continue;
+						const transfer_trip = trips.trips.get(transfer_st.trip_id);
+
+						// TODO: maybe don't check direction bc it be different for other stops
+						if (
+							!transfer_trip ||
+							transfer_trip.direction !== trip.direction ||
+							added_routes.has(transfer_trip.route_id)
+						)
+							continue;
+
+						// need to snapshot transfer so theres no unsafe state mutation error
+						transfer_st = $state.snapshot(transfer_st);
+						transfer_st.trip = transfer_trip;
+						transfers[st.stop_id].push(transfer_st);
+						added_routes.add(transfer_trip.route_id);
+					}
+				}
+			}
+		}
+
+		return transfers;
 	});
 
 	interface OpenTransfers {
@@ -113,27 +177,29 @@
 		{@const stop = page.data.stops[st.stop_id]}
 		<!-- {#if rt_stop_times.by_stop_id[]} -->
 		<div class="relative text-base">
-			<button
-				tabindex="0"
-				onclick={() => {
-					if (open_transfers[st.stop_id]) {
-						open_transfers[st.stop_id] = false;
-					} else {
-						open_transfers[st.stop_id] = true;
-					}
-				}}
-				aria-label="Show transfers at stop"
-				class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded-sm"
-			>
-				<div class="flex items-center mx-1">
-					<!-- Transfers -->
-					{#if !open_transfers[st.stop_id]}
-						<ChevronDown />
-					{:else}
-						<ChevronUp />
-					{/if}
-				</div>
-			</button>
+			{#if transfer_stop_times[st.stop_id].length}
+				<button
+					tabindex="0"
+					onclick={() => {
+						if (open_transfers[st.stop_id]) {
+							open_transfers[st.stop_id] = false;
+						} else {
+							open_transfers[st.stop_id] = true;
+						}
+					}}
+					aria-label="Show transfers at stop"
+					class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded-sm"
+				>
+					<div class="flex items-center mx-1">
+						<!-- Transfers -->
+						{#if !open_transfers[st.stop_id]}
+							<ChevronDown />
+						{:else}
+							<ChevronUp />
+						{/if}
+					</div>
+				</button>
+			{/if}
 
 			<Button state={{ modal: 'stop', data: stop }}>
 				<div
@@ -162,7 +228,7 @@
 
 		{#if open_transfers[st.stop_id]}
 			<div transition:slide>
-				<Transfers stop_time={st} {trip} {time_format} />
+				<Transfers {time_format} transfer_stop_times={transfer_stop_times[st.stop_id]} />
 			</div>
 		{/if}
 	{/each}
