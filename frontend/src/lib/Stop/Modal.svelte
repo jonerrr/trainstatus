@@ -112,7 +112,7 @@
 <div class="flex gap-1 items-center p-1">
 	<!-- grid gap-y-1 [grid-template-columns:repeat(auto-fit,minmax(4rem,1fr))] max-w-xs -->
 	<!-- grid gap-1 grid-cols-5 grid-rows-3 grid-flow-col -->
-
+	<!-- TODO: use grid with auto-fit and minmax(min(100px)) or whatever -->
 	<div class="flex flex-wrap gap-1 max-h-36 max-w-40 md:max-w-xs items-center">
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route}
@@ -165,8 +165,7 @@
 			{@const transfer_stop = page.data.stops[transfer] as Stop<'train'>}
 			<button
 				class="flex rounded-sm bg-neutral-800 shadow-2xl gap-1 p-1 items-center transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
-				onclick={() =>
-					pushState('', { modal: 'stop', data: JSON.parse(JSON.stringify(transfer_stop)) })}
+				onclick={() => pushState('', { modal: 'stop', data: $state.snapshot(transfer_stop) })}
 			>
 				{#each main_stop_routes(transfer_stop) as route}
 					<Icon

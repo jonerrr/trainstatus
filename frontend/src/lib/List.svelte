@@ -318,7 +318,7 @@
 						<button
 							class="w-full flex justify-between items-center p-2 hover:bg-neutral-800/50 active:bg-neutral-700/50 transition-colors duration-200"
 							onclick={() => {
-								pushState('', { modal: type, data: JSON.parse(JSON.stringify(data)) });
+								pushState('', { modal: type, data: $state.snapshot(data) });
 							}}
 						>
 							<Item {data} />
