@@ -182,7 +182,7 @@
 <!--  overflow-hidden -->
 <div class="flex flex-col max-h-[calc(100dvh-10.5rem)]" bind:offsetHeight={list_height}>
 	<!-- Pinned items section - no scroll -->
-	<div class="flex-none max-h-[50%] overflow-hidden" bind:offsetHeight={pin_list_height}>
+	<div class="flex-none overflow-hidden" bind:offsetHeight={pin_list_height}>
 		{#if trip_pins_rune.value.length}
 			<List
 				title="Pinned Trips"
@@ -192,6 +192,7 @@
 				pin_rune={trip_pins_rune}
 				height_calc={calculate_trip_height}
 				items_before_scroll={2}
+				class="max-h-[25dvh]"
 			/>
 		{/if}
 
@@ -204,6 +205,7 @@
 				type="route"
 				height_calc={calculate_route_height}
 				items_before_scroll={2}
+				class="max-h-[25dvh]"
 			/>
 		{/if}
 
@@ -218,6 +220,7 @@
 				height_calc={calculate_stop_height}
 				items_before_scroll={2}
 				ssr_min={0}
+				class="max-h-[25dvh]"
 			/>
 		{/if}
 	</div>
