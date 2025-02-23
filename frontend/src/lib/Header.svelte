@@ -16,10 +16,16 @@
 	$effect(() => {
 		current_time.value;
 		tick().then(() => {
-			if (!current_time.value || last_at === current_time.value) return;
-			// use existing url because we don't want to lose other query params
+			// console.log('updating time param');
 			const url = new URL(window.location.href);
-			url.searchParams.set('at', current_time.value.toString());
+
+			if (last_at === current_time.value) return;
+			// use existing url because we don't want to lose other query params
+			if (current_time.value) {
+				url.searchParams.set('at', current_time.value.toString());
+			} else {
+				url.searchParams.delete('at');
+			}
 			// Users can't change the time if they are in a modal, so it will always be null (hopefully).
 			replaceState(url.toString(), {
 				modal: null
@@ -27,26 +33,20 @@
 		});
 	});
 
-	let show_input = $state(!!current_time.value);
-
-	// TODO: fix min width calculation
-	let always_visible_width = $state(0);
-	let links_width = $state(0);
-	let show_links_min_width = $derived(always_visible_width + links_width + 10);
+	let show_input = $state(false);
 </script>
 
-<header
-	class="p-2 text-sm flex text-white justify-between relative bg-neutral-900 overflow-x-scroll"
->
-	<div class="flex gap-1 items-center" bind:offsetWidth={always_visible_width}>
+<header class="p-2 text-sm flex text-white justify-between relative bg-neutral-900 overflow-x-auto">
+	<div class="flex gap-1 items-center">
 		<div class="gradient-text text-nowrap text-3xl md:text-4xl font-semibold tracking-tight">
 			Train Status
 		</div>
 		<button
 			title="Change time"
 			onclick={() => (show_input = !show_input)}
-			class="hover:text-fuchsia-300 transition-colors duration-300 flex flex-col items-center {show_input &&
-				'text-fuchsia-400'}"
+			class:text-fuchsia-400={current_time.value}
+			class:text-fuchsia-300={show_input}
+			class="hover:text-fuchsia-300 transition-colors duration-300 flex flex-col items-center"
 		>
 			<Hourglass class="size-6" />
 			<span>Time</span>
@@ -82,14 +82,12 @@
 			</div>
 		{/if}
 	</div>
-	<div
-		bind:offsetWidth={links_width}
-		class="justify-center items-center gap-2 flex {show_input ? 'hidden sm:flex' : ''}"
-	>
+	<div class="justify-center items-center gap-2 flex">
+		<!-- {show_input ? 'hidden sm:flex' : ''} -->
 		<a
 			href="/api/docs"
 			target="_blank"
-			class=" hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
+			class="hover:text-blue-400 transition-colors duration-300 flex flex-col items-center"
 		>
 			<BookText class="size-6" />
 			<span>API</span>
