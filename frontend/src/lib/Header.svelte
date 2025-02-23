@@ -11,25 +11,30 @@
 	}
 
 	let { offline }: Props = $props();
-	let last_at = current_time.value;
+	// let last_at = current_time.value;
 
 	$effect(() => {
 		current_time.value;
 		tick().then(() => {
-			// console.log('updating time param');
+			// console.log('updating time param', last_at, current_time.value);
 			const url = new URL(window.location.href);
 
-			if (last_at === current_time.value) return;
 			// use existing url because we don't want to lose other query params
 			if (current_time.value) {
 				url.searchParams.set('at', current_time.value.toString());
 			} else {
 				url.searchParams.delete('at');
 			}
-			// Users can't change the time if they are in a modal, so it will always be null (hopefully).
-			replaceState(url.toString(), {
-				modal: null
-			});
+
+			// only update url if it has changed
+			const new_url = url.toString();
+			if (new_url !== window.location.href) {
+				// console.log('url changed', new_url, window.location.href);
+				// Users can't change the time if they are in a modal, so it will always be null (hopefully).
+				replaceState(new_url, {
+					modal: null
+				});
+			}
 		});
 	});
 
@@ -52,7 +57,8 @@
 			<span>Time</span>
 		</button>
 		{#if show_input}
-			<div transition:slide={{ axis: 'x' }} class="flex gap-1 items-center">
+			<div transition:slide={{ axis: 'x' }} class="flex gap-1 items-center pr-4">
+				<!-- need a min width because on IOS the width is 0 without anything inside -->
 				<input
 					max={dayjs().format('YYYY-MM-DDTHH:mm')}
 					style="color-scheme: dark; font-size: 0.75rem"
@@ -62,7 +68,7 @@
 							current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
 						(v) => (current_time.value = dayjs(v).unix())
 					}
-					class="text-neutral-400 bg-transparent border-b border-neutral-400 p-0 leading-6"
+					class="text-neutral-400 bg-transparent border-b border-neutral-400 p-0 leading-6 min-w-[150px]"
 				/>
 				{#if current_time.value}
 					<button
