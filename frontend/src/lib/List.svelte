@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { BusFront, TrainFront } from 'lucide-svelte';
 	import { tick, type Snippet } from 'svelte';
-	import { crossfade } from 'svelte/transition';
+	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';
 	import { browser } from '$app/environment';
 	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
@@ -268,26 +268,29 @@
 
 		<div class="bg-neutral-800/50 rounded-full p-1 border border-neutral-700/50 shadow-inner">
 			{#snippet tab_button(value: 'train' | 'bus', data: unknown[])}
-				{@const Icon = tab_icons[value]}
-				<button
-					class="relative px-4 py-1 rounded-full transition-all duration-200 flex items-center gap-2 {!data.length &&
-						'cursor-not-allowed opacity-40 text-neutral-500'} {selected_tab.value === value &&
-						'text-neutral-100 font-medium'} {selected_tab.value !== value && 'text-neutral-400'}"
-					onclick={() => (selected_tab.value = value)}
-					disabled={!data.length}
-					aria-label={`Show ${value} stops`}
-				>
-					<Icon class="w-4 h-4" />
-					<span class="capitalize">{value}</span>
+				{#if data.length}
+					{@const Icon = tab_icons[value]}
+					<div transition:slide={{ axis: 'x', duration: 250 }}>
+						<button
+							class="relative px-4 py-1 rounded-full transition-all duration-200 flex items-center gap-2 {selected_tab.value ===
+								value && 'text-neutral-100 font-medium'} {selected_tab.value !== value &&
+								'text-neutral-400'}"
+							onclick={() => (selected_tab.value = value)}
+							aria-label={`Show ${value} stops`}
+						>
+							<Icon class="w-4 h-4" />
+							<span class="capitalize">{value}</span>
 
-					{#if selected_tab.value === value && data.length}
-						<div
-							in:send={{ key: 'tab' }}
-							out:receive={{ key: 'tab' }}
-							class="absolute inset-0 bg-neutral-700/50 rounded-full -z-10"
-						></div>
-					{/if}
-				</button>
+							{#if selected_tab.value === value}
+								<div
+									in:send={{ key: 'tab' }}
+									out:receive={{ key: 'tab' }}
+									class="absolute inset-0 bg-neutral-700/50 rounded-full -z-10"
+								></div>
+							{/if}
+						</button>
+					</div>
+				{/if}
 			{/snippet}
 
 			<div class="flex gap-1">
