@@ -15,7 +15,8 @@
 		haversine,
 		stop_pins_rune,
 		trip_pins_rune,
-		route_pins_rune
+		route_pins_rune,
+		get_position
 	} from '$lib/util.svelte';
 	import List from '$lib/List.svelte';
 	import {
@@ -106,46 +107,51 @@
 		'unknown'
 	);
 
-	function get_nearby_stops() {
+	async function get_nearby_stops() {
 		location_status.value = 'loading';
-		navigator.geolocation.getCurrentPosition(
-			(position) => {
-				nearby_train_stops = page.data.train_stops
-					.map((stop: Stop<'train'>) => {
-						const distance = haversine(
-							position.coords.latitude,
-							position.coords.longitude,
-							stop.lat,
-							stop.lon
-						);
-						return { ...stop, distance };
-					})
-					.sort((a, b) => a.distance - b.distance);
+		try {
+			const position = await get_position();
+			nearby_train_stops = page.data.train_stops
+				.map((stop: Stop<'train'>) => {
+					const distance = haversine(
+						position.coords.latitude,
+						position.coords.longitude,
+						stop.lat,
+						stop.lon
+					);
+					return { ...stop, distance };
+				})
+				.sort((a, b) => a.distance - b.distance);
 
-				nearby_bus_stops = page.data.bus_stops
-					.map((stop: Stop<'bus'>) => {
-						const distance = haversine(
-							position.coords.latitude,
-							position.coords.longitude,
-							stop.lat,
-							stop.lon
-						);
-						return { ...stop, distance };
-					})
-					.sort((a, b) => a.distance - b.distance);
-				// .slice(0, 70);
+			nearby_bus_stops = page.data.bus_stops
+				.map((stop: Stop<'bus'>) => {
+					const distance = haversine(
+						position.coords.latitude,
+						position.coords.longitude,
+						stop.lat,
+						stop.lon
+					);
+					return { ...stop, distance };
+				})
+				.sort((a, b) => a.distance - b.distance);
 
-				location_status.value = 'granted';
-			},
-			(e) => {
-				console.error('Error getting location', e);
-				location_status.value = 'denied';
-			}
-		);
+			location_status.value = 'granted';
+		} catch (e) {
+			console.error('Error getting location', e);
+			location_status.value = 'denied';
+		}
 	}
 
-	if (location_status.value === 'granted' || location_status.value === 'loading') {
-		get_nearby_stops();
+	switch (location_status.value) {
+		case 'granted':
+		case 'loading':
+			get_nearby_stops();
+			break;
+		default:
+			// shows the nearby stop list even when we don't have location
+			nearby_bus_stops = [];
+			nearby_train_stops = [];
+			break;
 	}
 
 	// use this to calculate the height for the nearby stops list

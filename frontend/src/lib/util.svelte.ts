@@ -30,6 +30,12 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 	};
 }
 
+export function get_position(): Promise<GeolocationPosition> {
+	return new Promise<GeolocationPosition>((res, rej) => {
+		navigator.geolocation.getCurrentPosition(res, rej);
+	});
+}
+
 export interface PersistedRune<T> {
 	value: T;
 	// key: string;
