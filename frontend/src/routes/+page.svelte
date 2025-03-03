@@ -98,8 +98,8 @@
 			)
 	);
 
-	let nearby_train_stops = $state<Stop<'train'>[]>([]);
-	let nearby_bus_stops = $state<Stop<'bus'>[]>([]);
+	let nearby_train_stops = $state<Stop<'train'>[]>();
+	let nearby_bus_stops = $state<Stop<'bus'>[]>();
 
 	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
@@ -226,16 +226,18 @@
 	</div>
 
 	<div>
-		<List
-			title="Nearby Stops"
-			type="stop"
-			style="max-height: {nearby_list_height}px"
-			bus_data={nearby_bus_stops}
-			train_data={nearby_train_stops}
-			pin_rune={stop_pins_rune}
-			{locate_button}
-			height_calc={calculate_stop_height}
-		/>
+		{#if nearby_bus_stops && nearby_train_stops}
+			<List
+				title="Nearby Stops"
+				type="stop"
+				style="max-height: {nearby_list_height}px"
+				bus_data={nearby_bus_stops}
+				train_data={nearby_train_stops}
+				pin_rune={stop_pins_rune}
+				{locate_button}
+				height_calc={calculate_stop_height}
+			/>
+		{/if}
 	</div>
 </div>
 

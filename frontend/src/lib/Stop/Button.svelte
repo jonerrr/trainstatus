@@ -95,6 +95,7 @@
 	// const all_stop_routes = $derived(current_stop_routes);
 </script>
 
+<!-- eta used by bus and train -->
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
 	{#key eta}

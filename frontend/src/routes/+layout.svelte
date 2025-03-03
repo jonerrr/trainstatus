@@ -121,11 +121,11 @@
 					to_remove.forEach((r) => monitored_bus_routes.delete(r));
 				}
 
-				const new_routes =
+				const routes_changed =
 					monitored_bus_routes.size !== last_monitored_routes.size ||
 					!monitored_bus_routes.isSubsetOf(last_monitored_routes);
 				const update_st = now - last_st_update.getTime() > 1000 * 15;
-				if (new_routes && !update_st) {
+				if (routes_changed && !update_st) {
 					// if monitored routes have changed, update stop times
 					await stop_times.update(
 						fetch,

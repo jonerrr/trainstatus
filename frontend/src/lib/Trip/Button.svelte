@@ -92,10 +92,8 @@
 		{last_stop}
 	</div>
 
-	<div class="flex self-start">
-		<div>
-			<span class="font-medium">{current_status}</span>
-			{current_stop}
-		</div>
+	<div class="flex self-start gap-1">
+		<span>{current_status}</span>
+		{current_stop}
 	</div>
 </div>
