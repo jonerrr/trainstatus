@@ -15,8 +15,8 @@
 
 <div class="flex flex-col px-1 bg-neutral-900 pb-1">
 	<div class="font-medium">Transfers:</div>
-	<div class="flex gap-2 items-center justify-evenly">
-		{#each transfer_stop_times as st}
+	<div class="flex gap-2 items-center justify-evenly overflow-x-auto">
+		{#each transfer_stop_times as st (st.trip_id)}
 			{@const route = page.data.routes[st.trip.route_id]}
 			<button
 				onclick={() => pushState('', { modal: 'trip', data: st.trip })}
