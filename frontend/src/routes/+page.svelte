@@ -139,6 +139,8 @@
 		} catch (e) {
 			console.error('Error getting location', e);
 			location_status.value = 'denied';
+			nearby_bus_stops = [];
+			nearby_train_stops = [];
 		}
 	}
 
