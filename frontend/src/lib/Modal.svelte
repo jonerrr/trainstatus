@@ -89,11 +89,11 @@
 		switch (page.state.modal) {
 			case 'route':
 				dialog_el?.showModal();
-				document.title = `Alerts for ${page.state.data.id}`;
+				document.title = `${page.state.data.id} Alerts | Train Status`;
 				break;
 			case 'stop':
 				dialog_el?.showModal();
-				document.title = `Arrivals at ${page.state.data.name}`;
+				document.title = `${page.state.data.name} | Train Status`;
 
 				const stop: Stop<'bus' | 'train'> = page.state.data;
 				if (is_bus(stop)) {
@@ -103,7 +103,7 @@
 				break;
 			case 'trip':
 				dialog_el?.showModal();
-				document.title = `${page.state.data.route_id} Trip`;
+				document.title = `${page.state.data.route_id} Trip | Train Status`;
 
 				const trip: Trip<TripData> = page.state.data;
 				const bus_route = page.data.routes[trip.route_id];
@@ -117,13 +117,13 @@
 				dialog_el?.close();
 				switch (page.route.id) {
 					case '/stops':
-						document.title = 'Stops';
+						document.title = 'Stops | Train Status';
 						break;
 					case '/alerts':
-						document.title = 'Alerts';
+						document.title = 'Alerts | Train Status';
 						break;
 					default:
-						document.title = 'Train Status';
+						document.title = 'Home | Train Status';
 						break;
 				}
 				break;
