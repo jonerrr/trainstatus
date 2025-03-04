@@ -23,6 +23,8 @@
 				class="transition-colors duration-200 flex rounded-sm bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
 			>
 				<Icon
+					width={18}
+					height={18}
 					{route}
 					link={false}
 					express={is_train_route(route, st.trip) && st.trip.data.express}

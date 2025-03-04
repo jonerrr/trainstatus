@@ -10,12 +10,13 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
-	import { current_time, debounce } from '$lib/util.svelte';
+	import { current_time } from '$lib/util.svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	let { children, data } = $props();
 
 	let last_update = $state<Date>(new Date());
+	// TODO: they need to be sveltesets
 	let last_st_update = $state<Date>(new Date());
 	// used to check if bus routes have changed
 	let last_monitored_routes = $state(new SvelteSet<string>());
@@ -25,31 +26,6 @@
 	let is_updating = $state(false);
 
 	let last_at = data.at ? parseInt(data.at) : undefined;
-	// $effect(() => {
-	// 	current_time.value;
-	// 	if (last_at) console.log('updating time');
-	// if (page.state.at && page.state.at !== last_at) {
-	// 	console.log('updating trips bc at change', page.state.at);
-	// 	last_at = page.state.at;
-	// 	debounce(() => {
-	// 		try {
-	// 			is_updating = true;
-	// 			Promise.all([
-	// 				trips.update(fetch, page.state.at),
-	// 				alerts.update(fetch, page.state.at),
-	// 				stop_times.update(fetch, [...monitored_bus_routes], false, page.state.at)
-	// 			]);
-	// 			last_update = new Date();
-	// 			last_st_update = new Date();
-	// 		} catch (e) {
-	// 			console.error(e);
-	// 			offline = true;
-	// 		} finally {
-	// 			is_updating = false;
-	// 		}
-	// 	}, 500)();
-	// }
-	// });
 
 	onMount(() => {
 		if (last_at) {
@@ -93,6 +69,8 @@
 			offline = false;
 		});
 
+		// $inspect(last_monitored_routes);
+
 		const interval = setInterval(async () => {
 			// prevent multiple updates at the same time
 			if (is_updating) return;
@@ -118,7 +96,10 @@
 					// remove until there are 30 left
 					const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
 					// console.log('removing', to_remove);
-					to_remove.forEach((r) => monitored_bus_routes.delete(r));
+					to_remove.forEach((r) => {
+						monitored_bus_routes.delete(r);
+						last_monitored_routes.delete(r);
+					});
 				}
 
 				const routes_changed =
@@ -126,15 +107,31 @@
 					!monitored_bus_routes.isSubsetOf(last_monitored_routes);
 				const update_st = now - last_st_update.getTime() > 1000 * 15;
 				if (routes_changed && !update_st) {
-					// if monitored routes have changed, update stop times
+					// TODO: improve storing bus route so I can update only the new ones
+					// Find only the new routes that weren't in last_monitored_routes
+					// const new_routes = [...monitored_bus_routes].filter(
+					// 	(route) => !last_monitored_routes.has(route)
+					// );
+					// const new_routes = monitored_bus_routes.difference(last_monitored_routes);
+
+					// if (new_routes.size) {
+					// 	// Only update with the new routes
+					// 	await stop_times.update(fetch, [...new_routes], true, current_time.value?.toString());
+
+					// 	// const updated_routes = new SvelteSet([...last_monitored_routes]);
+					// 	// for (const route of new_routes) {
+					// 	// 	updated_routes.add(route);
+					// 	// }
+					// 	// last_monitored_routes = updated_routes;
+					// 	last_monitored_routes = new SvelteSet(last_monitored_routes.union(new_routes));
+					// 	offline = false;
+					// }
 					await stop_times.update(
 						fetch,
 						[...monitored_bus_routes],
 						true,
 						current_time.value?.toString()
 					);
-					// TODO: should we set last_st_update here?
-					// last_st_update = new Date();
 					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
 					offline = false;
 				}

@@ -105,6 +105,11 @@
 			}
 		}
 
+		// sort transfers by arrival time
+		for (const stop_id in transfers) {
+			transfers[stop_id].sort((a, b) => a.arrival.getTime() - b.arrival.getTime());
+		}
+
 		return transfers;
 	});
 
