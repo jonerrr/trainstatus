@@ -26,7 +26,7 @@
 	<title>Charts</title>
 </svelte:head>
 
-<div class="flex flex-col gap-1 text-white p-1">
+<div class="flex flex-col gap-1 p-1">
 	<div class="text-xl">Select Options</div>
 	<div class="grid grid-rows-2 gap-2">
 		<div class="flex items-center">
@@ -54,4 +54,4 @@
 	</div>
 </div>
 
-<div class="w-full h-full"></div>
+<div class="w-full h-full">Coming soon</div>

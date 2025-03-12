@@ -175,7 +175,7 @@
 
 <Header {offline} />
 <!--  h-[calc(100dvh-7.5rem)] -->
-<main class="max-w-[1000px] relative m-auto">
+<main class="max-w-[1000px] relative m-auto text-white">
 	<Modal />
 
 	{@render children()}
