@@ -79,8 +79,11 @@
 				is_updating = true;
 				const now = new Date().getTime();
 
-				// update alerts and trips every 15 seconds or when curren time changes
-				if (now - last_update.getTime() > 1000 * 15 || last_at !== current_time.value) {
+				const current_time_changed = last_at !== current_time.value;
+				// should update if current time is not set or if it's more than 4 hours old
+				const should_update = !current_time.value || current_time.ms >= now - 14400000;
+				// update alerts and trips every 15 seconds or when current time changes
+				if (should_update && (now - last_update.getTime() > 1000 * 15 || current_time_changed)) {
 					// console.log('Updating rt data');
 
 					await Promise.all([
@@ -105,8 +108,10 @@
 				const routes_changed =
 					monitored_bus_routes.size !== last_monitored_routes.size ||
 					!monitored_bus_routes.isSubsetOf(last_monitored_routes);
-				const update_st = now - last_st_update.getTime() > 1000 * 15;
-				if (routes_changed && !update_st) {
+				const should_update_st = now - last_st_update.getTime() > 1000 * 15 || current_time_changed;
+				if (routes_changed && !should_update_st) {
+					// console.log('Updating st bc routes changed');
+
 					// TODO: improve storing bus route so I can update only the new ones
 					// Find only the new routes that weren't in last_monitored_routes
 					// const new_routes = [...monitored_bus_routes].filter(
@@ -136,7 +141,9 @@
 					offline = false;
 				}
 				// update stop times every 15 seconds
-				if (update_st || last_at !== current_time.value) {
+				if (should_update && should_update_st) {
+					// console.log('Updating st');
+
 					await stop_times.update(
 						fetch,
 						[...monitored_bus_routes],

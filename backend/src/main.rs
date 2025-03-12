@@ -180,6 +180,7 @@ async fn main() {
     };
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        //TODO: use env var for version prefix
         .nest("/v1", api::router(state))
         .split_for_parts();
 

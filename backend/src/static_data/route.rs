@@ -12,7 +12,6 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, QueryBuilder};
-use std::collections::HashSet;
 use std::{collections::HashMap, fmt};
 use utoipa::ToSchema;
 
