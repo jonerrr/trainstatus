@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>Alerts</title>
+	<title>Alerts | Train Status</title>
 </svelte:head>
 
 <List

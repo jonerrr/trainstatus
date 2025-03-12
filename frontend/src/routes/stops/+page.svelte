@@ -94,7 +94,7 @@
 </script>
 
 <svelte:head>
-	<title>Stops</title>
+	<title>Stops | Train Status</title>
 </svelte:head>
 <!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
 <!-- TODO: maybe show indicator when filtered for specific route / stop -->
