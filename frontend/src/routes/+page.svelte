@@ -99,13 +99,13 @@
 			)
 	);
 
-	let nearby_train_stops = $state<Stop<'train'>[]>();
-	let nearby_bus_stops = $state<Stop<'bus'>[]>();
-
 	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
 		'unknown'
 	);
+
+	let nearby_train_stops = $state.raw<Stop<'train'>[]>([]);
+	let nearby_bus_stops = $state.raw<Stop<'bus'>[]>([]);
 
 	async function get_nearby_stops() {
 		location_status.value = 'loading';
@@ -143,6 +143,13 @@
 			nearby_train_stops = [];
 		}
 	}
+	// const nearby_stops = $derived.by(() => {
+	// 	if (location_status.value === 'loading') {
+	// 		return get_nearby_stops();
+	// 	} else {
+	// 		return { nearby_bus_stops: [], nearby_train_stops: [] };
+	// 	}
+	// });
 
 	switch (location_status.value) {
 		case 'granted':
@@ -151,8 +158,8 @@
 			break;
 		default:
 			// shows the nearby stop list even when we don't have location
-			nearby_bus_stops = [];
-			nearby_train_stops = [];
+			// nearby_bus_stops = [];
+			// nearby_train_stops = [];
 			break;
 	}
 
@@ -234,18 +241,18 @@
 	</div>
 
 	<div>
-		{#if nearby_bus_stops && nearby_train_stops}
-			<List
-				title="Nearby Stops"
-				type="stop"
-				style="max-height: {nearby_list_height}px"
-				bus_data={nearby_bus_stops}
-				train_data={nearby_train_stops}
-				pin_rune={stop_pins_rune}
-				{locate_button}
-				height_calc={calculate_stop_height}
-			/>
-		{/if}
+		<!-- {#if nearby_bus_stops && nearby_train_stops} -->
+		<List
+			title="Nearby Stops"
+			type="stop"
+			style="max-height: {nearby_list_height}px"
+			bus_data={nearby_bus_stops}
+			train_data={nearby_train_stops}
+			pin_rune={stop_pins_rune}
+			{locate_button}
+			height_calc={calculate_stop_height}
+		/>
+		<!-- {/if} -->
 	</div>
 </div>
 
