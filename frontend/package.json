@@ -38,6 +38,7 @@
 		"@tailwindcss/vite": "^4.0.13",
 		"dayjs": "^1.11.13",
 		"flexsearch": "^0.7.43",
+		"layercake": "^8.4.2",
 		"lucide-svelte": "^0.474.0"
 	},
 	"pnpm": {
