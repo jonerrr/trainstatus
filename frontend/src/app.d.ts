@@ -29,7 +29,7 @@ declare global {
 			// dialog_open: boolean;
 			// dialog_id: T;
 			// null is not open
-			modal: 'stop' | 'trip' | 'route' | null;
+			modal: 'stop' | 'trip' | 'route' | 'settings' | null;
 			data?: Stop | Trip | Route;
 			// time used for api requests.
 			// at?: number;

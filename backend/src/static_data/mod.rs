@@ -4,12 +4,7 @@ use geo::{CoordsIter, LinesIter};
 use redis::AsyncCommands;
 use serde_json::json;
 use sqlx::PgPool;
-use std::{
-    env::{remove_var, var},
-    io::Cursor,
-    sync::Arc,
-    time::Duration,
-};
+use std::{io::Cursor, sync::Arc, time::Duration};
 use tokio::{sync::Notify, time::sleep};
 
 pub mod route;
