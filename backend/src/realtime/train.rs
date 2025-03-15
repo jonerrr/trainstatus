@@ -379,6 +379,7 @@ fn parse_route_id(route_id: String) -> (String, bool) {
 //     Some(original_stop_id)
 // }
 
+#[derive(Debug)]
 struct StopTimeUpdateWithTrip<'a> {
     stop_time: StopTimeUpdate,
     trip: &'a Trip<TripData>,
@@ -392,6 +393,9 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
         // Remove direction from stop id
         stop_id.pop();
         let stop_id = convert_stop_id(stop_id).ok_or(IntoStopTimeError::FakeStop)?;
+        // if stop_id == 766589 {
+        //     println!("{:?}", &value);
+        // }
 
         let arrival = match value.stop_time.arrival {
             Some(a) => a.time,

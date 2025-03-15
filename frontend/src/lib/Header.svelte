@@ -1,37 +1,13 @@
 <script lang="ts">
 	import { CloudOff, Settings } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
-	import { current_time } from '$lib/util.svelte';
-	import { pushState, replaceState } from '$app/navigation';
-	import { tick } from 'svelte';
+	import { pushState } from '$app/navigation';
 
 	interface Props {
 		offline: boolean;
 	}
 
 	let { offline }: Props = $props();
-
-	$effect(() => {
-		current_time.value;
-		tick().then(() => {
-			const url = new URL(window.location.href);
-
-			// use existing url because we don't want to lose other query params
-			if (current_time.value) {
-				url.searchParams.set('at', current_time.value.toString());
-			} else {
-				url.searchParams.delete('at');
-			}
-
-			// only update url if it has changed
-			const new_url = url.toString();
-			if (new_url !== window.location.href) {
-				replaceState(new_url, {
-					modal: null
-				});
-			}
-		});
-	});
 </script>
 
 <header class="p-2 text-sm flex text-white justify-between relative bg-neutral-900 overflow-x-auto">
