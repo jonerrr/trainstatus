@@ -171,11 +171,33 @@
 
 		return () => clearInterval(interval);
 	});
+
+	$effect(() => {
+		current_time.value;
+		tick().then(() => {
+			const url = new URL(window.location.href);
+
+			// use existing url because we don't want to lose other query params
+			if (current_time.value) {
+				url.searchParams.set('at', current_time.value.toString());
+			} else {
+				url.searchParams.delete('at');
+			}
+
+			// only update url if it has changed
+			const new_url = url.toString();
+			if (new_url !== window.location.href) {
+				replaceState(new_url, {
+					modal: 'settings'
+				});
+			}
+		});
+	});
 </script>
 
 <Header {offline} />
 <!--  h-[calc(100dvh-7.5rem)] -->
-<main class="max-w-[1000px] relative m-auto text-white">
+<main class="relative m-auto text-white">
 	<Modal />
 
 	{@render children()}

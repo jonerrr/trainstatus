@@ -133,7 +133,6 @@
 				break;
 		}
 	});
-
 	// const rotation = new Tween(0, {
 	// 	duration: 300,
 	// 	easing: cubicOut

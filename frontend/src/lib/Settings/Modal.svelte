@@ -2,30 +2,6 @@
 	import dayjs from 'dayjs';
 	import { BookText, GitBranch, Hourglass, CircleX, Settings, Map } from 'lucide-svelte';
 	import { current_time } from '$lib/util.svelte';
-	import { replaceState } from '$app/navigation';
-	import { tick } from 'svelte';
-
-	$effect(() => {
-		current_time.value;
-		tick().then(() => {
-			const url = new URL(window.location.href);
-
-			// use existing url because we don't want to lose other query params
-			if (current_time.value) {
-				url.searchParams.set('at', current_time.value.toString());
-			} else {
-				url.searchParams.delete('at');
-			}
-
-			// only update url if it has changed
-			const new_url = url.toString();
-			if (new_url !== window.location.href) {
-				replaceState(new_url, {
-					modal: 'settings'
-				});
-			}
-		});
-	});
 </script>
 
 <div class="flex gap-1 items-center p-3 z-20">
@@ -36,7 +12,6 @@
 <div
 	class="flex flex-col max-h-[60dvh] border-y bg-neutral-950 border-neutral-800 divide-y overflow-auto divide-neutral-800 text-base"
 >
-	<!-- Time Settings -->
 	<div class="p-4">
 		<div class="flex items-center justify-between mb-3">
 			<div class="flex items-center gap-1">
@@ -55,7 +30,6 @@
 				max={dayjs().format('YYYY-MM-DDTHH:mm')}
 				style="color-scheme: dark; font-size: 0.875rem"
 				type="datetime-local"
-				tabindex={-1}
 				bind:value={
 					() =>
 						current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
@@ -66,7 +40,10 @@
 			{#if current_time.value}
 				<button
 					title="Clear time"
-					onclick={() => (current_time.value = undefined)}
+					onclick={(e) => {
+						// e.stopPropagation();
+						current_time.value = undefined;
+					}}
 					class="hover:text-fuchsia-300 transition-colors duration-300"
 				>
 					<CircleX class="size-6" />
@@ -80,39 +57,51 @@
 		{/if}
 	</div>
 
-	<!-- Links -->
-	{#snippet link(title: string, description: string, url: string, color: string)}
-		<a
-			href={url}
-			target="_blank"
-			class="flex items-center gap-2 p-2 rounded-md transition-all duration-200 hover:bg-neutral-800/50 hover:text-{color}-400 active:bg-neutral-800 active:scale-98 focus:outline-none focus:ring-2 focus:ring-{color}-500/30"
-		>
-			<BookText class="size-5" />
-			<div>
-				<div class="flex items-center gap-1">
-					<span>{title}</span>
-					<span class="text-xs opacity-60">↗</span>
-				</div>
-				<div class="text-xs text-neutral-400">{description}</div>
-			</div>
-		</a>
-	{/snippet}
-
 	<div class="p-4">
 		<h3 class="text-lg font-medium mb-3">Resources</h3>
 		<div class="flex flex-col gap-4">
-			{@render link(
-				'API Documentation',
-				'Access Train Status data for your own projects',
-				'/api/docs',
-				'blue'
-			)}
-			{@render link(
-				'Source Code',
-				'View and contribute on GitHub',
-				'https://github.com/jonerrr/trainstatus',
-				'green'
-			)}
+			<a
+				href="/api/docs"
+				target="_blank"
+				class="flex items-center gap-2 p-2 rounded-md transition-all duration-200 hover:bg-neutral-800/50 hover:text-blue-400 active:bg-neutral-800 active:scale-98 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+			>
+				<div>
+					<div class="flex items-center gap-1">
+						<BookText class="size-5" />
+						<span>Api Documentation</span>
+						<span class="text-xs opacity-60">↗</span>
+					</div>
+					<div class="text-xs text-neutral-400">Access Train Status data for your own projects</div>
+				</div>
+			</a>
+			<a
+				href="https://map.trainstat.us"
+				target="_blank"
+				class="flex items-center gap-2 p-2 rounded-md transition-all duration-200 hover:bg-neutral-800/50 hover:text-rose-400 active:bg-neutral-800 active:scale-98 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+			>
+				<div>
+					<div class="flex items-center gap-1">
+						<Map class="size-5" />
+						<span>Bus Map</span>
+						<span class="text-xs opacity-60">↗</span>
+					</div>
+					<div class="text-xs text-neutral-400">A realtime map of buses in New York City</div>
+				</div>
+			</a>
+			<a
+				href="https://github.com/jonerrr/trainstatus"
+				target="_blank"
+				class="flex items-center gap-2 p-2 rounded-md transition-all duration-200 hover:bg-neutral-800/50 hover:text-green-400 active:bg-neutral-800 active:scale-98 focus:outline-none focus:ring-2 focus:ring-green-500/30"
+			>
+				<div>
+					<div class="flex items-center gap-1">
+						<GitBranch class="size-5" />
+						<span>Source Code</span>
+						<span class="text-xs opacity-60">↗</span>
+					</div>
+					<div class="text-xs text-neutral-400">View and contribute on GitHub</div>
+				</div>
+			</a>
 		</div>
 	</div>
 </div>
