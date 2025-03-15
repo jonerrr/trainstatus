@@ -15,6 +15,7 @@
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
+	import SettingsModal from '$lib/Settings/Modal.svelte';
 	import Pin from './Pin.svelte';
 	import { is_bus_route, type Trip, type TripData } from './trips.svelte';
 	// import { Tween } from 'svelte/motion';
@@ -43,8 +44,6 @@
 			}
 		}
 
-		node.addEventListener('click', handle_click);
-
 		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog when swiping to go back
 		// from here https://stackoverflow.com/a/59741870
 		const delta = 6;
@@ -52,25 +51,26 @@
 		let startY: number;
 
 		function handle_mouse_down(event: MouseEvent) {
-			if (event.target === node) {
-				startX = event.pageX;
-				startY = event.pageY;
-			}
+			if (event.target !== node) return;
+
+			startX = event.pageX;
+			startY = event.pageY;
 		}
 
-		node.addEventListener('mousedown', handle_mouse_down);
-
 		function handle_mouse_up(event: MouseEvent) {
+			// Only act if the mouse started and ended directly on the dialog element
+			if (event.target !== node) return;
+
 			const diffX = Math.abs(event.pageX - startX);
 			const diffY = Math.abs(event.pageY - startY);
-			// console.log(event.target.id);
 
 			if (diffX < delta && diffY < delta) {
-				// Close the dialog
 				close();
 			}
 		}
 
+		node.addEventListener('click', handle_click);
+		node.addEventListener('mousedown', handle_mouse_down);
 		node.addEventListener('mouseup', handle_mouse_up);
 
 		return {
@@ -112,6 +112,10 @@
 					monitored_bus_routes.add(trip.route_id);
 				}
 
+				break;
+			case 'settings':
+				dialog_el?.showModal();
+				document.title = 'Settings | Train Status';
 				break;
 			default:
 				dialog_el?.close();
@@ -287,6 +291,8 @@
 			`${page.state.data.route_id} Trip`,
 			trip_pins_rune
 		)}
+	{:else if page.state.modal === 'settings'}
+		<SettingsModal />
 	{/if}
 </dialog>
 

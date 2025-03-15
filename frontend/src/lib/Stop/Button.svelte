@@ -99,8 +99,7 @@
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
 	{#key eta}
-		<!-- in:fade={{ duration: 300 }} -->
-		<span>
+		<span class="font-medium text-sm px-1.5 py-0.5 bg-neutral-800/70 rounded-sm">
 			{eta}m
 		</span>
 	{/key}
