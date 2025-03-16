@@ -10,8 +10,9 @@
 	import AxisY from './AxisY.svelte';
 	import Lines from './Lines.svelte';
 
-	let direction = $state<TripDirection>(TripDirection.North);
 	let route = $state<Route>(page.data.routes['3']);
+	let direction = $state<TripDirection>(TripDirection.North);
+	let stop_points = $state<boolean>(false);
 
 	$effect(() => {
 		if (route.route_type === 'bus') {
@@ -101,9 +102,6 @@
 		// Clean up the URL object
 		setTimeout(() => URL.revokeObjectURL(url), 100);
 	}
-
-	// Add a minimum width for the chart to ensure it doesn't compress too much
-	const minChartWidth = 1200; // Minimum width in pixels
 </script>
 
 <svelte:head>
@@ -114,31 +112,7 @@
 	<div class="text-xl font-bold px-2">Charts</div>
 	<div class="flex gap-4 bg-neutral-950 p-2 w-full items-start justify-between">
 		<div class="flex flex-wrap gap-4">
-			<div class="grid grid-rows-3 gap-2">
-				<div class="font-semibold">Direction</div>
-				<div class="flex items-center">
-					<input
-						bind:group={direction}
-						type="radio"
-						id="northbound"
-						name="direction"
-						value={TripDirection.North}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-					/>
-					<label for="northbound" class="cursor-pointer">Northbound</label>
-				</div>
-				<div class="flex items-center">
-					<input
-						bind:group={direction}
-						type="radio"
-						id="southbound"
-						name="direction"
-						value={TripDirection.South}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-					/>
-					<label for="southbound" class="cursor-pointer">Southbound</label>
-				</div>
-			</div>
+			<!-- TODO: Use labels -->
 			<div class="flex flex-col gap-2">
 				<div class="font-semibold">Route</div>
 				<div class="relative w-fit">
@@ -168,6 +142,36 @@
 						{/each}
 					</select>
 				</div>
+			</div>
+
+			<div class="grid grid-rows-3 gap-2">
+				<div class="font-semibold">Direction</div>
+				<div class="flex items-center">
+					<input
+						bind:group={direction}
+						type="radio"
+						id="northbound"
+						name="direction"
+						value={TripDirection.North}
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+					/>
+					<label for="northbound" class="cursor-pointer">Northbound</label>
+				</div>
+				<div class="flex items-center">
+					<input
+						bind:group={direction}
+						type="radio"
+						id="southbound"
+						name="direction"
+						value={TripDirection.South}
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+					/>
+					<label for="southbound" class="cursor-pointer">Southbound</label>
+				</div>
+			</div>
+			<div class="flex flex-col gap-2">
+				<div class="font-semibold">Stop Points</div>
+				<input type="checkbox" bind:checked={stop_points} class="cursor-pointer" />
 			</div>
 		</div>
 
@@ -199,7 +203,7 @@
 					<Svg>
 						<AxisX />
 						<AxisY />
-						<Lines stroke="#{route.color}" />
+						<Lines stroke="#{route.color}" bind:stop_points />
 					</Svg>
 				</LayerCake>
 			</div>
