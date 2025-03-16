@@ -108,9 +108,9 @@
 	<title>Charts | TrainStat.us</title>
 </svelte:head>
 
-<div class="flex flex-col gap-1 rounded">
+<div class="flex flex-col h-[calc(100dvh-8rem)] min-h-[300px]">
 	<div class="text-xl font-bold px-2">Charts</div>
-	<div class="flex gap-4 bg-neutral-950 p-2 w-full items-start justify-between">
+	<div class="flex gap-4 bg-neutral-950 p-2 w-full items-start justify-between flex-wrap">
 		<div class="flex flex-wrap gap-4">
 			<!-- TODO: Use labels -->
 			<div class="flex flex-col gap-2">
@@ -185,27 +185,31 @@
 		</button>
 	</div>
 
-	<!-- TODO: fix vertical scrolling on small screens -->
-	<div class="w-full overflow-auto relative max-w-[100dvw] max-h-[80vh]">
+	<!-- Chart container with proper overflow handling -->
+	<div class="flex-1 relative overflow-hidden">
 		{#if data.route_trips.length && data.yDomain.length}
-			<div bind:this={svgContainer} class="min-w-[1000px] h-[700px]">
-				<LayerCake
-					ssr
-					padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
-					x="time"
-					y="stop_name"
-					yDomain={data.yDomain}
-					yScale={scalePoint().padding(0.5)}
-					xScale={scaleTime()}
-					data={data.route_trips}
-					flatData={flatten(data.route_trips, 'points')}
-				>
-					<Svg>
-						<AxisX />
-						<AxisY />
-						<Lines stroke="#{route.color}" bind:stop_points />
-					</Svg>
-				</LayerCake>
+			<!-- Scrollable container with both scroll directions -->
+			<div class="absolute inset-0 overflow-auto">
+				<!-- Chart with minimum dimensions but able to shrink -->
+				<div bind:this={svgContainer} class="min-w-[1300px] min-h-[500px] h-full w-full">
+					<LayerCake
+						ssr
+						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
+						x="time"
+						y="stop_name"
+						yDomain={data.yDomain}
+						yScale={scalePoint().padding(0.5)}
+						xScale={scaleTime()}
+						data={data.route_trips}
+						flatData={flatten(data.route_trips, 'points')}
+					>
+						<Svg>
+							<AxisX />
+							<AxisY />
+							<Lines stroke="#{route.color}" bind:stop_points />
+						</Svg>
+					</LayerCake>
+				</div>
 			</div>
 		{:else}
 			<div class="flex items-center justify-center h-full text-neutral-400">No data available</div>
