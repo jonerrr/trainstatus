@@ -5,7 +5,9 @@
 	import { type Trip } from '$lib/trips.svelte';
 
 	const { xGet, yGet, data } = getContext('LayerCake');
+
 	export let stroke = '#FFF';
+	export let stop_points = false;
 
 	$: path = line().x($xGet).y($yGet);
 
@@ -41,6 +43,18 @@
 		opacity="1"
 		pointer-events="none"
 	/>
+	{#if stop_points}
+		{#each group.points as point}
+			<circle
+				cx={$xGet(point)}
+				cy={$yGet(point)}
+				r="3"
+				fill={stroke}
+				stroke="#fff"
+				stroke-width="1"
+			/>
+		{/each}
+	{/if}
 {/each}
 
 <style>
