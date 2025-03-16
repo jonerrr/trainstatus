@@ -1,5 +1,6 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
+	import { onMount } from 'svelte';
 	import {
 		BookText,
 		GitBranch,
@@ -10,9 +11,24 @@
 		ExternalLink
 	} from 'lucide-svelte';
 	import { current_time } from '$lib/util.svelte';
+
+	let headerRef = $state<HTMLDivElement>();
+
+	onMount(() => {
+		// Set a tiny timeout to ensure the dialog is fully rendered
+		setTimeout(() => {
+			// Focus the header element instead of any inputs
+			headerRef?.focus();
+		}, 50);
+	});
 </script>
 
-<div class="flex gap-1 items-center p-3 z-20">
+<div
+	class="flex gap-1 items-center p-3 z-20"
+	bind:this={headerRef}
+	tabindex="-1"
+	style="outline: none;"
+>
 	<Settings />
 	<div class="text-xl text-white">Settings</div>
 </div>

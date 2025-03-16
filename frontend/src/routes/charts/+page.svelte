@@ -101,6 +101,9 @@
 		// Clean up the URL object
 		setTimeout(() => URL.revokeObjectURL(url), 100);
 	}
+
+	// Add a minimum width for the chart to ensure it doesn't compress too much
+	const minChartWidth = 1200; // Minimum width in pixels
 </script>
 
 <svelte:head>
@@ -110,7 +113,7 @@
 <div class="flex flex-col gap-1 rounded">
 	<div class="text-xl font-bold px-2">Charts</div>
 	<div class="flex gap-4 bg-neutral-950 p-2 w-full items-start justify-between">
-		<div class="flex gap-4">
+		<div class="flex flex-wrap gap-4">
 			<div class="grid grid-rows-3 gap-2">
 				<div class="font-semibold">Direction</div>
 				<div class="flex items-center">
@@ -120,9 +123,9 @@
 						id="northbound"
 						name="direction"
 						value={TripDirection.North}
-						class="mr-2"
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
 					/>
-					<label for="northbound">Northbound</label>
+					<label for="northbound" class="cursor-pointer">Northbound</label>
 				</div>
 				<div class="flex items-center">
 					<input
@@ -131,14 +134,14 @@
 						id="southbound"
 						name="direction"
 						value={TripDirection.South}
-						class="mr-2"
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
 					/>
-					<label for="southbound">Southbound</label>
+					<label for="southbound" class="cursor-pointer">Southbound</label>
 				</div>
 			</div>
 			<div class="flex flex-col gap-2">
 				<div class="font-semibold">Route</div>
-				<div class="relative w-64">
+				<div class="relative w-fit">
 					<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
 						{#if route.route_type === 'train'}
 							<Train class="h-5 w-5 text-neutral-400" />
@@ -160,7 +163,7 @@
 							return a.short_name.localeCompare(b.short_name);
 						}) as route}
 							<option value={route}>
-								{route.short_name}
+								{route.short_name === 'S' ? route.id : route.short_name}
 							</option>
 						{/each}
 					</select>
@@ -170,34 +173,38 @@
 
 		<button
 			onclick={export_as_svg}
-			class="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white py-2 px-4 rounded"
+			class="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2 px-4 rounded"
 			aria-label="Export chart as SVG"
 		>
-			<Download size={16} />
+			<Download class="size-5" />
 			Export SVG
 		</button>
 	</div>
-	{#if data.route_trips.length && data.yDomain.length}
-		<div bind:this={svgContainer} class="w-[100dvw] h-[700px]">
-			<LayerCake
-				ssr
-				padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
-				x="time"
-				y="stop_name"
-				yDomain={data.yDomain}
-				yScale={scalePoint().padding(0.5)}
-				xScale={scaleTime()}
-				data={data.route_trips}
-				flatData={flatten(data.route_trips, 'points')}
-			>
-				<Svg>
-					<AxisX />
-					<AxisY />
-					<Lines stroke="#{route.color}" />
-				</Svg>
-			</LayerCake>
-		</div>
-	{:else}
-		<div class="flex items-center justify-center h-full text-neutral-400">No data available</div>
-	{/if}
+
+	<!-- TODO: fix vertical scrolling on small screens -->
+	<div class="w-full overflow-auto relative max-w-[100dvw] max-h-[80vh]">
+		{#if data.route_trips.length && data.yDomain.length}
+			<div bind:this={svgContainer} class="min-w-[1000px] h-[700px]">
+				<LayerCake
+					ssr
+					padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
+					x="time"
+					y="stop_name"
+					yDomain={data.yDomain}
+					yScale={scalePoint().padding(0.5)}
+					xScale={scaleTime()}
+					data={data.route_trips}
+					flatData={flatten(data.route_trips, 'points')}
+				>
+					<Svg>
+						<AxisX />
+						<AxisY />
+						<Lines stroke="#{route.color}" />
+					</Svg>
+				</LayerCake>
+			</div>
+		{:else}
+			<div class="flex items-center justify-center h-full text-neutral-400">No data available</div>
+		{/if}
+	</div>
 </div>
