@@ -14,9 +14,6 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.0.14
         version: 4.0.14(vite@6.2.2(@types/node@22.13.10)(jiti@2.4.2)(lightningcss@1.29.2)(yaml@2.7.0))
-      d3-array:
-        specifier: ^3.2.4
-        version: 3.2.4
       d3-scale:
         specifier: ^4.0.2
         version: 4.0.2
@@ -26,9 +23,6 @@ importers:
       d3-time:
         specifier: ^3.1.0
         version: 3.1.0
-      d3-time-format:
-        specifier: ^4.1.0
-        version: 4.1.0
       dayjs:
         specifier: ^1.11.13
         version: 1.11.13
@@ -57,9 +51,6 @@ importers:
       '@tailwindcss/forms':
         specifier: ^0.5.10
         version: 0.5.10(tailwindcss@4.0.14)
-      '@types/d3-array':
-        specifier: ^3.2.1
-        version: 3.2.1
       '@types/d3-scale':
         specifier: ^4.0.9
         version: 4.0.9
@@ -69,9 +60,6 @@ importers:
       '@types/d3-time':
         specifier: ^3.0.4
         version: 3.0.4
-      '@types/d3-time-format':
-        specifier: ^4.0.3
-        version: 4.0.3
       '@types/eslint':
         specifier: ^9.6.1
         version: 9.6.1
@@ -622,9 +610,6 @@ packages:
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
 
-  '@types/d3-array@3.2.1':
-    resolution: {integrity: sha512-Y2Jn2idRrLzUfAKV2LyRImR+y4oa2AntrgID95SHJxuMUrkNXmanDSed71sRNZysveJVt1hLLemQZIady0FpEg==}
-
   '@types/d3-path@3.1.1':
     resolution: {integrity: sha512-VMZBYyQvbGmWyWVea0EHs/BwLgxc+MKi1zLDCONksozI4YJMcTt8ZEuIR4Sb1MMTE8MMW49v0IwI5+b7RmfWlg==}
 
@@ -633,9 +618,6 @@ packages:
 
   '@types/d3-shape@3.1.7':
     resolution: {integrity: sha512-VLvUQ33C+3J+8p+Daf+nYSOsjB4GXp19/S/aGo60m9h1v6XaxjiT82lKVWJCfzhtuZ3yD7i/TPeC/fuKLLOSmg==}
-
-  '@types/d3-time-format@4.0.3':
-    resolution: {integrity: sha512-5xg9rC+wWL8kdDj153qZcsJ0FWiFt0J5RB6LYUNZjwSnesfblqrI/bJ1wBdJ8OQfncgbJG5+2F+qfqnqyzYxyg==}
 
   '@types/d3-time@3.0.4':
     resolution: {integrity: sha512-yuzZug1nkAAaBlBBikKZTgzCeA+k1uy4ZFwWANOfKw5z5LRhV0gNA7gNkKm7HoK+HRN0wX3EkxGk0fpbWhmB7g==}
@@ -1929,8 +1911,6 @@ snapshots:
 
   '@types/cookie@0.6.0': {}
 
-  '@types/d3-array@3.2.1': {}
-
   '@types/d3-path@3.1.1': {}
 
   '@types/d3-scale@4.0.9':
@@ -1940,8 +1920,6 @@ snapshots:
   '@types/d3-shape@3.1.7':
     dependencies:
       '@types/d3-path': 3.1.1
-
-  '@types/d3-time-format@4.0.3': {}
 
   '@types/d3-time@3.0.4': {}
 

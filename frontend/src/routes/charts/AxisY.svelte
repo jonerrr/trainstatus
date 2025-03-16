@@ -6,8 +6,13 @@
 </script>
 
 <g class="axis y-axis">
-	<!-- Horizontal gridlines for stops -->
 	{#each ticks as tick}
+		<g transform="translate(0, {$yScale(tick)})">
+			<!-- <line x1={-6} x2={0} stroke="#e5e5e5" /> -->
+			<text x={-10} y={4} fill="#e5e5e5" text-anchor="end" font-size="11px" class="stop-name">
+				{tick.length > 25 ? tick.substring(0, 22) + '...' : tick}
+			</text>
+		</g>
 		<line
 			x1={0}
 			y1={$yScale(tick)}
@@ -18,14 +23,16 @@
 		/>
 	{/each}
 
-	{#each ticks as tick}
-		<g transform="translate(0, {$yScale(tick)})">
-			<line x1={-6} x2={0} stroke="#999" />
-			<text x={-10} y={4} fill="#999" text-anchor="end" font-size="11px" class="stop-name">
-				{tick.length > 25 ? tick.substring(0, 22) + '...' : tick}
-			</text>
-		</g>
-	{/each}
+	<!-- {#each ticks as tick}
+		<line
+			x1={0}
+			y1={$yScale(tick)}
+			x2={$width}
+			y2={$yScale(tick)}
+			stroke="#e5e5e5"
+			class="gridline"
+		/>
+	{/each} -->
 
 	<!-- <text
 		x={-$yScale.range()[0] / 2}

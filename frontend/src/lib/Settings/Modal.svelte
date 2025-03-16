@@ -1,6 +1,14 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
-	import { BookText, GitBranch, Hourglass, CircleX, Settings, Map } from 'lucide-svelte';
+	import {
+		BookText,
+		GitBranch,
+		Hourglass,
+		CircleX,
+		Settings,
+		Map,
+		ExternalLink
+	} from 'lucide-svelte';
 	import { current_time } from '$lib/util.svelte';
 </script>
 
@@ -69,7 +77,7 @@
 					<div class="flex items-center gap-1">
 						<BookText class="size-5" />
 						<span>Api Documentation</span>
-						<span class="text-xs opacity-60">↗</span>
+						<ExternalLink class="size-4" />
 					</div>
 					<div class="text-xs text-neutral-400">Access Train Status data for your own projects</div>
 				</div>
@@ -82,8 +90,8 @@
 				<div>
 					<div class="flex items-center gap-1">
 						<Map class="size-5" />
-						<span>Bus Map</span>
-						<span class="text-xs opacity-60">↗</span>
+						<span>Bus Map </span>
+						<ExternalLink class="size-4" />
 					</div>
 					<div class="text-xs text-neutral-400">A realtime map of buses in New York City</div>
 				</div>
@@ -97,7 +105,7 @@
 					<div class="flex items-center gap-1">
 						<GitBranch class="size-5" />
 						<span>Source Code</span>
-						<span class="text-xs opacity-60">↗</span>
+						<ExternalLink class="size-4" />
 					</div>
 					<div class="text-xs text-neutral-400">View and contribute on GitHub</div>
 				</div>

@@ -126,6 +126,9 @@
 					case '/alerts':
 						document.title = 'Alerts | Train Status';
 						break;
+					case '/charts':
+						document.title = 'Charts | Train Status';
+						break;
 					default:
 						document.title = 'Home | Train Status';
 						break;
