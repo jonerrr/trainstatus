@@ -4,6 +4,7 @@
 	import { alerts } from '$lib/alerts.svelte';
 	import icons from './icons';
 
+	// TODO: combine w and h into size
 	const {
 		route,
 		link,

@@ -3,21 +3,33 @@
 	import { getContext } from 'svelte';
 	import { pushState } from '$app/navigation';
 	import { type Trip } from '$lib/trips.svelte';
+	import { type Route } from '$lib/static';
 
 	const { xGet, yGet, data } = getContext('LayerCake');
 
-	export let stroke = '#FFF';
-	export let stop_points = false;
+	interface Props {
+		routes?: Route[];
+		stop_points?: boolean;
+	}
 
-	$: path = line().x($xGet).y($yGet);
+	const { routes = [], stop_points = $bindable(false) }: Props = $props();
+
+	const path = $derived(line().x($xGet).y($yGet));
 
 	function open_trip(trip: Trip) {
 		pushState('', { modal: 'trip', data: trip });
+	}
+
+	// Get color for a specific trip based on its route_id
+	function getTripColor(trip: Trip): string {
+		const route = routes.find((r) => r.id === trip.route_id);
+		return route ? `#${route.color}` : '#FFFFFF'; // Default to white if route not found
 	}
 </script>
 
 <!-- Draw a path for each train trip -->
 {#each $data as group}
+	{@const tripColor = getTripColor(group.trip)}
 	<!-- Invisible wider path for easier clicking -->
 	<path
 		class="path-hitarea"
@@ -29,8 +41,8 @@
 		role="button"
 		tabindex="0"
 		aria-label="View details for trip {group.trip.id}"
-		on:click={() => open_trip(group.trip)}
-		on:keydown={(e) => e.key === 'Enter' && open_trip(group.trip)}
+		onclick={() => open_trip(group.trip)}
+		onkeydown={(e) => e.key === 'Enter' && open_trip(group.trip)}
 	/>
 
 	<!-- Visible path for display only -->
@@ -38,7 +50,7 @@
 		class="path-line"
 		d={path(group.points)}
 		fill="none"
-		{stroke}
+		stroke={tripColor}
 		stroke-width="2"
 		opacity="1"
 		pointer-events="none"
@@ -49,7 +61,7 @@
 				cx={$xGet(point)}
 				cy={$yGet(point)}
 				r="3"
-				fill={stroke}
+				fill={tripColor}
 				stroke="#fff"
 				stroke-width="1"
 			/>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LayerCake, Svg, flatten } from 'layercake';
-	import { Train, BusFront, Download } from 'lucide-svelte';
+	import { Download, Search, ChevronDown, X, Check } from 'lucide-svelte';
 	import { scaleTime, scalePoint } from 'd3-scale';
 	import { page } from '$app/state';
 	import { TripDirection, trips } from '$lib/trips.svelte';
@@ -9,31 +9,43 @@
 	import AxisX from './AxisX.svelte';
 	import AxisY from './AxisY.svelte';
 	import Lines from './Lines.svelte';
+	import { current_time } from '$lib/util.svelte';
+	import { onMount } from 'svelte';
+	import Icon from '$lib/Icon.svelte';
 
-	let route = $state<Route>(page.data.routes['3']);
+	let routes = $state<Route[]>([page.data.routes['3']]);
 	let direction = $state<TripDirection>(TripDirection.North);
 	let stop_points = $state<boolean>(false);
 
 	$effect(() => {
-		if (route.route_type === 'bus') {
-			monitored_bus_routes.add(route.id);
+		for (const r of routes) {
+			if (r.route_type === 'bus') {
+				monitored_bus_routes.add(r.id);
+			}
 		}
 	});
 
 	// TODO: add main route stops to y domain no matter what
+	// TODO: add to common stops if theres a transfer to the route
 	const data = $derived.by(() => {
-		// if (!trips.trips || !route) return;
-
 		const route_trips = [];
-		// keep track of active stops so we know what the y domain should be
-		const route_stops = new Set<{ id: number; name: string; sequence: number }>();
+		// Track stops by route ID
+		const stopsByRoute = new Map<string, Set<{ id: number; name: string; sequence: number }>>();
+
+		// Initialize sets for each selected route
+		for (const route of routes) {
+			stopsByRoute.set(route.id, new Set());
+		}
 
 		for (const trip of trips.trips.values()) {
-			if (trip.route_id !== route.id || trip.direction !== direction) continue;
+			if (routes.every((r) => r.id !== trip.route_id) || trip.direction !== direction) continue;
 			const trip_st = stop_times.by_trip_id[trip.id];
 			if (!trip_st) continue;
 			const trip_points = [];
 			for (const st of trip_st) {
+				// TODO: show 2 hours of data, ending at current_time.ms
+				// if (st.departure.getTime() > current_time.ms) continue;
+
 				const stop = page.data.stops[st.stop_id];
 
 				const stop_sequence = stop.routes.find((r) => r.id === trip.route_id)?.stop_sequence;
@@ -42,13 +54,16 @@
 					continue;
 				}
 
-				route_stops.add({ id: stop.id, name: stop.name, sequence: stop_sequence });
+				// Add the stop to its route's set
+				const stopInfo = { id: stop.id, name: stop.name, sequence: stop_sequence };
+				const routeStops = stopsByRoute.get(trip.route_id);
+				if (routeStops) {
+					routeStops.add(stopInfo);
+				}
+
 				trip_points.push({
-					// trip: trip,
-					// route_id: trip.route_id,
-					// stop_id: st.stop_id,
+					stop_id: stop.id,
 					stop_name: stop.name,
-					// sequence: stop_sequence,
 					time: st.arrival
 				});
 			}
@@ -56,9 +71,39 @@
 			route_trips.push({ trip, points: trip_points });
 		}
 
-		const yDomain = Array.from(route_stops)
-			.sort((a, b) => a.sequence - b.sequence)
-			.map((stop) => stop.name);
+		// Find stops that are common to all selected routes
+		let commonStops: Array<{ id: number; name: string; sequence: number }> = [];
+
+		if (routes.length > 0) {
+			// Start with all stops from the first route
+			const firstRouteStops = stopsByRoute.get(routes[0].id);
+			if (firstRouteStops && firstRouteStops.size > 0) {
+				commonStops = Array.from(firstRouteStops);
+
+				// Filter to keep only stops that exist in all other routes
+				for (let i = 1; i < routes.length; i++) {
+					const routeStops = stopsByRoute.get(routes[i].id);
+					if (routeStops) {
+						commonStops = commonStops.filter((stop) =>
+							Array.from(routeStops).some((rs) => rs.id === stop.id)
+						);
+					}
+				}
+			}
+
+			// remove stops that are not in the main route from trip points
+			route_trips.forEach((trip) => {
+				trip.points = trip.points.filter((point) =>
+					commonStops.some((stop) => stop.id === point.stop_id)
+				);
+			});
+		}
+
+		// Sort stops by sequence number
+		commonStops.sort((a, b) => a.sequence - b.sequence);
+
+		// Create y domain from the sorted common stops
+		const yDomain = commonStops.map((stop) => stop.name);
 
 		return { route_trips, yDomain };
 	});
@@ -89,10 +134,13 @@
 		// Create a download URL
 		const url = URL.createObjectURL(blob);
 
+		// Create a filename with all route short names
+		const filename = `${routes.map((r) => r.short_name).join('_')}_${direction === TripDirection.North ? 'northbound' : 'southbound'}_chart.svg`;
+
 		// Create a download link and click it
 		const downloadLink = document.createElement('a');
 		downloadLink.href = url;
-		downloadLink.download = `${route.short_name}_${direction === TripDirection.North ? 'northbound' : 'southbound'}_chart.svg`;
+		downloadLink.download = filename;
 
 		// Programmatically click the link to trigger download
 		document.body.appendChild(downloadLink);
@@ -102,87 +150,309 @@
 		// Clean up the URL object
 		setTimeout(() => URL.revokeObjectURL(url), 100);
 	}
+
+	// Combobox state
+	let isComboboxOpen = $state(false);
+	let searchQuery = $state('');
+	let comboboxRef = $state<HTMLDivElement | null>(null);
+	let searchInputRef = $state<HTMLInputElement | null>(null);
+
+	// Sorted routes for the combobox
+	const sortedRoutes = $derived(
+		Object.values(page.data.routes).sort((a, b) => {
+			// Train routes come first
+			if (a.route_type === 'train' && b.route_type !== 'train') return -1;
+			if (a.route_type !== 'train' && b.route_type === 'train') return 1;
+			// Then sort by short_name
+			return a.short_name.localeCompare(b.short_name);
+		})
+	);
+
+	// Filter routes based on search query
+	const filteredRoutes = $derived(
+		sortedRoutes
+			.filter((r) => {
+				if (!searchQuery) return true;
+				const query = searchQuery.toLowerCase();
+				const shortName = r.short_name.toLowerCase();
+				const longName = r.long_name.toLowerCase();
+				const id = r.id.toLowerCase();
+
+				return shortName.includes(query) || longName.includes(query) || id.includes(query);
+			})
+			.sort((a, b) => {
+				// If search query exists and exactly matches a route_id, prioritize it
+				if (searchQuery) {
+					const query = searchQuery.toLowerCase();
+					const aId = a.id.toLowerCase();
+					const bId = b.id.toLowerCase();
+
+					if (aId === query && bId !== query) return -1;
+					if (bId === query && aId !== query) return 1;
+				}
+				return 0;
+			})
+	);
+
+	// Get display name for a route
+	function getRouteDisplayName(route: Route) {
+		return route.short_name === 'S' ? route.id : route.short_name;
+	}
+
+	// Close combobox when clicking outside
+	function handleClickOutside(event: MouseEvent) {
+		if (comboboxRef && !comboboxRef.contains(event.target as Node)) {
+			isComboboxOpen = false;
+		}
+	}
+
+	// Handle route selection
+	function selectRoute(selectedRoute: Route) {
+		// Check if the route is already selected
+		if (!routes.some((r) => r.id === selectedRoute.id)) {
+			routes.push(selectedRoute);
+		}
+		isComboboxOpen = false;
+		searchQuery = ''; // Clear search when selection is made
+	}
+
+	// Remove a route from selection
+	function removeRoute(routeToRemove: Route) {
+		// Don't remove if it's the last route
+		if (routes.length <= 1) return;
+		routes = routes.filter((r) => r.id !== routeToRemove.id);
+	}
+
+	// Check if route is already selected
+	function isRouteSelected(routeId: string) {
+		return routes.some((r) => r.id === routeId);
+	}
+
+	// Handle combobox keyboard navigation
+	function handleComboboxKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			isComboboxOpen = false;
+		} else if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			const firstOption = comboboxRef?.querySelector('[role="option"]') as HTMLElement;
+			if (firstOption) firstOption.focus();
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			selectRoute(filteredRoutes[0]);
+		} else if (event.key === 'Tab' && isComboboxOpen) {
+			// Prevent default tab behavior
+			event.preventDefault();
+			// Focus first option if available
+			const firstOption = comboboxRef?.querySelector('[role="option"]') as HTMLElement;
+			if (firstOption) firstOption.focus();
+		}
+	}
+
+	// Handle option keyboard navigation
+	function handleOptionKeydown(event: KeyboardEvent, routeOption: Route) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			selectRoute(routeOption);
+		} else if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			const nextOption = (event.target as HTMLElement).nextElementSibling as HTMLElement;
+			if (nextOption) nextOption.focus();
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			const prevOption = (event.target as HTMLElement).previousElementSibling as HTMLElement;
+			if (prevOption) {
+				prevOption.focus();
+			} else {
+				searchInputRef?.focus();
+			}
+		}
+	}
+
+	// Toggle dropdown and focus search when opening
+	function toggleCombobox() {
+		isComboboxOpen = !isComboboxOpen;
+		if (isComboboxOpen) {
+			// Focus the search input when opening
+			setTimeout(() => {
+				searchInputRef?.focus();
+			}, 0);
+		}
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleClickOutside);
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
+	});
 </script>
 
 <svelte:head>
-	<title>Charts | TrainStat.us</title>
+	<title>Charts | Train Status</title>
 </svelte:head>
 
 <div class="flex flex-col h-[calc(100dvh-8rem)] min-h-[300px]">
-	<div class="text-xl font-bold px-2">Charts</div>
-	<div class="flex gap-4 bg-neutral-950 p-2 w-full items-start justify-between flex-wrap">
-		<div class="flex flex-wrap gap-4">
-			<!-- TODO: Use labels -->
-			<div class="flex flex-col gap-2">
-				<div class="font-semibold">Route</div>
-				<div class="relative w-fit">
-					<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-						{#if route.route_type === 'train'}
-							<Train class="h-5 w-5 text-neutral-400" />
-						{:else}
-							<BusFront class="h-5 w-5 text-neutral-400" />
-						{/if}
-					</div>
-
-					<select
-						bind:value={route}
-						class="block w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 pl-10 pr-3 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-					>
-						<option value="" disabled selected>Select a route</option>
-						{#each Object.values(page.data.routes).sort((a, b) => {
-							// Train routes come first
-							if (a.route_type === 'train' && b.route_type !== 'train') return -1;
-							if (a.route_type !== 'train' && b.route_type === 'train') return 1;
-							// Then sort by short_name
-							return a.short_name.localeCompare(b.short_name);
-						}) as route}
-							<option value={route}>
-								{route.short_name === 'S' ? route.id : route.short_name}
-							</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-
-			<div class="grid grid-rows-3 gap-2">
-				<div class="font-semibold">Direction</div>
-				<div class="flex items-center">
-					<input
-						bind:group={direction}
-						type="radio"
-						id="northbound"
-						name="direction"
-						value={TripDirection.North}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-					/>
-					<label for="northbound" class="cursor-pointer">Northbound</label>
-				</div>
-				<div class="flex items-center">
-					<input
-						bind:group={direction}
-						type="radio"
-						id="southbound"
-						name="direction"
-						value={TripDirection.South}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-					/>
-					<label for="southbound" class="cursor-pointer">Southbound</label>
-				</div>
-			</div>
-			<div class="flex flex-col gap-2">
-				<div class="font-semibold">Stop Points</div>
-				<input type="checkbox" bind:checked={stop_points} class="cursor-pointer" />
-			</div>
-		</div>
-
+	<div class="text-xl font-bold pl-3">Charts</div>
+	<div
+		class="grid grid-cols-4 gap-4 p-4 w-fit mx-auto rounded-md bg-neutral-800/70 text-neutral-300 border border-neutral-700/50"
+	>
+		<!-- Route Column -->
+		<div class="font-semibold">Route</div>
+		<!-- Direction Column -->
+		<div class="font-semibold">Direction</div>
+		<!-- Stop Points Column -->
+		<div class="font-semibold text-center">Stop Points</div>
+		<!-- Export Button (spans 2 rows) -->
 		<button
 			onclick={export_as_svg}
-			class="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 py-2 px-4 rounded"
+			class="row-span-2 self-center flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 transition-colors py-2 px-4 rounded"
 			aria-label="Export chart as SVG"
 		>
 			<Download class="size-5" />
 			Export SVG
 		</button>
+
+		<!-- Route Selection (2nd row) -->
+		<div class="relative w-full" bind:this={comboboxRef}>
+			<button
+				type="button"
+				onclick={toggleCombobox}
+				aria-haspopup="listbox"
+				aria-expanded={isComboboxOpen}
+				class="flex items-center justify-between w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 px-3 text-base gap-2 hover:bg-neutral-800"
+				aria-label="Add routes"
+			>
+				<div class="flex flex-wrap gap-2 items-center flex-1">
+					{#if routes.length === 0}
+						<span>Select routes</span>
+					{:else}
+						{#each routes as selectedRoute}
+							<div class="flex items-center bg-neutral-800 rounded-md px-2 py-1">
+								<Icon height={20} width={20} express={false} route={selectedRoute} link={false} />
+								{#if routes.length > 1}
+									<div
+										role="button"
+										tabindex="0"
+										onclick={(e) => {
+											e.stopPropagation();
+											removeRoute(selectedRoute);
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												e.stopPropagation();
+												removeRoute(selectedRoute);
+											}
+										}}
+										class="text-neutral-400 hover:text-white ml-1 cursor-pointer"
+										aria-label={`Remove ${getRouteDisplayName(selectedRoute)}`}
+									>
+										<X class="size-3" />
+									</div>
+								{/if}
+							</div>
+						{/each}
+					{/if}
+				</div>
+				<ChevronDown class="h-4 w-4 flex-shrink-0" />
+			</button>
+
+			<!-- Dropdown with search and options -->
+			{#if isComboboxOpen}
+				<div
+					class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md bg-neutral-900 border border-neutral-700 shadow-lg"
+				>
+					<div class="p-2 border-b border-neutral-700">
+						<div class="relative">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<Search class="h-4 w-4 text-neutral-400" />
+							</div>
+							<input
+								type="text"
+								bind:this={searchInputRef}
+								bind:value={searchQuery}
+								onkeydown={handleComboboxKeydown}
+								class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
+								placeholder="Search routes..."
+								autocomplete="off"
+							/>
+						</div>
+					</div>
+
+					<!-- Route options -->
+					<div id="route-listbox" role="listbox" class="max-h-60 overflow-auto py-1">
+						{#if filteredRoutes.length === 0}
+							<div class="px-4 py-2 text-neutral-400">No routes found</div>
+						{:else}
+							{#each filteredRoutes as routeOption}
+								<div
+									role="option"
+									tabindex="0"
+									aria-selected={isRouteSelected(routeOption.id)}
+									class="flex gap-2 items-center px-4 py-2 cursor-pointer hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
+										routeOption.id
+									)
+										? 'bg-neutral-700'
+										: ''}"
+									onclick={() => selectRoute(routeOption)}
+									onkeydown={(e) => handleOptionKeydown(e, routeOption)}
+								>
+									<Icon
+										height={32}
+										width={32}
+										express={false}
+										route={routeOption}
+										link={false}
+										class="mr-3"
+									/>
+									{routeOption.long_name}
+									<!-- <div class="flex flex-col">
+										<span class="text-sm">{getRouteDisplayName(routeOption)}</span>
+										<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
+									</div> -->
+									{#if isRouteSelected(routeOption.id)}
+										<Check class="size-4 text-green-500" />
+										<!-- <span class="ml-auto text-green-500">✓</span> -->
+									{/if}
+								</div>
+							{/each}
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Direction Input (2nd row) -->
+		<div class="flex flex-col gap-2">
+			<div class="flex items-center">
+				<!-- TODO: instead of northbound and southbound, show route headsigns -->
+				<input
+					bind:group={direction}
+					type="radio"
+					id="northbound"
+					name="direction"
+					value={TripDirection.North}
+					class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+				/>
+				<label for="northbound" class="cursor-pointer">Northbound</label>
+			</div>
+			<div class="flex items-center">
+				<input
+					bind:group={direction}
+					type="radio"
+					id="southbound"
+					name="direction"
+					value={TripDirection.South}
+					class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+				/>
+				<label for="southbound" class="cursor-pointer">Southbound</label>
+			</div>
+		</div>
+
+		<!-- Stop Points Input (2nd row) -->
+		<div class="flex justify-center">
+			<input type="checkbox" bind:checked={stop_points} class="cursor-pointer w-6 h-6" />
+		</div>
 	</div>
 
 	<!-- Chart container with proper overflow handling -->
@@ -193,12 +463,13 @@
 				<!-- Chart with minimum dimensions but able to shrink -->
 				<div bind:this={svgContainer} class="min-w-[1300px] min-h-[500px] h-full w-full">
 					<LayerCake
+						debug
 						ssr
 						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
 						x="time"
 						y="stop_name"
 						yDomain={data.yDomain}
-						yScale={scalePoint().padding(0.5)}
+						yScale={scalePoint().padding(0)}
 						xScale={scaleTime()}
 						data={data.route_trips}
 						flatData={flatten(data.route_trips, 'points')}
@@ -206,7 +477,7 @@
 						<Svg>
 							<AxisX />
 							<AxisY />
-							<Lines stroke="#{route.color}" bind:stop_points />
+							<Lines {routes} bind:stop_points />
 						</Svg>
 					</LayerCake>
 				</div>

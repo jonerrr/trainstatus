@@ -2,14 +2,14 @@
 	import { getContext } from 'svelte';
 	const { yScale, width } = getContext('LayerCake');
 
-	$: ticks = $yScale.domain();
+	const ticks = $derived($yScale.domain());
 </script>
 
 <g class="axis y-axis">
-	{#each ticks as tick}
+	{#each ticks as tick, i}
 		<g transform="translate(0, {$yScale(tick)})">
-			<!-- <line x1={-6} x2={0} stroke="#e5e5e5" /> -->
-			<text x={-10} y={4} fill="#e5e5e5" text-anchor="end" font-size="11px" class="stop-name">
+			<line x1={-3} x2={2} stroke="#e5e5e5" />
+			<text x={-5} y={4} fill="#e5e5e5" text-anchor="end" font-size="11px" class="stop-name">
 				{tick.length > 25 ? tick.substring(0, 22) + '...' : tick}
 			</text>
 		</g>
