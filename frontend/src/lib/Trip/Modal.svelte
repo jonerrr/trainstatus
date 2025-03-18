@@ -24,7 +24,10 @@
 
 	const stop_times = $derived(
 		(rt_stop_times.by_trip_id[trip.id] || []).filter(
-			(st) => st.arrival.getTime() > current_time.ms || show_previous
+			(st) =>
+				st.arrival.getTime() > current_time.ms ||
+				show_previous ||
+				page.url.pathname.startsWith('/charts') // charts only show trips that have already passed
 		)
 	);
 	const last_stop = $derived.by(() => {

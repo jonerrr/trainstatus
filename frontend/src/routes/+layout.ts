@@ -10,11 +10,13 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 
 	const at = url.searchParams.get('at') ?? undefined;
 
+	let finished = url.pathname.startsWith('/charts');
+
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
 		stops_promise,
 		routes_promise,
-		trips.update(fetch, at),
-		stop_times.update(fetch, [], false, at),
+		trips.update(fetch, at, finished),
+		stop_times.update(fetch, [], false, at, finished),
 		alerts.update(fetch, at)
 	]);
 

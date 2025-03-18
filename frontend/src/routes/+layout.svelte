@@ -16,7 +16,6 @@
 	let { children, data } = $props();
 
 	let last_update = $state<Date>(new Date());
-	// TODO: they need to be sveltesets
 	let last_st_update = $state<Date>(new Date());
 	// used to check if bus routes have changed
 	let last_monitored_routes = $state(new SvelteSet<string>());
@@ -69,6 +68,8 @@
 			offline = false;
 		});
 
+		const finished = $derived(page.url.pathname.startsWith('/charts'));
+
 		// $inspect(last_monitored_routes);
 
 		const interval = setInterval(async () => {
@@ -87,7 +88,7 @@
 					// console.log('Updating rt data');
 
 					await Promise.all([
-						trips.update(fetch, current_time.value?.toString()),
+						trips.update(fetch, current_time.value?.toString(), finished),
 						alerts.update(fetch, current_time.value?.toString())
 					]);
 
@@ -135,7 +136,8 @@
 						fetch,
 						[...monitored_bus_routes],
 						true,
-						current_time.value?.toString()
+						current_time.value?.toString(),
+						finished
 					);
 					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
 					offline = false;
@@ -148,7 +150,8 @@
 						fetch,
 						[...monitored_bus_routes],
 						false,
-						current_time.value?.toString()
+						current_time.value?.toString(),
+						finished
 					);
 					last_st_update = new Date();
 					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);

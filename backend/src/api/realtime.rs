@@ -38,12 +38,9 @@ pub async fn trips_handler(
     params: Query<TripsParameters>,
     current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    match current_time.user_specified {
-        true => {
-            let trips = Trip::get_all(&state.pg_pool, current_time.time).await?;
-            Ok((json_headers().clone(), serde_json::to_string(&trips)?))
-        }
-        false => {
+    // TODO: maybe cache finished trips
+    match (current_time.user_specified, current_time.finished) {
+        (false, false) => {
             let mut conn = state.redis_pool.get().await?;
             let key = if params.geojson {
                 "bus_trips_geojson"
@@ -53,16 +50,12 @@ pub async fn trips_handler(
             let trips: String = conn.get(key).await?;
             Ok((json_headers().clone(), trips))
         }
+        _ => {
+            let trips =
+                Trip::get_all(&state.pg_pool, current_time.time, current_time.finished).await?;
+            Ok((json_headers().clone(), serde_json::to_string(&trips)?))
+        }
     }
-    // let mut conn = state.redis_pool.get().await?;
-
-    // let key = if params.geojson {
-    //     "bus_trips_geojson"
-    // } else {
-    //     "trips"
-    // };
-    // let trips: String = conn.get(key).await?;
-    // Ok((json_headers().clone(), trips))
 }
 
 #[derive(Deserialize, IntoParams)]
@@ -94,8 +87,12 @@ pub async fn stop_times_handler(
     params: Query<StopTimesParameters>,
     current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    match (params.bus_route_ids.is_empty(), current_time.user_specified) {
-        (true, false) => {
+    match (
+        params.bus_route_ids.is_empty(),
+        current_time.user_specified,
+        current_time.finished,
+    ) {
+        (true, false, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
 
@@ -120,6 +117,7 @@ pub async fn stop_times_handler(
                 Some(&params.bus_route_ids),
                 params.only_bus,
                 params.filter_arrival,
+                current_time.finished,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))
