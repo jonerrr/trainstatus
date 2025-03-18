@@ -1,6 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
 import { page } from '$app/state';
+import { current_time } from './util.svelte';
 
 export interface Trip<T = TripData, R = never> {
 	id: string;
@@ -67,6 +68,7 @@ export function createTrips() {
 		}
 		if (finished) {
 			params.set('finished', 'true');
+			// params.set('at', Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000).toString());
 		}
 
 		const res = await fetch(`/api/v1/trips${params.size ? '?' + params.toString() : ''}`);
