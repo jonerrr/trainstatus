@@ -218,108 +218,9 @@ impl Trip<serde_json::Value> {
         at: DateTime<Utc>,
         finished: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        let mut query = QueryBuilder::new(
-            r#"
-SELECT
-            t.id,
-            t.mta_id,
-            t.vehicle_id,
-            t.route_id,
-            t.direction,
-            t.created_at,
-            t.updated_at,
-            NULL AS deviation,
-            CASE
-                WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
-                'stop_id',
-                p.stop_id,
-                'status',
-                p.status,
-                'express',
-                t.express,
-                'assigned',
-                t.assigned
-                        )
-                ELSE jsonb_build_object(
-                'stop_id',
-                p.stop_id,
-                'status',
-                p.status,
-                'lat',
-                p.lat,
-                'lon',
-                p.lon,
-                'bearing',
-                p.bearing,
-                'passengers',
-                p.passengers,
-                'capacity',
-                p.capacity,
-                'deviation',
-                t.deviation
-                        )
-            END AS DATA
-        FROM
-            trip t
-        LEFT JOIN "position" p ON
-            t.vehicle_id = p.vehicle_id
-        WHERE "#,
-        );
-
-        query.push("t.updated_at >= (");
-        query.push_bind(at);
-
-        if finished {
-            query.push(" - INTERVAL '5 minutes')");
-        } else {
-            query.push(" - INTERVAL '4 hours')");
-        }
-
-        // if finished {
-        //     query.push("t.updated_at >= (");
-        //     query.push_bind(at);
-        //     query.push(" - INTERVAL '5 minutes')");
-        // } else {
-        //     query.push("t.updated_at BETWEEN (");
-        //     query.push_bind(at);
-        //     query.push(" - INTERVAL '4 hours') AND ");
-        //     query.push_bind(at);
-        // }
-
-        query.push(
-            " AND
-                        t.id = ANY(
-            SELECT
-                t.id
-            FROM
-                trip t
-            LEFT JOIN stop_time st ON
-                st.trip_id = t.id
-            WHERE
-                st.arrival BETWEEN ",
-        );
-        query.push_bind(at);
-        if finished {
-            query.push(" - INTERVAL '4 hours' AND (");
-            query.push_bind(at);
-            query.push(" + INTERVAL '4 hours')");
-        } else {
-            query.push(" AND (");
-            query.push_bind(at);
-            query.push(" + INTERVAL '4 hours')");
-        }
-
-        query.push(
-            ")
-        ORDER BY
-            t.created_at DESC",
-        );
-        query.build_query_as().fetch_all(pool).await
-
-        //         sqlx::query_as!(
-        //             Trip::<serde_json::Value>,
+        //         let mut query = QueryBuilder::new(
         //             r#"
-        //  SELECT
+        // SELECT
         //             t.id,
         //             t.mta_id,
         //             t.vehicle_id,
@@ -327,7 +228,7 @@ SELECT
         //             t.direction,
         //             t.created_at,
         //             t.updated_at,
-        //             NULL AS "deviation: _",
+        //             NULL AS deviation,
         //             CASE
         //                 WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
         //                 'stop_id',
@@ -362,9 +263,20 @@ SELECT
         //             trip t
         //         LEFT JOIN "position" p ON
         //             t.vehicle_id = p.vehicle_id
-        //         WHERE
-        //             t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
-        //             AND
+        //         WHERE "#,
+        //         );
+
+        //         query.push("t.updated_at >= (");
+        //         query.push_bind(at);
+
+        //         if finished {
+        //             query.push(" - INTERVAL '5 minutes')");
+        //         } else {
+        //             query.push(" - INTERVAL '4 hours')");
+        //         }
+
+        //         query.push(
+        //             " AND
         //                         t.id = ANY(
         //             SELECT
         //                 t.id
@@ -373,19 +285,92 @@ SELECT
         //             LEFT JOIN stop_time st ON
         //                 st.trip_id = t.id
         //             WHERE
-        //                 st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-        //                             )
+        //                 st.arrival BETWEEN ",
+        //         );
+        //         query.push_bind(at);
+        //         if finished {
+        //             query.push(" - INTERVAL '4 hours' AND (");
+        //             query.push_bind(at);
+        //             query.push(" + INTERVAL '4 hours')");
+        //         } else {
+        //             query.push(" AND (");
+        //             query.push_bind(at);
+        //             query.push(" + INTERVAL '4 hours')");
+        //         }
+
+        //         query.push(
+        //             ")
         //         ORDER BY
-        //             t.created_at DESC
-        //                     "#,
-        //             at
-        //         )
-        //         .fetch_all(pool)
-        //         .await
-        // match trips.0 {
-        //     Some(value) => Ok(value),
-        //     None => Ok(serde_json::Value::Array(vec![])), // Return an empty array if the result is NULL
-        // }
+        //             t.created_at DESC",
+        //         );
+        //         query.build_query_as().fetch_all(pool).await
+
+        sqlx::query_as!(
+            Trip::<serde_json::Value>,
+            r#"
+         SELECT
+                    t.id,
+                    t.mta_id,
+                    t.vehicle_id,
+                    t.route_id,
+                    t.direction,
+                    t.created_at,
+                    t.updated_at,
+                    NULL AS "deviation: _",
+                    CASE
+                        WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
+                        'stop_id',
+                        p.stop_id,
+                        'status',
+                        p.status,
+                        'express',
+                        t.express,
+                        'assigned',
+                        t.assigned
+                                )
+                        ELSE jsonb_build_object(
+                        'stop_id',
+                        p.stop_id,
+                        'status',
+                        p.status,
+                        'lat',
+                        p.lat,
+                        'lon',
+                        p.lon,
+                        'bearing',
+                        p.bearing,
+                        'passengers',
+                        p.passengers,
+                        'capacity',
+                        p.capacity,
+                        'deviation',
+                        t.deviation
+                                )
+                    END AS DATA
+                FROM
+                    trip t
+                LEFT JOIN "position" p ON
+                    t.vehicle_id = p.vehicle_id
+                WHERE
+                    t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
+                    AND
+                                t.id = ANY(
+                    SELECT
+                        t.id
+                    FROM
+                        trip t
+                    LEFT JOIN stop_time st ON
+                        st.trip_id = t.id
+                    WHERE
+                        st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                                    )
+                ORDER BY
+                    t.created_at DESC
+                            "#,
+            at
+        )
+        .fetch_all(pool)
+        .await
     }
 
     // TODO: i dont think we need result

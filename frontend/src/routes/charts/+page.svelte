@@ -16,6 +16,8 @@
 	let routes = $state<Route[]>([page.data.routes['3']]);
 	let direction = $state<TripDirection>(TripDirection.North);
 	let stop_points = $state<boolean>(false);
+	let xAxisInterval = $state<number>(15);
+	let displayHours = $state<number>(3);
 
 	$effect(() => {
 		for (const r of routes) {
@@ -25,7 +27,12 @@
 		}
 	});
 
-	// TODO: add a slider to change the time range. default to start: -4 hours, end: current time
+	interface RouteStopData {
+		stop_id: number;
+		stop_name: string;
+		// sequence of this stop in stop times for each of the trips
+		sequences: number[];
+	}
 
 	// TODO: add main route stops to y domain no matter what
 	// TODO: add to common stops if theres a transfer to the route
@@ -53,7 +60,12 @@
 
 				const stop_sequence = stop.routes.find((r) => r.id === trip.route_id)?.stop_sequence;
 				if (!stop_sequence) {
-					console.log('stop_sequence not found, skipping', stop.name, trip.route_id);
+					console.log(
+						'stop_sequence not found, skipping',
+						stop.name,
+						trip.route_id,
+						stop.routes.map((r) => r.id)
+					);
 					continue;
 				}
 
@@ -282,22 +294,29 @@
 		}
 	}
 
+	// let last_at = current_time.value;
+
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
+		// set current time to 2 hours ago
+		// current_time.value = Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000);
+
 		return () => {
 			document.removeEventListener('click', handleClickOutside);
+			// if (last_at) {
+			// 	console.log('setting to old current time', last_at);
+			// 	current_time.value = last_at;
+			// }
 		};
 	});
 
-	const xDomain = $derived(() => {
-		// Get all time points from your data
+	const xDomain = $derived.by(() => {
 		const allTimes = data.route_trips
 			.flatMap((trip) => trip.points.map((point) => +point.time))
 			.filter((time) => !isNaN(time));
 
-		// Find the minimum time in the data (or default to 4 hours ago)
 		const minTime =
-			allTimes.length > 0 ? Math.min(...allTimes) : current_time.ms - 4 * 60 * 60 * 1000;
+			allTimes.length > 0 ? Math.min(...allTimes) : current_time.ms - displayHours * 60 * 60 * 1000;
 
 		// Return domain from earliest point to current time
 		return [new Date(minTime), new Date(current_time.ms)];
@@ -465,6 +484,42 @@
 			</div>
 		</div>
 
+		<!-- X-Axis Interval Slider -->
+		<div class="flex flex-col gap-2 min-w-[160px]">
+			<div class="font-semibold">Time Interval</div>
+			<div class="flex flex-col gap-1">
+				<div class="flex items-center gap-2">
+					<input
+						type="range"
+						min="5"
+						max="30"
+						step="5"
+						bind:value={xAxisInterval}
+						class="w-full cursor-pointer"
+					/>
+					<span class="w-8 text-right">{xAxisInterval}m</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Display Hours Slider -->
+		<div class="flex flex-col gap-2 min-w-[160px]">
+			<div class="font-semibold">Time Range</div>
+			<div class="flex flex-col gap-1">
+				<div class="flex items-center gap-2">
+					<input
+						type="range"
+						min="1"
+						max="5"
+						step="1"
+						bind:value={displayHours}
+						class="w-full cursor-pointer"
+					/>
+					<span class="w-8 text-right">{displayHours}h</span>
+				</div>
+			</div>
+		</div>
+
 		<!-- Export Button -->
 		<div class="flex flex-col justify-center min-w-[120px]">
 			<button
@@ -486,7 +541,7 @@
 				<!-- Chart with minimum dimensions but able to shrink -->
 				<div bind:this={svgContainer} class="min-w-[1300px] min-h-[500px] h-full w-full">
 					<LayerCake
-						debug={true}
+						debug={false}
 						ssr
 						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
 						x="time"
@@ -499,7 +554,7 @@
 						flatData={flatten(data.route_trips, 'points')}
 					>
 						<Svg>
-							<AxisX />
+							<AxisX interval={xAxisInterval} />
 							<AxisY />
 							<Lines {routes} bind:stop_points />
 						</Svg>
