@@ -159,10 +159,17 @@ pub async fn import(
     tokio::spawn(async move {
         loop {
             // callback hell alert
-            match trip::Trip::<serde_json::Value>::get_all(&c_pool, Utc::now()).await {
+            match trip::Trip::<serde_json::Value>::get_all(&c_pool, Utc::now(), false).await {
                 Ok(trips) => {
-                    match stop_time::StopTime::get_all(&c_pool, Utc::now(), None, false, false)
-                        .await
+                    match stop_time::StopTime::get_all(
+                        &c_pool,
+                        Utc::now(),
+                        None,
+                        false,
+                        false,
+                        false,
+                    )
+                    .await
                     {
                         Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now(), true)
                             .await

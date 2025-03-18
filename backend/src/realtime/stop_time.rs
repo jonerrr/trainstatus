@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, PgPool};
+use sqlx::{prelude::FromRow, PgPool, QueryBuilder};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -45,49 +45,76 @@ impl StopTime {
         bus_route_ids: Option<&Vec<String>>,
         only_bus: bool,
         filter_arrival: bool,
+        finished: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let default_routes = Vec::new();
         let bus_routes = bus_route_ids.unwrap_or(&default_routes);
 
-        sqlx::query_as!(
-            StopTime,
-            r#"
-            SELECT
-                st.trip_id,
-                st.stop_id,
-                st.arrival,
-                st.departure
-            FROM
-                stop_time st
-            WHERE
-                st.trip_id IN (
-                    SELECT
-                        t.id
-                    FROM
-                        trip t
-                    WHERE
-                        t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'
-                        AND ($1)::timestamp with time zone + INTERVAL '4 hours'
-                        AND (
-                            ($3 = TRUE AND t.route_id = ANY($2))
-                            OR
-                            ($3 = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY($2)))
-                        )
-                )
-                AND (
-                    $4 = FALSE OR
-                    (st.arrival BETWEEN $1 AND $1 + INTERVAL '4 hours')
-                )
-            ORDER BY
-                st.arrival;
-            "#,
-            at,             // $1: Timestamp
-            bus_routes,     // $2: Array of bus_route_ids (can be empty)
-            only_bus,       // $3: only_bus flag
-            filter_arrival  // $4: make sure arrival is > current time
-        )
-        .fetch_all(pool)
-        .await
+        let mut query = QueryBuilder::new(
+            r#"SELECT
+            st.trip_id,
+            st.stop_id,
+            st.arrival,
+            st.departure
+        FROM
+            stop_time st
+        WHERE
+            st.trip_id IN (
+                SELECT
+                    t.id
+                FROM
+                    trip t
+                WHERE
+                                t.updated_at BETWEEN "#,
+        );
+        query.push_bind(at);
+        query.push("::timestamp with time zone - INTERVAL ");
+        if finished {
+            query.push(" '4 hours'")
+        } else {
+            query.push(" '5 minutes'")
+        };
+        query.push(" AND ");
+        query.push_bind(at);
+        query.push(
+            r#"::timestamp with time zone + INTERVAL '4 hours'
+                                AND (
+                        ("#,
+        );
+        query.push_bind(only_bus);
+        query.push(" = TRUE AND t.route_id = ANY(");
+        query.push_bind(bus_routes);
+        query.push(
+            "))
+                        OR
+                        (",
+        );
+        query.push_bind(only_bus);
+        query.push(" = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY(");
+        query.push_bind(bus_routes);
+        query.push(
+            ")))
+                    )
+            )
+            AND (",
+        );
+        query.push_bind(filter_arrival);
+        query.push(
+            " = FALSE OR
+                            (st.arrival BETWEEN ",
+        );
+        query.push_bind(at);
+        query.push(" AND ");
+        query.push_bind(at);
+        query.push(
+            " + INTERVAL '4 hours')
+            )
+        ORDER BY
+            st.arrival;
+        ",
+        );
+
+        query.build_query_as().fetch_all(pool).await
     }
 
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {

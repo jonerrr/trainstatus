@@ -1,5 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity';
 import type { Trip } from './trips.svelte';
+import { page } from '$app/state';
 
 export interface StopTime<T = never | Trip> {
 	trip_id: string;
@@ -39,7 +40,13 @@ export function createStopTimes() {
 	let updating_bus_routes = $state(new SvelteSet<string>());
 
 	// must specify routes if only_bus is true
-	async function update(fetch: Fetch, routes: string[], only_bus: boolean = false, at?: string) {
+	async function update(
+		fetch: Fetch,
+		routes: string[],
+		only_bus: boolean = false,
+		at?: string,
+		finished: boolean = false
+	) {
 		if (only_bus) {
 			updating_bus_routes = new SvelteSet(routes);
 		}
@@ -54,6 +61,11 @@ export function createStopTimes() {
 		if (at) {
 			// convert back to seconds from ms
 			params.set('at', at.toString());
+		}
+
+		// if on charts, fetch finished stop times
+		if (finished) {
+			params.set('finished', 'true');
 		}
 
 		const res = await fetch(`/api/v1/stop_times${params.size ? '?' + params.toString() : ''}`);

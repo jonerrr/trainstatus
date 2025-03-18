@@ -25,6 +25,8 @@
 		}
 	});
 
+	// TODO: add a slider to change the time range. default to start: -4 hours, end: current time
+
 	// TODO: add main route stops to y domain no matter what
 	// TODO: add to common stops if theres a transfer to the route
 	const data = $derived.by(() => {
@@ -41,11 +43,12 @@
 			if (routes.every((r) => r.id !== trip.route_id) || trip.direction !== direction) continue;
 			const trip_st = stop_times.by_trip_id[trip.id];
 			if (!trip_st) continue;
+
+			// Skip trips that aren't fully complete (any departure time > current_time)
+			// if (trip_st.some((st) => st.departure.getTime() >= current_time.ms)) continue;
+
 			const trip_points = [];
 			for (const st of trip_st) {
-				// TODO: show 2 hours of data, ending at current_time.ms
-				// if (st.departure.getTime() > current_time.ms) continue;
-
 				const stop = page.data.stops[st.stop_id];
 
 				const stop_sequence = stop.routes.find((r) => r.id === trip.route_id)?.stop_sequence;
@@ -285,6 +288,20 @@
 			document.removeEventListener('click', handleClickOutside);
 		};
 	});
+
+	const xDomain = $derived(() => {
+		// Get all time points from your data
+		const allTimes = data.route_trips
+			.flatMap((trip) => trip.points.map((point) => +point.time))
+			.filter((time) => !isNaN(time));
+
+		// Find the minimum time in the data (or default to 4 hours ago)
+		const minTime =
+			allTimes.length > 0 ? Math.min(...allTimes) : current_time.ms - 4 * 60 * 60 * 1000;
+
+		// Return domain from earliest point to current time
+		return [new Date(minTime), new Date(current_time.ms)];
+	});
 </script>
 
 <svelte:head>
@@ -294,164 +311,170 @@
 <div class="flex flex-col h-[calc(100dvh-8rem)] min-h-[300px]">
 	<div class="text-xl font-bold pl-3">Charts</div>
 	<div
-		class="grid grid-cols-4 gap-4 p-4 w-fit mx-auto rounded-md bg-neutral-800/70 text-neutral-300 border border-neutral-700/50"
+		class="flex flex-wrap gap-6 p-4 w-fit mx-auto rounded-md bg-neutral-800/70 text-neutral-300 border border-neutral-700/50"
 	>
-		<!-- Route Column -->
-		<div class="font-semibold">Route</div>
-		<!-- Direction Column -->
-		<div class="font-semibold">Direction</div>
-		<!-- Stop Points Column -->
-		<div class="font-semibold text-center">Stop Points</div>
-		<!-- Export Button (spans 2 rows) -->
-		<button
-			onclick={export_as_svg}
-			class="row-span-2 self-center flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 transition-colors py-2 px-4 rounded"
-			aria-label="Export chart as SVG"
-		>
-			<Download class="size-5" />
-			Export SVG
-		</button>
-
-		<!-- Route Selection (2nd row) -->
-		<div class="relative w-full" bind:this={comboboxRef}>
-			<button
-				type="button"
-				onclick={toggleCombobox}
-				aria-haspopup="listbox"
-				aria-expanded={isComboboxOpen}
-				class="flex items-center justify-between w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 px-3 text-base gap-2 hover:bg-neutral-800"
-				aria-label="Add routes"
-			>
-				<div class="flex flex-wrap gap-2 items-center flex-1">
-					{#if routes.length === 0}
-						<span>Select routes</span>
-					{:else}
-						{#each routes as selectedRoute}
-							<div class="flex items-center bg-neutral-800 rounded-md px-2 py-1">
-								<Icon height={20} width={20} express={false} route={selectedRoute} link={false} />
-								{#if routes.length > 1}
-									<div
-										role="button"
-										tabindex="0"
-										onclick={(e) => {
-											e.stopPropagation();
-											removeRoute(selectedRoute);
-										}}
-										onkeydown={(e) => {
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
+		<!-- Routes Option -->
+		<div class="flex flex-col gap-2 min-w-[240px]">
+			<div class="font-semibold">Routes</div>
+			<div class="relative w-full" bind:this={comboboxRef}>
+				<button
+					type="button"
+					onclick={toggleCombobox}
+					aria-haspopup="listbox"
+					aria-expanded={isComboboxOpen}
+					class="flex items-center justify-between w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 px-3 text-base gap-2 hover:bg-neutral-800"
+					aria-label="Add routes"
+				>
+					<div class="flex flex-wrap gap-2 items-center flex-1">
+						{#if routes.length === 0}
+							<span>Select routes</span>
+						{:else}
+							{#each routes as selectedRoute}
+								<div
+									class="flex items-center bg-neutral-800 rounded-md px-2 py-1 border-neutral-700 border"
+								>
+									<Icon height={20} width={20} express={false} route={selectedRoute} link={false} />
+									{#if routes.length > 1}
+										<div
+											role="button"
+											tabindex="0"
+											onclick={(e) => {
 												e.stopPropagation();
 												removeRoute(selectedRoute);
-											}
-										}}
-										class="text-neutral-400 hover:text-white ml-1 cursor-pointer"
-										aria-label={`Remove ${getRouteDisplayName(selectedRoute)}`}
-									>
-										<X class="size-3" />
-									</div>
-								{/if}
-							</div>
-						{/each}
-					{/if}
-				</div>
-				<ChevronDown class="h-4 w-4 flex-shrink-0" />
-			</button>
-
-			<!-- Dropdown with search and options -->
-			{#if isComboboxOpen}
-				<div
-					class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md bg-neutral-900 border border-neutral-700 shadow-lg"
-				>
-					<div class="p-2 border-b border-neutral-700">
-						<div class="relative">
-							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<Search class="h-4 w-4 text-neutral-400" />
-							</div>
-							<input
-								type="text"
-								bind:this={searchInputRef}
-								bind:value={searchQuery}
-								onkeydown={handleComboboxKeydown}
-								class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
-								placeholder="Search routes..."
-								autocomplete="off"
-							/>
-						</div>
-					</div>
-
-					<!-- Route options -->
-					<div id="route-listbox" role="listbox" class="max-h-60 overflow-auto py-1">
-						{#if filteredRoutes.length === 0}
-							<div class="px-4 py-2 text-neutral-400">No routes found</div>
-						{:else}
-							{#each filteredRoutes as routeOption}
-								<div
-									role="option"
-									tabindex="0"
-									aria-selected={isRouteSelected(routeOption.id)}
-									class="flex gap-2 items-center px-4 py-2 cursor-pointer hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
-										routeOption.id
-									)
-										? 'bg-neutral-700'
-										: ''}"
-									onclick={() => selectRoute(routeOption)}
-									onkeydown={(e) => handleOptionKeydown(e, routeOption)}
-								>
-									<Icon
-										height={32}
-										width={32}
-										express={false}
-										route={routeOption}
-										link={false}
-										class="mr-3"
-									/>
-									{routeOption.long_name}
-									<!-- <div class="flex flex-col">
-										<span class="text-sm">{getRouteDisplayName(routeOption)}</span>
-										<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
-									</div> -->
-									{#if isRouteSelected(routeOption.id)}
-										<Check class="size-4 text-green-500" />
-										<!-- <span class="ml-auto text-green-500">✓</span> -->
+											}}
+											onkeydown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													e.stopPropagation();
+													removeRoute(selectedRoute);
+												}
+											}}
+											class="text-neutral-400 hover:text-white ml-1 cursor-pointer"
+											aria-label={`Remove ${getRouteDisplayName(selectedRoute)}`}
+										>
+											<X class="size-3" />
+										</div>
 									{/if}
 								</div>
 							{/each}
 						{/if}
 					</div>
+					<ChevronDown class="h-4 w-4 flex-shrink-0" />
+				</button>
+
+				<!-- Dropdown with search and options -->
+				{#if isComboboxOpen}
+					<div
+						class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md bg-neutral-900 border border-neutral-700 shadow-lg"
+					>
+						<div class="p-2 border-b border-neutral-700">
+							<div class="relative">
+								<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+									<Search class="h-4 w-4 text-neutral-400" />
+								</div>
+								<input
+									type="text"
+									bind:this={searchInputRef}
+									bind:value={searchQuery}
+									onkeydown={handleComboboxKeydown}
+									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
+									placeholder="Search routes..."
+									autocomplete="off"
+								/>
+							</div>
+						</div>
+
+						<!-- Route options -->
+						<div id="route-listbox" role="listbox" class="max-h-60 overflow-auto py-1">
+							{#if filteredRoutes.length === 0}
+								<div class="px-4 py-2 text-neutral-400">No routes found</div>
+							{:else}
+								{#each filteredRoutes as routeOption}
+									<div
+										role="option"
+										tabindex="0"
+										aria-selected={isRouteSelected(routeOption.id)}
+										class="flex gap-2 items-center px-4 py-2 cursor-pointer hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
+											routeOption.id
+										)
+											? 'bg-neutral-700'
+											: ''}"
+										onclick={() => selectRoute(routeOption)}
+										onkeydown={(e) => handleOptionKeydown(e, routeOption)}
+									>
+										<Icon
+											height={32}
+											width={32}
+											express={false}
+											route={routeOption}
+											link={false}
+											class="mr-3 flex-shrink-0"
+										/>
+										<span class="flex-grow">{routeOption.long_name}</span>
+										<!-- <div class="flex flex-col">
+											<span class="text-sm">{getRouteDisplayName(routeOption)}</span>
+											<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
+										</div> -->
+										{#if isRouteSelected(routeOption.id)}
+											<Check class="size-4 text-green-500 flex-shrink-0 mt-1" />
+											<!-- <span class="ml-auto text-green-500">✓</span> -->
+										{/if}
+									</div>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Direction Option -->
+		<div class="flex flex-col gap-2 min-w-[150px]">
+			<div class="font-semibold">Direction</div>
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center">
+					<input
+						bind:group={direction}
+						type="radio"
+						id="northbound"
+						name="direction"
+						value={TripDirection.North}
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+					/>
+					<label for="northbound" class="cursor-pointer">Northbound</label>
 				</div>
-			{/if}
-		</div>
-
-		<!-- Direction Input (2nd row) -->
-		<div class="flex flex-col gap-2">
-			<div class="flex items-center">
-				<!-- TODO: instead of northbound and southbound, show route headsigns -->
-				<input
-					bind:group={direction}
-					type="radio"
-					id="northbound"
-					name="direction"
-					value={TripDirection.North}
-					class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-				/>
-				<label for="northbound" class="cursor-pointer">Northbound</label>
-			</div>
-			<div class="flex items-center">
-				<input
-					bind:group={direction}
-					type="radio"
-					id="southbound"
-					name="direction"
-					value={TripDirection.South}
-					class="mr-2 cursor-pointer hover:scale-110 transition-transform"
-				/>
-				<label for="southbound" class="cursor-pointer">Southbound</label>
+				<div class="flex items-center">
+					<input
+						bind:group={direction}
+						type="radio"
+						id="southbound"
+						name="direction"
+						value={TripDirection.South}
+						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+					/>
+					<label for="southbound" class="cursor-pointer">Southbound</label>
+				</div>
 			</div>
 		</div>
 
-		<!-- Stop Points Input (2nd row) -->
-		<div class="flex justify-center">
-			<input type="checkbox" bind:checked={stop_points} class="cursor-pointer w-6 h-6" />
+		<!-- Stop Points Option -->
+		<div class="flex flex-col gap-2 items-center min-w-[100px]">
+			<div class="font-semibold">Stop Points</div>
+			<div class="flex justify-center pt-2">
+				<input type="checkbox" bind:checked={stop_points} class="cursor-pointer w-6 h-6" />
+			</div>
+		</div>
+
+		<!-- Export Button -->
+		<div class="flex flex-col justify-center min-w-[120px]">
+			<button
+				onclick={export_as_svg}
+				class="flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 transition-colors py-2 px-4 rounded h-fit"
+				aria-label="Export chart as SVG"
+			>
+				<Download class="size-5" />
+				Export SVG
+			</button>
 		</div>
 	</div>
 
@@ -463,11 +486,12 @@
 				<!-- Chart with minimum dimensions but able to shrink -->
 				<div bind:this={svgContainer} class="min-w-[1300px] min-h-[500px] h-full w-full">
 					<LayerCake
-						debug
+						debug={true}
 						ssr
 						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
 						x="time"
 						y="stop_name"
+						{xDomain}
 						yDomain={data.yDomain}
 						yScale={scalePoint().padding(0)}
 						xScale={scaleTime()}

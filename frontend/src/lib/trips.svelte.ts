@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Route, Stop } from './static';
+import { page } from '$app/state';
 
 export interface Trip<T = TripData, R = never> {
 	id: string;
@@ -57,9 +58,18 @@ export function createTrips() {
 	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
-	async function update(fetch: Fetch, at?: string) {
+	async function update(fetch: Fetch, at?: string, finished: boolean = false) {
+		// if (page.url.pathname)
 		// try {
-		const res = await fetch(`/api/v1/trips${at ? `?at=${at}` : ''}`);
+		const params = new URLSearchParams();
+		if (at) {
+			params.set('at', at);
+		}
+		if (finished) {
+			params.set('finished', 'true');
+		}
+
+		const res = await fetch(`/api/v1/trips${params.size ? '?' + params.toString() : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
 			throw new Error('Offline');
 		}
