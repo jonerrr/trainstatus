@@ -19,17 +19,13 @@
 	function open_trip(trip: Trip) {
 		pushState('', { modal: 'trip', data: trip });
 	}
-
-	// Get color for a specific trip based on its route_id
-	function getTripColor(trip: Trip): string {
-		const route = routes.find((r) => r.id === trip.route_id);
-		return route ? `#${route.color}` : '#FFFFFF'; // Default to white if route not found
-	}
 </script>
 
 <!-- Draw a path for each train trip -->
 {#each $data as group}
-	{@const tripColor = getTripColor(group.trip)}
+	<!-- {@const tripColor = getTripColor(group.trip)} -->
+	{@const tripColor = '#' + routes.find((r) => r.id === group.trip.route_id)!.color}
+
 	<!-- Invisible wider path for easier clicking -->
 	<path
 		class="path-hitarea"

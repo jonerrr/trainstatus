@@ -16,6 +16,7 @@
 	let routes = $state<Route[]>([page.data.routes['3']]);
 	let direction = $state<TripDirection>(TripDirection.North);
 	let stop_points = $state<boolean>(false);
+	let current_time_line = $state<boolean>(true);
 	let xAxisInterval = $state<number>(15);
 	let displayHours = $state<number>(3);
 
@@ -27,12 +28,12 @@
 		}
 	});
 
-	interface RouteStopData {
-		stop_id: number;
-		stop_name: string;
-		// sequence of this stop in stop times for each of the trips
-		sequences: number[];
-	}
+	// interface RouteStopData {
+	// 	stop_id: number;
+	// 	stop_name: string;
+	// 	// sequence of this stop in stop times for each of the trips
+	// 	sequences: number[];
+	// }
 
 	// TODO: add main route stops to y domain no matter what
 	// TODO: add to common stops if theres a transfer to the route
@@ -40,6 +41,7 @@
 		const route_trips = [];
 		// Track stops by route ID
 		const stopsByRoute = new Map<string, Set<{ id: number; name: string; sequence: number }>>();
+		// TODO: but
 
 		// Initialize sets for each selected route
 		for (const route of routes) {
@@ -52,7 +54,7 @@
 			if (!trip_st) continue;
 
 			// Skip trips that aren't fully complete (any departure time > current_time)
-			// if (trip_st.some((st) => st.departure.getTime() >= current_time.ms)) continue;
+			if (trip_st.some((st) => st.departure.getTime() <= current_time.ms)) continue;
 
 			const trip_points = [];
 			for (const st of trip_st) {
@@ -311,15 +313,11 @@
 	});
 
 	const xDomain = $derived.by(() => {
-		const allTimes = data.route_trips
-			.flatMap((trip) => trip.points.map((point) => +point.time))
-			.filter((time) => !isNaN(time));
+		const startTime = new Date(current_time.ms);
+		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
 
-		const minTime =
-			allTimes.length > 0 ? Math.min(...allTimes) : current_time.ms - displayHours * 60 * 60 * 1000;
-
-		// Return domain from earliest point to current time
-		return [new Date(minTime), new Date(current_time.ms)];
+		// Return domain from current time to current time + displayHours
+		return [startTime, endTime];
 	});
 </script>
 
@@ -477,12 +475,33 @@
 		</div>
 
 		<!-- Stop Points Option -->
-		<div class="flex flex-col gap-2 items-center min-w-[100px]">
+		<div class="flex flex-col justify-evenly gap-2 items-start min-w-[100px]">
+			<div class="flex justify-between w-full gap-2">
+				<label for="stop_points">Stop Points</label>
+				<input
+					id="stop_points"
+					type="checkbox"
+					bind:checked={stop_points}
+					class="cursor-pointer w-6 h-6"
+				/>
+			</div>
+			<div class="flex justify-between gap-2 w-full">
+				<label for="time_line">Time Line</label>
+				<input
+					id="time_line"
+					type="checkbox"
+					bind:checked={current_time_line}
+					class="cursor-pointer w-6 h-6"
+				/>
+			</div>
+		</div>
+
+		<!-- <div class="flex flex-col gap-2 items-center min-w-[100px]">
 			<div class="font-semibold">Stop Points</div>
 			<div class="flex justify-center pt-2">
 				<input type="checkbox" bind:checked={stop_points} class="cursor-pointer w-6 h-6" />
 			</div>
-		</div>
+		</div> -->
 
 		<!-- X-Axis Interval Slider -->
 		<div class="flex flex-col gap-2 min-w-[160px]">
@@ -504,13 +523,13 @@
 
 		<!-- Display Hours Slider -->
 		<div class="flex flex-col gap-2 min-w-[160px]">
-			<div class="font-semibold">Time Range</div>
+			<div class="font-semibold">Number of Hours</div>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
 					<input
 						type="range"
 						min="1"
-						max="5"
+						max="4"
 						step="1"
 						bind:value={displayHours}
 						class="w-full cursor-pointer"
@@ -554,7 +573,7 @@
 						flatData={flatten(data.route_trips, 'points')}
 					>
 						<Svg>
-							<AxisX interval={xAxisInterval} />
+							<AxisX {current_time_line} interval={xAxisInterval} />
 							<AxisY />
 							<Lines {routes} bind:stop_points />
 						</Svg>

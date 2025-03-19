@@ -44,6 +44,14 @@
 			}
 		}
 
+		// Add keyboard handler for Escape key
+		function handle_keydown(event: KeyboardEvent) {
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				close();
+			}
+		}
+
 		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog when swiping to go back
 		// from here https://stackoverflow.com/a/59741870
 		const delta = 6;
@@ -72,6 +80,7 @@
 		node.addEventListener('click', handle_click);
 		node.addEventListener('mousedown', handle_mouse_down);
 		node.addEventListener('mouseup', handle_mouse_up);
+		document.addEventListener('keydown', handle_keydown);
 
 		return {
 			destroy() {
@@ -79,6 +88,7 @@
 				node.removeEventListener('mousedown', handle_mouse_down);
 				node.removeEventListener('mouseup', handle_mouse_up);
 				node.removeEventListener('click', handle_click);
+				document.removeEventListener('keydown', handle_keydown);
 			}
 		};
 	}
