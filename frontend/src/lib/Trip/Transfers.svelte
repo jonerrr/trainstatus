@@ -13,14 +13,14 @@
 	const { time_format, transfer_stop_times }: TransferProps = $props();
 </script>
 
-<div class="flex flex-col px-1 bg-neutral-900 pb-1">
+<div class="flex flex-col bg-neutral-900 px-1 pb-1">
 	<div class="font-medium">Transfers:</div>
-	<div class="flex gap-2 items-center justify-evenly overflow-x-auto">
+	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
 		{#each transfer_stop_times as st (st.trip_id)}
 			{@const route = page.data.routes[st.trip.route_id]}
 			<button
 				onclick={() => pushState('', { modal: 'trip', data: st.trip })}
-				class="transition-colors duration-200 flex rounded-sm bg-neutral-800 shadow-2xl gap-1 p-1 items-center hover:bg-neutral-700 active:bg-neutral-900"
+				class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 			>
 				<Icon
 					width={18}

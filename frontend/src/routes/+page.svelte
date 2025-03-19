@@ -195,7 +195,7 @@
 {/snippet}
 
 <!--  overflow-hidden -->
-<div class="flex flex-col max-h-[calc(100dvh-10.5rem)]" bind:offsetHeight={list_height}>
+<div class="flex max-h-[calc(100dvh-10.5rem)] flex-col" bind:offsetHeight={list_height}>
 	<!-- Pinned items section - no scroll -->
 	<div class="flex-none overflow-hidden" bind:offsetHeight={pin_list_height}>
 		{#if trip_pins_rune.value.length}
@@ -260,10 +260,7 @@
 	@reference "../app.css";
 
 	.locate-button {
-		@apply relative flex items-center justify-center
-			 p-1 rounded-lg
-			 transition-all duration-200
-			 shadow-lg;
+		@apply relative flex items-center justify-center rounded-lg p-1 shadow-lg transition-all duration-200;
 	}
 
 	.locate-active {
@@ -271,10 +268,10 @@
 	}
 
 	.locate-denied {
-		@apply bg-red-600 hover:bg-red-500 active:bg-red-700 text-white;
+		@apply bg-red-600 text-white hover:bg-red-500 active:bg-red-700;
 	}
 
 	.locate-inactive {
-		@apply bg-neutral-700 hover:bg-neutral-600 active:bg-neutral-800 text-white;
+		@apply bg-neutral-700 text-white hover:bg-neutral-600 active:bg-neutral-800;
 	}
 </style>

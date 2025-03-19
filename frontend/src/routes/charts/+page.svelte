@@ -325,13 +325,13 @@
 	<title>Charts | Train Status</title>
 </svelte:head>
 
-<div class="flex flex-col h-[calc(100dvh-8rem)] min-h-[300px]">
-	<div class="text-xl font-bold pl-3">Charts</div>
+<div class="flex h-[calc(100dvh-8rem)] min-h-[300px] flex-col">
+	<div class="pl-3 text-xl font-bold">Charts</div>
 	<div
-		class="flex flex-wrap gap-6 p-4 w-fit mx-auto rounded-md bg-neutral-800/70 text-neutral-300 border border-neutral-700/50"
+		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4 text-neutral-300"
 	>
 		<!-- Routes Option -->
-		<div class="flex flex-col gap-2 min-w-[240px]">
+		<div class="flex min-w-[240px] flex-col gap-2">
 			<div class="font-semibold">Routes</div>
 			<div class="relative w-full" bind:this={comboboxRef}>
 				<button
@@ -339,16 +339,16 @@
 					onclick={toggleCombobox}
 					aria-haspopup="listbox"
 					aria-expanded={isComboboxOpen}
-					class="flex items-center justify-between w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 px-3 text-base gap-2 hover:bg-neutral-800"
+					class="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-base hover:bg-neutral-800"
 					aria-label="Add routes"
 				>
-					<div class="flex flex-wrap gap-2 items-center flex-1">
+					<div class="flex flex-1 flex-wrap items-center gap-2">
 						{#if routes.length === 0}
 							<span>Select routes</span>
 						{:else}
 							{#each routes as selectedRoute}
 								<div
-									class="flex items-center bg-neutral-800 rounded-md px-2 py-1 border-neutral-700 border"
+									class="flex items-center rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1"
 								>
 									<Icon height={20} width={20} express={false} route={selectedRoute} link={false} />
 									{#if routes.length > 1}
@@ -366,7 +366,7 @@
 													removeRoute(selectedRoute);
 												}
 											}}
-											class="text-neutral-400 hover:text-white ml-1 cursor-pointer"
+											class="ml-1 cursor-pointer text-neutral-400 hover:text-white"
 											aria-label={`Remove ${getRouteDisplayName(selectedRoute)}`}
 										>
 											<X class="size-3" />
@@ -382,11 +382,11 @@
 				<!-- Dropdown with search and options -->
 				{#if isComboboxOpen}
 					<div
-						class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md bg-neutral-900 border border-neutral-700 shadow-lg"
+						class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 shadow-lg"
 					>
-						<div class="p-2 border-b border-neutral-700">
+						<div class="border-b border-neutral-700 p-2">
 							<div class="relative">
-								<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
 									<Search class="h-4 w-4 text-neutral-400" />
 								</div>
 								<input
@@ -394,7 +394,7 @@
 									bind:this={searchInputRef}
 									bind:value={searchQuery}
 									onkeydown={handleComboboxKeydown}
-									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
+									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pr-3 pl-10 text-sm placeholder-neutral-400"
 									placeholder="Search routes..."
 									autocomplete="off"
 								/>
@@ -411,7 +411,7 @@
 										role="option"
 										tabindex="0"
 										aria-selected={isRouteSelected(routeOption.id)}
-										class="flex gap-2 items-center px-4 py-2 cursor-pointer hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
+										class="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
 											routeOption.id
 										)
 											? 'bg-neutral-700'
@@ -433,7 +433,7 @@
 											<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
 										</div> -->
 										{#if isRouteSelected(routeOption.id)}
-											<Check class="size-4 text-green-500 flex-shrink-0 mt-1" />
+											<Check class="mt-1 size-4 flex-shrink-0 text-green-500" />
 											<!-- <span class="ml-auto text-green-500">✓</span> -->
 										{/if}
 									</div>
@@ -446,7 +446,7 @@
 		</div>
 
 		<!-- Direction Option -->
-		<div class="flex flex-col gap-2 min-w-[150px]">
+		<div class="flex min-w-[150px] flex-col gap-2">
 			<div class="font-semibold">Direction</div>
 			<div class="flex flex-col gap-2">
 				<div class="flex items-center">
@@ -456,7 +456,7 @@
 						id="northbound"
 						name="direction"
 						value={TripDirection.North}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+						class="mr-2 cursor-pointer transition-transform hover:scale-110"
 					/>
 					<label for="northbound" class="cursor-pointer">Northbound</label>
 				</div>
@@ -467,7 +467,7 @@
 						id="southbound"
 						name="direction"
 						value={TripDirection.South}
-						class="mr-2 cursor-pointer hover:scale-110 transition-transform"
+						class="mr-2 cursor-pointer transition-transform hover:scale-110"
 					/>
 					<label for="southbound" class="cursor-pointer">Southbound</label>
 				</div>
@@ -475,23 +475,23 @@
 		</div>
 
 		<!-- Stop Points Option -->
-		<div class="flex flex-col justify-evenly gap-2 items-start min-w-[100px]">
-			<div class="flex justify-between w-full gap-2">
+		<div class="flex min-w-[100px] flex-col items-start justify-evenly gap-2">
+			<div class="flex w-full justify-between gap-2">
 				<label for="stop_points">Stop Points</label>
 				<input
 					id="stop_points"
 					type="checkbox"
 					bind:checked={stop_points}
-					class="cursor-pointer w-6 h-6"
+					class="h-6 w-6 cursor-pointer"
 				/>
 			</div>
-			<div class="flex justify-between gap-2 w-full">
+			<div class="flex w-full justify-between gap-2">
 				<label for="time_line">Time Line</label>
 				<input
 					id="time_line"
 					type="checkbox"
 					bind:checked={current_time_line}
-					class="cursor-pointer w-6 h-6"
+					class="h-6 w-6 cursor-pointer"
 				/>
 			</div>
 		</div>
@@ -504,7 +504,7 @@
 		</div> -->
 
 		<!-- X-Axis Interval Slider -->
-		<div class="flex flex-col gap-2 min-w-[160px]">
+		<div class="flex min-w-[160px] flex-col gap-2">
 			<div class="font-semibold">Time Interval</div>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
@@ -522,7 +522,7 @@
 		</div>
 
 		<!-- Display Hours Slider -->
-		<div class="flex flex-col gap-2 min-w-[160px]">
+		<div class="flex min-w-[160px] flex-col gap-2">
 			<div class="font-semibold">Number of Hours</div>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
@@ -540,10 +540,10 @@
 		</div>
 
 		<!-- Export Button -->
-		<div class="flex flex-col justify-center min-w-[120px]">
+		<div class="flex min-w-[120px] flex-col justify-center">
 			<button
 				onclick={export_as_svg}
-				class="flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 transition-colors py-2 px-4 rounded h-fit"
+				class="flex h-fit items-center justify-center gap-2 rounded bg-neutral-900 px-4 py-2 transition-colors hover:bg-neutral-800"
 				aria-label="Export chart as SVG"
 			>
 				<Download class="size-5" />
@@ -553,12 +553,12 @@
 	</div>
 
 	<!-- Chart container with proper overflow handling -->
-	<div class="flex-1 relative overflow-hidden">
+	<div class="relative flex-1 overflow-hidden">
 		{#if data.route_trips.length && data.yDomain.length}
 			<!-- Scrollable container with both scroll directions -->
 			<div class="absolute inset-0 overflow-auto">
 				<!-- Chart with minimum dimensions but able to shrink -->
-				<div bind:this={svgContainer} class="min-w-[1300px] min-h-[500px] h-full w-full">
+				<div bind:this={svgContainer} class="h-full min-h-[500px] w-full min-w-[1300px]">
 					<LayerCake
 						debug={false}
 						ssr
@@ -581,7 +581,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex items-center justify-center h-full text-neutral-400">No data available</div>
+			<div class="flex h-full items-center justify-center text-neutral-400">No data available</div>
 		{/if}
 	</div>
 </div>

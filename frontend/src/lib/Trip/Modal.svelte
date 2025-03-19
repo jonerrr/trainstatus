@@ -124,8 +124,8 @@
 	const open_transfers = $state<OpenTransfers>({});
 </script>
 
-<div class="flex gap-1 items-center p-1">
-	<div class="flex flex-col gap-1 items-start">
+<div class="flex items-center gap-1 p-1">
+	<div class="flex flex-col items-start gap-1">
 		{#if is_bus_route(route, trip)}
 			{#if trip.data.passengers && trip.data.capacity}
 				<BusCapacity passengers={trip.data.passengers} capacity={trip.data.capacity} />
@@ -150,7 +150,7 @@
 	</div>
 
 	{#if is_bus_route(route, trip) && trip.data.deviation && Math.abs(trip.data.deviation) > 120}
-		<div class="text-sm ml-auto {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
+		<div class="ml-auto text-sm {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
 			{trip.data.deviation > 0 ? '+' : ''}{(trip.data.deviation / 60).toFixed(0)}m
 		</div>
 	{/if}
@@ -196,9 +196,9 @@
 						}
 					}}
 					aria-label="Show transfers at stop"
-					class="bg-neutral-800 z-20 absolute left-0 top-[50%] -translate-y-1/2 h-[95%] rounded-sm"
+					class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
 				>
-					<div class="flex items-center mx-1">
+					<div class="mx-1 flex items-center">
 						<!-- Transfers -->
 						{#if !open_transfers[st.stop_id]}
 							<ChevronDown />
@@ -211,16 +211,16 @@
 
 			<Button state={{ modal: 'stop', data: stop }}>
 				<div
-					class="flex flex-col w-full"
+					class="flex w-full flex-col"
 					class:text-neutral-400={st.arrival.getTime() < current_time.ms}
 				>
 					<div class="flex items-center justify-between">
-						<div class="text-left pl-10">
+						<div class="pl-10 text-left">
 							{stop.name}
 						</div>
 
 						<!-- TODO: maybe italicize if trip isn't assigned -->
-						<div class="flex gap-1 items-center text-right">
+						<div class="flex items-center gap-1 text-right">
 							<div class="text-left">
 								{#if time_format === 'time'}
 									{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}

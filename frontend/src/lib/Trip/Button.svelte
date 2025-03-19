@@ -77,8 +77,8 @@
 	});
 </script>
 
-<div class="flex flex-col gap-1 items-center text-left">
-	<div class="flex gap-1 items-center self-start max-w-[95%]">
+<div class="flex flex-col items-center gap-1 text-left">
+	<div class="flex max-w-[95%] items-center gap-1 self-start">
 		<Icon
 			width={36}
 			height={36}
@@ -92,7 +92,7 @@
 		{last_stop}
 	</div>
 
-	<div class="flex self-start gap-1">
+	<div class="flex gap-1 self-start">
 		<span>{current_status}</span>
 		{current_stop}
 	</div>
