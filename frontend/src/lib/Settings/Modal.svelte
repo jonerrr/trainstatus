@@ -8,7 +8,8 @@
 		CircleX,
 		Settings,
 		Map,
-		ExternalLink
+		ExternalLink,
+		ChartLine
 	} from 'lucide-svelte';
 	import { current_time } from '$lib/util.svelte';
 
@@ -85,9 +86,21 @@
 		<h3 class="mb-3 text-lg font-medium">Resources</h3>
 		<div class="flex flex-col gap-4">
 			<a
+				href="/charts"
+				class="active:scale-98 flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 active:bg-neutral-800"
+			>
+				<div>
+					<div class="flex items-center gap-1">
+						<ChartLine class="size-5" />
+						<span>Charts</span>
+					</div>
+					<div class="text-xs text-neutral-400">Subway and Bus string lines</div>
+				</div>
+			</a>
+			<a
 				href="/api/docs"
 				target="_blank"
-				class="flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-blue-400 focus:ring-2 focus:ring-blue-500/30 focus:outline-none active:scale-98 active:bg-neutral-800"
+				class="active:scale-98 flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 active:bg-neutral-800"
 			>
 				<div>
 					<div class="flex items-center gap-1">
@@ -101,7 +114,7 @@
 			<a
 				href="https://map.trainstat.us"
 				target="_blank"
-				class="flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-rose-400 focus:ring-2 focus:ring-rose-500/30 focus:outline-none active:scale-98 active:bg-neutral-800"
+				class="active:scale-98 flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 active:bg-neutral-800"
 			>
 				<div>
 					<div class="flex items-center gap-1">
@@ -115,7 +128,7 @@
 			<a
 				href="https://github.com/jonerrr/trainstatus"
 				target="_blank"
-				class="flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-green-400 focus:ring-2 focus:ring-green-500/30 focus:outline-none active:scale-98 active:bg-neutral-800"
+				class="active:scale-98 flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 active:bg-neutral-800"
 			>
 				<div>
 					<div class="flex items-center gap-1">
