@@ -142,6 +142,30 @@
 		svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 		svgClone.setAttribute('version', '1.1');
 
+		// Get SVG dimensions
+		const width = svgClone.getAttribute('width');
+		const height = svgClone.getAttribute('height');
+
+		const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		background.setAttribute('width', width || '100%');
+		background.setAttribute('height', height || '100%');
+		background.setAttribute('fill', '#171717');
+
+		// Insert background as first child so it's behind everything else
+		svgClone.insertBefore(background, svgClone.firstChild);
+
+		// Add watermark
+		const watermark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+		watermark.textContent = 'TrainStat.us';
+		watermark.setAttribute('x', '6');
+		watermark.setAttribute('y', '10');
+		watermark.setAttribute('font-size', '10');
+		watermark.setAttribute('fill', '#666666');
+		watermark.setAttribute('opacity', '0.6');
+
+		// Add watermark to the SVG
+		svgClone.appendChild(watermark);
+
 		// Generate a clean SVG string
 		const svgData = new XMLSerializer().serializeToString(svgClone);
 
@@ -394,7 +418,7 @@
 									bind:this={searchInputRef}
 									bind:value={searchQuery}
 									onkeydown={handleComboboxKeydown}
-									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pr-3 pl-10 text-sm placeholder-neutral-400"
+									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
 									placeholder="Search routes..."
 									autocomplete="off"
 								/>
