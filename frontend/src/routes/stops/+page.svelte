@@ -98,7 +98,7 @@
 </svelte:head>
 <!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
 <!-- TODO: maybe show indicator when filtered for specific route / stop -->
-<div class="flex flex-col h-full">
+<div class="flex h-full flex-col">
 	<List
 		title="Stops"
 		type="stop"
@@ -114,7 +114,7 @@
 	<div class="w-full">
 		<div class="relative">
 			<Search
-				class="z-20 absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 group-focus-within:text-neutral-200 transition-colors duration-200"
+				class="absolute top-1/2 left-3 z-20 h-5 w-5 -translate-y-1/2 text-neutral-400 transition-colors duration-200 group-focus-within:text-neutral-200"
 			/>
 
 			<input
@@ -122,29 +122,29 @@
 				bind:value={search_input}
 				type="search"
 				placeholder="Search stops"
-				class="w-full h-12 pl-10 pr-10
-			   text-neutral-200
+				class="h-12 w-full rounded border
+			   border-neutral-800/50
 			   bg-neutral-900
-			   backdrop-blur-xs
-			   rounded
-			   border border-neutral-800/50
-			   shadow-lg shadow-black/10
-			   ring-1 ring-inset ring-neutral-600/30
+			   pr-10
+			   pl-10
+			   text-neutral-200 shadow-lg
+			   ring-1 shadow-black/10
+			   ring-neutral-600/30 backdrop-blur-xs ring-inset
 			   placeholder:text-neutral-500
-			   focus:ring-2
-			   focus:ring-neutral-500/50
 			   focus:border-neutral-500/50
-			   focus:bg-neutral-900"
+			   focus:bg-neutral-900
+			   focus:ring-2
+			   focus:ring-neutral-500/50"
 			/>
 
 			<button
 				aria-label="Clear search"
-				class="absolute right-3 top-1/2 -translate-y-1/2
-			   w-6 h-6
+				class="absolute top-1/2 right-3 h-6
+			   w-6 -translate-y-1/2
 			   text-neutral-400
-			   hover:text-neutral-200
-			   active:scale-95
-			   transition-all duration-200"
+			   transition-all
+			   duration-200
+			   hover:text-neutral-200 active:scale-95"
 				onclick={clear_search}
 			>
 				<CircleX />

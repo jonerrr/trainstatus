@@ -81,10 +81,10 @@
 	});
 </script>
 
-<header class="flex gap-1 p-1 items-center">
+<header class="flex items-center gap-1 p-1">
 	<Icon width={36} height={36} express={false} link={false} {route} />
 
-	<div class="text-xl font-semibold flex items-center gap-1">
+	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if alerts.length && idx < alerts.length}
 			{alerts[idx].alert_type}
 		{:else}
@@ -106,15 +106,15 @@
 />
 
 <div
-	class="snap-mandatory snap-x gap-2 overflow-x-scroll flex scrollbar-hidden bg-neutral-950"
+	class="scrollbar-hidden flex snap-x snap-mandatory gap-2 overflow-x-scroll bg-neutral-950"
 	bind:this={scroll_area}
 	use:manage_scroll
 >
 	{#each alerts as alert}
 		<article
-			class="alert snap-start snap-always flex flex-col gap-1 items-center justify-between shrink-0 w-full max-h-[65dvh]"
+			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
-			<div class="px-1 max-h-[65dvh] overflow-auto bg-neutral-950">
+			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-1">
 				{@html alert.header_html}
 
 				{#if alert.description_html}
@@ -133,7 +133,7 @@
 				{/if}
 			{/snippet}
 
-			<div class="text-sm text-neutral-400 px-1 w-full flex justify-between">
+			<div class="flex w-full justify-between px-1 text-sm text-neutral-400">
 				<div class="text-left">
 					Updated:
 					{@render alert_time(alert.updated_at)}
@@ -149,7 +149,7 @@
 	{/each}
 
 	{#if alerts.length > 1}
-		<div class="absolute bottom-0 -translate-y-16 w-full flex gap-2 justify-center items-center">
+		<div class="absolute bottom-0 flex w-full -translate-y-16 items-center justify-center gap-2">
 			<!-- <div class="flex  w-fit"> -->
 
 			<button
@@ -162,7 +162,7 @@
 			</button>
 			{#each alerts as _alert, i}
 				<button
-					class="rounded-full bg-neutral-300 size-3 {i !== idx && 'bg-neutral-500'}"
+					class="size-3 rounded-full bg-neutral-300 {i !== idx && 'bg-neutral-500'}"
 					aria-label="Scroll to alert"
 					onclick={() => scroll_to_alert(i)}
 				>

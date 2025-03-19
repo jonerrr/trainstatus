@@ -99,20 +99,20 @@
 {#snippet eta(n: number)}
 	{@const eta = parseInt(n.toFixed(0))}
 	{#key eta}
-		<span class="font-medium text-sm px-1.5 py-0.5 bg-neutral-800/70 rounded-sm">
+		<span class="rounded-sm bg-neutral-800/70 px-1.5 py-0.5 text-sm font-medium">
 			{eta}m
 		</span>
 	{/key}
 {/snippet}
 
 {#if is_train(data)}
-	<div class="grid gap-1 w-full grid-cols-1">
-		<div class="flex gap-1 items-center">
+	<div class="grid w-full grid-cols-1 gap-1">
+		<div class="flex items-center gap-1">
 			{#each current_stop_routes as route (route.id)}
 				<Icon height={24} width={24} express={false} link={false} {route} />
 			{/each}
 
-			<div class="font-medium my-auto text-left text-lg">
+			<div class="my-auto text-left text-lg font-medium">
 				{data.name}
 			</div>
 		</div>
@@ -123,17 +123,17 @@
 	</div>
 
 	{#snippet arrivals(headsign: string, routes: Route[], stop_times: StopTimeByRoute)}
-		<div class="flex flex-col mt-auto">
-			<div class="font-semibold table-cell text-left max-w-[85%]">
+		<div class="mt-auto flex flex-col">
+			<div class="table-cell max-w-[85%] text-left font-semibold">
 				{headsign}
 			</div>
 			<div class="flex flex-col gap-1">
 				{#each routes as route (route.id)}
 					{@const route_stop_times = stop_times.get(route.id) ?? []}
 					<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
-					<div class="flex gap-1 items-center">
+					<div class="flex items-center gap-1">
 						<Icon height={20} width={20} express={false} link={false} {route} />
-						<div class="flex gap-1 items-center">
+						<div class="flex items-center gap-1">
 							{#if route_stop_times.length}
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 									{@render eta(stop_time.eta)}
@@ -154,7 +154,7 @@
 			<div>
 				<BusArrow direction={data.data.direction} />
 			</div>
-			<div class="font-medium text-lg text-left">
+			<div class="text-left text-lg font-medium">
 				{data.name}
 			</div>
 		</div>
@@ -165,7 +165,7 @@
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
 				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
 
-				<div class="flex gap-2 items-center text-wrap text-left rounded-sm p-1">
+				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} express={false} />
 					<div class="flex flex-col">
 						<div>
@@ -174,8 +174,8 @@
 						<div class="flex gap-2 pr-1">
 							{#if rt_stop_times.updating_routes.has(route.id)}
 								<div class="flex items-center gap-1 py-1">
-									<div class="animate-pulse bg-neutral-700 h-[1em] w-6"></div>
-									<div class="animate-pulse bg-neutral-700 h-[1em] w-6"></div>
+									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
+									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
 								</div>
 							{:else if route_stop_times.length}
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
@@ -194,7 +194,7 @@
 		</div>
 	</div>
 
-	<div class="text-neutral-300 self-start">
+	<div class="self-start text-neutral-300">
 		#{data.id}
 	</div>
 {/if}

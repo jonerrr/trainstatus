@@ -24,14 +24,14 @@
 </script>
 
 <!-- <Button state={{ modal: 'route', data }} {pin_rune}> -->
-<section class="flex gap-1 items-center">
+<section class="flex items-center gap-1">
 	<Icon height={36} width={36} express={false} link={true} route={data} />
 	{#if alerts.length}
 		<div class="font-semibold">
 			{alerts[0].alert_type}
 		</div>
 		{#if alerts.length > 1}
-			<div class="bg-neutral-700 text-neutral-50 rounded-sm p-1">
+			<div class="rounded-sm bg-neutral-700 p-1 text-neutral-50">
 				+{alerts.length - 1}
 			</div>
 		{/if}

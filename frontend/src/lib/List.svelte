@@ -252,11 +252,11 @@
 
 <!-- TODO: back to top button in header -->
 
-<div class="flex flex-col text-neutral-200 relative w-full z-30">
+<div class="relative z-30 flex w-full flex-col text-neutral-200">
 	<div
-		class="flex sticky top-0 bg-neutral-900/95 backdrop-blur-xs shadow-lg shadow-black/10 items-center justify-between w-full z-30"
+		class="sticky top-0 z-30 flex w-full items-center justify-between bg-neutral-900/95 shadow-lg shadow-black/10 backdrop-blur-xs"
 	>
-		<h1 class="flex gap-2 items-center font-bold text-xl pl-2">
+		<h1 class="flex items-center gap-2 pl-2 text-xl font-bold">
 			<span>
 				{title}
 			</span>
@@ -266,26 +266,26 @@
 			{/if}
 		</h1>
 
-		<div class="bg-neutral-800/50 rounded-full p-1 border border-neutral-700/50 shadow-inner">
+		<div class="rounded-full border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
 			{#snippet tab_button(value: 'train' | 'bus', data: unknown[])}
 				{#if data.length}
 					{@const Icon = tab_icons[value]}
 					<div transition:slide={{ axis: 'x', duration: 250 }}>
 						<button
-							class="relative px-4 py-1 rounded-full transition-all duration-200 flex items-center gap-2 {selected_tab.value ===
-								value && 'text-neutral-100 font-medium'} {selected_tab.value !== value &&
+							class="relative flex items-center gap-2 rounded-full px-4 py-1 transition-all duration-200 {selected_tab.value ===
+								value && 'font-medium text-neutral-100'} {selected_tab.value !== value &&
 								'text-neutral-400'}"
 							onclick={() => (selected_tab.value = value)}
 							aria-label={`Show ${value} stops`}
 						>
-							<Icon class="w-4 h-4" />
+							<Icon class="h-4 w-4" />
 							<span class="capitalize">{value}</span>
 
 							{#if selected_tab.value === value}
 								<div
 									in:send={{ key: 'tab' }}
 									out:receive={{ key: 'tab' }}
-									class="absolute inset-0 bg-neutral-700/50 rounded-full -z-10"
+									class="absolute inset-0 -z-10 rounded-full bg-neutral-700/50"
 								></div>
 							{/if}
 						</button>
@@ -316,10 +316,10 @@
 				{#each visible_items as { data, id } (id)}
 					<div
 						bind:offsetHeight={item_heights[data.id]}
-						class="relative w-full list-item will-change-transform bg-neutral-950 border border-neutral-800/50 rounded-sm"
+						class="relative list-item w-full rounded-sm border border-neutral-800/50 bg-neutral-950 will-change-transform"
 					>
 						<button
-							class="w-full flex justify-between items-center p-2 hover:bg-neutral-800/50 active:bg-neutral-700/50 transition-colors duration-200"
+							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
 							onclick={() => {
 								pushState('', { modal: type, data: $state.snapshot(data) });
 							}}
@@ -331,7 +331,7 @@
 							<Pin
 								bind:pin_rune
 								id={data.id}
-								class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-200 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
+								class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-md px-2 py-1 text-neutral-200 hover:text-neutral-400"
 							/>
 						{/if}
 

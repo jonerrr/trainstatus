@@ -10,23 +10,23 @@
 	let { offline }: Props = $props();
 </script>
 
-<header class="p-2 text-sm flex text-white justify-between relative bg-neutral-900 overflow-x-auto">
-	<div class="flex gap-1 items-center">
-		<div class="gradient-text text-nowrap text-3xl md:text-4xl font-semibold tracking-tight">
+<header class="relative flex justify-between overflow-x-auto bg-neutral-900 p-2 text-sm text-white">
+	<div class="flex items-center gap-1">
+		<div class="gradient-text text-3xl font-semibold tracking-tight text-nowrap md:text-4xl">
 			Train Status
 		</div>
 		{#if offline}
-			<div transition:fade class="text-red-500 flex flex-col items-center">
+			<div transition:fade class="flex flex-col items-center text-red-500">
 				<CloudOff class="size-6" />
 				<div class="self-end">Offline</div>
 			</div>
 		{/if}
 	</div>
-	<div class="justify-center items-center gap-2 flex">
+	<div class="flex items-center justify-center gap-2">
 		<button
 			aria-label="Open settings"
 			title="Settings"
-			class="flex items-center justify-center p-2 rounded-md bg-neutral-800/70 hover:bg-neutral-700 active:bg-neutral-600 text-neutral-300 hover:text-blue-400 border border-neutral-700/50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+			class="flex items-center justify-center rounded-md border border-neutral-700/50 bg-neutral-800/70 p-2 text-neutral-300 transition-all duration-200 hover:bg-neutral-700 hover:text-blue-400 focus:ring-2 focus:ring-blue-500/30 focus:outline-none active:bg-neutral-600"
 			onclick={() => {
 				pushState('', { modal: 'settings' });
 			}}

@@ -30,7 +30,7 @@
 {/snippet}
 
 <nav
-	class="fixed bottom-0 h-16 w-full bg-neutral-900/95 z-30 grid grid-cols-3 items-center text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg"
+	class="fixed bottom-0 z-30 grid h-16 w-full grid-cols-3 items-center bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg"
 >
 	{@render nav_button('Home')}
 	{@render nav_button('Alerts')}
@@ -41,19 +41,16 @@
 	@reference "../app.css";
 
 	.nav-button {
-		@apply flex flex-col items-center justify-center gap-1
-			 p-2  transition-all duration-200
-			 hover:bg-neutral-800/50 active:bg-neutral-700/50;
+		@apply flex flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
 	}
 
 	.nav-button-active {
-		@apply bg-neutral-800 text-neutral-100 font-medium;
+		@apply bg-neutral-800 font-medium text-neutral-100;
 	}
 
 	/* Gradient separator at top of nav */
 	nav::before {
 		content: '';
-		@apply absolute top-0 left-0 right-0 h-[1px]
-			 bg-linear-to-r from-transparent via-neutral-700 to-transparent;
+		@apply absolute top-0 right-0 left-0 h-[1px] bg-linear-to-r from-transparent via-neutral-700 to-transparent;
 	}
 </style>

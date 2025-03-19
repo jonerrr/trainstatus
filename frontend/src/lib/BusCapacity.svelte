@@ -7,7 +7,7 @@
 </script>
 
 <div
-	class={`flex self-start items-center gap-1 text-neutral-200 ${p_full > 30 ? 'text-yellow-400' : ''} ${p_full > 80 ? 'text-red-400' : ''}`}
+	class={`flex items-center gap-1 self-start text-neutral-200 ${p_full > 30 ? 'text-yellow-400' : ''} ${p_full > 80 ? 'text-red-400' : ''}`}
 >
 	<Users size="16" />
 	{passengers}

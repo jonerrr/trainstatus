@@ -164,7 +164,7 @@
 	title: string,
 	pin_rune: PersistedRune<(string | number)[]>
 )}
-	<div class="flex gap-1 items-center justify-between px-1 h-16">
+	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
 				close();
@@ -175,7 +175,7 @@
 			<CircleX size="2rem" />
 		</button>
 
-		<div class="flex gap-1 items-center text-xs">
+		<div class="flex items-center gap-1 text-xs">
 			{#if history}
 				<button
 					class:text-neutral-400={!show_previous}
@@ -258,7 +258,7 @@
 					<Share size="2rem" />
 				</button>
 			{:else}
-				<button class="appearance-none flex text-green-600" aria-label="Link copied to clipboard">
+				<button class="flex appearance-none text-green-600" aria-label="Link copied to clipboard">
 					<ClipboardCheck size="2rem" />
 				</button>
 			{/if}
@@ -271,7 +271,7 @@
 <dialog
 	bind:this={dialog_el}
 	use:manage_modal
-	class="m-auto text-white bg-neutral-900 w-full max-w-[800px] max-h-[95dvh] rounded-t-sm flex flex-col backdrop:bg-black/50 mb-0 focus:outline-hidden focus:ring-2 focus:ring-neutral-700"
+	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-[800px] flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal === 'stop'}
 		<StopModal {show_previous} time_format={time_format.value} stop={page.state.data} />

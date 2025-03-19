@@ -24,9 +24,9 @@
 <!-- 	transition:slide={{ easing: quintOut, axis: 'y', duration: 100 }}
  -->
 <!-- currently only used in modals, not main list -->
-<div class="relative w-full list-item">
+<div class="relative list-item w-full">
 	<button
-		class="transition-colors duration-200 hover:bg-neutral-900 active:bg-neutral-900 w-full flex justify-between items-center p-1 text-white border-b border-neutral-800 last:border-b-0"
+		class="flex w-full items-center justify-between border-b border-neutral-800 p-1 text-white transition-colors duration-200 last:border-b-0 hover:bg-neutral-900 active:bg-neutral-900"
 		onclick={() => {
 			pushState('', $state.snapshot(pState));
 		}}
@@ -38,7 +38,7 @@
 		<Pin
 			bind:pin_rune
 			id={pState.data.id}
-			class="absolute z-20 right-0 py-1 px-2 rounded-md text-neutral-200 hover:text-neutral-400 top-[50%] transform -translate-y-1/2"
+			class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-md px-2 py-1 text-neutral-200 hover:text-neutral-400"
 		/>
 	{/if}
 </div>
