@@ -68,7 +68,7 @@
 			offline = false;
 		});
 
-		const finished = $derived(page.url.pathname.startsWith('/charts'));
+		// const finished = $derived(page.url.pathname.startsWith('/charts'));
 
 		// $inspect(last_monitored_routes);
 
@@ -84,11 +84,11 @@
 				// should update if current time is not set or if it's more than 4 hours old
 				const should_update = !current_time.value || current_time.ms >= now - 14400000;
 				// update alerts and trips every 15 seconds or when current time changes
-				if (should_update && (now - last_update.getTime() > 1000 * 15 || current_time_changed)) {
+				if (current_time_changed || (should_update && now - last_update.getTime() > 1000 * 15)) {
 					// console.log('Updating rt data');
 
 					await Promise.all([
-						trips.update(fetch, current_time.value?.toString(), finished),
+						trips.update(fetch, current_time.value?.toString()),
 						alerts.update(fetch, current_time.value?.toString())
 					]);
 
@@ -109,7 +109,7 @@
 				const routes_changed =
 					monitored_bus_routes.size !== last_monitored_routes.size ||
 					!monitored_bus_routes.isSubsetOf(last_monitored_routes);
-				const should_update_st = now - last_st_update.getTime() > 1000 * 15 || current_time_changed;
+				const should_update_st = now - last_st_update.getTime() > 1000 * 15;
 				if (routes_changed && !should_update_st) {
 					// console.log('Updating st bc routes changed');
 
@@ -136,22 +136,20 @@
 						fetch,
 						[...monitored_bus_routes],
 						true,
-						current_time.value?.toString(),
-						finished
+						current_time.value?.toString()
 					);
 					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
 					offline = false;
 				}
 				// update stop times every 15 seconds
-				if (should_update && should_update_st) {
+				if (current_time_changed || (should_update && should_update_st)) {
 					// console.log('Updating st');
 
 					await stop_times.update(
 						fetch,
 						[...monitored_bus_routes],
 						false,
-						current_time.value?.toString(),
-						finished
+						current_time.value?.toString()
 					);
 					last_st_update = new Date();
 					last_monitored_routes = new SvelteSet([...monitored_bus_routes]);

@@ -59,17 +59,17 @@ export function createTrips() {
 	let trips = $state(new SvelteMap<string, Trip<TripData>>());
 
 	// this returns true if there was an error (aka offline)
-	async function update(fetch: Fetch, at?: string, finished: boolean = false) {
+	async function update(fetch: Fetch, at?: string) {
 		// if (page.url.pathname)
 		// try {
 		const params = new URLSearchParams();
 		if (at) {
 			params.set('at', at);
 		}
-		if (finished) {
-			params.set('finished', 'true');
-			// params.set('at', Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000).toString());
-		}
+		// if (finished) {
+		// 	params.set('finished', 'true');
+		// 	// params.set('at', Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000).toString());
+		// }
 
 		const res = await fetch(`/api/v1/trips${params.size ? '?' + params.toString() : ''}`);
 		if (res.headers.has('x-sw-fallback')) {

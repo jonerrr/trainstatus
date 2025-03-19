@@ -44,8 +44,8 @@ export function createStopTimes() {
 		fetch: Fetch,
 		routes: string[],
 		only_bus: boolean = false,
-		at?: string,
-		finished: boolean = false
+		at?: string
+		// finished: boolean = false
 	) {
 		if (only_bus) {
 			updating_bus_routes = new SvelteSet(routes);
@@ -64,9 +64,9 @@ export function createStopTimes() {
 		}
 
 		// if on charts, fetch finished stop times
-		if (finished) {
-			params.set('finished', 'true');
-		}
+		// if (finished) {
+		// 	params.set('finished', 'true');
+		// }
 
 		const res = await fetch(`/api/v1/stop_times${params.size ? '?' + params.toString() : ''}`);
 		if (res.headers.has('x-sw-fallback')) {
