@@ -9,7 +9,7 @@
 	const formatDate = (time: Date) => dayjs(time).format('YYYY-MM-DD');
 	const formatTime = (time: Date) => dayjs(time).format('h:mm A');
 
-	const { interval = 15, current_time_line = $bindable(true) } = $props();
+	const { interval = 15, current_time_line = true } = $props();
 
 	// not sure if this could be undefined
 	const ticks = $derived(
@@ -19,14 +19,14 @@
 
 {#if current_time_line}
 	<g transform="translate({$xScale(new Date())}, 0)">
-		<text y={-5} text-anchor="middle" fill="#e5e5e5" font-size="12px">{formatTime(new Date())}</text
+		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px">{formatTime(new Date())}</text
 		>
 		<line y1={0} y2={$height} stroke="#e5e5e5" />
 	</g>
 {/if}
 
 <g transform="translate(0, {$height})">
-	<text x={-60} y={20} text-anchor="middle" fill="#e5e5e5" font-size="12px">
+	<text x={-65} y={20} text-anchor="middle" fill="#e5e5e5" font-size="12px">
 		{formatDate(new Date(current_time.ms))} -
 	</text>
 </g>

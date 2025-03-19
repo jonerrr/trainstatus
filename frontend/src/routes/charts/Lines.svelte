@@ -23,7 +23,6 @@
 
 <!-- Draw a path for each train trip -->
 {#each $data as group}
-	<!-- {@const tripColor = getTripColor(group.trip)} -->
 	{@const tripColor = '#' + routes.find((r) => r.id === group.trip.route_id)!.color}
 
 	<!-- Invisible wider path for easier clicking -->
