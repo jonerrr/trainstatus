@@ -86,7 +86,7 @@
 		<h3 class="mb-3 text-lg font-medium">Resources</h3>
 		<div class="flex flex-col gap-4">
 			<a
-				href="/charts"
+				href="/charts{current_time.value ? `?at=${current_time.value}` : ''}"
 				class="active:scale-98 flex items-center gap-2 rounded-md p-2 transition-all duration-200 hover:bg-neutral-800/50 hover:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 active:bg-neutral-800"
 			>
 				<div>
