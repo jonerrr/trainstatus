@@ -100,6 +100,8 @@ pub async fn routes_handler(
     }
 }
 
+// TODO: reuse existing stop struct
+/// Stop route data, depends on the route type
 #[derive(ToSchema, Deserialize)]
 #[serde(untagged)]
 pub enum ApiStopRoute {
