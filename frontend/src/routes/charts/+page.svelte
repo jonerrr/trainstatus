@@ -347,7 +347,7 @@
 	// 	const width = svgContainer?.clientWidth || 0;
 	// 	return [0, width];
 	// });
-	$inspect(xDomain);
+	// $inspect(xDomain);
 </script>
 
 <svelte:head>
