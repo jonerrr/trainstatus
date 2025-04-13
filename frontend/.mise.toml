@@ -1,0 +1,5 @@
+[tools]
+node = "23"
+pnpm = "latest"
+[env]
+# VITE_ALLOWED_HOSTS = ""
