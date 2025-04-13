@@ -10,6 +10,8 @@ pub struct StopTime {
     pub stop_id: i32,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
+    pub scheduled_track: Option<String>,
+    pub actual_track: Option<String>,
 }
 
 // #[derive(PartialEq, Serialize, Hash, Eq, FromRow)]
@@ -122,7 +124,9 @@ impl StopTime {
                 st.trip_id,
                 st.stop_id,
                 st.arrival,
-                st.departure
+                st.departure,
+                st.scheduled_track,
+                st.actual_track
             FROM
                 stop_time st
             WHERE
@@ -147,10 +151,11 @@ impl StopTime {
             ORDER BY
                 st.arrival;
             "#,
-            at,             // $1: Timestamp
-            bus_routes,     // $2: Array of bus_route_ids (can be empty)
-            only_bus,       // $3: only_bus flag
+            at,         // $1: Timestamp
+            bus_routes, // $2: Array of bus_route_ids (can be empty)
+            only_bus,   // $3: only_bus flag
             filter_arrival  // $4: make sure arrival is > current time
+                        // TODO: choose if you want to return tracks
         )
         .fetch_all(pool)
         .await
@@ -161,17 +166,27 @@ impl StopTime {
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
         let arrivals = values.iter().map(|v| v.arrival).collect::<Vec<_>>();
         let departures = values.iter().map(|v| v.departure).collect::<Vec<_>>();
+        let scheduled_tracks = values
+            .iter()
+            .map(|v| v.scheduled_track.clone())
+            .collect::<Vec<_>>();
+        let actual_tracks = values
+            .into_iter()
+            .map(|v| v.actual_track)
+            .collect::<Vec<_>>();
 
         sqlx::query!(
             r#"
-            INSERT INTO stop_time (trip_id, stop_id, arrival, departure)
-            SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[])
-            ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure
+            INSERT INTO stop_time (trip_id, stop_id, arrival, departure, scheduled_track, actual_track)
+            SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::text[], $6::text[])
+            ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, scheduled_track = EXCLUDED.scheduled_track, actual_track = EXCLUDED.actual_track
             "#,
             &trip_ids,
             &stop_ids,
             &arrivals,
-            &departures
+            &departures,
+            scheduled_tracks as _,
+            actual_tracks as _,
         ).execute(pool).await?;
 
         Ok(())

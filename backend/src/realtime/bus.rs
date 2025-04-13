@@ -196,6 +196,9 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
             stop_id,
             arrival: arrival.unwrap(),
             departure: departure.unwrap(),
+            // TODO: make enum for stoptime and dont have scheduled_track and actual_track for bus
+            scheduled_track: None,
+            actual_track: None,
         })
     }
 }
