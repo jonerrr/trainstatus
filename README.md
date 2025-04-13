@@ -29,8 +29,8 @@ A realtime bus map is available at <a href="https://map.trainstat.us" target="_b
 ### Requirements
 
 - Podman/Docker
-- <a href="https://mise.jdx.dev/" target="_blank">Mise</a>
-- <a href="https://developer.nyct.com/" target="_blank">BusTime API Key</a>
+- [Mise](https://mise.jdx.dev/)
+- [BusTime API Key](https://register.developer.obanyc.com/)
 
 ### Setup
 
