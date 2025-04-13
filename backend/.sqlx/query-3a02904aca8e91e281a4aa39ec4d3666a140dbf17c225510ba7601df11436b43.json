@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                st.trip_id,\n                st.stop_id,\n                st.arrival,\n                st.departure,\n                NULL AS scheduled_track,\n                NULL AS actual_track\n            FROM\n                stop_time st\n            WHERE\n                st.trip_id IN (\n                    SELECT\n                        t.id\n                    FROM\n                        trip t\n                    WHERE\n                        t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'\n                        AND ($1)::timestamp with time zone + INTERVAL '4 hours'\n                        AND (\n                            ($3 = TRUE AND t.route_id = ANY($2))\n                            OR\n                            ($3 = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY($2)))\n                        )\n                )\n                AND (\n                    $4 = FALSE OR\n                    (st.arrival BETWEEN $1 AND $1 + INTERVAL '4 hours')\n                )\n            ORDER BY\n                st.arrival;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "arrival",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "departure",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "scheduled_track",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "actual_track",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "TextArray",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "3a02904aca8e91e281a4aa39ec4d3666a140dbf17c225510ba7601df11436b43"
+}

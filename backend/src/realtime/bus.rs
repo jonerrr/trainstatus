@@ -157,7 +157,7 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip<TripData> {
             direction: Some(direction),
             deviation: value.0.delay,
             route_id,
-            data: TripData::Bus,
+            data: TripData::default_bus(),
         })
     }
 }

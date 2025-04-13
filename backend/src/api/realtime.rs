@@ -3,7 +3,7 @@ use super::{json_headers, CurrentTime};
 use crate::api::{parse_list, TimeParams};
 use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
-use crate::realtime::trip::Trip;
+use crate::realtime::trip::{Trip, TripData};
 use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
@@ -30,7 +30,7 @@ pub struct TripsParameters {
         TripsParameters, TimeParams
     ),
     responses(
-        (status = 200, description = "Subway and bus trips", body = [Trip<serde_json::Value>])
+        (status = 200, description = "Subway and bus trips", body = [Trip<TripData>])
     )
 )]
 pub async fn trips_handler(
@@ -62,12 +62,15 @@ pub struct StopTimesParameters {
     /// Comma-separated list of bus route IDs to include in response. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     bus_route_ids: Vec<String>,
-    /// Only return bus stop times. If bus_route_ids is not specified, this will return all TRAIN stop times.
+    /// Only return bus stop times. If `bus_route_ids` is not specified, this will return all TRAIN stop times.
     #[serde(default)]
     only_bus: bool,
-    /// Make sure trip.updated_at and stop_time.arrival are after the current time. By default, this only checks trip.updated_at.
+    /// Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
     #[serde(default)]
     filter_arrival: bool,
+    /// Includes the `actual_track` and `scheduled_track` in the response.
+    #[serde(default)]
+    include_tracks: bool,
 }
 
 #[utoipa::path(
@@ -86,8 +89,12 @@ pub async fn stop_times_handler(
     params: Query<StopTimesParameters>,
     current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    match (params.bus_route_ids.is_empty(), current_time.user_specified) {
-        (true, false) => {
+    match (
+        params.bus_route_ids.is_empty(),
+        current_time.user_specified,
+        params.include_tracks,
+    ) {
+        (true, false, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
 
@@ -112,6 +119,7 @@ pub async fn stop_times_handler(
                 Some(&params.bus_route_ids),
                 params.only_bus,
                 params.filter_arrival,
+                params.include_tracks,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))

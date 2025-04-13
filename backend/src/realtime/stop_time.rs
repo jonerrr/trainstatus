@@ -10,7 +10,11 @@ pub struct StopTime {
     pub stop_id: i32,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "B2")]
     pub scheduled_track: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "B2")]
     pub actual_track: Option<String>,
 }
 
@@ -47,13 +51,15 @@ impl StopTime {
         bus_route_ids: Option<&Vec<String>>,
         only_bus: bool,
         filter_arrival: bool,
+        include_tracks: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let default_routes = Vec::new();
         let bus_routes = bus_route_ids.unwrap_or(&default_routes);
 
-        sqlx::query_as!(
-            StopTime,
-            r#"
+        if include_tracks {
+            sqlx::query_as!(
+                StopTime,
+                r#"
             SELECT
                 st.trip_id,
                 st.stop_id,
@@ -85,14 +91,56 @@ impl StopTime {
             ORDER BY
                 st.arrival;
             "#,
-            at,         // $1: Timestamp
-            bus_routes, // $2: Array of bus_route_ids (can be empty)
-            only_bus,   // $3: only_bus flag
-            filter_arrival  // $4: make sure arrival is > current time
-                        // TODO: choose if you want to return tracks
-        )
-        .fetch_all(pool)
-        .await
+                at,             // $1: Timestamp
+                bus_routes,     // $2: Array of bus_route_ids (can be empty)
+                only_bus,       // $3: only_bus flag
+                filter_arrival  // $4: make sure arrival is > current time
+            )
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as!(
+                StopTime,
+                r#"
+            SELECT
+                st.trip_id,
+                st.stop_id,
+                st.arrival,
+                st.departure,
+                NULL AS scheduled_track,
+                NULL AS actual_track
+            FROM
+                stop_time st
+            WHERE
+                st.trip_id IN (
+                    SELECT
+                        t.id
+                    FROM
+                        trip t
+                    WHERE
+                        t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'
+                        AND ($1)::timestamp with time zone + INTERVAL '4 hours'
+                        AND (
+                            ($3 = TRUE AND t.route_id = ANY($2))
+                            OR
+                            ($3 = FALSE AND (t.assigned IS NOT NULL OR t.route_id = ANY($2)))
+                        )
+                )
+                AND (
+                    $4 = FALSE OR
+                    (st.arrival BETWEEN $1 AND $1 + INTERVAL '4 hours')
+                )
+            ORDER BY
+                st.arrival;
+            "#,
+                at,             // $1: Timestamp
+                bus_routes,     // $2: Array of bus_route_ids (can be empty)
+                only_bus,       // $3: only_bus flag
+                filter_arrival  // $4: make sure arrival is > current time
+            )
+            .fetch_all(pool)
+            .await
+        }
     }
 
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {

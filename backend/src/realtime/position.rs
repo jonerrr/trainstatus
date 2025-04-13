@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
+use utoipa::ToSchema;
 // use uuid::Uuid;
 
 pub struct Position {
@@ -23,7 +24,7 @@ pub struct SiriPosition {
     pub capacity: Option<i32>,
 }
 
-#[derive(sqlx::Type, Clone, Serialize)]
+#[derive(sqlx::Type, Clone, Serialize, PartialEq, ToSchema, Debug)]
 #[sqlx(type_name = "status", rename_all = "snake_case")]
 pub enum Status {
     None,
@@ -35,6 +36,12 @@ pub enum Status {
     Spooking,
     Layover,
     NoProgress,
+}
+
+impl Default for Status {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 #[derive(sqlx::Type, Clone)]

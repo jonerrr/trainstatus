@@ -1,17 +1,42 @@
+use super::position::Status;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use thiserror::Error;
-use utoipa::ToSchema;
+use utoipa::{
+    openapi::schema::{Object, ObjectBuilder},
+    PartialSchema, ToSchema,
+};
 use uuid::Uuid;
+
+fn get_tripdata_schema<T: PartialSchema>() -> Object {
+    ObjectBuilder::new()
+        .property(
+            "Train",
+            ObjectBuilder::new()
+                .property("express", T::schema())
+                .required("express")
+                .property("assigned", T::schema())
+                .required("assigned")
+                .build(),
+        )
+        .property("Bus", T::schema())
+        .description(Some(
+            "Trip data type that distinguishes between train and bus trips",
+        ))
+        .build()
+}
 
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema, FromRow)]
 pub struct Trip<D> {
     pub id: Uuid,
     /// This the ID from the MTA feed
+    #[schema(example = "097550_1..S03R")]
     pub mta_id: String,
+    #[schema(example = "01 1615+ 242/SFT")]
     pub vehicle_id: String,
+    #[schema(example = "1")]
     pub route_id: String,
     /// For trains, 0 is southbound, 1 is northbound.
     /// For buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
@@ -25,13 +50,58 @@ pub struct Trip<D> {
     /// A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deviation: Option<i32>,
+    /// Data is either train or bus data
     pub data: D,
 }
 
-#[derive(Serialize, Clone, PartialEq, Debug)]
+/// Trip data changes based on the type of trip (train or bus)
+#[derive(Serialize, Clone, PartialEq, Debug, ToSchema)]
+#[serde(untagged)]
 pub enum TripData {
-    Train { express: bool, assigned: bool },
-    Bus,
+    Train {
+        express: bool,
+        assigned: bool,
+        /// Can be `None` `Incoming`, `AtStop`, or `InTransitTo`
+        status: Status,
+        /// Last known stop ID
+        stop_id: Option<String>,
+    },
+    Bus {
+        /// Can be `None` `Spooking`, `Layover`, or `NoProgress`
+        status: Status,
+        /// Last known stop ID
+        stop_id: Option<String>,
+        lat: Option<f32>,
+        lon: Option<f32>,
+        bearing: Option<f32>,
+        passengers: Option<i32>,
+        capacity: Option<i32>,
+    },
+}
+
+// For importing trip and stop times, only express and assigned are needed
+// The other status data is taken from the positions endpoint or SIRI for buses.
+impl TripData {
+    pub fn default_train(express: bool, assigned: bool) -> Self {
+        Self::Train {
+            express,
+            assigned,
+            status: Status::default(),
+            stop_id: None,
+        }
+    }
+
+    pub fn default_bus() -> Self {
+        Self::Bus {
+            status: Status::default(),
+            stop_id: None,
+            lat: None,
+            lon: None,
+            bearing: None,
+            passengers: None,
+            capacity: None,
+        }
+    }
 }
 
 impl Trip<TripData> {
@@ -65,15 +135,14 @@ impl Trip<TripData> {
             .collect::<Vec<Option<i32>>>();
 
         match values.first().map(|t| &t.data) {
-            Some(TripData::Train {
-                express: _,
-                assigned: _,
-            }) => {
+            Some(TripData::Train { .. }) => {
                 // get express and assigned from each trip. If first one is train that means they all are
                 let (expresses, assigns): (Vec<bool>, Vec<bool>) = values
                     .iter()
                     .map(|v| match &v.data {
-                        TripData::Train { express, assigned } => (*express, *assigned),
+                        TripData::Train {
+                            express, assigned, ..
+                        } => (*express, *assigned),
                         _ => unreachable!("all trips should be the same type"),
                     })
                     .unzip();
@@ -98,7 +167,7 @@ impl Trip<TripData> {
                 .execute(pool)
                 .await?;
             }
-            Some(TripData::Bus) => {
+            Some(TripData::Bus { .. }) => {
                 sqlx::query!(
                     r#"
                     INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
@@ -158,10 +227,10 @@ impl Trip<TripData> {
                 // self.created_at = t.created_at;
 
                 let changed = match &self.data {
-                    TripData::Train { express, assigned } => {
-                        t.express != Some(*express) || t.assigned != Some(*assigned)
-                    }
-                    TripData::Bus => t.deviation != self.deviation,
+                    TripData::Train {
+                        express, assigned, ..
+                    } => t.express != Some(*express) || t.assigned != Some(*assigned),
+                    TripData::Bus { .. } => t.deviation != self.deviation,
                 };
 
                 Ok((true, changed))
