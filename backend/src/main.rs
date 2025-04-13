@@ -159,11 +159,11 @@ async fn main() {
     // let ws_clients = Arc::new(Mutex::new(HashMap::<String, HashSet<String>>::new()));
     // TODO: use env var for email
     #[derive(OpenApi)]
-    #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds. Historical data and more options for the API are coming soon.", contact(email = "jonah@trainstat.us")),
+    #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
     servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
-        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between the current time and 4 hours from the current_time.")
+        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
     )
     )]
     struct ApiDoc;
