@@ -1,0 +1,5 @@
+[tools]
+rust = "latest"
+protoc = "latest"
+[env]
+_.file = ".env.toml"

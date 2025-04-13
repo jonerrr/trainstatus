@@ -18,19 +18,26 @@ A realtime bus map is available at <a href="https://map.trainstat.us" target="_b
 - No ads or tracking (your geolocation data never leaves your device)
 - Simple API that supports JSON and GeoJSON responses.
 
+## Self Hosting
+
+- Use the prebuilt container images linked to this repository.
+- Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
+- Requires PostgreSQL and Valkey/Redis.
+
 ## Development
 
 ### Requirements
 
 - Podman/Docker
-- Pnpm
-- Rust
+- <a href="https://mise.jdx.dev/" target="_blank">Mise</a>
+- <a href="https://developer.nyct.com/" target="_blank">BusTime API Key</a>
 
 ### Setup
 
 1. Clone the repository
-2. Get an MTA BusTime API Key from [here](https://bustime.mta.info/wiki/Developers/Index).
-3. Set environment variables as listed in `backend/README.md`
-4. Start databases with `docker compose up`
-5. Start backend with `cargo run --release`
-6. Start frontend with `pnpm dev`
+2. Mise should automatically install required dependencies
+3. Set environment variables as listed in `backend/README.md` inside `backend/.env.toml`
+4. Start PostgreSQL and Valkey with `docker compose up -d` or `podman compose up -d`
+5. Install SQLX CLI with `cargo install sqlx-cli --no-default-features --features native-tls,postgres`
+6. Start backend with `cargo r`
+7. Start frontend with `pnpm dev`
