@@ -4,29 +4,8 @@ use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use thiserror::Error;
-use utoipa::{
-    openapi::schema::{Object, ObjectBuilder},
-    PartialSchema, ToSchema,
-};
+use utoipa::ToSchema;
 use uuid::Uuid;
-
-fn get_tripdata_schema<T: PartialSchema>() -> Object {
-    ObjectBuilder::new()
-        .property(
-            "Train",
-            ObjectBuilder::new()
-                .property("express", T::schema())
-                .required("express")
-                .property("assigned", T::schema())
-                .required("assigned")
-                .build(),
-        )
-        .property("Bus", T::schema())
-        .description(Some(
-            "Trip data type that distinguishes between train and bus trips",
-        ))
-        .build()
-}
 
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema, FromRow)]
 pub struct Trip<D> {
