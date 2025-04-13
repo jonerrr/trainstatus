@@ -41,7 +41,6 @@
 		const route_trips = [];
 		// Track stops by route ID
 		const stopsByRoute = new Map<string, Set<{ id: number; name: string; sequence: number }>>();
-		// TODO: but
 
 		// Initialize sets for each selected route
 		for (const route of routes) {
@@ -54,10 +53,11 @@
 			if (!trip_st) continue;
 
 			// Skip trips that aren't fully complete (any departure time > current_time)
-			if (trip_st.some((st) => st.departure.getTime() <= current_time.ms)) continue;
+			// if (trip_st.some((st) => st.departure.getTime() <= current_time.ms)) continue;
 
 			const trip_points = [];
 			for (const st of trip_st) {
+				if (st.arrival.getTime() < current_time.ms) continue;
 				const stop = page.data.stops[st.stop_id];
 
 				const stop_sequence = stop.routes.find((r) => r.id === trip.route_id)?.stop_sequence;
@@ -339,10 +339,15 @@
 	const xDomain = $derived.by(() => {
 		const startTime = new Date(current_time.ms);
 		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
-
+		// console.log(xDomain);
 		// Return domain from current time to current time + displayHours
 		return [startTime, endTime];
 	});
+	// const xRange = $derived(() => {
+	// 	const width = svgContainer?.clientWidth || 0;
+	// 	return [0, width];
+	// });
+	$inspect(xDomain);
 </script>
 
 <svelte:head>
@@ -352,7 +357,7 @@
 <div class="flex h-[calc(100dvh-8rem)] min-h-[300px] flex-col">
 	<div class="pl-3 text-xl font-bold">Charts</div>
 	<div
-		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4 text-neutral-300"
+		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"
 	>
 		<!-- Routes Option -->
 		<div class="flex min-w-[240px] flex-col gap-2">
@@ -363,7 +368,7 @@
 					onclick={toggleCombobox}
 					aria-haspopup="listbox"
 					aria-expanded={isComboboxOpen}
-					class="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-base hover:bg-neutral-800"
+					class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-base hover:bg-neutral-800"
 					aria-label="Add routes"
 				>
 					<div class="flex flex-1 flex-wrap items-center gap-2">
@@ -470,65 +475,63 @@
 		</div>
 
 		<!-- Direction Option -->
-		<div class="flex min-w-[150px] flex-col gap-2">
-			<div class="font-semibold">Direction</div>
-			<div class="flex flex-col gap-2">
-				<div class="flex items-center">
+		<div class="flex min-w-24 flex-col gap-2">
+			<div class="font-bold">Direction</div>
+			<div class="flex flex-col gap-2 text-neutral-300">
+				<div class="flex items-center justify-between gap-2">
+					<label for="northbound" class="cursor-pointer">Northbound</label>
 					<input
 						bind:group={direction}
 						type="radio"
 						id="northbound"
 						name="direction"
 						value={TripDirection.North}
-						class="mr-2 cursor-pointer transition-transform hover:scale-110"
+						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
-					<label for="northbound" class="cursor-pointer">Northbound</label>
 				</div>
-				<div class="flex items-center">
+				<div class="flex items-center justify-between gap-2">
+					<label for="southbound" class="cursor-pointer">Southbound</label>
 					<input
 						bind:group={direction}
 						type="radio"
 						id="southbound"
 						name="direction"
 						value={TripDirection.South}
-						class="mr-2 cursor-pointer transition-transform hover:scale-110"
+						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
-					<label for="southbound" class="cursor-pointer">Southbound</label>
 				</div>
 			</div>
 		</div>
 
 		<!-- Stop Points Option -->
-		<div class="flex min-w-[100px] flex-col items-start justify-evenly gap-2">
-			<div class="flex w-full justify-between gap-2">
-				<label for="stop_points">Stop Points</label>
-				<input
-					id="stop_points"
-					type="checkbox"
-					bind:checked={stop_points}
-					class="h-6 w-6 cursor-pointer"
-				/>
-			</div>
-			<div class="flex w-full justify-between gap-2">
-				<label for="time_line">Time Line</label>
-				<input
-					id="time_line"
-					type="checkbox"
-					bind:checked={current_time_line}
-					class="h-6 w-6 cursor-pointer"
-				/>
+		<div class="flex min-w-24 flex-col justify-end gap-2">
+			<div class="font-bold">Style</div>
+			<div class="flex flex-col gap-2 text-neutral-300">
+				<div class="flex w-full items-center justify-between gap-2">
+					<label for="stop_points" class="cursor-pointer">Stop Points</label>
+					<input
+						id="stop_points"
+						type="checkbox"
+						name="stop_points"
+						bind:checked={stop_points}
+						class="size-5 cursor-pointer transition-transform hover:scale-110"
+					/>
+				</div>
+				<div class="flex w-full justify-between gap-2">
+					<label for="time_line" class="cursor-pointer">Time Line</label>
+					<input
+						id="time_line"
+						type="checkbox"
+						name="time_line"
+						bind:checked={current_time_line}
+						class="size-5 cursor-pointer transition-transform hover:scale-110"
+					/>
+				</div>
 			</div>
 		</div>
 
-		<!-- <div class="flex flex-col gap-2 items-center min-w-[100px]">
-			<div class="font-semibold">Stop Points</div>
-			<div class="flex justify-center pt-2">
-				<input type="checkbox" bind:checked={stop_points} class="cursor-pointer w-6 h-6" />
-			</div>
-		</div> -->
-
 		<!-- X-Axis Interval Slider -->
-		<div class="flex min-w-[160px] flex-col gap-2">
+		<div class="flex min-w-40 flex-col gap-2">
 			<div class="font-semibold">Time Interval</div>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
@@ -546,7 +549,7 @@
 		</div>
 
 		<!-- Display Hours Slider -->
-		<div class="flex min-w-[160px] flex-col gap-2">
+		<div class="flex min-w-40 flex-col gap-2">
 			<div class="font-semibold">Number of Hours</div>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">

@@ -302,7 +302,7 @@ impl TryFrom<TripDescriptor> for Trip<TripData> {
             direction,
             route_id,
             deviation: None,
-            data: TripData::Train { express, assigned },
+            data: TripData::default_train(express, assigned),
         })
     }
 }

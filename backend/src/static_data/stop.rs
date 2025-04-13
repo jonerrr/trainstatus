@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 pub struct Stop<D, R> {
     /// Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
     #[schema(example = 101)]
+    // TODO: use string instead of number
     pub id: i32,
     #[schema(example = "Van Cortlandt Park-242 St")]
     pub name: String,
@@ -21,10 +22,10 @@ pub struct Stop<D, R> {
     pub routes: R,
 }
 
+/// Stop data changes based on the `route_type`
 #[derive(Serialize, ToSchema)]
 #[serde(untagged)]
 pub enum StopData {
-    /// Train
     Train {
         ada: bool,
         /// Notes about ADA accessibility at the stop
@@ -38,8 +39,9 @@ pub enum StopData {
         transfers: Vec<i32>,
         borough: Borough,
     },
-    /// Bus
-    Bus { direction: BusDirection },
+    Bus {
+        direction: BusDirection,
+    },
 }
 
 #[derive(sqlx::Type, Serialize, ToSchema)]
