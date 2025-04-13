@@ -39,8 +39,8 @@ pub async fn trips_handler(
     current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
     // TODO: maybe cache finished trips
-    match (current_time.user_specified, current_time.finished) {
-        (false, false) => {
+    match current_time.user_specified {
+        false => {
             let mut conn = state.redis_pool.get().await?;
             let key = if params.geojson {
                 "bus_trips_geojson"
@@ -51,8 +51,7 @@ pub async fn trips_handler(
             Ok((json_headers().clone(), trips))
         }
         _ => {
-            let trips =
-                Trip::get_all(&state.pg_pool, current_time.time, current_time.finished).await?;
+            let trips = Trip::get_all(&state.pg_pool, current_time.time).await?;
             Ok((json_headers().clone(), serde_json::to_string(&trips)?))
         }
     }
@@ -87,12 +86,8 @@ pub async fn stop_times_handler(
     params: Query<StopTimesParameters>,
     current_time: CurrentTime,
 ) -> Result<impl IntoResponse, ServerError> {
-    match (
-        params.bus_route_ids.is_empty(),
-        current_time.user_specified,
-        current_time.finished,
-    ) {
-        (true, false, false) => {
+    match (params.bus_route_ids.is_empty(), current_time.user_specified) {
+        (true, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
 
@@ -117,7 +112,6 @@ pub async fn stop_times_handler(
                 Some(&params.bus_route_ids),
                 params.only_bus,
                 params.filter_arrival,
-                current_time.finished,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))

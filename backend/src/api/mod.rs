@@ -101,7 +101,7 @@ pub struct CurrentTime {
     pub time: DateTime<Utc>,
     pub user_specified: bool,
     // not used currently
-    pub finished: bool,
+    // pub finished: bool,
 }
 
 #[derive(Deserialize, IntoParams)]
@@ -110,9 +110,6 @@ pub struct TimeParams {
     /// Unix timestamp to use as the current time. If not specified, the current time is used.
     #[serde(default)]
     pub at: Option<i64>,
-    // /// Include trips / stop times that have finished. Mainly used for charts. DOES NOT AFFECT ALERTS CURRENTLY
-    // #[serde(default)]
-    // pub finished: bool,
 }
 
 impl<S> FromRequestParts<S> for CurrentTime
@@ -137,7 +134,6 @@ where
                     chrono::LocalResult::Single(time) => CurrentTime {
                         time,
                         user_specified: true,
-                        finished: false,
                     },
                     _ => {
                         // TODO: maybe return a 400 instead of logging
@@ -145,7 +141,6 @@ where
                         CurrentTime {
                             time: Utc::now(),
                             user_specified: false,
-                            finished: false,
                         }
                     }
                 }
@@ -155,7 +150,6 @@ where
                 CurrentTime {
                     time: now,
                     user_specified: false,
-                    finished: false,
                 }
             }
         };
