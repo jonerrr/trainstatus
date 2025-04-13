@@ -246,4 +246,5 @@ GROUP BY
     a.description_plain,
     a.alert_type
 ORDER BY
-    array_length(ARRAY_AGG(DISTINCT ae.route_id), 1) DESC
+    array_length(ARRAY_AGG(DISTINCT ae.route_id), 1) DESC;
+SELECT DISTINCT actual_track, scheduled_track FROM stop_time;

@@ -106,6 +106,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 tracing::error!("Error finding trip: {:?}", e);
                 (false, true)
             });
+            // dbg!(&trip);
 
             let mut trip_stop_times = trip_update
                 .stop_time_update
@@ -421,11 +422,18 @@ impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
         let departure =
             DateTime::from_timestamp(departure, 0).ok_or(IntoStopTimeError::Departure)?;
 
+        let (scheduled_track, actual_track) = match value.stop_time.nyct_stop_time_update {
+            Some(nyct) => (nyct.scheduled_track, nyct.actual_track),
+            None => (None, None),
+        };
+
         Ok(StopTime {
             trip_id: value.trip.id,
             stop_id,
             arrival,
             departure,
+            scheduled_track,
+            actual_track,
         })
     }
 }
