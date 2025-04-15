@@ -20,7 +20,6 @@ pub struct TripsParameters {
     geojson: bool,
 }
 
-// TODO: dont use serde_json::Value
 #[utoipa::path(
     get,
     path = "/trips",
