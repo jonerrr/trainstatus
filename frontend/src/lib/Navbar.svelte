@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Home, Clock, CircleAlert } from 'lucide-svelte';
+	import { Home, Clock, CircleAlert } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { current_time } from '$lib/util.svelte';
 

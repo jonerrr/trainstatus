@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX, Search } from 'lucide-svelte';
+	import { CircleX, Search } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { calculate_stop_height, type Stop } from '$lib/static';
 	import List from '$lib/List.svelte';

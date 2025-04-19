@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowBigRight, ChevronDown, ChevronUp } from 'lucide-svelte';
+	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { slide } from 'svelte/transition';
 	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';

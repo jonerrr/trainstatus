@@ -1,7 +1,7 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
-	import { ChevronRight, ChevronLeft } from 'lucide-svelte';
+	import { ChevronRight, ChevronLeft } from '@lucide/svelte';
 	import { alerts as rt_alerts } from '$lib/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 	import { type Route } from '$lib/static';

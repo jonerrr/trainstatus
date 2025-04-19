@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends string | number">
-	import { Pin } from 'lucide-svelte';
+	import { Pin } from '@lucide/svelte';
 	import type { PersistedRune } from './util.svelte';
 
 	// TODO: not sure if i need to bind

@@ -25,7 +25,7 @@
 	import Button from '$lib/Button.svelte';
 	import BusCapacity from '$lib/BusCapacity.svelte';
 	import BusArrow from './BusArrow.svelte';
-	import { CircleAlert } from 'lucide-svelte';
+	import { CircleAlert } from '@lucide/svelte';
 
 	interface Props {
 		show_previous: boolean;

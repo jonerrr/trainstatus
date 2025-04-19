@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CloudOff, Settings } from 'lucide-svelte';
+	import { CloudOff, Settings } from '@lucide/svelte';
 	import { fade } from 'svelte/transition';
 	import { pushState } from '$app/navigation';
 
