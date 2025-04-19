@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Users } from 'lucide-svelte';
+	import { Users } from '@lucide/svelte';
 
 	const { passengers, capacity }: { passengers: number; capacity: number } = $props();
 

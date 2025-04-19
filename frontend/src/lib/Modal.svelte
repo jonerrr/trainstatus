@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from 'lucide-svelte';
+	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from '@lucide/svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 	import {

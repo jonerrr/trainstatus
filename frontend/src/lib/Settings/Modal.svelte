@@ -10,7 +10,7 @@
 		Map,
 		ExternalLink,
 		ChartLine
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	let headerRef = $state<HTMLDivElement>();

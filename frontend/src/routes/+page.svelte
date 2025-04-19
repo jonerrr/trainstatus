@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Locate, LocateOff, LocateFixed } from 'lucide-svelte';
+	import { Locate, LocateOff, LocateFixed } from '@lucide/svelte';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import {

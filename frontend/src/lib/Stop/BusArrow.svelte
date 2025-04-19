@@ -9,7 +9,7 @@
 		ArrowUpLeft,
 		ArrowUpRight,
 		ArrowUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	const { direction }: { direction: BusStopDirection } = $props();
 </script>

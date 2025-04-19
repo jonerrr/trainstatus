@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BusFront, TrainFront } from 'lucide-svelte';
+	import { BusFront, TrainFront } from '@lucide/svelte';
 	import { tick, type Snippet } from 'svelte';
 	import { crossfade, slide } from 'svelte/transition';
 	import { cubicInOut } from 'svelte/easing';

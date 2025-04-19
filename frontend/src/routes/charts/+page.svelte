@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LayerCake, Svg, flatten } from 'layercake';
-	import { Download, Search, ChevronDown, X, Check } from 'lucide-svelte';
+	import { Download, Search, ChevronDown, X, Check } from '@lucide/svelte';
 	import { scaleTime, scalePoint } from 'd3-scale';
 	import { page } from '$app/state';
 	import { TripDirection, trips } from '$lib/trips.svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowBigRight } from 'lucide-svelte';
+	import { ArrowBigRight } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { is_bus_route, is_train_route, type Trip, type TripData } from '$lib/trips.svelte';
