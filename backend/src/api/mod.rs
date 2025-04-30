@@ -1,10 +1,10 @@
-use crate::{static_data::cache_all, AppState};
+use crate::{AppState, static_data::cache_all};
 use axum::{
     extract::{FromRequestParts, Query},
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, TimeZone, Utc};
-use http::{request::Parts, HeaderMap};
+use http::{HeaderMap, request::Parts};
 use redis::AsyncCommands;
 use serde::{Deserialize, Deserializer};
 use std::sync::OnceLock;

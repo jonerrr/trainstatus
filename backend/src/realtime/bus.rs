@@ -1,12 +1,11 @@
 use super::{
-    decode,
+    ImportError, decode,
     position::{IntoPositionError, Position, PositionData, SiriPosition, Status},
     siri::{self, MonitoredVehicleJourney},
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
-    ImportError,
 };
-use crate::feed::{trip_update::StopTimeUpdate, TripUpdate, VehiclePosition};
+use crate::feed::{TripUpdate, VehiclePosition, trip_update::StopTimeUpdate};
 use chrono::{DateTime, Utc};
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;

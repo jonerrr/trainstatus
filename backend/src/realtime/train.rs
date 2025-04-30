@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 
 use super::{
-    decode,
+    ImportError, decode,
     position::{IntoPositionError, Position, PositionData, Status},
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
-    ImportError,
 };
 use crate::{
-    feed::{trip_update::StopTimeUpdate, TripDescriptor, VehiclePosition},
+    feed::{TripDescriptor, VehiclePosition, trip_update::StopTimeUpdate},
     static_data::stop::convert_stop_id,
 };
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
