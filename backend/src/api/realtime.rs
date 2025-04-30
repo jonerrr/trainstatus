@@ -1,10 +1,10 @@
 use super::errors::ServerError;
-use super::{json_headers, CurrentTime};
-use crate::api::{parse_list, TimeParams};
+use super::{CurrentTime, json_headers};
+use crate::AppState;
+use crate::api::{TimeParams, parse_list};
 use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
 use crate::realtime::trip::{Trip, TripData};
-use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use chrono::{DateTime, Utc};

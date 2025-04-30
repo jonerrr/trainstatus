@@ -1,12 +1,12 @@
 use super::errors::ServerError;
 use super::json_headers;
+use crate::AppState;
 use crate::static_data::route::{self, Route};
 use crate::static_data::stop::{Stop, StopData, StopType};
-use crate::AppState;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use headers::{ETag, HeaderMapExt, IfNoneMatch};
-use http::{header, HeaderMap, StatusCode};
+use http::{HeaderMap, StatusCode, header};
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 

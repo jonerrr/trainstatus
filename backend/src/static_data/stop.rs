@@ -129,8 +129,8 @@ impl Stop<StopData, Option<serde_json::Value>> {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
         for chunk in values.chunks(64000 / 12) {
             let mut query_builder = QueryBuilder::new(
-            "INSERT INTO stop (id, name, lat, lon, route_type, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
-        );
+                "INSERT INTO stop (id, name, lat, lon, route_type, ada, north_headsign, south_headsign, transfers, notes, borough, direction) ",
+            );
             query_builder.push_values(chunk, |mut b, stop| {
                 b.push_bind(stop.id)
                     .push_bind(&stop.name)

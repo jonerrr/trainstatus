@@ -1,4 +1,4 @@
-use super::{decode, ImportError};
+use super::{ImportError, decode};
 use crate::static_data::stop::convert_stop_id;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -159,7 +159,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     Some(entity_selector) => entity_selector
                         .sort_order
                         .split(':')
-                        .last()
+                        .next_back()
                         .unwrap()
                         .parse()
                         .unwrap(),

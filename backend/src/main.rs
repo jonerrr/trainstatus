@@ -1,16 +1,16 @@
 // use api::websocket::{Clients, Update};
 use axum::{
+    ServiceExt,
     body::Body,
     error_handling::HandleErrorLayer,
     extract::Request,
     response::{IntoResponse, Response},
     routing::get,
-    ServiceExt,
 };
 use bb8_redis::RedisConnectionManager;
 // use crossbeam::channel::unbounded;
 // use crossbeam::channel::{Receiver, Sender};
-use http::{request::Parts, HeaderValue, Method, StatusCode};
+use http::{HeaderValue, Method, StatusCode, request::Parts};
 // use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
@@ -22,11 +22,11 @@ use std::{
 use tokio::{
     signal,
     sync::{
-        broadcast::{self, Sender},
         Notify,
+        broadcast::{self, Sender},
     },
 };
-use tower::{buffer::BufferLayer, limit::RateLimitLayer, BoxError, Layer, ServiceBuilder};
+use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
     compression::CompressionLayer,
     cors::{AllowOrigin, CorsLayer},
@@ -42,6 +42,7 @@ mod api;
 mod realtime;
 mod static_data;
 
+#[allow(clippy::all)]
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
