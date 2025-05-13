@@ -9,7 +9,7 @@ debug = true
 
 
 [dependencies]
-axum = { version = "0.8.3", features = ["ws"] }
+axum = { version = "0.8.4", features = ["ws"] }
 bb8 = "0.9.0"
 bb8-redis = "0.23.0"
 blake3 = "1.8.2"
