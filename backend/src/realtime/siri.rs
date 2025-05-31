@@ -4,11 +4,7 @@ use serde::{Deserialize, Deserializer};
 pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeSiriError> {
     let siri_res = reqwest::Client::new()
         .get("https://api.prod.obanyc.com/api/siri/vehicle-monitoring.json")
-        .query(&[
-            ("key", api_key()),
-            ("version", "2"),
-            ("VehicleMonitoringDetailLevel", "basic"),
-        ])
+        .query(&[("key", api_key()), ("version", "2")])
         .send()
         .await?
         .json::<serde_json::Value>()
@@ -18,52 +14,52 @@ pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeSiriError> {
     let service_delivery: ServiceDelivery =
         serde_json::from_value(siri_res["Siri"]["ServiceDelivery"].to_owned())?;
 
-    // let mut progresses = Vec::new();
-    // // let mut statuses = Vec::new();
-    // for vehicle_monitoring_delivery in service_delivery.vehicle_monitoring_delivery {
-    //     for vehicle_activity in vehicle_monitoring_delivery.vehicle_activity {
-    //         let monitored_vehicle_journey = vehicle_activity.monitored_vehicle_journey;
-    //         let progress_rate = monitored_vehicle_journey
-    //             .progress_status
-    //             .and_then(|s| s.into_iter().nth(0));
-
-    //         // if progress_rate == "noProgress" {
-    //         //     dbg!(&monitored_vehicle_journey.progress_status);
-    //         // }
-
-    //         if !progresses.contains(&progress_rate) {
-    //             progresses.push(progress_rate.clone());
-    //         }
-
-    //         // monitored_vehicle_journey.progress_status.map(|status| {
-    //         //     for s in status {
-    //         //         if s == "layover" {
-    //         //             if progress_rate != "noProgress" {
-    //         //                 println!("layover with progress rate: {}", progress_rate);
-    //         //             }
-    //         //         } else if s == "spooking" {
-    //         //             if progress_rate != "unknown" {
-    //         //                 println!("spooking without unknown: {}", progress_rate);
-    //         //             }
-    //         //         }
-
-    //         //         if !statuses.contains(&s) {
-    //         //             statuses.push(s);
-    //         //         }
-    //         //     }
-    //         // });
-    //     }
-    // }
-
-    // println!("Unique Progress Rates: {:?}", progresses);
-    // // println!("Unique Progress Statuses: {:?}", statuses);
-
     service_delivery
         .vehicle_monitoring_delivery
         .into_iter()
         .next()
         .ok_or(DecodeSiriError::NoVehicles)
 }
+
+// let mut progresses = Vec::new();
+// // let mut statuses = Vec::new();
+// for vehicle_monitoring_delivery in service_delivery.vehicle_monitoring_delivery {
+//     for vehicle_activity in vehicle_monitoring_delivery.vehicle_activity {
+//         let monitored_vehicle_journey = vehicle_activity.monitored_vehicle_journey;
+//         let progress_rate = monitored_vehicle_journey
+//             .progress_status
+//             .and_then(|s| s.into_iter().nth(0));
+
+//         // if progress_rate == "noProgress" {
+//         //     dbg!(&monitored_vehicle_journey.progress_status);
+//         // }
+
+//         if !progresses.contains(&progress_rate) {
+//             progresses.push(progress_rate.clone());
+//         }
+
+//         // monitored_vehicle_journey.progress_status.map(|status| {
+//         //     for s in status {
+//         //         if s == "layover" {
+//         //             if progress_rate != "noProgress" {
+//         //                 println!("layover with progress rate: {}", progress_rate);
+//         //             }
+//         //         } else if s == "spooking" {
+//         //             if progress_rate != "unknown" {
+//         //                 println!("spooking without unknown: {}", progress_rate);
+//         //             }
+//         //         }
+
+//         //         if !statuses.contains(&s) {
+//         //             statuses.push(s);
+//         //         }
+//         //     }
+//         // });
+//     }
+// }
+
+// println!("Unique Progress Rates: {:?}", progresses);
+// // println!("Unique Progress Statuses: {:?}", statuses);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -104,7 +100,7 @@ pub struct MonitoredVehicleJourney {
     pub framed_vehicle_journey_ref: JourneyRef,
     // should be only 1 in vec
     // published_line_name: Vec<String>,
-    #[serde(deserialize_with = "de_remove_prefix")]
+    // #[serde(deserialize_with = "de_remove_prefix")]
     pub vehicle_ref: String,
     // progress_rate: String,
     pub progress_status: Option<Vec<String>>,

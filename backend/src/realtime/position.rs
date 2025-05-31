@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+// use serde::Serialize;
 use sqlx::PgPool;
-use utoipa::ToSchema;
+// use utoipa::ToSchema;
 // use uuid::Uuid;
 
 pub struct Position {
@@ -9,7 +9,7 @@ pub struct Position {
     pub mta_id: Option<String>,
     pub stop_id: Option<i32>,
     pub updated_at: DateTime<Utc>,
-    pub status: Status,
+    pub status: String,
     pub data: PositionData,
     // TODO: remove this probably
     // pub vehicle_type: VehicleType,
@@ -19,30 +19,30 @@ pub struct Position {
 pub struct SiriPosition {
     pub vehicle_id: String,
     pub mta_id: String,
-    pub status: Status,
+    pub status: String,
     pub passengers: Option<i32>,
     pub capacity: Option<i32>,
 }
 
-#[derive(sqlx::Type, Clone, Serialize, PartialEq, ToSchema, Debug)]
-#[sqlx(type_name = "status", rename_all = "snake_case")]
-pub enum Status {
-    None,
-    // train statuses
-    Incoming,
-    AtStop,
-    InTransitTo,
-    // bus statuses
-    Spooking,
-    Layover,
-    NoProgress,
-}
+// #[derive(sqlx::Type, Clone, Serialize, PartialEq, ToSchema, Debug)]
+// #[sqlx(type_name = "status", rename_all = "snake_case")]
+// pub enum Status {
+//     None,
+//     // train statuses
+//     Incoming,
+//     AtStop,
+//     InTransitTo,
+//     // bus statuses
+//     Spooking,
+//     Layover,
+//     NoProgress,
+// }
 
-impl Default for Status {
-    fn default() -> Self {
-        Self::None
-    }
-}
+// impl Default for Status {
+//     fn default() -> Self {
+//         Self::None
+//     }
+// }
 
 #[derive(sqlx::Type, Clone)]
 #[sqlx(type_name = "vehicle_type", rename_all = "snake_case")]
@@ -85,14 +85,14 @@ impl Position {
                 sqlx::query!(
                     r#"
                     INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status)
-                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::status[])
+                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[])
                     ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, status = EXCLUDED.status, stop_id = EXCLUDED.stop_id
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
                     &stop_ids as &[Option<i32>],
                     &updated_ats,
-                    &statuses as &[Status],
+                    &statuses as &[String],
                 ).execute(pool).await?;
             }
             Some(PositionData::Bus {
@@ -130,14 +130,14 @@ impl Position {
                 sqlx::query!(
                     r#"
                     INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status, lat, lon, bearing)
-                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::status[], $6::float[], $7::float[], $8::float[])
+                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[], $6::float[], $7::float[], $8::float[])
                     ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, stop_id = EXCLUDED.stop_id
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
                     &stop_ids as &[Option<i32>],
                     &updated_ats,
-                    &statuses as &[Status],
+                    &statuses as &[String],
                     &lats as &[f32],
                     &lons as &[f32],
                     &bearings as &[f32],
@@ -212,7 +212,7 @@ impl SiriPosition {
                 SELECT
                     unnest($1::text[]) AS vehicle_id,
                     unnest($2::text[]) AS mta_id,
-                    unnest($3::status[]) AS status,
+                    unnest($3::text[]) AS status,
                     unnest($4::int[]) AS passengers,
                     unnest($5::int[]) AS capacity
             )
@@ -227,7 +227,7 @@ impl SiriPosition {
             "#,
             &vehicle_ids,
             &mta_ids as &[String],
-            &statuses as &[Status],
+            &statuses as &[String],
             &passengers as &[Option<i32>],
             &capacities as &[Option<i32>]
         )

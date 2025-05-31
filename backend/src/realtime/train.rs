@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::{
     ImportError, decode,
-    position::{IntoPositionError, Position, PositionData, Status},
+    position::{IntoPositionError, Position, PositionData},
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
 };
@@ -14,8 +14,6 @@ use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
 use uuid::Uuid;
-
-// pub
 
 const ENDPOINTS: [(&str, &str); 8] = [
     (
@@ -467,11 +465,17 @@ impl TryFrom<VehiclePosition> for Position {
         // }
 
         // let current_stop_sequence = value.current_stop_sequence.map(|s| s as i16);
+        // let status = match value.current_status {
+        //     Some(0) => Status::Incoming,
+        //     Some(1) => Status::AtStop,
+        //     Some(2) => Status::InTransitTo,
+        //     _ => Status::None,
+        // };
         let status = match value.current_status {
-            Some(0) => Status::Incoming,
-            Some(1) => Status::AtStop,
-            Some(2) => Status::InTransitTo,
-            _ => Status::None,
+            Some(0) => "incoming".into(),
+            Some(1) => "at_stop".into(),
+            Some(2) => "in_transit_to".into(),
+            _ => "none".into(), // maybe do unknown instead of none?
         };
 
         let updated_at = value.timestamp.ok_or(IntoPositionError::Timestamp)?;

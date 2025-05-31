@@ -248,3 +248,30 @@ GROUP BY
 ORDER BY
     array_length(ARRAY_AGG(DISTINCT ae.route_id), 1) DESC;
 SELECT DISTINCT actual_track, scheduled_track FROM stop_time;
+
+-- get positions from buses that have been updated > now() - 5 minutes. join the trip data and bus data
+SELECT DISTINCT ON (bp.vehicle_id)
+    bp.vehicle_id,
+    bp.lat,
+    bp.lon,
+    bp.bearing,
+    -- bp.speed,
+    bp.updated_at AS position_updated_at,
+    bt.id AS trip_id,
+    bt.route_id,
+    bt.direction AS trip_direction,
+    br.short_name AS route_short_name,
+    br.long_name AS route_long_name,
+    br.color AS route_color
+FROM
+    position bp
+    JOIN trip bt ON bp.mta_id = bt.mta_id
+    JOIN route br ON bt.route_id = br.id
+WHERE
+    bp.updated_at > now() - interval '5 minutes'
+    -- bus only
+    AND bt.assigned IS NULL
+ORDER BY
+    bp.vehicle_id,
+    bp.updated_at DESC;
+
