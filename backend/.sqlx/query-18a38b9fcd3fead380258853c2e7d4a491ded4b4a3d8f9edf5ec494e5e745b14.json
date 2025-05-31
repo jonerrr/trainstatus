@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT siri_id\n            FROM unnest($1::TEXT[]) AS siri_id_table(siri_id)\n            WHERE NOT EXISTS (\n                SELECT 1\n                FROM position p\n                WHERE p.vehicle_id = siri_id_table.siri_id\n            )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "siri_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "18a38b9fcd3fead380258853c2e7d4a491ded4b4a3d8f9edf5ec494e5e745b14"
+}

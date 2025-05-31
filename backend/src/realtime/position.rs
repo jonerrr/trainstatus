@@ -15,14 +15,16 @@ pub struct Position {
     // pub vehicle_type: VehicleType,
 }
 
+// TODO: remove or move to siri.rs
 // because the bus GTFS doesn't include passengers and status, we need to also get stuff from SIRI API
-pub struct SiriPosition {
-    pub vehicle_id: String,
-    pub mta_id: String,
-    pub status: String,
-    pub passengers: Option<i32>,
-    pub capacity: Option<i32>,
-}
+// pub struct SiriPosition {
+//     pub vehicle_id: String,
+//     pub mta_id: String,
+//     pub status: String,
+//     pub passengers: Option<i32>,
+//     pub capacity: Option<i32>,
+//     // pub updated_at: DateTime<Utc>,
+// }
 
 // #[derive(sqlx::Type, Clone, Serialize, PartialEq, ToSchema, Debug)]
 // #[sqlx(type_name = "status", rename_all = "snake_case")]
@@ -63,9 +65,14 @@ pub enum PositionData {
         lat: f32,
         lon: f32,
         bearing: f32,
-        // these are from SIRI API not GTFS
+        // these are from SIRI/OBA API not GTFS
         // passengers: Option<i32>,
         // capacity: Option<i32>,
+    },
+    // The OBA API also has lat/lng, but we get that from GTFS
+    OBABus {
+        passengers: Option<i32>,
+        capacity: Option<i32>,
     },
 }
 
@@ -95,13 +102,7 @@ impl Position {
                     &statuses as &[String],
                 ).execute(pool).await?;
             }
-            Some(PositionData::Bus {
-                lat: _,
-                lon: _,
-                bearing: _,
-                // passengers: _,
-                // capacity: _,
-            }) => {
+            Some(PositionData::Bus { .. }) => {
                 let mut lats = vec![];
                 let mut lons = vec![];
                 let mut bearings = vec![];
@@ -129,9 +130,24 @@ impl Position {
                 // status is updated from SIRI so we don't set it here
                 sqlx::query!(
                     r#"
-                    INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status, lat, lon, bearing)
-                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[], $6::float[], $7::float[], $8::float[])
-                    ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, lat = EXCLUDED.lat, lon = EXCLUDED.lon, bearing = EXCLUDED.bearing, stop_id = EXCLUDED.stop_id
+                    INSERT INTO position (
+                        vehicle_id,
+                        mta_id,
+                        stop_id,
+                        updated_at,
+                        status,
+                        lat,
+                        lon,
+                        bearing
+                    )
+                    SELECT *
+                    FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[], $6::float[], $7::float[], $8::float[])
+                    ON CONFLICT (vehicle_id) DO UPDATE SET
+                        updated_at = EXCLUDED.updated_at,
+                        lat = EXCLUDED.lat,
+                        lon = EXCLUDED.lon,
+                        bearing = EXCLUDED.bearing,
+                        stop_id = EXCLUDED.stop_id
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
@@ -143,6 +159,51 @@ impl Position {
                     &bearings as &[f32],
                     // &passenger_data as &[Option<i32>],
                     // &capacities as &[Option<i32>]
+                ).execute(pool).await?;
+            }
+            Some(PositionData::OBABus { .. }) => {
+                let mut passengers = vec![];
+                let mut capacities = vec![];
+
+                for v in values {
+                    match v.data {
+                        PositionData::OBABus {
+                            passengers: p,
+                            capacity: c,
+                        } => {
+                            passengers.push(p);
+                            capacities.push(c);
+                        }
+                        _ => unreachable!("all positions should be the same type"),
+                    }
+                }
+
+                // stop_id is taken from GTFS, so we don't set it here
+                sqlx::query!(
+                    r#"
+                    INSERT INTO position (
+                        vehicle_id,
+                        mta_id,
+                        updated_at,
+                        status,
+                        passengers,
+                        capacity
+                    )
+                    SELECT *
+                    FROM UNNEST($1::text[], $2::text[], $3::timestamptz[], $4::text[], $5::int[], $6::int[])
+                    ON CONFLICT (vehicle_id) DO UPDATE SET
+                        mta_id = EXCLUDED.mta_id,
+                        updated_at = EXCLUDED.updated_at,
+                        status = EXCLUDED.status,
+                        passengers = EXCLUDED.passengers,
+                        capacity = EXCLUDED.capacity
+                    "#,
+                    &vehicle_ids,
+                    &mta_ids as &[Option<String>],
+                    &updated_ats,
+                    &statuses as &[String],
+                    &passengers as &[Option<i32>],
+                    &capacities as &[Option<i32>]
                 ).execute(pool).await?;
             }
             None => tracing::warn!("No positions to insert"),
@@ -195,48 +256,48 @@ impl Position {
     // }
 }
 
-impl SiriPosition {
-    pub async fn update(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
-        let vehicle_ids = values
-            .iter()
-            .map(|v| v.vehicle_id.clone())
-            .collect::<Vec<_>>();
-        let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
-        let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
-        let passengers = values.iter().map(|v| v.passengers).collect::<Vec<_>>();
-        let capacities = values.iter().map(|v| v.capacity).collect::<Vec<_>>();
+// impl SiriPosition {
+//     pub async fn update(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
+//         let vehicle_ids = values
+//             .iter()
+//             .map(|v| v.vehicle_id.clone())
+//             .collect::<Vec<_>>();
+//         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
+//         let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
+//         let passengers = values.iter().map(|v| v.passengers).collect::<Vec<_>>();
+//         let capacities = values.iter().map(|v| v.capacity).collect::<Vec<_>>();
 
-        sqlx::query!(
-            r#"
-            WITH updated_values AS (
-                SELECT
-                    unnest($1::text[]) AS vehicle_id,
-                    unnest($2::text[]) AS mta_id,
-                    unnest($3::text[]) AS status,
-                    unnest($4::int[]) AS passengers,
-                    unnest($5::int[]) AS capacity
-            )
-            UPDATE position
-            SET
-                status = updated_values.status,
-                passengers = updated_values.passengers,
-                capacity = updated_values.capacity
-            FROM updated_values
-            WHERE position.vehicle_id = updated_values.vehicle_id
-              AND position.mta_id = updated_values.mta_id
-            "#,
-            &vehicle_ids,
-            &mta_ids as &[String],
-            &statuses as &[String],
-            &passengers as &[Option<i32>],
-            &capacities as &[Option<i32>]
-        )
-        .execute(pool)
-        .await?;
+//         sqlx::query!(
+//             r#"
+//             WITH updated_values AS (
+//                 SELECT
+//                     unnest($1::text[]) AS vehicle_id,
+//                     unnest($2::text[]) AS mta_id,
+//                     unnest($3::text[]) AS status,
+//                     unnest($4::int[]) AS passengers,
+//                     unnest($5::int[]) AS capacity
+//             )
+//             UPDATE position
+//             SET
+//                 status = updated_values.status,
+//                 passengers = updated_values.passengers,
+//                 capacity = updated_values.capacity
+//             FROM updated_values
+//             WHERE position.vehicle_id = updated_values.vehicle_id
+//               AND position.mta_id = updated_values.mta_id
+//             "#,
+//             &vehicle_ids,
+//             &mta_ids as &[String],
+//             &statuses as &[String],
+//             &passengers as &[Option<i32>],
+//             &capacities as &[Option<i32>]
+//         )
+//         .execute(pool)
+//         .await?;
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 #[derive(Debug)]
 pub enum IntoPositionError {

@@ -21,6 +21,7 @@ use tokio::{
 
 pub mod alert;
 pub mod bus;
+pub mod oba;
 pub mod position;
 pub mod siri;
 pub mod stop_time;
@@ -59,11 +60,11 @@ pub enum ImportError {
     #[error("SQLX error: {0}")]
     Sqlx(#[from] sqlx::Error),
     #[error("SIRI decode error: {0}")]
-    SiriDecode(#[from] siri::DecodeSiriError),
+    BusDecode(#[from] bus::DecodeError),
     #[error("reqwest error: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("protobuf decode error: {0}")]
-    Decode(#[from] prost::DecodeError),
+    ProtobufDecode(#[from] prost::DecodeError),
     #[error("Failed to parse: {0}")]
     Parse(String),
 }
@@ -77,9 +78,11 @@ pub async fn import(
 ) {
     let c_pool = pool.clone();
     if !read_only {
-        let t_pool = pool.clone();
-        let b_pool = pool.clone();
-        let s_pool = pool.clone();
+        let train_pool = pool.clone();
+        let bus_pool = pool.clone();
+        let siri_pool = pool.clone();
+        let oba_pool = pool.clone();
+
         let redis_pool = redis_pool.clone();
 
         tokio::spawn(async move {
@@ -93,7 +96,7 @@ pub async fn import(
 
         tokio::spawn(async move {
             loop {
-                let _ = train::import(&t_pool)
+                let _ = train::import(&train_pool)
                     .await
                     .inspect_err(|e| tracing::error!("train::import: {:#?}", e));
                 sleep(Duration::from_secs(35)).await;
@@ -102,7 +105,7 @@ pub async fn import(
 
         tokio::spawn(async move {
             loop {
-                if let Err(e) = bus::import(&b_pool).await {
+                if let Err(e) = bus::import(&bus_pool).await {
                     tracing::error!("bus::import: {:#?}", e);
                     if let ImportError::Sqlx(err) = e {
                         // This error probably means theres a new bus stop, so we will update static data
@@ -113,7 +116,7 @@ pub async fn import(
                             let notify2 = notify.clone();
 
                             crate::static_data::import(
-                                b_pool.clone(),
+                                bus_pool.clone(),
                                 notify,
                                 redis_pool.clone(),
                                 true,
@@ -141,10 +144,17 @@ pub async fn import(
         });
 
         tokio::spawn(async move {
+            let _ = bus::import_oba(&oba_pool)
+                .await
+                .inspect_err(|e| tracing::error!("bus::import_oba: {:#?}", e));
+            sleep(Duration::from_secs(35)).await;
+        });
+
+        tokio::spawn(async move {
             loop {
-                let _ = bus::import_siri(&s_pool).await.inspect_err(|e| match e {
+                let _ = bus::import_siri(&siri_pool).await.inspect_err(|e| match e {
                     // ignore decode errors because they happen often. I think this happens bc sometimes the API takes longer than 30 seconds to respond.
-                    ImportError::SiriDecode(_) => (),
+                    ImportError::BusDecode(_) => (),
                     e => tracing::error!("bus::import_siri: {}", e),
                 });
                 sleep(Duration::from_secs(45)).await;
