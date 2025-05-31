@@ -19,6 +19,7 @@ export type TripData = TrainTripData | BusTripData;
 
 interface BaseTripData {
 	stop_id?: number;
+	// TODO: add more options to status here
 	status: 'none' | 'incoming' | 'at_stop' | 'in_transit_to' | 'layover';
 }
 

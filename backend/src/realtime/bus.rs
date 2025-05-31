@@ -1,6 +1,6 @@
 use super::{
     ImportError, decode,
-    position::{IntoPositionError, Position, PositionData, SiriPosition, Status},
+    position::{IntoPositionError, Position, PositionData, SiriPosition},
     siri::{self, MonitoredVehicleJourney},
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
@@ -235,7 +235,7 @@ impl TryFrom<BusVehiclePosition> for Position {
             mta_id,
             stop_id,
             updated_at: Utc::now(),
-            status: Status::None,
+            status: "none".into(),
             data: PositionData::Bus {
                 lat: position.latitude,
                 lon: position.longitude,
@@ -273,15 +273,16 @@ impl From<MonitoredVehicleJourney> for SiriPosition {
         let mta_id = value.framed_vehicle_journey_ref.dated_vehicle_journey_ref;
 
         let progress_status = value.progress_status.and_then(|s| s.into_iter().nth(0));
-        let status = match progress_status.as_deref() {
-            Some("layover") => Status::Layover,
-            Some("spooking") => Status::Spooking,
-            _ => {
-                // dbg!(progress_status);
+        let status = progress_status.unwrap_or_else(|| "none".to_string());
+        // let status = match progress_status.as_deref() {
+        //     Some("layover") => Status::Layover,
+        //     Some("spooking") => Status::Spooking,
+        //     _ => {
+        //         // dbg!(progress_status);
 
-                Status::None
-            }
-        };
+        //         Status::None
+        //     }
+        // };
 
         Self {
             vehicle_id: value.vehicle_ref,

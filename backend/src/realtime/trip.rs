@@ -1,4 +1,3 @@
-use super::position::Status;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
@@ -40,14 +39,15 @@ pub enum TripData {
     Train {
         express: bool,
         assigned: bool,
+        // TODO: get list of possible statuses
         /// Can be `None` `Incoming`, `AtStop`, or `InTransitTo`
-        status: Status,
+        status: String,
         /// Last known stop ID
         stop_id: Option<String>,
     },
     Bus {
         /// Can be `None` `Spooking`, `Layover`, or `NoProgress`
-        status: Status,
+        status: String,
         /// Last known stop ID
         stop_id: Option<String>,
         lat: Option<f32>,
@@ -65,14 +65,14 @@ impl TripData {
         Self::Train {
             express,
             assigned,
-            status: Status::default(),
+            status: "none".into(),
             stop_id: None,
         }
     }
 
     pub fn default_bus() -> Self {
         Self::Bus {
-            status: Status::default(),
+            status: "none".into(),
             stop_id: None,
             lat: None,
             lon: None,
