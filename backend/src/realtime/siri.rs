@@ -1,7 +1,8 @@
+use super::bus::{DecodeError, de_remove_underscore_prefix};
 use crate::api_key;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
-pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeSiriError> {
+pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeError> {
     let siri_res = reqwest::Client::new()
         .get("https://api.prod.obanyc.com/api/siri/vehicle-monitoring.json")
         .query(&[("key", api_key()), ("version", "2")])
@@ -18,7 +19,7 @@ pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeSiriError> {
         .vehicle_monitoring_delivery
         .into_iter()
         .next()
-        .ok_or(DecodeSiriError::NoVehicles)
+        .ok_or(DecodeError::NoVehicles)
 }
 
 // let mut progresses = Vec::new();
@@ -79,67 +80,46 @@ pub struct VehicleActivity {
     pub monitored_vehicle_journey: MonitoredVehicleJourney,
 }
 
-fn de_remove_prefix<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    str.split_once('_')
-        .map(|(_, id)| id.to_string())
-        .ok_or("failed to remove prefix")
-        .map_err(serde::de::Error::custom)
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct MonitoredVehicleJourney {
-    // #[serde(deserialize_with = "de_remove_prefix")]
+    // #[serde(deserialize_with = "de_remove_underscore_prefix")]
     // line_ref: String,
     // #[serde(deserialize_with = "de_str_to_i16")]
     // direction_ref: i16,
-    pub framed_vehicle_journey_ref: JourneyRef,
+    // pub framed_vehicle_journey_ref: JourneyRef,
     // should be only 1 in vec
     // published_line_name: Vec<String>,
-    // #[serde(deserialize_with = "de_remove_prefix")]
+    #[serde(deserialize_with = "de_remove_underscore_prefix")]
     pub vehicle_ref: String,
     // progress_rate: String,
-    pub progress_status: Option<Vec<String>>,
-    pub monitored_call: Option<MonitoredCall>,
+    // pub progress_status: Option<Vec<String>>,
+    // pub monitored_call: Option<MonitoredCall>,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct JourneyRef {
-    // data_frame_ref: chrono::NaiveDate,
-    #[serde(deserialize_with = "de_remove_prefix")]
-    pub dated_vehicle_journey_ref: String,
-}
+// #[derive(Deserialize)]
+// #[serde(rename_all = "PascalCase")]
+// pub struct JourneyRef {
+//     // data_frame_ref: chrono::NaiveDate,
+//     #[serde(deserialize_with = "de_remove_underscore_prefix")]
+//     pub dated_vehicle_journey_ref: String,
+// }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct MonitoredCall {
-    pub extensions: Option<Extensions>,
-}
+// #[derive(Deserialize)]
+// #[serde(rename_all = "PascalCase")]
+// pub struct MonitoredCall {
+//     pub extensions: Option<Extensions>,
+// }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct Extensions {
-    pub capacities: Capacities,
-}
+// #[derive(Deserialize)]
+// #[serde(rename_all = "PascalCase")]
+// pub struct Extensions {
+//     pub capacities: Capacities,
+// }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct Capacities {
-    pub estimated_passenger_count: i32,
-    pub estimated_passenger_capacity: i32,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum DecodeSiriError {
-    #[error("{0}")]
-    Reqwest(#[from] reqwest::Error),
-    #[error("{0}")]
-    Decode(#[from] serde_json::Error),
-    #[error("No vehicles")]
-    NoVehicles,
-}
+// #[derive(Deserialize)]
+// #[serde(rename_all = "PascalCase")]
+// pub struct Capacities {
+//     pub estimated_passenger_count: i32,
+//     pub estimated_passenger_capacity: i32,
+// }

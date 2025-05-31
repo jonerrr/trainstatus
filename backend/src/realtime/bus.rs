@@ -1,7 +1,7 @@
 use super::{
-    ImportError, decode,
-    position::{IntoPositionError, Position, PositionData, SiriPosition},
-    siri::{self, MonitoredVehicleJourney},
+    ImportError, decode, oba,
+    position::{IntoPositionError, Position, PositionData},
+    siri,
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
 };
@@ -9,6 +9,7 @@ use crate::feed::{TripUpdate, VehiclePosition, trip_update::StopTimeUpdate};
 use chrono::{DateTime, Utc};
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
+use serde::{Deserialize as _, Deserializer};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -102,17 +103,47 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
+pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
+    let vehicles = oba::decode().await?;
+
+    let positions: Vec<Position> = vehicles.into_iter().map(|v| v.into()).collect();
+
+    Position::insert(positions, pool).await?;
+
+    Ok(())
+}
+
 pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
     let vehicles = siri::decode().await?;
-
-    let positions: Vec<SiriPosition> = vehicles
+    let vehicle_ids = vehicles
         .vehicle_activity
-        .into_par_iter()
-        .map(|v| v.monitored_vehicle_journey.into())
-        .collect();
+        .into_iter()
+        .map(|v| v.monitored_vehicle_journey.vehicle_ref)
+        .collect::<Vec<_>>();
 
-    SiriPosition::update(positions, pool).await?;
+    if !vehicle_ids.is_empty() {
+        let missing_vehicle_ids: Vec<Option<String>> = sqlx::query_scalar!(
+            r#"
+            SELECT siri_id
+            FROM unnest($1::TEXT[]) AS siri_id_table(siri_id)
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM position p
+                WHERE p.vehicle_id = siri_id_table.siri_id
+            )
+            "#,
+            &vehicle_ids
+        )
+        .fetch_all(pool)
+        .await?;
 
+        if !missing_vehicle_ids.is_empty() {
+            tracing::warn!(
+                "SIRI vehicle_ids not found in positions table: {:?}",
+                missing_vehicle_ids
+            );
+        }
+    }
     Ok(())
 }
 
@@ -252,44 +283,89 @@ impl TryFrom<BusVehiclePosition> for Position {
     }
 }
 
-impl From<MonitoredVehicleJourney> for SiriPosition {
-    fn from(value: MonitoredVehicleJourney) -> Self {
-        let (passengers, capacity) = value
-            .monitored_call
-            .and_then(|c| {
-                c.extensions.map(|e| {
-                    (
-                        e.capacities.estimated_passenger_count,
-                        e.capacities.estimated_passenger_capacity,
-                    )
-                })
-            })
-            .unzip();
+// impl From<MonitoredVehicleJourney> for SiriPosition {
+//     fn from(value: MonitoredVehicleJourney) -> Self {
+//         let (passengers, capacity) = value
+//             .monitored_call
+//             .and_then(|c| {
+//                 c.extensions.map(|e| {
+//                     (
+//                         e.capacities.estimated_passenger_count,
+//                         e.capacities.estimated_passenger_capacity,
+//                     )
+//                 })
+//             })
+//             .unzip();
 
-        // if value.vehicle_ref == "7892" {
-        //     dbg!(&value);
-        // }
+//         // if value.vehicle_ref == "7892" {
+//         //     dbg!(&value);
+//         // }
 
-        let mta_id = value.framed_vehicle_journey_ref.dated_vehicle_journey_ref;
+//         let mta_id = value.framed_vehicle_journey_ref.dated_vehicle_journey_ref;
 
-        let progress_status = value.progress_status.and_then(|s| s.into_iter().nth(0));
-        let status = progress_status.unwrap_or_else(|| "none".to_string());
-        // let status = match progress_status.as_deref() {
-        //     Some("layover") => Status::Layover,
-        //     Some("spooking") => Status::Spooking,
-        //     _ => {
-        //         // dbg!(progress_status);
+//         let progress_status = value.progress_status.and_then(|s| s.into_iter().nth(0));
+//         let status = progress_status.unwrap_or_else(|| "none".to_string());
+//         // let status = match progress_status.as_deref() {
+//         //     Some("layover") => Status::Layover,
+//         //     Some("spooking") => Status::Spooking,
+//         //     _ => {
+//         //         // dbg!(progress_status);
 
-        //         Status::None
-        //     }
-        // };
+//         //         Status::None
+//         //     }
+//         // };
 
+//         Self {
+//             vehicle_id: value.vehicle_ref,
+//             mta_id,
+//             status,
+//             passengers,
+//             capacity,
+//         }
+//     }
+// }
+
+impl From<oba::VehicleStatus> for Position {
+    fn from(value: oba::VehicleStatus) -> Self {
         Self {
-            vehicle_id: value.vehicle_ref,
-            mta_id,
-            status,
-            passengers,
-            capacity,
+            vehicle_id: value.vehicle_id,
+            mta_id: value.trip_id,
+            stop_id: None,
+            updated_at: value.last_update_time,
+            status: value.phase,
+            data: PositionData::OBABus {
+                passengers: value.occupancy_count,
+                capacity: value.occupancy_capacity,
+            },
         }
     }
+}
+
+// used to remove the prefix from the vehicle id and trip id
+pub fn de_remove_underscore_prefix<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str = String::deserialize(deserializer)?;
+    str.split_once('_')
+        .map(|(_, id)| id.to_string())
+        .ok_or("failed to remove prefix")
+        .map_err(serde::de::Error::custom)
+}
+
+// maybe move somewhere else
+#[derive(thiserror::Error, Debug)]
+pub enum DecodeError {
+    // SIRI stuff
+    #[error("{0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("{0}")]
+    Decode(#[from] serde_json::Error),
+    #[error("No vehicles")]
+    NoVehicles,
+    // OBA stuff
+    #[error("OBA: Out of range")]
+    OutOfRange,
+    #[error("OBA: Limit exceeded")]
+    LimitExceeded,
 }
