@@ -109,6 +109,7 @@ pub async fn import(
                     tracing::error!("bus::import: {:#?}", e);
                     if let ImportError::Sqlx(err) = e {
                         // This error probably means theres a new bus stop, so we will update static data
+                        // TODO: maybe name the constraint, just in case some postgres version doesn't name it the same way
                         if err.to_string().contains("stop_time_stop_id_fkey") {
                             tracing::warn!("updating static data for new bus stop");
 
