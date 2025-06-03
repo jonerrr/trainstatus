@@ -4,11 +4,21 @@ use geo::{CoordsIter, LinesIter};
 use redis::AsyncCommands;
 use serde_json::json;
 use sqlx::PgPool;
-use std::{io::Cursor, sync::Arc, time::Duration};
+use std::{
+    io::Cursor,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use tokio::{sync::Notify, time::sleep};
 
 pub mod route;
 pub mod stop;
+
+// Global flag to prevent concurrent import operations
+static IS_IMPORTING: AtomicBool = AtomicBool::new(false);
 
 pub async fn import(
     pool: PgPool,
@@ -18,123 +28,152 @@ pub async fn import(
     update_once: bool,
 ) {
     tokio::spawn(async move {
-        // prevent infinite loops when force update is true
-        let mut force_update_flag = force_update;
-
-        loop {
-            let last_updated = sqlx::query!("SELECT update_at FROM last_update")
-                .fetch_optional(&pool)
-                .await
-                .unwrap();
-
-            // If force update, then don't check for last updated
-            if !force_update_flag {
-                // Data should be refreshed every 3 days
-                if let Some(last_updated) = last_updated {
-                    tracing::info!("Last updated at: {}", last_updated.update_at);
-
-                    notify.notify_one();
-
-                    let duration_since_last_update =
-                        Utc::now().signed_duration_since(last_updated.update_at);
-
-                    // Sleep until it has been 3 days, take into account the time since last update
-                    let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
-                        .checked_sub(duration_since_last_update.to_std().unwrap());
-
-                    if let Some(sleep_time) = sleep_time {
-                        tracing::info!("Waiting {} seconds before updating", sleep_time.as_secs());
-                        sleep(sleep_time).await;
-                    }
-                }
-            } else {
-                // prevent infinite loops when force update is true
-                force_update_flag = false;
-            }
-
-            tracing::info!("Updating static data");
-
-            let gtfs = reqwest::Client::new()
-                .get("https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip")
-                .send()
-                .await
-                .unwrap()
-                .bytes()
-                .await
-                .unwrap();
-
-            // TODO: figure out a cleaner way to extract multiple files from zip (without cloning)
-            let (gtfs_routes, gtfs_transfers, gtfs_shapes) =
-                tokio::task::spawn_blocking(move || {
-                    let reader = Cursor::new(gtfs);
-                    let mut archive = zip::ZipArchive::new(reader).unwrap();
-                    let mut archive2 = archive.clone();
-                    let mut archive3 = archive.clone();
-
-                    let routes_file = archive.by_name("routes.txt").unwrap();
-                    let transfers_file = archive2.by_name("transfers.txt").unwrap();
-                    let shape_file = archive3.by_name("shapes.txt").unwrap();
-
-                    let mut routes_rdr = csv::Reader::from_reader(routes_file);
-                    let mut transfers_rdr = csv::Reader::from_reader(transfers_file);
-                    let mut shape_rdr = csv::Reader::from_reader(shape_file);
-
-                    let routes = routes_rdr
-                        .deserialize()
-                        .collect::<Result<Vec<route::GtfsRoute>, csv::Error>>()
-                        .unwrap();
-
-                    let transfers = transfers_rdr
-                        .deserialize()
-                        .collect::<Result<Vec<stop::Transfer<String>>, csv::Error>>()
-                        .unwrap();
-
-                    let shapes = shape_rdr
-                        .deserialize()
-                        .collect::<Result<Vec<route::GtfsShape>, csv::Error>>()
-                        .unwrap();
-
-                    (routes, transfers, shapes)
-                })
-                .await
-                .unwrap();
-
-            let mut routes = route::Route::parse_train(gtfs_routes, gtfs_shapes).await;
-            let (mut stops, mut route_stops) = stop::Stop::parse_train(
-                routes.iter().map(|r| r.id.clone()).collect(),
-                gtfs_transfers,
-            )
-            .await;
-            let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
-                route::Route::parse_bus().await;
-            routes.append(&mut bus_routes);
-            stops.append(&mut bus_stops);
-            route_stops.append(&mut bus_route_stops);
-
-            // dbg!(bus_route_stops.len());
-            route::Route::insert(routes, &pool).await;
-            stop::Stop::insert(stops, &pool).await;
-
-            stop::RouteStop::insert(route_stops, &pool).await;
-
-            // remove old update_ats
-            sqlx::query!("DELETE FROM last_update")
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
-                .execute(&pool)
-                .await
-                .unwrap();
-
-            cache_all(&pool, &redis_pool).await.unwrap();
-
-            tracing::info!("Data updated");
+        // Check if already importing to prevent concurrent operations
+        // TODO: If the import was called from realtime::mod.rs, block until the import is done
+        if IS_IMPORTING
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            tracing::warn!("Import operation already in progress, skipping");
             notify.notify_one();
+            return;
+        }
 
-            if update_once {
-                break;
+        // Use a closure to ensure the flag is reset even if an error occurs
+        let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = async {
+            // prevent infinite loops when force update is true
+            let mut force_update_flag = force_update;
+
+            loop {
+                let last_updated = sqlx::query!("SELECT update_at FROM last_update")
+                    .fetch_optional(&pool)
+                    .await
+                    .unwrap();
+
+                // If force update, then don't check for last updated
+                if !force_update_flag {
+                    // Data should be refreshed every 3 days
+                    if let Some(last_updated) = last_updated {
+                        tracing::info!("Last updated at: {}", last_updated.update_at);
+
+                        notify.notify_one();
+
+                        let duration_since_last_update =
+                            Utc::now().signed_duration_since(last_updated.update_at);
+
+                        // Sleep until it has been 3 days, take into account the time since last update
+                        let sleep_time = Duration::from_secs(60 * 60 * 24 * 3)
+                            .checked_sub(duration_since_last_update.to_std().unwrap());
+
+                        if let Some(sleep_time) = sleep_time {
+                            tracing::info!(
+                                "Waiting {} seconds before updating",
+                                sleep_time.as_secs()
+                            );
+                            sleep(sleep_time).await;
+                        }
+                    }
+                } else {
+                    // prevent infinite loops when force update is true
+                    force_update_flag = false;
+                }
+
+                tracing::info!("Updating static data");
+
+                let gtfs = reqwest::Client::new()
+                    .get("https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip")
+                    .send()
+                    .await
+                    .unwrap()
+                    .bytes()
+                    .await
+                    .unwrap();
+
+                // TODO: figure out a cleaner way to extract multiple files from zip (without cloning)
+                let (gtfs_routes, gtfs_transfers, gtfs_shapes) =
+                    tokio::task::spawn_blocking(move || {
+                        let reader = Cursor::new(gtfs);
+                        let mut archive = zip::ZipArchive::new(reader).unwrap();
+                        let mut archive2 = archive.clone();
+                        let mut archive3 = archive.clone();
+
+                        let routes_file = archive.by_name("routes.txt").unwrap();
+                        let transfers_file = archive2.by_name("transfers.txt").unwrap();
+                        let shape_file = archive3.by_name("shapes.txt").unwrap();
+
+                        let mut routes_rdr = csv::Reader::from_reader(routes_file);
+                        let mut transfers_rdr = csv::Reader::from_reader(transfers_file);
+                        let mut shape_rdr = csv::Reader::from_reader(shape_file);
+
+                        let routes = routes_rdr
+                            .deserialize()
+                            .collect::<Result<Vec<route::GtfsRoute>, csv::Error>>()
+                            .unwrap();
+
+                        let transfers = transfers_rdr
+                            .deserialize()
+                            .collect::<Result<Vec<stop::Transfer<String>>, csv::Error>>()
+                            .unwrap();
+
+                        let shapes = shape_rdr
+                            .deserialize()
+                            .collect::<Result<Vec<route::GtfsShape>, csv::Error>>()
+                            .unwrap();
+
+                        (routes, transfers, shapes)
+                    })
+                    .await
+                    .unwrap();
+
+                let mut routes = route::Route::parse_train(gtfs_routes, gtfs_shapes).await;
+                let (mut stops, mut route_stops) = stop::Stop::parse_train(
+                    routes.iter().map(|r| r.id.clone()).collect(),
+                    gtfs_transfers,
+                )
+                .await;
+                let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
+                    route::Route::parse_bus().await;
+                routes.append(&mut bus_routes);
+                stops.append(&mut bus_stops);
+                route_stops.append(&mut bus_route_stops);
+
+                // dbg!(bus_route_stops.len());
+                route::Route::insert(routes, &pool).await;
+                stop::Stop::insert(stops, &pool).await;
+
+                stop::RouteStop::insert(route_stops, &pool).await;
+
+                // remove old update_ats
+                sqlx::query!("DELETE FROM last_update")
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+
+                cache_all(&pool, &redis_pool).await.unwrap();
+
+                tracing::info!("Data updated");
+                notify.notify_one();
+
+                if update_once {
+                    break;
+                }
             }
+
+            Ok(())
+        }
+        .await;
+
+        // Reset the flag
+        IS_IMPORTING.store(false, Ordering::Release);
+
+        // Log the result
+        match result {
+            Ok(_) => tracing::info!("Import operation completed successfully"),
+            Err(e) => tracing::error!("Import operation failed: {}", e),
         }
     });
 }
