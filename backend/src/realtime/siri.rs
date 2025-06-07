@@ -1,5 +1,6 @@
 use super::bus::{DecodeError, de_remove_underscore_prefix};
 use crate::api_key;
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 pub async fn decode() -> Result<VehicleMonitoringDelivery, DecodeError> {
@@ -78,6 +79,7 @@ pub struct VehicleMonitoringDelivery {
 #[serde(rename_all = "PascalCase")]
 pub struct VehicleActivity {
     pub monitored_vehicle_journey: MonitoredVehicleJourney,
+    pub recorded_at_time: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]

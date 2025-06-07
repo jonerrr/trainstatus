@@ -147,6 +147,37 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // TODO: remove if not needed
     // let trips = trips.into_par_iter().map(|t| t.0).collect::<Vec<Trip>>();
 
+    // check for duplicates in trips and positions
+    let mut trip_counts = std::collections::HashMap::new();
+    for trip in &trips {
+        let key = (
+            &trip.mta_id,
+            &trip.vehicle_id,
+            trip.created_at.date_naive(),
+            trip.direction,
+            &trip.route_id,
+        );
+        *trip_counts.entry(key).or_insert(0) += 1;
+    }
+
+    let duplicates: Vec<_> = trip_counts
+        .iter()
+        .filter(|&(_, &count)| count > 1)
+        .collect();
+    if !duplicates.is_empty() {
+        tracing::warn!("Duplicate trips found: {:?}", duplicates);
+    }
+
+    let mut pos_counts = std::collections::HashMap::new();
+    for pos in &positions {
+        *pos_counts.entry(&pos.vehicle_id).or_insert(0) += 1;
+    }
+
+    let pos_duplicates: Vec<_> = pos_counts.iter().filter(|&(_, &count)| count > 1).collect();
+    if !pos_duplicates.is_empty() {
+        tracing::warn!("Duplicate positions found: {:?}", pos_duplicates);
+    }
+
     Trip::insert(trips, pool).await?;
     tracing::debug!("trips inserted");
     // TODO: figure out why tf there are duplicate stop times rarely
