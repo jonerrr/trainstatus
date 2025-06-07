@@ -129,7 +129,7 @@ pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM position p
-                WHERE p.vehicle_id = siri_id_table.siri_id
+                WHERE p.vehicle_id = siri_id_table.siri_id AND p.updated_at > NOW() - INTERVAL '5 minutes'
             )
             "#,
             &vehicle_ids
