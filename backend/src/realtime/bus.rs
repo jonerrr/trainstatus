@@ -115,24 +115,30 @@ pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
 
 pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
     let vehicles = siri::decode().await?;
-    let vehicle_ids = vehicles
+    let vehicle_data: Vec<(String, DateTime<Utc>)> = vehicles
         .vehicle_activity
         .into_iter()
-        .map(|v| v.monitored_vehicle_journey.vehicle_ref)
+        .map(|v| (v.monitored_vehicle_journey.vehicle_ref, v.recorded_at_time))
         .collect::<Vec<_>>();
 
-    if !vehicle_ids.is_empty() {
+    if !vehicle_data.is_empty() {
+        let vehicle_ids: Vec<String> = vehicle_data.iter().map(|(id, _)| id.clone()).collect();
+        let recorded_times: Vec<DateTime<Utc>> =
+            vehicle_data.iter().map(|(_, time)| *time).collect();
+
         let missing_vehicle_ids: Vec<Option<String>> = sqlx::query_scalar!(
             r#"
-            SELECT siri_id
-            FROM unnest($1::TEXT[]) AS siri_id_table(siri_id)
+            SELECT vehicle_time.vehicle_id
+            FROM unnest($1::TEXT[], $2::TIMESTAMPTZ[]) AS vehicle_time(vehicle_id, recorded_at)
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM position p
-                WHERE p.vehicle_id = siri_id_table.siri_id AND p.updated_at > NOW() - INTERVAL '5 minutes'
+                WHERE p.vehicle_id = vehicle_time.vehicle_id 
+                AND p.updated_at > vehicle_time.recorded_at - INTERVAL '5 minutes'
             )
             "#,
-            &vehicle_ids
+            &vehicle_ids,
+            &recorded_times
         )
         .fetch_all(pool)
         .await?;
