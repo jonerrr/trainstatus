@@ -95,7 +95,7 @@ pub struct MonitoredVehicleJourney {
     #[serde(deserialize_with = "de_remove_underscore_prefix")]
     pub vehicle_ref: String,
     // progress_rate: String,
-    // pub progress_status: Option<Vec<String>>,
+    pub progress_status: Option<Vec<String>>,
     // pub monitored_call: Option<MonitoredCall>,
 }
 

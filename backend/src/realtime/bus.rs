@@ -115,16 +115,18 @@ pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
 
 pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
     let vehicles = siri::decode().await?;
-    let vehicle_data: Vec<(String, DateTime<Utc>)> = vehicles
-        .vehicle_activity
-        .into_iter()
-        .map(|v| (v.monitored_vehicle_journey.vehicle_ref, v.recorded_at_time))
-        .collect::<Vec<_>>();
 
-    if !vehicle_data.is_empty() {
-        let vehicle_ids: Vec<String> = vehicle_data.iter().map(|(id, _)| id.clone()).collect();
-        let recorded_times: Vec<DateTime<Utc>> =
-            vehicle_data.iter().map(|(_, time)| *time).collect();
+    if !vehicles.vehicle_activity.is_empty() {
+        let vehicle_ids: Vec<String> = vehicles
+            .vehicle_activity
+            .iter()
+            .map(|v| v.monitored_vehicle_journey.vehicle_ref.clone())
+            .collect();
+        let recorded_times: Vec<DateTime<Utc>> = vehicles
+            .vehicle_activity
+            .iter()
+            .map(|v| v.recorded_at_time)
+            .collect();
 
         let missing_vehicle_ids: Vec<Option<String>> = sqlx::query_scalar!(
             r#"
@@ -133,8 +135,8 @@ pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM position p
-                WHERE p.vehicle_id = vehicle_time.vehicle_id 
-                AND p.updated_at > vehicle_time.recorded_at - INTERVAL '5 minutes'
+                WHERE p.vehicle_id = vehicle_time.vehicle_id
+                AND p.updated_at >= vehicle_time.recorded_at - INTERVAL '5 minutes'
             )
             "#,
             &vehicle_ids,
@@ -144,10 +146,21 @@ pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
         .await?;
 
         if !missing_vehicle_ids.is_empty() {
-            tracing::warn!(
-                "SIRI vehicle_ids not found in positions table: {:?}",
-                missing_vehicle_ids
-            );
+            for missing_id in &missing_vehicle_ids {
+                if let Some(id) = missing_id {
+                    if let Some(vehicle) = vehicles
+                        .vehicle_activity
+                        .iter()
+                        .find(|v| &v.monitored_vehicle_journey.vehicle_ref == id)
+                    {
+                        tracing::warn!(
+                            "Missing vehicle_id: {}, progress_status: {:?}",
+                            id,
+                            vehicle.monitored_vehicle_journey.progress_status
+                        );
+                    }
+                }
+            }
         }
     }
     Ok(())
