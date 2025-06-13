@@ -80,7 +80,7 @@ pub async fn import(
     if !read_only {
         let train_pool = pool.clone();
         let bus_pool = pool.clone();
-        let siri_pool = pool.clone();
+        // let siri_pool = pool.clone();
         let oba_pool = pool.clone();
 
         let redis_pool = redis_pool.clone();
@@ -151,16 +151,16 @@ pub async fn import(
             sleep(Duration::from_secs(35)).await;
         });
 
-        tokio::spawn(async move {
-            loop {
-                let _ = bus::import_siri(&siri_pool).await.inspect_err(|e| match e {
-                    // ignore decode errors because they happen often. I think this happens bc sometimes the API takes longer than 30 seconds to respond.
-                    ImportError::BusDecode(_) => (),
-                    e => tracing::error!("bus::import_siri: {}", e),
-                });
-                sleep(Duration::from_secs(45)).await;
-            }
-        });
+        // tokio::spawn(async move {
+        //     loop {
+        //         let _ = bus::import_siri(&siri_pool).await.inspect_err(|e| match e {
+        //             // ignore decode errors because they happen often. I think this happens bc sometimes the API takes longer than 30 seconds to respond.
+        //             ImportError::BusDecode(_) => (),
+        //             e => tracing::error!("bus::import_siri: {}", e),
+        //         });
+        //         sleep(Duration::from_secs(45)).await;
+        //     }
+        // });
     }
 
     // sleep 10 seconds to wait for the feeds to be imported before caching
