@@ -28,7 +28,7 @@ prost = "0.14.0"
 rayon = "1.10.0"
 # TODO: update to redis 0.32.0 when bb8-redis is updated
 # redis = { version = "0.32.0", features = ["aio", "tokio-comp"] }
-redis = "0.31.0"
+redis = "0.32.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.19", default-features = false, features = [
     "json",
