@@ -227,14 +227,37 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     .execute(&mut *transaction)
     .await?;
 
-    // tracing::info!("inserting alerts");
+    let start_time = std::time::Instant::now();
+    let alerts_count = alerts.len();
+    let active_periods_count = active_periods.len();
+    let affected_entities_count = affected_entities.len();
+
     Alert::insert(alerts, &mut transaction).await?;
-    // tracing::info!("inserting active periods");
+    let alerts_duration = start_time.elapsed();
+    tracing::debug!("Inserted {} alerts in {:?}", alerts_count, alerts_duration);
+
+    let active_periods_start = std::time::Instant::now();
     ActivePeriod::insert(active_periods, &mut transaction).await?;
-    // tracing::info!("inserting affected entities");
+    let active_periods_duration = active_periods_start.elapsed();
+    tracing::debug!(
+        "Inserted {} active periods in {:?}",
+        active_periods_count,
+        active_periods_duration
+    );
+
+    let affected_entities_start = std::time::Instant::now();
     AffectedEntity::insert(affected_entities, &mut transaction).await?;
+    let affected_entities_duration = affected_entities_start.elapsed();
+    tracing::debug!(
+        "Inserted {} affected entities in {:?}",
+        affected_entities_count,
+        affected_entities_duration
+    );
 
     transaction.commit().await?;
+
+    let total_duration = start_time.elapsed();
+    tracing::debug!("Total alert import completed in {:?}", total_duration);
 
     Ok(())
 }
@@ -485,6 +508,7 @@ impl AffectedEntity {
         let stop_ids = values.iter().map(|ae| ae.stop_id).collect::<Vec<_>>();
         let sort_orders = values.iter().map(|ae| ae.sort_order).collect::<Vec<_>>();
 
+        // TODO: find some efficient way to log rows that don't get inserted
         sqlx::query!(
             r#"
             INSERT INTO affected_entity (
@@ -494,10 +518,21 @@ impl AffectedEntity {
                 sort_order
             )
             SELECT
-                unnest($1::uuid[]),
-                unnest($2::text[]),
-                unnest($3::int[]),
-                unnest($4::int[])
+                data.alert_id,
+                data.route_id,
+                data.stop_id,
+                data.sort_order
+            FROM (
+                SELECT
+                    unnest($1::uuid[]) as alert_id,
+                    unnest($2::text[]) as route_id,
+                    unnest($3::int[]) as stop_id,
+                    unnest($4::int[]) as sort_order
+            ) data
+            LEFT JOIN route r ON data.route_id = r.id
+            LEFT JOIN stop s ON data.stop_id = s.id
+            WHERE (data.route_id IS NULL OR r.id IS NOT NULL)
+            AND (data.stop_id IS NULL OR s.id IS NOT NULL)
             ON CONFLICT DO NOTHING
             "#,
             &alert_ids,
