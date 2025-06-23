@@ -1938,7 +1938,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8189daf915866b24b097b7775fbdd5a105cc3a44da13637d4b0961be73e8bc2d"
 dependencies = [
  "heck",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -1958,7 +1958,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26ac3e3c6b0e1c219e61ceda600eaad26d7195ecc9b5c027925c904091374ab5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -2124,9 +2124,9 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.32.0"
+version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd673deb3d184140109c1e27b043c2354cb79399c3ef304c365fc628092ed773"
+checksum = "f2f6fd3fd5bb3a9a48819ae5cbad501968f208c1abd139649e7e2cf5d7f4b40b"
 dependencies = [
  "bytes",
  "cfg-if",
