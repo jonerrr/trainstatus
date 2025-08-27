@@ -1,5 +1,5 @@
 [tools]
-node = "23"
+node = "latest"
 pnpm = "latest"
 [env]
 # VITE_ALLOWED_HOSTS = ""
