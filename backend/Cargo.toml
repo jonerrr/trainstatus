@@ -58,7 +58,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 utoipa = { version = "5.4.0", features = ["uuid", "chrono", "axum_extras"] }
 utoipa-axum = "0.2.0"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
-uuid = { version = "1.17.0", features = ["serde", "v7"] }
+uuid = { version = "1.18.0", features = ["serde", "v7"] }
 zip = "4.2.0"
 
 [build-dependencies]
