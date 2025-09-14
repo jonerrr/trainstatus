@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO stop (id, name, geom, route_type, ada, north_headsign, south_headsign, notes, borough, direction)\n            SELECT * FROM UNNEST(\n                $1::INTEGER[],\n                $2::TEXT[],\n                $3::GEOMETRY[],\n                $4::route_type[],\n                $5::BOOLEAN[],\n                $6::TEXT[],\n                $7::TEXT[],\n                $8::TEXT[],\n                $9::borough[],\n                $10::bus_direction[]\n            )\n            ON CONFLICT (id) DO UPDATE SET\n                name = EXCLUDED.name,\n                geom = EXCLUDED.geom,\n                route_type = EXCLUDED.route_type,\n                ada = EXCLUDED.ada,\n                north_headsign = EXCLUDED.north_headsign,\n                south_headsign = EXCLUDED.south_headsign,\n                notes = EXCLUDED.notes,\n                borough = EXCLUDED.borough,\n                direction = EXCLUDED.direction\n            ",
+  "query": "\n            INSERT INTO static.stop (id, name, geom, route_type, ada, north_headsign, south_headsign, notes, borough, direction)\n            SELECT * FROM UNNEST(\n                $1::INTEGER[],\n                $2::TEXT[],\n                $3::GEOMETRY[],\n                $4::static.route_type[],\n                $5::BOOLEAN[],\n                $6::TEXT[],\n                $7::TEXT[],\n                $8::TEXT[],\n                $9::static.borough[],\n                $10::static.bus_direction[]\n            )\n            ON CONFLICT (id) DO UPDATE SET\n                name = EXCLUDED.name,\n                geom = EXCLUDED.geom,\n                route_type = EXCLUDED.route_type,\n                ada = EXCLUDED.ada,\n                north_headsign = EXCLUDED.north_headsign,\n                south_headsign = EXCLUDED.south_headsign,\n                notes = EXCLUDED.notes,\n                borough = EXCLUDED.borough,\n                direction = EXCLUDED.direction\n            ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -22,11 +22,11 @@
         },
         {
           "Custom": {
-            "name": "route_type[]",
+            "name": "static.route_type[]",
             "kind": {
               "Array": {
                 "Custom": {
-                  "name": "route_type",
+                  "name": "static.route_type",
                   "kind": {
                     "Enum": [
                       "train",
@@ -44,11 +44,11 @@
         "TextArray",
         {
           "Custom": {
-            "name": "borough[]",
+            "name": "static.borough[]",
             "kind": {
               "Array": {
                 "Custom": {
-                  "name": "borough",
+                  "name": "static.borough",
                   "kind": {
                     "Enum": [
                       "brooklyn",
@@ -65,11 +65,11 @@
         },
         {
           "Custom": {
-            "name": "bus_direction[]",
+            "name": "static.bus_direction[]",
             "kind": {
               "Array": {
                 "Custom": {
-                  "name": "bus_direction",
+                  "name": "static.bus_direction",
                   "kind": {
                     "Enum": [
                       "sw",
@@ -92,5 +92,5 @@
     },
     "nullable": []
   },
-  "hash": "0788e05943b09603a3b59e0a599f5cf390915d3413426a159383fb3373311298"
+  "hash": "d1324bdc3a05e4adea59a78c55b6116e277f42f94511fd40bd840227e7ed541c"
 }

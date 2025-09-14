@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO realtime.position (\n                        vehicle_id,\n                        mta_id,\n                        stop_id,\n                        status,\n                        bearing,\n                        geom,\n                        recorded_at\n                    )\n                    SELECT\n                        unnest($1::text[]),\n                        unnest($2::text[]),\n                        unnest($3::int[]),\n                        unnest($4::text[]),\n                        unnest($5::real[]),\n                        ST_SetSRID(unnest($6::geometry[]), 4326),\n                        unnest($7::timestamptz[])\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "Int4Array",
+        "TextArray",
+        "Float4Array",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "01c745d3d5001cc070d58143ca814aa360475e03f0fa80d6317b0ba8f49f8a6c"
+}

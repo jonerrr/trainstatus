@@ -6,6 +6,8 @@ use thiserror::Error;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+// TODO: use geo types for geom
+// TODO: remove generics and create impl for FromRow
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema, FromRow)]
 pub struct Trip<D> {
     pub id: Uuid,
@@ -84,6 +86,8 @@ impl TripData {
 }
 
 impl Trip<TripData> {
+    // TODO: insert individually instead of bulk insert so if theres some constraint violation it only fails that one
+    // maybe use db function or procedure or prepared statement
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         // using UNNEST to insert multiple rows at once https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
         let ids = values.iter().map(|v| v.id).collect::<Vec<Uuid>>();
@@ -128,7 +132,7 @@ impl Trip<TripData> {
 
                 sqlx::query!(
                     r#"
-                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, express, assigned)
+                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, express, assigned)
                     SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::bool[], $10::bool[])
                     ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned, updated_at = EXCLUDED.updated_at
                     "#,
@@ -149,7 +153,7 @@ impl Trip<TripData> {
             Some(TripData::Bus { .. }) => {
                 sqlx::query!(
                     r#"
-                    INSERT INTO trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
+                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
                     SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
                     ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
                     "#,
@@ -180,7 +184,7 @@ impl Trip<TripData> {
             SELECT
                 *
             FROM
-                trip
+                realtime.trip
             WHERE
                 mta_id = $1
                 AND vehicle_id = $2
@@ -245,7 +249,7 @@ impl Trip<TripData> {
     pub async fn delete(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
-            DELETE FROM trip WHERE mta_id = $1 AND created_at::date = $2 AND direction = $3 AND route_id = $4
+            DELETE FROM realtime.trip WHERE mta_id = $1 AND created_at::date = $2 AND direction = $3 AND route_id = $4
             "#,
             self.mta_id,
             self.created_at.date_naive(),
@@ -265,65 +269,59 @@ impl Trip<serde_json::Value> {
         sqlx::query_as!(
             Trip::<serde_json::Value>,
             r#"
-         SELECT
-                    t.id,
-                    t.mta_id,
-                    t.vehicle_id,
-                    t.route_id,
-                    t.direction,
-                    t.created_at,
-                    t.updated_at,
-                    NULL AS "deviation: _",
-                    CASE
-                        WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
-                        'stop_id',
-                        p.stop_id,
-                        'status',
-                        p.status,
-                        'express',
-                        t.express,
-                        'assigned',
-                        t.assigned
-                                )
-                        ELSE jsonb_build_object(
-                        'stop_id',
-                        p.stop_id,
-                        'status',
-                        p.status,
-                        'lat',
-                        p.lat,
-                        'lon',
-                        p.lon,
-                        'bearing',
-                        p.bearing,
-                        'passengers',
-                        p.passengers,
-                        'capacity',
-                        p.capacity,
-                        'deviation',
-                        t.deviation
-                                )
-                    END AS DATA
-                FROM
-                    trip t
-                LEFT JOIN "position" p ON
-                    t.vehicle_id = p.vehicle_id
-                WHERE
-                    t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
-                    AND
-                                t.id = ANY(
-                    SELECT
-                        t.id
-                    FROM
-                        trip t
-                    LEFT JOIN stop_time st ON
-                        st.trip_id = t.id
-                    WHERE
-                        st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                                    )
-                ORDER BY
-                    t.created_at DESC
-                            "#,
+            WITH latest_positions AS (
+                SELECT DISTINCT ON (vehicle_id)
+                    vehicle_id,
+                    mta_id,
+                    stop_id,
+                    status,
+                    bearing,
+                    passengers,
+                    capacity,
+                    ST_X(geom) as lon,
+                    ST_Y(geom) as lat,
+                    recorded_at
+                FROM realtime.position
+                ORDER BY vehicle_id, recorded_at DESC
+            )
+            SELECT
+                t.id,
+                t.mta_id,
+                t.vehicle_id,
+                t.route_id,
+                t.direction,
+                t.created_at,
+                t.updated_at,
+                t.deviation,
+                CASE
+                    WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
+                        'stop_id', p.stop_id,
+                        'status', p.status,
+                        'express', t.express,
+                        'assigned', t.assigned
+                    )
+                    ELSE jsonb_build_object(
+                        'stop_id', p.stop_id,
+                        'status', p.status,
+                        'lat', p.lat,
+                        'lon', p.lon,
+                        'bearing', p.bearing,
+                        'passengers', p.passengers,
+                        'capacity', p.capacity
+                    )
+                END AS data
+            FROM realtime.trip t
+            LEFT JOIN latest_positions p ON t.vehicle_id = p.vehicle_id
+            WHERE
+                t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
+                AND t.id = ANY(
+                    SELECT t.id
+                    FROM realtime.trip t
+                    LEFT JOIN realtime.stop_time st ON st.trip_id = t.id
+                    WHERE st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                )
+            ORDER BY t.created_at DESC
+            "#,
             at
         )
         .fetch_all(pool)
@@ -337,6 +335,7 @@ impl Trip<serde_json::Value> {
             .filter_map(|t| {
                 let data = t.data.as_object()?;
 
+                // Get coordinates from the data object
                 let lon = data.get("lon")?.as_f64()?;
                 let lat = data.get("lat")?.as_f64()?;
 
@@ -353,12 +352,12 @@ impl Trip<serde_json::Value> {
                         "vehicle_id": t.vehicle_id,
                         "route_id": t.route_id,
                         "direction": t.direction,
-                        "stop_id": data["stop_id"],
-                        "status": data["status"],
-                        "capacity": data["capacity"],
-                        "passengers": data["passengers"],
+                        "stop_id": data.get("stop_id"),
+                        "status": data.get("status"),
+                        "capacity": data.get("capacity"),
+                        "passengers": data.get("passengers"),
                         "deviation": t.deviation,
-                        "bearing": data["bearing"],
+                        "bearing": data.get("bearing"),
                         "created_at": t.created_at,
                         "updated_at": t.updated_at
                     },

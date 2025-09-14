@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO static.last_update (update_at) VALUES (now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "c1180c147abd369c3441a05b8130da7b007152aad72f1e16395353300f659bd3"
+}

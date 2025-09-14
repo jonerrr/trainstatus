@@ -7,6 +7,7 @@ use super::{
 };
 use crate::feed::{TripUpdate, VehiclePosition, trip_update::StopTimeUpdate};
 use chrono::{DateTime, Utc};
+use geo::Point;
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
 use serde::{Deserialize as _, Deserializer};
@@ -113,6 +114,7 @@ pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
+// not used anymore
 pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
     let vehicles = siri::decode().await?;
 
@@ -134,9 +136,9 @@ pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
             FROM unnest($1::TEXT[], $2::TIMESTAMPTZ[]) AS vehicle_time(vehicle_id, recorded_at)
             WHERE NOT EXISTS (
                 SELECT 1
-                FROM position p
+                FROM realtime.position p
                 WHERE p.vehicle_id = vehicle_time.vehicle_id
-                AND p.updated_at >= vehicle_time.recorded_at - INTERVAL '5 minutes'
+                AND p.recorded_at >= vehicle_time.recorded_at - INTERVAL '5 minutes'
             )
             "#,
             &vehicle_ids,
@@ -284,11 +286,12 @@ impl TryFrom<BusVehiclePosition> for Position {
             vehicle_id,
             mta_id,
             stop_id,
-            updated_at: Utc::now(),
-            status: "none".into(),
+            recorded_at: Utc::now(),
+            status: None,
             data: PositionData::Bus {
-                lat: position.latitude,
-                lon: position.longitude,
+                geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
+                // lat: position.latitude,
+                // lon: position.longitude,
                 bearing: position.bearing.unwrap(),
                 // passengers: None,
                 // capacity: None,
@@ -350,8 +353,8 @@ impl From<oba::VehicleStatus> for Position {
             vehicle_id: value.vehicle_id,
             mta_id: value.trip_id,
             stop_id: None,
-            updated_at: value.last_update_time,
-            status: value.phase,
+            recorded_at: value.last_update_time,
+            status: Some(value.phase),
             data: PositionData::OBABus {
                 passengers: value.occupancy_count,
                 capacity: value.occupancy_capacity,

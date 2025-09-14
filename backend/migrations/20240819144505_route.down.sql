@@ -1,3 +1,3 @@
-DROP TABLE IF EXISTS route;
+DROP TABLE IF EXISTS static.route;
 
-DROP TYPE IF EXISTS route_type;
+DROP TYPE IF EXISTS static.route_type;

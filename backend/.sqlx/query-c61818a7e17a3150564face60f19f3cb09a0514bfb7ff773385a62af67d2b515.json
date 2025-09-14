@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.stop_time (trip_id, stop_id, arrival, departure, scheduled_track, actual_track)\n            SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::text[], $6::text[])\n            ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, scheduled_track = EXCLUDED.scheduled_track, actual_track = EXCLUDED.actual_track\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c61818a7e17a3150564face60f19f3cb09a0514bfb7ff773385a62af67d2b515"
+}

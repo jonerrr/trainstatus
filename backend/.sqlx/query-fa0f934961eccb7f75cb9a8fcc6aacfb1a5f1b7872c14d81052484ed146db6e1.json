@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM last_update",
+  "query": "DELETE FROM static.last_update",
   "describe": {
     "columns": [],
     "parameters": {
@@ -8,5 +8,5 @@
     },
     "nullable": []
   },
-  "hash": "ba196a80665df0d11973213f6dd0c3fe7bcad49e84947d5924227d75c2971c60"
+  "hash": "fa0f934961eccb7f75cb9a8fcc6aacfb1a5f1b7872c14d81052484ed146db6e1"
 }

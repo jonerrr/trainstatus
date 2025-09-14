@@ -1,3 +1,0 @@
-ALTER TABLE position ALTER COLUMN status TYPE VARCHAR;
-
-DROP TYPE status;

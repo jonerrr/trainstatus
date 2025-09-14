@@ -1,16 +1,19 @@
 use chrono::{DateTime, Utc};
+use geo::Geometry;
+use geozero::wkb;
 // use serde::Serialize;
 use sqlx::PgPool;
 // use utoipa::ToSchema;
 // use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct Position {
     pub vehicle_id: String,
     pub mta_id: Option<String>,
     pub stop_id: Option<i32>,
-    pub updated_at: DateTime<Utc>,
-    pub status: String,
+    pub status: Option<String>,
     pub data: PositionData,
+    pub recorded_at: DateTime<Utc>,
     // TODO: remove this probably
     // pub vehicle_type: VehicleType,
 }
@@ -46,13 +49,14 @@ pub struct Position {
 //     }
 // }
 
-#[derive(sqlx::Type, Clone)]
-#[sqlx(type_name = "vehicle_type", rename_all = "snake_case")]
-pub enum VehicleType {
-    Train,
-    Bus,
-}
+// #[derive(sqlx::Type, Clone)]
+// #[sqlx(type_name = "vehicle_type", rename_all = "snake_case")]
+// pub enum VehicleType {
+//     Train,
+//     Bus,
+// }
 
+#[derive(Clone)]
 pub enum PositionData {
     Train,
     // {
@@ -62,8 +66,7 @@ pub enum PositionData {
     Bus {
         // vehicle_id: String,
         // mta_id: Option<String>,
-        lat: f32,
-        lon: f32,
+        geom: Option<Geometry>,
         bearing: f32,
         // these are from SIRI/OBA API not GTFS
         // passengers: Option<i32>,
@@ -78,139 +81,181 @@ pub enum PositionData {
 
 impl Position {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
+        if values.is_empty() {
+            tracing::warn!("No positions to insert");
+            return Ok(());
+        }
+
         let vehicle_ids = values
             .iter()
             .map(|v| v.vehicle_id.clone())
             .collect::<Vec<_>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
-        let updated_ats = values.iter().map(|v| v.updated_at).collect::<Vec<_>>();
         let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
+        let recorded_ats = values.iter().map(|v| v.recorded_at).collect::<Vec<_>>();
 
         match values.first().map(|p| &p.data) {
             Some(PositionData::Train) => {
+                // For trains, we don't have geometry/bearing/passengers/capacity
                 sqlx::query!(
                     r#"
-                    INSERT INTO position (vehicle_id, mta_id, stop_id, updated_at, status)
-                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[])
-                    ON CONFLICT (vehicle_id) DO UPDATE SET updated_at = EXCLUDED.updated_at, status = EXCLUDED.status, stop_id = EXCLUDED.stop_id
+                    INSERT INTO realtime.position (vehicle_id, mta_id, stop_id, status, recorded_at)
+                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::text[], $5::timestamptz[])
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
                     &stop_ids as &[Option<i32>],
-                    &updated_ats,
-                    &statuses as &[String],
+                    &statuses as &[Option<String>],
+                    &recorded_ats,
                 ).execute(pool).await?;
             }
             Some(PositionData::Bus { .. }) => {
-                let mut lats = vec![];
-                let mut lons = vec![];
                 let mut bearings = vec![];
-                // let mut passenger_data = vec![];
-                // let mut capacities = vec![];
+                let mut geoms = vec![];
 
-                for v in values {
-                    match v.data {
-                        PositionData::Bus {
-                            lat,
-                            lon,
-                            bearing,
-                            // passengers,
-                            // capacity,
-                        } => {
-                            lats.push(lat);
-                            lons.push(lon);
-                            bearings.push(bearing);
-                            // passenger_data.push(passengers);
-                            // capacities.push(capacity);
-                        }
-                        _ => unreachable!("all positions should be the same type"),
+                for v in &values {
+                    if let PositionData::Bus { geom, bearing, .. } = &v.data {
+                        bearings.push(Some(*bearing));
+                        // Use the same approach as route.rs
+                        geoms.push(geom.clone().map(wkb::Encode));
                     }
                 }
-                // status is updated from SIRI so we don't set it here
+
                 sqlx::query!(
                     r#"
-                    INSERT INTO position (
+                    INSERT INTO realtime.position (
                         vehicle_id,
                         mta_id,
                         stop_id,
-                        updated_at,
                         status,
-                        lat,
-                        lon,
-                        bearing
+                        bearing,
+                        geom,
+                        recorded_at
                     )
-                    SELECT *
-                    FROM UNNEST($1::text[], $2::text[], $3::int[], $4::timestamptz[], $5::text[], $6::float[], $7::float[], $8::float[])
-                    ON CONFLICT (vehicle_id) DO UPDATE SET
-                        updated_at = EXCLUDED.updated_at,
-                        lat = EXCLUDED.lat,
-                        lon = EXCLUDED.lon,
-                        bearing = EXCLUDED.bearing,
-                        stop_id = EXCLUDED.stop_id
+                    SELECT
+                        unnest($1::text[]),
+                        unnest($2::text[]),
+                        unnest($3::int[]),
+                        unnest($4::text[]),
+                        unnest($5::real[]),
+                        ST_SetSRID(unnest($6::geometry[]), 4326),
+                        unnest($7::timestamptz[])
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
                     &stop_ids as &[Option<i32>],
-                    &updated_ats,
-                    &statuses as &[String],
-                    &lats as &[f32],
-                    &lons as &[f32],
-                    &bearings as &[f32],
-                    // &passenger_data as &[Option<i32>],
-                    // &capacities as &[Option<i32>]
-                ).execute(pool).await?;
+                    &statuses as &[Option<String>],
+                    &bearings as &[Option<f32>],
+                    &geoms as &[Option<wkb::Encode<Geometry>>],
+                    &recorded_ats,
+                )
+                .execute(pool)
+                .await?;
             }
             Some(PositionData::OBABus { .. }) => {
                 let mut passengers = vec![];
                 let mut capacities = vec![];
 
-                for v in values {
-                    match v.data {
-                        PositionData::OBABus {
-                            passengers: p,
-                            capacity: c,
-                        } => {
-                            passengers.push(p);
-                            capacities.push(c);
-                        }
-                        _ => unreachable!("all positions should be the same type"),
+                for v in &values {
+                    if let PositionData::OBABus {
+                        passengers: p,
+                        capacity: c,
+                    } = &v.data
+                    {
+                        passengers.push(*p);
+                        capacities.push(*c);
                     }
                 }
 
-                // stop_id is taken from GTFS, so we don't set it here
+                // For OBA bus data, we only have passengers/capacity, no geometry
                 sqlx::query!(
                     r#"
-                    INSERT INTO position (
+                    INSERT INTO realtime.position (
                         vehicle_id,
                         mta_id,
-                        updated_at,
                         status,
                         passengers,
-                        capacity
+                        capacity,
+                        recorded_at
                     )
-                    SELECT *
-                    FROM UNNEST($1::text[], $2::text[], $3::timestamptz[], $4::text[], $5::int[], $6::int[])
-                    ON CONFLICT (vehicle_id) DO UPDATE SET
-                        mta_id = EXCLUDED.mta_id,
-                        updated_at = EXCLUDED.updated_at,
-                        status = EXCLUDED.status,
-                        passengers = EXCLUDED.passengers,
-                        capacity = EXCLUDED.capacity
+                    SELECT
+                        unnest($1::text[]),
+                        unnest($2::text[]),
+                        unnest($3::text[]),
+                        unnest($4::int[]),
+                        unnest($5::int[]),
+                        unnest($6::timestamptz[])
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
-                    &updated_ats,
-                    &statuses as &[String],
+                    &statuses as &[Option<String>],
                     &passengers as &[Option<i32>],
-                    &capacities as &[Option<i32>]
-                ).execute(pool).await?;
+                    &capacities as &[Option<i32>],
+                    &recorded_ats,
+                )
+                .execute(pool)
+                .await?;
             }
             None => tracing::warn!("No positions to insert"),
         };
 
         Ok(())
     }
+
+    // /// Get position history for a specific vehicle or all vehicles within a time range
+    // pub async fn get_history(
+    //     pool: &PgPool,
+    //     vehicle_id: Option<&str>,
+    //     start_time: DateTime<Utc>,
+    //     end_time: DateTime<Utc>,
+    // ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+    //     let query = sqlx::query!(
+    //         r#"
+    //         SELECT
+    //             vehicle_id,
+    //             mta_id,
+    //             stop_id,
+    //             status,
+    //             bearing,
+    //             passengers,
+    //             capacity,
+    //             ST_X(geom) as lon,
+    //             ST_Y(geom) as lat,
+    //             recorded_at
+    //         FROM realtime.position
+    //         WHERE ($1::text IS NULL OR vehicle_id = $1)
+    //             AND recorded_at BETWEEN $2 AND $3
+    //         ORDER BY recorded_at DESC
+    //         LIMIT CASE WHEN $1::text IS NULL THEN 1000 ELSE NULL END
+    //         "#,
+    //         vehicle_id,
+    //         start_time,
+    //         end_time
+    //     )
+    //     .fetch_all(pool)
+    //     .await?;
+
+    //     let results = query
+    //         .into_iter()
+    //         .map(|row| {
+    //             serde_json::json!({
+    //                 "vehicle_id": row.vehicle_id,
+    //                 "mta_id": row.mta_id,
+    //                 "stop_id": row.stop_id,
+    //                 "status": row.status,
+    //                 "bearing": row.bearing,
+    //                 "passengers": row.passengers,
+    //                 "capacity": row.capacity,
+    //                 "lon": row.lon,
+    //                 "lat": row.lat,
+    //                 "recorded_at": row.recorded_at
+    //             })
+    //         })
+    //         .collect();
+
+    //     Ok(results)
+    // }
 
     // pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Self, sqlx::Error> {
     //     let rows = sqlx::query(
@@ -277,7 +322,7 @@ impl Position {
 //                     unnest($4::int[]) AS passengers,
 //                     unnest($5::int[]) AS capacity
 //             )
-//             UPDATE position
+//             UPDATE realtime.position
 //             SET
 //                 status = updated_values.status,
 //                 passengers = updated_values.passengers,

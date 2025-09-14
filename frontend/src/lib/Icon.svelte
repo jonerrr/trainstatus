@@ -42,7 +42,7 @@
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
-		style:background-color={`#${route.color}`}
+		style:background-color={route.color}
 		class="relative flex w-fit justify-center rounded p-1 text-center text-lg font-bold text-white shadow-2xl [text-shadow:_1px_1px_2px_rgb(0_0_0_/_60%),_-1px_-1px_2px_rgb(0_0_0_/_60%)] {show_alert_icon
 			? 'ring-3 ring-red-800'
 			: ''}"
@@ -60,7 +60,7 @@
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
-		class="relative appearance-none {show_alert_icon ? 'rounded-full ring-3 ring-red-800' : ''}"
+		class="relative appearance-none {show_alert_icon ? 'ring-3 rounded-full ring-red-800' : ''}"
 		onclick={() => {
 			if (link) pushState('', { modal: 'route', data: route });
 		}}
