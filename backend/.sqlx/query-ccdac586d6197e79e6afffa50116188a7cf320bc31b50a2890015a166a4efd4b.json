@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.stop_transfer (from_stop_id, to_stop_id, transfer_type, min_transfer_time)\n            SELECT * FROM UNNEST(\n                $1::INTEGER[],\n                $2::INTEGER[],\n                $3::SMALLINT[],\n                $4::SMALLINT[]\n            )\n            ON CONFLICT (from_stop_id, to_stop_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4Array",
+        "Int4Array",
+        "Int2Array",
+        "Int2Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ccdac586d6197e79e6afffa50116188a7cf320bc31b50a2890015a166a4efd4b"
+}

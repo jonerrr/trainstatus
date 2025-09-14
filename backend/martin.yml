@@ -1,22 +1,21 @@
-# PostgreSQL connection
 postgres:
   # The connection URL will be read from DATABASE_URL env var
   connection_string: $DATABASE_URL
 
-  # Auto-publish all spatial tables as tiles
   auto_publish:
-    from_schemas:
-      - public
     tables:
+      from_schemas:
+        - static
       # must be integer i think
       id_columns: id
+    functions:
+      from_schemas:
+        - realtime
 
 sprites:
   paths:
     - /sprites
-  # sources:
-  #   cb_sprites: /sprites
-# web ui and cors should be disabled in prod
+
 web_ui: enable-for-all
-# cors:
-#   origin:
+
+cors: false

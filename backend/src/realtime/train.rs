@@ -212,7 +212,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Position::insert(positions, pool).await?;
 
     sqlx::query!(
-        "DELETE FROM position WHERE vehicle_id = ANY($1)",
+        "DELETE FROM realtime.position WHERE vehicle_id = ANY($1)",
         &delete_position_vehicle_ids
     )
     .execute(pool)
@@ -503,21 +503,21 @@ impl TryFrom<VehiclePosition> for Position {
         //     _ => Status::None,
         // };
         let status = match value.current_status {
-            Some(0) => "incoming".into(),
-            Some(1) => "at_stop".into(),
-            Some(2) => "in_transit_to".into(),
-            _ => "none".into(), // maybe do unknown instead of none?
+            Some(0) => Some("incoming".into()),
+            Some(1) => Some("at_stop".into()),
+            Some(2) => Some("in_transit_to".into()),
+            _ => None,
         };
 
-        let updated_at = value.timestamp.ok_or(IntoPositionError::Timestamp)?;
-        let updated_at =
-            DateTime::from_timestamp(updated_at as i64, 0).ok_or(IntoPositionError::UpdatedAt)?;
+        let recorded_at = value.timestamp.ok_or(IntoPositionError::Timestamp)?;
+        let recorded_at =
+            DateTime::from_timestamp(recorded_at as i64, 0).ok_or(IntoPositionError::UpdatedAt)?;
 
         Ok(Position {
             vehicle_id: trip.vehicle_id,
             mta_id: Some(trip.mta_id),
             stop_id: Some(stop_id),
-            updated_at,
+            recorded_at,
             status,
             data: PositionData::Train,
             // data: PositionData::Train {

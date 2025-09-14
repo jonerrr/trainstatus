@@ -68,13 +68,13 @@ impl StopTime {
                 st.scheduled_track,
                 st.actual_track
             FROM
-                stop_time st
+                realtime.stop_time st
             WHERE
                 st.trip_id IN (
                     SELECT
                         t.id
                     FROM
-                        trip t
+                        realtime.trip t
                     WHERE
                         t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'
                         AND ($1)::timestamp with time zone + INTERVAL '4 hours'
@@ -110,13 +110,13 @@ impl StopTime {
                 NULL AS scheduled_track,
                 NULL AS actual_track
             FROM
-                stop_time st
+                realtime.stop_time st
             WHERE
                 st.trip_id IN (
                     SELECT
                         t.id
                     FROM
-                        trip t
+                        realtime.trip t
                     WHERE
                         t.updated_at BETWEEN ($1)::timestamp with time zone - INTERVAL '5 minutes'
                         AND ($1)::timestamp with time zone + INTERVAL '4 hours'
@@ -159,7 +159,7 @@ impl StopTime {
 
         sqlx::query!(
             r#"
-            INSERT INTO stop_time (trip_id, stop_id, arrival, departure, scheduled_track, actual_track)
+            INSERT INTO realtime.stop_time (trip_id, stop_id, arrival, departure, scheduled_track, actual_track)
             SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::text[], $6::text[])
             ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, scheduled_track = EXCLUDED.scheduled_track, actual_track = EXCLUDED.actual_track
             "#,

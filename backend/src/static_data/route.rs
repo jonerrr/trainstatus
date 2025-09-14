@@ -26,7 +26,7 @@ pub struct Route {
     pub long_name: String,
     #[schema(example = "1")]
     pub short_name: String,
-    #[schema(example = "EE352E")]
+    #[schema(example = "#EE352E")]
     pub color: String,
     #[schema(example = false)]
     /// This is currently only used for bus routes. It will be false for all trains.
@@ -83,7 +83,7 @@ impl FromRow<'_, PgRow> for Route {
 }
 
 #[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq, ToSchema, Hash, Eq, Clone, Copy)]
-#[sqlx(type_name = "route_type", rename_all = "snake_case")]
+#[sqlx(type_name = "static.route_type", rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RouteType {
     Train,
@@ -101,7 +101,7 @@ impl Route {
         let ids: Vec<_> = routes.iter().map(|r| &r.id).collect();
         let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
         let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
-        let colors: Vec<_> = routes.iter().map(|r| &r.color).collect();
+        let colors: Vec<_> = routes.iter().map(|r| format!("#{}", r.color)).collect();
         let shuttles: Vec<_> = routes.iter().map(|r| r.shuttle).collect();
         let geoms: Vec<_> = routes
             .iter()
@@ -111,7 +111,7 @@ impl Route {
 
         sqlx::query!(
             r#"
-            INSERT INTO route (id, long_name, short_name, color, shuttle, geom, route_type)
+            INSERT INTO static.route (id, long_name, short_name, color, shuttle, geom, route_type)
             SELECT
                 u.id,
                 u.long_name,
@@ -128,7 +128,7 @@ impl Route {
                     $4::text[],
                     $5::bool[],
                     $6::geometry[],
-                    $7::route_type[]
+                    $7::static.route_type[]
                 ) AS u(id, long_name, short_name, color, shuttle, geom, route_type)
             ON CONFLICT (id) DO UPDATE SET
                 long_name = EXCLUDED.long_name,
@@ -165,7 +165,7 @@ impl Route {
             query.push(r#"NULL AS geom"#);
         }
 
-        query.push(" FROM route");
+        query.push(" FROM static.route");
 
         if let Some(route_type) = route_type {
             query.push(" WHERE route_type = ");

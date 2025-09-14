@@ -4,4 +4,4 @@ rust = "latest"
 # protoc = "latest"
 
 [env]
-RUST_LOG = "backend=debug"
+# RUST_LOG = "backend=debug"

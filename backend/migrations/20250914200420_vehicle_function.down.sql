@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS realtime.latest_vehicle_position(integer, integer, integer);

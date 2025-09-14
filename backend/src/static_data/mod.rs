@@ -44,7 +44,7 @@ pub async fn import(
             let mut force_update_flag = force_update;
 
             loop {
-                let last_updated = sqlx::query!("SELECT update_at FROM last_update")
+                let last_updated = sqlx::query!("SELECT update_at FROM static.last_update")
                     .fetch_optional(&pool)
                     .await
                     .unwrap();
@@ -146,11 +146,11 @@ pub async fn import(
                 stop::Transfer::insert(transfers, &pool).await;
 
                 // remove old update_ats
-                sqlx::query!("DELETE FROM last_update")
+                sqlx::query!("DELETE FROM static.last_update")
                     .execute(&pool)
                     .await
                     .unwrap();
-                sqlx::query!("INSERT INTO last_update (update_at) VALUES (now())")
+                sqlx::query!("INSERT INTO static.last_update (update_at) VALUES (now())")
                     .execute(&pool)
                     .await
                     .unwrap();

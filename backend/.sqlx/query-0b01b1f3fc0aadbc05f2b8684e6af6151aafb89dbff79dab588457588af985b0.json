@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                *\n            FROM\n                trip\n            WHERE\n                mta_id = $1\n                AND vehicle_id = $2\n                AND created_at::date = $3\n                AND direction = $4\n                AND route_id = $5\n            ",
+  "query": "\n            SELECT\n                *\n            FROM\n                realtime.trip\n            WHERE\n                mta_id = $1\n                AND vehicle_id = $2\n                AND created_at::date = $3\n                AND direction = $4\n                AND route_id = $5\n            ",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       true
     ]
   },
-  "hash": "c6508bffaba63fc755dec59634d3d0d898db7421f541ca746a645411e899815f"
+  "hash": "0b01b1f3fc0aadbc05f2b8684e6af6151aafb89dbff79dab588457588af985b0"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM position WHERE vehicle_id = ANY($1)",
+  "query": "DELETE FROM realtime.alert WHERE mta_id = ANY($1)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "1154be3113cec7acd7b2e2188671098bcba0243cbb60bebcf02854b6dd940be1"
+  "hash": "b102901bee39d15a8de2a11157e15c1691d136c54752bc576e1e6a2e2f50cb84"
 }

@@ -204,24 +204,27 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // .await?;
     // Set end time for active periods that are no longer active
     sqlx::query!(
-        "UPDATE active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM active_period WHERE alert_id = ANY($1))",
+        "UPDATE realtime.active_period SET end_time = NOW() WHERE alert_id = ANY($1) AND end_time IS NULL AND start_time NOT IN (SELECT start_time FROM realtime.active_period WHERE alert_id = ANY($1))",
         &in_feed_ids
     ).execute(&mut *transaction).await?;
 
     // delete cloned ids
-    sqlx::query!("DELETE FROM alert WHERE mta_id = ANY($1)", &cloned_mta_ids)
-        .execute(&mut *transaction)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM realtime.alert WHERE mta_id = ANY($1)",
+        &cloned_mta_ids
+    )
+    .execute(&mut *transaction)
+    .await?;
 
     // Delete existing active periods and affected entities
     sqlx::query!(
-        "DELETE FROM affected_entity WHERE alert_id = ANY($1)",
+        "DELETE FROM realtime.affected_entity WHERE alert_id = ANY($1)",
         &existing_alert_ids
     )
     .execute(&mut *transaction)
     .await?;
     sqlx::query!(
-        "DELETE FROM active_period WHERE alert_id = ANY($1)",
+        "DELETE FROM realtime.active_period WHERE alert_id = ANY($1)",
         &existing_alert_ids
     )
     .execute(&mut *transaction)
@@ -313,7 +316,7 @@ impl Alert {
         let last_in_feed = values.iter().map(|_| Utc::now()).collect::<Vec<_>>();
 
         sqlx::query!(r#"
-        INSERT INTO alert (
+        INSERT INTO realtime.alert (
             id,
             mta_id,
             alert_type,
@@ -384,10 +387,10 @@ impl Alert {
                 'sort_order',
                 ae.sort_order)) AS entities
             FROM
-                alert a
-            LEFT JOIN active_period ap ON
+                realtime.alert a
+            LEFT JOIN realtime.active_period ap ON
                 a.id = ap.alert_id
-            LEFT JOIN affected_entity ae ON
+            LEFT JOIN realtime.affected_entity ae ON
                 a.id = ae.alert_id
             WHERE
                 a.last_in_feed >= $1 - INTERVAL '2 minutes' AND
@@ -419,8 +422,8 @@ impl Alert {
             SELECT
                 a.id, ae.route_id, ae.stop_id
             FROM
-                alert a
-            LEFT JOIN affected_entity ae ON
+                realtime.alert a
+            LEFT JOIN realtime.affected_entity ae ON
                 a.id = ae.alert_id
             WHERE
                 a.mta_id = $1 OR a.created_at = $2",
@@ -462,7 +465,7 @@ impl ActivePeriod {
 
         sqlx::query!(
             r#"
-            INSERT INTO active_period (
+            INSERT INTO realtime.active_period (
                 alert_id,
                 start_time,
                 end_time
@@ -511,7 +514,7 @@ impl AffectedEntity {
         // TODO: find some efficient way to log rows that don't get inserted
         sqlx::query!(
             r#"
-            INSERT INTO affected_entity (
+            INSERT INTO realtime.affected_entity (
                 alert_id,
                 route_id,
                 stop_id,
@@ -529,8 +532,8 @@ impl AffectedEntity {
                     unnest($3::int[]) as stop_id,
                     unnest($4::int[]) as sort_order
             ) data
-            LEFT JOIN route r ON data.route_id = r.id
-            LEFT JOIN stop s ON data.stop_id = s.id
+            LEFT JOIN static.route r ON data.route_id = r.id
+            LEFT JOIN static.stop s ON data.stop_id = s.id
             WHERE (data.route_id IS NULL OR r.id IS NOT NULL)
             AND (data.stop_id IS NULL OR s.id IS NOT NULL)
             ON CONFLICT DO NOTHING

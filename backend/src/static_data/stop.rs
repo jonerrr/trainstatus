@@ -167,7 +167,7 @@ pub enum StopData {
 }
 
 #[derive(sqlx::Type, Serialize, ToSchema)]
-#[sqlx(type_name = "borough", rename_all = "snake_case")]
+#[sqlx(type_name = "static.borough", rename_all = "snake_case")]
 pub enum Borough {
     Brooklyn,
     Queens,
@@ -177,7 +177,7 @@ pub enum Borough {
 }
 
 #[derive(sqlx::Type, Serialize, Clone, ToSchema)]
-#[sqlx(type_name = "bus_direction", rename_all = "lowercase")]
+#[sqlx(type_name = "static.bus_direction", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum BusDirection {
     SW,
@@ -204,7 +204,7 @@ pub enum RouteStopData {
 }
 
 #[derive(sqlx::Type, ToSchema, Deserialize, Serialize)]
-#[sqlx(type_name = "stop_type", rename_all = "snake_case")]
+#[sqlx(type_name = "static.stop_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum StopType {
     FullTime,
@@ -316,18 +316,18 @@ impl Stop {
 
         sqlx::query!(
             r#"
-            INSERT INTO stop (id, name, geom, route_type, ada, north_headsign, south_headsign, notes, borough, direction)
+            INSERT INTO static.stop (id, name, geom, route_type, ada, north_headsign, south_headsign, notes, borough, direction)
             SELECT * FROM UNNEST(
                 $1::INTEGER[],
                 $2::TEXT[],
                 $3::GEOMETRY[],
-                $4::route_type[],
+                $4::static.route_type[],
                 $5::BOOLEAN[],
                 $6::TEXT[],
                 $7::TEXT[],
                 $8::TEXT[],
-                $9::borough[],
-                $10::bus_direction[]
+                $9::static.borough[],
+                $10::static.bus_direction[]
             )
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
@@ -536,10 +536,10 @@ impl Stop {
                     ORDER BY rs.route_id
                 ) AS routes
             FROM
-                stop s
-            LEFT JOIN stop_transfer st ON
+                static.stop s
+            LEFT JOIN static.stop_transfer st ON
                 s.id = st.from_stop_id
-            LEFT JOIN route_stop rs ON
+            LEFT JOIN static.route_stop rs ON
                 s.id = rs.stop_id
             GROUP BY
                 s.id, s.name, s.geom, s.route_type, s.ada, s.north_headsign,
@@ -571,7 +571,7 @@ impl RouteStop {
 
         for chunk in values.chunks(32000 / 6) {
             let mut query_builder = QueryBuilder::new(
-                "INSERT INTO route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
+                "INSERT INTO static.route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
             );
             query_builder.push_values(chunk, |mut b, stop| {
                 b.push_bind(&stop.route_id)
@@ -756,7 +756,7 @@ impl Transfer<i32> {
 
         sqlx::query!(
             r#"
-            INSERT INTO stop_transfer (from_stop_id, to_stop_id, transfer_type, min_transfer_time)
+            INSERT INTO static.stop_transfer (from_stop_id, to_stop_id, transfer_type, min_transfer_time)
             SELECT * FROM UNNEST(
                 $1::INTEGER[],
                 $2::INTEGER[],
