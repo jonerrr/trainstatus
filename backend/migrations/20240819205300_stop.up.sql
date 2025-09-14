@@ -21,18 +21,26 @@ CREATE TYPE bus_direction AS ENUM (
 CREATE TABLE IF NOT EXISTS stop (
     id INTEGER PRIMARY KEY,
     name VARCHAR NOT NULL,
-    lat REAL NOT NULL,
-    lon REAL NOT NULL,
+    geom geometry(POINT, 4326) NOT NULL,
     route_type route_type NOT NULL,
     -- train fields
     ada BOOLEAN,
     north_headsign VARCHAR,
     south_headsign VARCHAR,
-    transfers INTEGER [],
+    -- transfers INTEGER [],
     notes VARCHAR,
     borough borough,
     -- bus fields
     direction bus_direction
+);
+
+CREATE TABLE IF NOT EXISTS stop_transfer (
+    from_stop_id INTEGER REFERENCES stop(id) ON DELETE CASCADE,
+    to_stop_id INTEGER REFERENCES stop(id) ON DELETE CASCADE,
+    -- will probably be used to indicate if its from the official dataset or calculated by us
+    transfer_type SMALLINT NOT NULL,
+    min_transfer_time SMALLINT NOT NULL,
+    PRIMARY KEY (from_stop_id, to_stop_id)
 );
 
 CREATE TYPE stop_type AS enum (
