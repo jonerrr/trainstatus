@@ -1,7 +1,7 @@
 services:
-  trainstatus-postgres:
-    image: postgres:alpine
-    restart: unless-stopped
+  postgis:
+    container_name: postgis
+    image: postgis/postgis:17-3.6-alpine
     ports:
       - 5432:5432
     environment:
@@ -10,14 +10,29 @@ services:
       - POSTGRES_DB=trains
     volumes:
       - trainstatus-db:/var/lib/postgresql/data:z
-      - ./postgresql.conf:/etc/postgresql/postgresql.conf:z
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:z,ro
     shm_size: 1g
+
   valkey:
-    image: valkey/valkey:alpine
     container_name: valkey
-    restart: unless-stopped
+    image: valkey/valkey:alpine
     ports:
       - 6379:6379
+
+  # martin:
+  #   container_name: martin
+  #   image: ghcr.io/maplibre/martin:latest
+  #   ports:
+  #     - 3000:3000
+  #   environment:
+  #     - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
+  #   depends_on:
+  #     - postgis
+  #   command: ["--config", "/config/martin.yml"]
+  #   volumes:
+  #     - ./martin.yml:/config/martin.yml:z,ro
+  #     - ./sprites:/sprites:z,ro
+
   # ts-backend:
   #   environment:
   #     - DATABASE_URL=postgres://trains:trains@trainstatus-postgres:5432/trains

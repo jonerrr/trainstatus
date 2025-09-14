@@ -3,7 +3,10 @@ use crate::{
     api_key,
     static_data::stop::{RouteStop, RouteStopData, Stop, StopData},
 };
-use geo::{LineString, MultiLineString};
+use geo::LineString;
+use geo::MultiLineString;
+use geo::{Geometry, Point};
+use geozero::wkb;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use itertools::Itertools;
@@ -11,11 +14,11 @@ use polyline::decode_polyline;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
-use sqlx::{PgPool, QueryBuilder};
+use sqlx::{FromRow, PgPool, QueryBuilder, Row, postgres::PgRow};
 use std::{collections::HashMap, fmt};
 use utoipa::ToSchema;
 
-#[derive(Serialize, sqlx::FromRow, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct Route {
     #[schema(example = "1")]
     pub id: String,
@@ -26,15 +29,60 @@ pub struct Route {
     #[schema(example = "EE352E")]
     pub color: String,
     #[schema(example = false)]
-    /// This will only be true for shuttle bus routes. It is false for all train routes.
+    /// This is currently only used for bus routes. It will be false for all trains.
     pub shuttle: bool,
+    // maybe change to wkt
     #[serde(skip_serializing_if = "Option::is_none")]
+    // TODO: correct schema
+    // #[schema(schema_with = crate::static_data::stop::point_schema)]
     #[serde(skip_deserializing)]
-    pub geom: Option<serde_json::Value>,
+    pub geom: Option<Geometry>,
     pub route_type: RouteType,
 }
 
-#[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq, ToSchema, Hash, Eq)]
+// fn serialize_geometry<S>(
+//     geom: &Option<wkb::Decode<Geometry>>,
+//     serializer: S,
+// ) -> Result<S::Ok, S::Error>
+// where
+//     S: serde::Serializer,
+// {
+//     match geom {
+//         Some(decode) => {
+//             // You can serialize the inner geometry or convert to a string representation
+//             serializer.serialize_none() // or implement proper geometry serialization
+//         }
+//         None => serializer.serialize_none(),
+//     }
+// }
+
+impl FromRow<'_, PgRow> for Route {
+    fn from_row(row: &PgRow) -> sqlx::Result<Self> {
+        let geom: Option<wkb::Decode<Geometry>> = match row.try_get("geom") {
+            Ok(g) => g,
+            Err(e) => {
+                println!(
+                    "Error decoding geometry for route {}: {}",
+                    row.try_get::<String, _>("id")?,
+                    e
+                );
+                return Err(e);
+            }
+        };
+
+        Ok(Self {
+            id: row.try_get("id")?,
+            long_name: row.try_get("long_name")?,
+            short_name: row.try_get("short_name")?,
+            color: row.try_get("color")?,
+            shuttle: row.try_get("shuttle")?,
+            geom: geom.and_then(|g| g.geometry),
+            route_type: row.try_get("route_type")?,
+        })
+    }
+}
+
+#[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq, ToSchema, Hash, Eq, Clone, Copy)]
 #[sqlx(type_name = "route_type", rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RouteType {
@@ -50,21 +98,57 @@ impl fmt::Display for RouteType {
 
 impl Route {
     pub async fn insert(routes: Vec<Self>, pool: &PgPool) {
-        let mut query_builder = QueryBuilder::new(
-            "INSERT INTO route (id, long_name, short_name, color, shuttle, geom, route_type)",
-        );
-        query_builder.push_values(routes, |mut b, route| {
-            b.push_bind(route.id)
-                .push_bind(route.long_name)
-                .push_bind(route.short_name)
-                .push_bind(route.color)
-                .push_bind(route.shuttle)
-                .push_bind(route.geom)
-                .push_bind(route.route_type);
-        });
-        query_builder.push("ON CONFLICT (id) DO UPDATE SET long_name = EXCLUDED.long_name, short_name = EXCLUDED.short_name, color = EXCLUDED.color, shuttle = EXCLUDED.shuttle, geom = EXCLUDED.geom, route_type = EXCLUDED.route_type");
-        let query = query_builder.build();
-        query.execute(pool).await.unwrap();
+        let ids: Vec<_> = routes.iter().map(|r| &r.id).collect();
+        let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
+        let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
+        let colors: Vec<_> = routes.iter().map(|r| &r.color).collect();
+        let shuttles: Vec<_> = routes.iter().map(|r| r.shuttle).collect();
+        let geoms: Vec<_> = routes
+            .iter()
+            .map(|r| r.geom.clone().map(wkb::Encode))
+            .collect();
+        let route_types: Vec<_> = routes.iter().map(|r| r.route_type).collect();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO route (id, long_name, short_name, color, shuttle, geom, route_type)
+            SELECT
+                u.id,
+                u.long_name,
+                u.short_name,
+                u.color,
+                u.shuttle,
+                ST_SetSRID(u.geom, 4326),
+                u.route_type
+            FROM
+                unnest(
+                    $1::text[],
+                    $2::text[],
+                    $3::text[],
+                    $4::text[],
+                    $5::bool[],
+                    $6::geometry[],
+                    $7::route_type[]
+                ) AS u(id, long_name, short_name, color, shuttle, geom, route_type)
+            ON CONFLICT (id) DO UPDATE SET
+                long_name = EXCLUDED.long_name,
+                short_name = EXCLUDED.short_name,
+                color = EXCLUDED.color,
+                shuttle = EXCLUDED.shuttle,
+                geom = EXCLUDED.geom,
+                route_type = EXCLUDED.route_type
+            "#,
+            &ids as _,
+            &long_names as _,
+            &short_names as _,
+            &colors as _,
+            &shuttles as _,
+            &geoms as _,
+            &route_types as &[RouteType]
+        )
+        .execute(pool)
+        .await
+        .unwrap();
     }
 
     pub async fn get_all(
@@ -92,7 +176,7 @@ impl Route {
         query.build_query_as().fetch_all(pool).await
     }
 
-    fn parse_shapes(shapes: Vec<GtfsShape>) -> HashMap<String, MultiLineString<f32>> {
+    fn parse_shapes(shapes: Vec<GtfsShape>) -> HashMap<String, MultiLineString> {
         let mut geom = HashMap::new();
 
         let mut shapes_by_route = vec![];
@@ -125,7 +209,7 @@ impl Route {
                     continue;
                 }
 
-                let segment: LineString<f32> = vec![
+                let segment: LineString = vec![
                     (
                         shape.shape_pt_lon.parse().unwrap(),
                         shape.shape_pt_lat.parse().unwrap(),
@@ -175,11 +259,10 @@ impl Route {
                 } else {
                     let geom = shapes
                         .get(&r.route_id)
-                        // .map(|lines| MultiLineString::new(lines.to_vec()))
-                        .map(|g| serde_json::to_value(g).unwrap())
+                        .map(|g| Some(g.clone().into()))
                         .unwrap_or_else(|| {
                             tracing::warn!("no geometry for route {}", r.route_id);
-                            serde_json::json!(null)
+                            None
                         });
 
                     // Some routes are missing colors, so we need to fill them in
@@ -198,7 +281,7 @@ impl Route {
                         short_name: r.route_short_name,
                         color: route_color,
                         shuttle: false,
-                        geom: Some(geom),
+                        geom,
                         route_type: RouteType::Train,
                     })
                 }
@@ -206,14 +289,10 @@ impl Route {
             .collect::<Vec<Route>>()
     }
 
-    pub async fn parse_bus() -> (
-        Vec<Self>,
-        Vec<Stop<StopData, Option<serde_json::Value>>>,
-        Vec<RouteStop>,
-    ) {
+    pub async fn parse_bus() -> (Vec<Self>, Vec<Stop>, Vec<RouteStop>) {
         // It wouldn't make sense to get bus routes and stops at different times bc they are all from the same API
         let mut routes: Vec<Route> = Vec::new();
-        let mut stops: Vec<Stop<StopData, Option<serde_json::Value>>> = Vec::new();
+        let mut stops: Vec<Stop> = Vec::new();
         let mut route_stops: Vec<RouteStop> = Vec::new();
 
         let all_routes = AgencyBusRoute::get_all().await;
@@ -263,7 +342,7 @@ impl Route {
                 short_name: route.short_name,
                 color: route.color,
                 shuttle,
-                geom: Some(serde_json::to_value(route_geom).unwrap()),
+                geom: Some(route_geom.into()),
                 route_type: RouteType::Bus,
             });
 
@@ -281,13 +360,15 @@ impl Route {
                 .map(|s| Stop {
                     id: s.code,
                     name: s.name,
-                    lat: s.lat,
+                    geom: Point::new(s.lon as f64, s.lat as f64).into(),
                     route_type: RouteType::Bus,
-                    routes: None,
+                    // TODO: calculate bus transfers myself
+                    transfers: vec![],
+                    // stop routes inserted later
+                    routes: vec![],
                     data: StopData::Bus {
                         direction: s.direction,
                     },
-                    lon: s.lon,
                 })
                 .collect::<Vec<_>>();
             // let s_names = stops_n.iter().map(|s| s.1.clone()).collect::<Vec<String>>();

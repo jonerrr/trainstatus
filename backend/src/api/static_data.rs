@@ -2,13 +2,13 @@ use super::errors::ServerError;
 use super::json_headers;
 use crate::AppState;
 use crate::static_data::route::{self, Route};
-use crate::static_data::stop::{Stop, StopData, StopType};
+use crate::static_data::stop::Stop;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use headers::{ETag, HeaderMapExt, IfNoneMatch};
 use http::{HeaderMap, StatusCode, header};
 use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
 
 #[derive(Deserialize, IntoParams)]
 pub struct Parameters {
@@ -100,30 +100,6 @@ pub async fn routes_handler(
     }
 }
 
-// TODO: reuse existing stop struct
-/// Stop route data, depends on the route type
-#[derive(ToSchema, Deserialize)]
-#[serde(untagged)]
-pub enum ApiStopRoute {
-    /// Bus
-    Bus {
-        #[schema(example = 1)]
-        /// Direction is from MTA's bus API. Can be 0 or 1
-        direction: i8,
-        headsign: String,
-        id: String,
-        stop_sequence: i32,
-    },
-    /// Train
-    Train {
-        id: String,
-        stop_sequence: i32,
-        #[serde(rename = "type")]
-        stop_type: StopType,
-    },
-}
-
-// TODO: use struct instead of serde_json value
 #[utoipa::path(
     get,
     path = "/stops",
@@ -132,7 +108,7 @@ pub enum ApiStopRoute {
         Parameters
     ),
     responses(
-        (status = 200, description = "Subway and bus stops", body = [Stop<StopData, Vec<ApiStopRoute>>]),
+        (status = 200, description = "Subway and bus stops", body = [Stop]),
         (status = 304, description = "If no parameters are provided and the etag matches the request")
     )
 )]

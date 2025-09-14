@@ -1,6 +1,5 @@
 use bb8_redis::RedisConnectionManager;
 use chrono::Utc;
-use geo::{CoordsIter, LinesIter};
 use redis::AsyncCommands;
 use serde_json::json;
 use sqlx::PgPool;
@@ -126,11 +125,12 @@ pub async fn import(
                     .unwrap();
 
                 let mut routes = route::Route::parse_train(gtfs_routes, gtfs_shapes).await;
-                let (mut stops, mut route_stops) = stop::Stop::parse_train(
+                let (mut stops, mut route_stops, transfers) = stop::Stop::parse_train(
                     routes.iter().map(|r| r.id.clone()).collect(),
                     gtfs_transfers,
                 )
                 .await;
+                // no bus transfers yet
                 let (mut bus_routes, mut bus_stops, mut bus_route_stops) =
                     route::Route::parse_bus().await;
                 routes.append(&mut bus_routes);
@@ -138,10 +138,12 @@ pub async fn import(
                 route_stops.append(&mut bus_route_stops);
 
                 // dbg!(bus_route_stops.len());
+                // no result returned because we can't do anything if it fails
                 route::Route::insert(routes, &pool).await;
                 stop::Stop::insert(stops, &pool).await;
 
                 stop::RouteStop::insert(route_stops, &pool).await;
+                stop::Transfer::insert(transfers, &pool).await;
 
                 // remove old update_ats
                 sqlx::query!("DELETE FROM last_update")
@@ -183,8 +185,11 @@ pub async fn cache_all(
     redis_pool: &bb8::Pool<RedisConnectionManager>,
 ) -> Result<(), sqlx::Error> {
     let stops = stop::Stop::get_all(pool).await?;
+    tracing::debug!("Caching {} stops", stops.len());
     let mut routes = route::Route::get_all(pool, None, true).await?;
+    tracing::debug!("Caching {} routes", routes.len());
 
+    // TODO: maybe use martin instead of having a geojson API option
     // cache geojson
     // let routes_w_geom = route::Route::get_all(&pool, None, true).await?;
 
@@ -203,7 +208,7 @@ pub async fn cache_all(
                 },
                 "geometry": {
                     "type": "Point",
-                    "coordinates": [s.lon, s.lat],
+                    "coordinates": s.geom,
                 },
             });
 
@@ -218,11 +223,10 @@ pub async fn cache_all(
 
     // TODO: remove extra filter once we have all routes with geom
     let (bus_route_features, train_route_features) =
-        routes.iter().filter(|r| serde_json::from_value::<geo::MultiLineString>(r.geom.clone().unwrap()).is_ok()).fold(
+        routes.iter().filter(|r| r.geom.is_some()).fold(
             (Vec::new(), Vec::new()),
             |(mut bus_acc, mut train_acc), r| {
-                let geom: geo::MultiLineString =
-                    serde_json::from_value(r.geom.clone().unwrap()).unwrap();
+                let geom = r.geom.as_ref().unwrap();
 
                 let feature = json!({
                     "type": "Feature",
@@ -237,9 +241,10 @@ pub async fn cache_all(
                     },
                     "geometry": {
                         "type": "MultiLineString",
-                        "coordinates": geom.lines_iter().map(|l| l.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>()).collect::<Vec<_>>(),
+                        "coordinates": geom
                     },
                 });
+                //                         // "coordinates": r.geom.lines_iter().map(|l| l.coords_iter().map(|c| [c.x, c.y]).collect::<Vec<_>>()).collect::<Vec<_>>(),
 
                 match r.route_type {
                     route::RouteType::Bus => bus_acc.push(feature),
