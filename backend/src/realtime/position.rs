@@ -69,14 +69,14 @@ pub enum PositionData {
         geom: Option<Geometry>,
         bearing: f32,
         // these are from SIRI/OBA API not GTFS
-        // passengers: Option<i32>,
-        // capacity: Option<i32>,
-    },
-    // The OBA API also has lat/lng, but we get that from GTFS
-    OBABus {
         passengers: Option<i32>,
         capacity: Option<i32>,
     },
+    // The OBA API also has lat/lng, but we get that from GTFS
+    // OBABus {
+    //     passengers: Option<i32>,
+    //     capacity: Option<i32>,
+    // },
 }
 
 impl Position {
@@ -113,11 +113,20 @@ impl Position {
             Some(PositionData::Bus { .. }) => {
                 let mut bearings = vec![];
                 let mut geoms = vec![];
+                let mut occupancies = vec![];
+                let mut capacities = vec![];
 
                 for v in &values {
-                    if let PositionData::Bus { geom, bearing, .. } = &v.data {
+                    if let PositionData::Bus {
+                        geom,
+                        bearing,
+                        capacity,
+                        passengers,
+                    } = &v.data
+                    {
                         bearings.push(Some(*bearing));
-                        // Use the same approach as route.rs
+                        occupancies.push(*passengers);
+                        capacities.push(*capacity);
                         geoms.push(geom.clone().map(wkb::Encode));
                     }
                 }
@@ -130,6 +139,8 @@ impl Position {
                         stop_id,
                         status,
                         bearing,
+                        passengers,
+                        capacity,
                         geom,
                         recorded_at
                     )
@@ -139,64 +150,68 @@ impl Position {
                         unnest($3::int[]),
                         unnest($4::text[]),
                         unnest($5::real[]),
-                        ST_SetSRID(unnest($6::geometry[]), 4326),
-                        unnest($7::timestamptz[])
+                        unnest($6::int[]),
+                        unnest($7::int[]),
+                        ST_SetSRID(unnest($8::geometry[]), 4326),
+                        unnest($9::timestamptz[])
                     "#,
                     &vehicle_ids,
                     &mta_ids as &[Option<String>],
                     &stop_ids as &[Option<i32>],
                     &statuses as &[Option<String>],
                     &bearings as &[Option<f32>],
+                    &occupancies as &[Option<i32>],
+                    &capacities as &[Option<i32>],
                     &geoms as &[Option<wkb::Encode<Geometry>>],
                     &recorded_ats,
                 )
                 .execute(pool)
                 .await?;
             }
-            Some(PositionData::OBABus { .. }) => {
-                let mut passengers = vec![];
-                let mut capacities = vec![];
+            // Some(PositionData::OBABus { .. }) => {
+            //     let mut passengers = vec![];
+            //     let mut capacities = vec![];
 
-                for v in &values {
-                    if let PositionData::OBABus {
-                        passengers: p,
-                        capacity: c,
-                    } = &v.data
-                    {
-                        passengers.push(*p);
-                        capacities.push(*c);
-                    }
-                }
+            //     for v in &values {
+            //         if let PositionData::OBABus {
+            //             passengers: p,
+            //             capacity: c,
+            //         } = &v.data
+            //         {
+            //             passengers.push(*p);
+            //             capacities.push(*c);
+            //         }
+            //     }
 
-                // For OBA bus data, we only have passengers/capacity, no geometry
-                sqlx::query!(
-                    r#"
-                    INSERT INTO realtime.position (
-                        vehicle_id,
-                        mta_id,
-                        status,
-                        passengers,
-                        capacity,
-                        recorded_at
-                    )
-                    SELECT
-                        unnest($1::text[]),
-                        unnest($2::text[]),
-                        unnest($3::text[]),
-                        unnest($4::int[]),
-                        unnest($5::int[]),
-                        unnest($6::timestamptz[])
-                    "#,
-                    &vehicle_ids,
-                    &mta_ids as &[Option<String>],
-                    &statuses as &[Option<String>],
-                    &passengers as &[Option<i32>],
-                    &capacities as &[Option<i32>],
-                    &recorded_ats,
-                )
-                .execute(pool)
-                .await?;
-            }
+            //     // For OBA bus data, we only have passengers/capacity, no geometry
+            //     sqlx::query!(
+            //         r#"
+            //         INSERT INTO realtime.position (
+            //             vehicle_id,
+            //             mta_id,
+            //             status,
+            //             passengers,
+            //             capacity,
+            //             recorded_at
+            //         )
+            //         SELECT
+            //             unnest($1::text[]),
+            //             unnest($2::text[]),
+            //             unnest($3::text[]),
+            //             unnest($4::int[]),
+            //             unnest($5::int[]),
+            //             unnest($6::timestamptz[])
+            //         "#,
+            //         &vehicle_ids,
+            //         &mta_ids as &[Option<String>],
+            //         &statuses as &[Option<String>],
+            //         &passengers as &[Option<i32>],
+            //         &capacities as &[Option<i32>],
+            //         &recorded_ats,
+            //     )
+            //     .execute(pool)
+            //     .await?;
+            // }
             None => tracing::warn!("No positions to insert"),
         };
 

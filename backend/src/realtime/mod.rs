@@ -144,12 +144,12 @@ pub async fn import(
             }
         });
 
-        tokio::spawn(async move {
-            let _ = bus::import_oba(&oba_pool)
-                .await
-                .inspect_err(|e| tracing::error!("bus::import_oba: {:#?}", e));
-            sleep(Duration::from_secs(35)).await;
-        });
+        // tokio::spawn(async move {
+        //     let _ = bus::import_oba(&oba_pool)
+        //         .await
+        //         .inspect_err(|e| tracing::error!("bus::import_oba: {:#?}", e));
+        //     sleep(Duration::from_secs(35)).await;
+        // });
 
         // tokio::spawn(async move {
         //     loop {
