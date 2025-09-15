@@ -34,6 +34,15 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         .flat_map(|f| f.entity.into_iter())
         .collect::<Vec<_>>();
 
+    let oba_vehicles = oba::decode().await?;
+
+    // let oba_positions: Vec<Position> = oba_vehicles.into_iter().map(|v| v.into()).collect();
+    // create map of vehicle_id to (passengers, capacity)
+    let oba_map: std::collections::HashMap<String, (Option<i32>, Option<i32>)> = oba_vehicles
+        .into_iter()
+        .map(|v| (v.vehicle_id, (v.occupancy_count, v.occupancy_capacity)))
+        .collect();
+
     let mut trips: Vec<Trip<TripData>> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
@@ -81,17 +90,30 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         }
 
         if let Some(vehicle_position) = entity.vehicle {
-            let position = match BusVehiclePosition(vehicle_position.clone()).try_into() {
-                Ok(p) => p,
-                Err(e) => {
-                    tracing::error!(
-                        "Error converting position: {:?}\n{:#?}",
-                        e,
-                        vehicle_position
-                    );
-                    continue;
+            let mut position: Position =
+                match BusVehiclePosition(vehicle_position.clone()).try_into() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::error!(
+                            "Error converting position: {:?}\n{:#?}",
+                            e,
+                            vehicle_position
+                        );
+                        continue;
+                    }
+                };
+            let oba_data = oba_map.get(&position.vehicle_id);
+            if let Some((oba_passengers, oba_capacity)) = oba_data {
+                if let PositionData::Bus {
+                    passengers,
+                    capacity,
+                    ..
+                } = &mut position.data
+                {
+                    *passengers = *oba_passengers;
+                    *capacity = *oba_capacity;
                 }
-            };
+            }
 
             positions.push(position);
         }
@@ -104,69 +126,69 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     Ok(())
 }
 
-pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
-    let vehicles = oba::decode().await?;
+// pub async fn import_oba(pool: &PgPool) -> Result<(), ImportError> {
+//     let vehicles = oba::decode().await?;
 
-    let positions: Vec<Position> = vehicles.into_iter().map(|v| v.into()).collect();
+//     let positions: Vec<Position> = vehicles.into_iter().map(|v| v.into()).collect();
 
-    Position::insert(positions, pool).await?;
+//     Position::insert(positions, pool).await?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // not used anymore
-pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
-    let vehicles = siri::decode().await?;
+// pub async fn import_siri(pool: &PgPool) -> Result<(), ImportError> {
+//     let vehicles = siri::decode().await?;
 
-    if !vehicles.vehicle_activity.is_empty() {
-        let vehicle_ids: Vec<String> = vehicles
-            .vehicle_activity
-            .iter()
-            .map(|v| v.monitored_vehicle_journey.vehicle_ref.clone())
-            .collect();
-        let recorded_times: Vec<DateTime<Utc>> = vehicles
-            .vehicle_activity
-            .iter()
-            .map(|v| v.recorded_at_time)
-            .collect();
+//     if !vehicles.vehicle_activity.is_empty() {
+//         let vehicle_ids: Vec<String> = vehicles
+//             .vehicle_activity
+//             .iter()
+//             .map(|v| v.monitored_vehicle_journey.vehicle_ref.clone())
+//             .collect();
+//         let recorded_times: Vec<DateTime<Utc>> = vehicles
+//             .vehicle_activity
+//             .iter()
+//             .map(|v| v.recorded_at_time)
+//             .collect();
 
-        let missing_vehicle_ids: Vec<Option<String>> = sqlx::query_scalar!(
-            r#"
-            SELECT vehicle_time.vehicle_id
-            FROM unnest($1::TEXT[], $2::TIMESTAMPTZ[]) AS vehicle_time(vehicle_id, recorded_at)
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM realtime.position p
-                WHERE p.vehicle_id = vehicle_time.vehicle_id
-                AND p.recorded_at >= vehicle_time.recorded_at - INTERVAL '5 minutes'
-            )
-            "#,
-            &vehicle_ids,
-            &recorded_times
-        )
-        .fetch_all(pool)
-        .await?;
+//         let missing_vehicle_ids: Vec<Option<String>> = sqlx::query_scalar!(
+//             r#"
+//             SELECT vehicle_time.vehicle_id
+//             FROM unnest($1::TEXT[], $2::TIMESTAMPTZ[]) AS vehicle_time(vehicle_id, recorded_at)
+//             WHERE NOT EXISTS (
+//                 SELECT 1
+//                 FROM realtime.position p
+//                 WHERE p.vehicle_id = vehicle_time.vehicle_id
+//                 AND p.recorded_at >= vehicle_time.recorded_at - INTERVAL '5 minutes'
+//             )
+//             "#,
+//             &vehicle_ids,
+//             &recorded_times
+//         )
+//         .fetch_all(pool)
+//         .await?;
 
-        if !missing_vehicle_ids.is_empty() {
-            for missing_id in &missing_vehicle_ids {
-                if let Some(id) = missing_id {
-                    if let Some(vehicle) = vehicles
-                        .vehicle_activity
-                        .iter()
-                        .find(|v| &v.monitored_vehicle_journey.vehicle_ref == id)
-                    {
-                        tracing::warn!(
-                            "Missing vehicle_id: {}, progress_status: {:?}",
-                            id,
-                            vehicle.monitored_vehicle_journey.progress_status
-                        );
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
+//         if !missing_vehicle_ids.is_empty() {
+//             for missing_id in &missing_vehicle_ids {
+//                 if let Some(id) = missing_id {
+//                     if let Some(vehicle) = vehicles
+//                         .vehicle_activity
+//                         .iter()
+//                         .find(|v| &v.monitored_vehicle_journey.vehicle_ref == id)
+//                     {
+//                         tracing::warn!(
+//                             "Missing vehicle_id: {}, progress_status: {:?}",
+//                             id,
+//                             vehicle.monitored_vehicle_journey.progress_status
+//                         );
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     Ok(())
+// }
 
 struct BusTripUpdate<'a>(&'a TripUpdate);
 
@@ -290,11 +312,10 @@ impl TryFrom<BusVehiclePosition> for Position {
             status: None,
             data: PositionData::Bus {
                 geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
-                // lat: position.latitude,
-                // lon: position.longitude,
                 bearing: position.bearing.unwrap(),
-                // passengers: None,
-                // capacity: None,
+                // these will be added from OBA api
+                passengers: None,
+                capacity: None,
             },
             // vehicle_type: super::position::VehicleType::Bus,
             // data: PositionData::Train {
@@ -347,21 +368,21 @@ impl TryFrom<BusVehiclePosition> for Position {
 //     }
 // }
 
-impl From<oba::VehicleStatus> for Position {
-    fn from(value: oba::VehicleStatus) -> Self {
-        Self {
-            vehicle_id: value.vehicle_id,
-            mta_id: value.trip_id,
-            stop_id: None,
-            recorded_at: value.last_update_time,
-            status: Some(value.phase),
-            data: PositionData::OBABus {
-                passengers: value.occupancy_count,
-                capacity: value.occupancy_capacity,
-            },
-        }
-    }
-}
+// impl From<oba::VehicleStatus> for Position {
+//     fn from(value: oba::VehicleStatus) -> Self {
+//         Self {
+//             vehicle_id: value.vehicle_id,
+//             mta_id: value.trip_id,
+//             stop_id: None,
+//             recorded_at: value.last_update_time,
+//             status: Some(value.phase),
+//             data: PositionData::OBABus {
+//                 passengers: value.occupancy_count,
+//                 capacity: value.occupancy_capacity,
+//             },
+//         }
+//     }
+// }
 
 // used to remove the prefix from the vehicle id and trip id
 pub fn de_remove_underscore_prefix<'de, D>(deserializer: D) -> Result<String, D::Error>
