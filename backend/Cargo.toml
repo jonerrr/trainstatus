@@ -13,7 +13,7 @@ axum = { version = "0.8.4", features = ["ws"] }
 bb8 = "0.9.0"
 bb8-redis = "0.24.0"
 blake3 = "1.8.2"
-chrono = { version = "0.4.40", features = ["serde"] }
+chrono = { version = "0.4.42", features = ["serde"] }
 chrono-tz = "0.10.4"
 # crossbeam = "0.8.4"
 csv = "1.3.0"
