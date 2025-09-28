@@ -81,7 +81,7 @@ pub async fn import(
         let train_pool = pool.clone();
         let bus_pool = pool.clone();
         // let siri_pool = pool.clone();
-        let oba_pool = pool.clone();
+        // let oba_pool = pool.clone();
 
         let redis_pool = redis_pool.clone();
 

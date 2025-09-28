@@ -71,6 +71,7 @@ pub enum PositionData {
         // these are from SIRI/OBA API not GTFS
         passengers: Option<i32>,
         capacity: Option<i32>,
+        status: Option<String>,
     },
     // The OBA API also has lat/lng, but we get that from GTFS
     // OBABus {
@@ -80,6 +81,7 @@ pub enum PositionData {
 }
 
 impl Position {
+    // TODO: maybe don't insert if position has same geom
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         if values.is_empty() {
             tracing::warn!("No positions to insert");
@@ -115,6 +117,7 @@ impl Position {
                 let mut geoms = vec![];
                 let mut occupancies = vec![];
                 let mut capacities = vec![];
+                let mut statuses = vec![];
 
                 for v in &values {
                     if let PositionData::Bus {
@@ -122,12 +125,14 @@ impl Position {
                         bearing,
                         capacity,
                         passengers,
+                        status,
                     } = &v.data
                     {
                         bearings.push(Some(*bearing));
                         occupancies.push(*passengers);
                         capacities.push(*capacity);
                         geoms.push(geom.clone().map(wkb::Encode));
+                        statuses.push(status.clone());
                     }
                 }
 

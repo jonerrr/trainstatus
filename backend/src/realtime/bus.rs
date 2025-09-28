@@ -1,7 +1,6 @@
 use super::{
     ImportError, decode, oba,
     position::{IntoPositionError, Position, PositionData},
-    siri,
     stop_time::{IntoStopTimeError, StopTime},
     trip::{IntoTripError, Trip, TripData},
 };
@@ -38,10 +37,21 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     // let oba_positions: Vec<Position> = oba_vehicles.into_iter().map(|v| v.into()).collect();
     // create map of vehicle_id to (passengers, capacity)
-    let oba_map: std::collections::HashMap<String, (Option<i32>, Option<i32>)> = oba_vehicles
-        .into_iter()
-        .map(|v| (v.vehicle_id, (v.occupancy_count, v.occupancy_capacity)))
-        .collect();
+    let oba_map: std::collections::HashMap<String, (Option<i32>, Option<i32>, String)> =
+        oba_vehicles
+            .into_iter()
+            .map(|v| {
+                (
+                    v.vehicle_id,
+                    (
+                        v.occupancy_count,
+                        v.occupancy_capacity,
+                        // TODO: maybe separate status and phase
+                        format!("{} | {}", v.status, v.phase),
+                    ),
+                )
+            })
+            .collect();
 
     let mut trips: Vec<Trip<TripData>> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
@@ -103,15 +113,17 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     }
                 };
             let oba_data = oba_map.get(&position.vehicle_id);
-            if let Some((oba_passengers, oba_capacity)) = oba_data {
+            if let Some((oba_passengers, oba_capacity, oba_status)) = oba_data {
                 if let PositionData::Bus {
                     passengers,
                     capacity,
+                    status,
                     ..
                 } = &mut position.data
                 {
                     *passengers = *oba_passengers;
                     *capacity = *oba_capacity;
+                    *status = Some(oba_status.to_string());
                 }
             }
 
@@ -316,6 +328,7 @@ impl TryFrom<BusVehiclePosition> for Position {
                 // these will be added from OBA api
                 passengers: None,
                 capacity: None,
+                status: None,
             },
             // vehicle_type: super::position::VehicleType::Bus,
             // data: PositionData::Train {

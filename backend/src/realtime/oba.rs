@@ -81,7 +81,7 @@ pub struct VehicleStatus {
     pub occupancy_count: Option<i32>,
     // pub occupancy_status: Option<i32>,
     pub phase: String,
-    // pub status: String,
+    pub status: String,
     #[serde(deserialize_with = "de_trip_id")]
     pub trip_id: Option<String>,
     #[serde(deserialize_with = "de_remove_underscore_prefix")]
