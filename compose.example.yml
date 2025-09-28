@@ -1,4 +1,4 @@
-# this is broken bc frontend can't access backend
+# this is broken (and outdated) bc frontend can't access backend
 services:
   traefik:
     image: traefik:v3.2
