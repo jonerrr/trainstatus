@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use geo::Geometry;
 use geozero::wkb;
+use serde::{Deserialize, Serialize};
 // use serde::Serialize;
 use sqlx::PgPool;
 // use utoipa::ToSchema;
@@ -11,9 +12,10 @@ pub struct Position {
     pub vehicle_id: String,
     pub mta_id: Option<String>,
     pub stop_id: Option<i32>,
-    pub status: Option<String>,
-    pub data: PositionData,
+    // pub status: Option<String>,
     pub recorded_at: DateTime<Utc>,
+    pub data: PositionData,
+    pub geom: Option<Geometry>,
     // TODO: remove this probably
     // pub vehicle_type: VehicleType,
 }
@@ -56,9 +58,13 @@ pub struct Position {
 //     Bus,
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data")]
 pub enum PositionData {
-    Train,
+    Train {
+        assigned: bool,
+        status: Option<String>,
+    },
     // {
     //     trip_id: Uuid,
     //     current_stop_sequence: i16,
@@ -66,12 +72,13 @@ pub enum PositionData {
     Bus {
         // vehicle_id: String,
         // mta_id: Option<String>,
-        geom: Option<Geometry>,
+        // geom: Option<Geometry>,
         bearing: f32,
         // these are from SIRI/OBA API not GTFS
         passengers: Option<i32>,
         capacity: Option<i32>,
         status: Option<String>,
+        phase: Option<String>,
     },
     // The OBA API also has lat/lng, but we get that from GTFS
     // OBABus {
@@ -94,131 +101,44 @@ impl Position {
             .collect::<Vec<_>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
-        let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
+        // let statuses = values.iter().map(|v| v.status.clone()).collect::<Vec<_>>();
         let recorded_ats = values.iter().map(|v| v.recorded_at).collect::<Vec<_>>();
+        let geoms: Vec<Option<wkb::Encode<Geometry>>> = values
+            .iter()
+            .map(|v| v.geom.clone().map(|g| wkb::Encode(g)))
+            .collect::<Vec<_>>();
+        let datas = values
+            .iter()
+            .map(|v| serde_json::to_value(&v.data).unwrap())
+            .collect::<Vec<_>>();
 
-        match values.first().map(|p| &p.data) {
-            Some(PositionData::Train) => {
-                // For trains, we don't have geometry/bearing/passengers/capacity
-                sqlx::query!(
-                    r#"
-                    INSERT INTO realtime.position (vehicle_id, mta_id, stop_id, status, recorded_at)
-                    SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[], $4::text[], $5::timestamptz[])
-                    "#,
-                    &vehicle_ids,
-                    &mta_ids as &[Option<String>],
-                    &stop_ids as &[Option<i32>],
-                    &statuses as &[Option<String>],
-                    &recorded_ats,
-                ).execute(pool).await?;
-            }
-            Some(PositionData::Bus { .. }) => {
-                let mut bearings = vec![];
-                let mut geoms = vec![];
-                let mut occupancies = vec![];
-                let mut capacities = vec![];
-                let mut statuses = vec![];
-
-                for v in &values {
-                    if let PositionData::Bus {
-                        geom,
-                        bearing,
-                        capacity,
-                        passengers,
-                        status,
-                    } = &v.data
-                    {
-                        bearings.push(Some(*bearing));
-                        occupancies.push(*passengers);
-                        capacities.push(*capacity);
-                        geoms.push(geom.clone().map(wkb::Encode));
-                        statuses.push(status.clone());
-                    }
-                }
-
-                sqlx::query!(
-                    r#"
-                    INSERT INTO realtime.position (
-                        vehicle_id,
-                        mta_id,
-                        stop_id,
-                        status,
-                        bearing,
-                        passengers,
-                        capacity,
-                        geom,
-                        recorded_at
-                    )
-                    SELECT
-                        unnest($1::text[]),
-                        unnest($2::text[]),
-                        unnest($3::int[]),
-                        unnest($4::text[]),
-                        unnest($5::real[]),
-                        unnest($6::int[]),
-                        unnest($7::int[]),
-                        ST_SetSRID(unnest($8::geometry[]), 4326),
-                        unnest($9::timestamptz[])
-                    "#,
-                    &vehicle_ids,
-                    &mta_ids as &[Option<String>],
-                    &stop_ids as &[Option<i32>],
-                    &statuses as &[Option<String>],
-                    &bearings as &[Option<f32>],
-                    &occupancies as &[Option<i32>],
-                    &capacities as &[Option<i32>],
-                    &geoms as &[Option<wkb::Encode<Geometry>>],
-                    &recorded_ats,
-                )
-                .execute(pool)
-                .await?;
-            }
-            // Some(PositionData::OBABus { .. }) => {
-            //     let mut passengers = vec![];
-            //     let mut capacities = vec![];
-
-            //     for v in &values {
-            //         if let PositionData::OBABus {
-            //             passengers: p,
-            //             capacity: c,
-            //         } = &v.data
-            //         {
-            //             passengers.push(*p);
-            //             capacities.push(*c);
-            //         }
-            //     }
-
-            //     // For OBA bus data, we only have passengers/capacity, no geometry
-            //     sqlx::query!(
-            //         r#"
-            //         INSERT INTO realtime.position (
-            //             vehicle_id,
-            //             mta_id,
-            //             status,
-            //             passengers,
-            //             capacity,
-            //             recorded_at
-            //         )
-            //         SELECT
-            //             unnest($1::text[]),
-            //             unnest($2::text[]),
-            //             unnest($3::text[]),
-            //             unnest($4::int[]),
-            //             unnest($5::int[]),
-            //             unnest($6::timestamptz[])
-            //         "#,
-            //         &vehicle_ids,
-            //         &mta_ids as &[Option<String>],
-            //         &statuses as &[Option<String>],
-            //         &passengers as &[Option<i32>],
-            //         &capacities as &[Option<i32>],
-            //         &recorded_ats,
-            //     )
-            //     .execute(pool)
-            //     .await?;
-            // }
-            None => tracing::warn!("No positions to insert"),
-        };
+        sqlx::query!(
+            r#"
+            INSERT INTO realtime.position (
+                vehicle_id,
+                mta_id,
+                stop_id,
+                geom,
+                data,
+                recorded_at
+            )
+            SELECT
+                unnest($1::text[]),
+                unnest($2::text[]),
+                unnest($3::int[]),
+                unnest($4::geometry[]),
+                unnest($5::JSONB[]),
+                unnest($6::timestamptz[])
+            "#,
+            &vehicle_ids,
+            &mta_ids as &[Option<String>],
+            &stop_ids as &[Option<i32>],
+            &geoms as _,
+            &datas,
+            &recorded_ats,
+        )
+        .execute(pool)
+        .await?;
 
         Ok(())
     }

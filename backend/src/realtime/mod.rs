@@ -167,10 +167,11 @@ pub async fn import(
     // sleep(Duration::from_secs(10)).await;
 
     // cache data in redis
+    // TODO: find a better way to do this (use channels to notify when data changes or something)
     tokio::spawn(async move {
         loop {
             // callback hell alert
-            match trip::Trip::<serde_json::Value>::get_all(&c_pool, Utc::now()).await {
+            match trip::Trip::get_all(&c_pool, Utc::now()).await {
                 Ok(trips) => {
                     match stop_time::StopTime::get_all(
                         &c_pool,
@@ -178,51 +179,41 @@ pub async fn import(
                         None,
                         false,
                         false,
-                        false,
+                        // false,
                     )
                     .await
                     {
                         Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now(), true)
                             .await
                         {
-                            Ok(alerts) => {
-                                match trip::Trip::<serde_json::Value>::to_geojson(&trips).await {
-                                    Ok(geojson) => {
-                                        let Ok(mut conn) = redis_pool.get().await else {
-                                            tracing::error!("failed to get redis connection");
-                                            sleep(Duration::from_secs(35)).await;
-                                            continue;
-                                        };
-                                        let items = [
-                                            ("trips", serde_json::to_string(&trips).unwrap()),
-                                            (
-                                                "stop_times",
-                                                serde_json::to_string(&stop_times).unwrap(),
-                                            ),
-                                            ("alerts", serde_json::to_string(&alerts).unwrap()),
-                                            (
-                                                "bus_trips_geojson",
-                                                serde_json::to_string(&geojson).unwrap(),
-                                            ),
-                                        ];
-                                        if let Err(err) =
-                                            conn.mset::<&str, String, ()>(&items).await
-                                        {
-                                            tracing::error!(
-                                                "failed to cache data in redis: {}",
-                                                err
-                                            );
-                                            sleep(Duration::from_secs(35)).await;
-                                            continue;
-                                        }
-                                    }
-                                    Err(err) => {
-                                        tracing::error!("failed to cache geojson: {}", err);
+                            Ok(alerts) => match trip::Trip::to_geojson(&trips).await {
+                                Ok(geojson) => {
+                                    let Ok(mut conn) = redis_pool.get().await else {
+                                        tracing::error!("failed to get redis connection");
+                                        sleep(Duration::from_secs(35)).await;
+                                        continue;
+                                    };
+                                    let items = [
+                                        ("trips", serde_json::to_string(&trips).unwrap()),
+                                        ("stop_times", serde_json::to_string(&stop_times).unwrap()),
+                                        ("alerts", serde_json::to_string(&alerts).unwrap()),
+                                        (
+                                            "bus_trips_geojson",
+                                            serde_json::to_string(&geojson).unwrap(),
+                                        ),
+                                    ];
+                                    if let Err(err) = conn.mset::<&str, String, ()>(&items).await {
+                                        tracing::error!("failed to cache data in redis: {}", err);
                                         sleep(Duration::from_secs(35)).await;
                                         continue;
                                     }
                                 }
-                            }
+                                Err(err) => {
+                                    tracing::error!("failed to cache geojson: {}", err);
+                                    sleep(Duration::from_secs(35)).await;
+                                    continue;
+                                }
+                            },
                             Err(err) => {
                                 tracing::error!("failed to cache alerts: {}", err);
                                 sleep(Duration::from_secs(35)).await;

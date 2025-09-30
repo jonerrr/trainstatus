@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)\n                    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])\n                    ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4Array",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Int2Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "de31de12f6df3dcf3e4e51960098454408ae744f76d9c0e1027b221e638418d4"
+}

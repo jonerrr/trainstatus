@@ -1,5 +1,5 @@
-CREATE TABLE IF NOT EXISTS realtime.trip (
-    id UUID PRIMARY KEY,
+ CREATE TABLE IF NOT EXISTS realtime.trip (
+    id SERIAL PRIMARY KEY,
     mta_id VARCHAR NOT NULL,
     vehicle_id VARCHAR NOT NULL,
     route_id VARCHAR NOT NULL REFERENCES static.route(id),
@@ -8,19 +8,30 @@ CREATE TABLE IF NOT EXISTS realtime.trip (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     deviation INTEGER,
-    -- train fields
-    express BOOLEAN,
-    assigned BOOLEAN,
+
+    route_type static.route_type NOT NULL,
+    -- data JSONB NOT NULL,
+    -- train JSONB,
+    -- bus JSONB,
+    -- express BOOLEAN,
+    -- assigned BOOLEAN,
+
+    -- TODO: what if we created a geom col that is updated by a trigger on position insert?
+
     UNIQUE (mta_id, vehicle_id, created_at, direction)
 );
 
 CREATE TABLE IF NOT EXISTS realtime.stop_time (
-    trip_id UUID REFERENCES realtime.trip(id) ON DELETE CASCADE,
+    trip_id INTEGER REFERENCES realtime.trip(id) ON DELETE CASCADE,
     stop_id INTEGER REFERENCES static.stop(id),
     arrival TIMESTAMP WITH TIME ZONE NOT NULL,
     departure TIMESTAMP WITH TIME ZONE NOT NULL,
-    scheduled_track VARCHAR,
-    actual_track VARCHAR,
+    data JSONB NOT NULL,
+    -- scheduled_track VARCHAR,
+    -- actual_track VARCHAR,
+    -- bus JSONB,
+    -- train JSONB,
+
     PRIMARY KEY (trip_id, stop_id)
 );
 
@@ -40,19 +51,22 @@ CREATE TABLE IF NOT EXISTS realtime.stop_time (
 -- CREATE TABLE IF NOT EXISTS position (
 --     vehicle_id VARCHAR PRIMARY KEY,
 --     mta_id VARCHAR,
---     stop_id INTEGER REFERENCES stop(id),
+--     stop_id INTEGER REFERENCES static.stop(id),
 --     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
---     status status NOT NULL,
+--     data JSONB NOT NULL,
+--     -- -- status status NOT NULL,
+--     -- bus JSONB,
+--     -- train JSONB
 --     -- train
 --     -- trip_id UUID UNIQUE REFERENCES trip(id) ON DELETE CASCADE,
 --     -- current_stop_sequence SMALLINT,
 --     -- bus
---     -- vehicle_type vehicle_type,
---     lat REAL,
---     lon REAL,
---     bearing REAL,
---     passengers INTEGER,
---     capacity INTEGER
+--     -- -- vehicle_type vehicle_type,
+--     -- lat REAL,
+--     -- lon REAL,
+--     -- bearing REAL,
+--     -- passengers INTEGER,
+--     -- capacity INTEGER
 -- );
 
 CREATE TABLE IF NOT EXISTS realtime.position (
@@ -60,10 +74,13 @@ CREATE TABLE IF NOT EXISTS realtime.position (
     vehicle_id VARCHAR NOT NULL,
     mta_id VARCHAR,
     stop_id INTEGER REFERENCES static.stop(id),
-    status VARCHAR,
-    bearing REAL,
-    passengers INTEGER,
-    capacity INTEGER,
+    data JSONB NOT NULL,
+    -- bus JSONB,
+    -- train JSONB,
+    -- status VARCHAR,
+    -- bearing REAL,
+    -- passengers INTEGER,
+    -- capacity INTEGER,
     geom geometry(POINT, 4326),
     recorded_at TIMESTAMP WITH TIME ZONE NOT NULL
 );

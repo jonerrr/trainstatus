@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use thiserror::Error;
 use utoipa::ToSchema;
-use uuid::Uuid;
+
+use crate::static_data::route::RouteType;
 
 // TODO: use geo types for geom
 // TODO: remove generics and create impl for FromRow
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema, FromRow)]
-pub struct Trip<D> {
-    pub id: Uuid,
+pub struct Trip {
+    pub id: i32,
     /// This the ID from the MTA feed
     #[schema(example = "097550_1..S03R")]
     pub mta_id: String,
@@ -30,67 +31,71 @@ pub struct Trip<D> {
     /// A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deviation: Option<i32>,
-    /// Data is either train or bus data
-    pub data: D,
+    pub route_type: RouteType,
+    // /// Data is either train or bus data
+    // #[sqlx(json)]
+    // pub data: TripData,
 }
 
 /// Trip data changes based on the type of trip (train or bus)
-#[derive(Serialize, Clone, PartialEq, Debug, ToSchema)]
-#[serde(untagged)]
-pub enum TripData {
-    Train {
-        express: bool,
-        assigned: bool,
-        // TODO: get list of possible statuses
-        /// Can be `None` `Incoming`, `AtStop`, or `InTransitTo`
-        status: String,
-        /// Last known stop ID
-        stop_id: Option<String>,
-    },
-    Bus {
-        /// Can be `None` `Spooking`, `Layover`, or `NoProgress`
-        status: String,
-        /// Last known stop ID
-        stop_id: Option<String>,
-        lat: Option<f32>,
-        lon: Option<f32>,
-        bearing: Option<f32>,
-        passengers: Option<i32>,
-        capacity: Option<i32>,
-    },
-}
+// #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, ToSchema)]
+// #[serde(untagged)]
+// pub enum TripData {
+//     Train {
+//         express: bool,
+//         assigned: bool,
+//         // TODO: get list of possible statuses
+//         // /// Can be `None` `Incoming`, `AtStop`, or `InTransitTo`
+//         // status: String,
+//         // /// Last known stop ID
+//         // stop_id: Option<String>,
+//     },
+//     Bus {
+//         // /// Can be `None` `Spooking`, `Layover`, or `NoProgress`
+//         // status: String,
+//         // phase: String,
+//         // /// Last known stop ID
+//         // stop_id: Option<String>,
+//         // lat: Option<f32>,
+//         // lon: Option<f32>,
+//         // bearing: Option<f32>,
+//         // passengers: Option<i32>,
+//         // capacity: Option<i32>,
+//     },
+// }
 
-// For importing trip and stop times, only express and assigned are needed
-// The other status data is taken from the positions endpoint or SIRI for buses.
-impl TripData {
-    pub fn default_train(express: bool, assigned: bool) -> Self {
-        Self::Train {
-            express,
-            assigned,
-            status: "none".into(),
-            stop_id: None,
-        }
-    }
+// // For importing trip and stop times, only express and assigned are needed
+// // The other status data is taken from the positions endpoint or SIRI for buses.
+// impl TripData {
+//     pub fn default_train(express: bool, assigned: bool) -> Self {
+//         Self::Train {
+//             express,
+//             assigned,
+//             status: "none".into(),
+//             stop_id: None,
+//         }
+//     }
 
-    pub fn default_bus() -> Self {
-        Self::Bus {
-            status: "none".into(),
-            stop_id: None,
-            lat: None,
-            lon: None,
-            bearing: None,
-            passengers: None,
-            capacity: None,
-        }
-    }
-}
+//     pub fn default_bus() -> Self {
+//         Self::Bus {
+//             status: "none".into(),
+//             phase: "none".into(),
+//             stop_id: None,
+//             lat: None,
+//             lon: None,
+//             bearing: None,
+//             passengers: None,
+//             capacity: None,
+//         }
+//     }
+// }
 
-impl Trip<TripData> {
+impl Trip {
     // TODO: insert individually instead of bulk insert so if theres some constraint violation it only fails that one
     // maybe use db function or procedure or prepared statement
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         // using UNNEST to insert multiple rows at once https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
-        let ids = values.iter().map(|v| v.id).collect::<Vec<Uuid>>();
+        let ids = values.iter().map(|v| v.id).collect::<Vec<i32>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
         let vehicle_ids = values
             .iter()
@@ -117,44 +122,10 @@ impl Trip<TripData> {
             .map(|v| v.deviation)
             .collect::<Vec<Option<i32>>>();
 
-        match values.first().map(|t| &t.data) {
-            Some(TripData::Train { .. }) => {
-                // get express and assigned from each trip. If first one is train that means they all are
-                let (expresses, assigns): (Vec<bool>, Vec<bool>) = values
-                    .iter()
-                    .map(|v| match &v.data {
-                        TripData::Train {
-                            express, assigned, ..
-                        } => (*express, *assigned),
-                        _ => unreachable!("all trips should be the same type"),
-                    })
-                    .unzip();
-
-                sqlx::query!(
-                    r#"
-                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, express, assigned)
-                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::bool[], $10::bool[])
-                    ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned, updated_at = EXCLUDED.updated_at
-                    "#,
-                    &ids,
-                    &mta_ids,
-                    &vehicle_ids,
-                    &route_ids,
-                    &directions as &[Option<i16>],
-                    &created_ats,
-                    &update_ats,
-                    &deviations as &[Option<i32>],
-                    &expresses,
-                    &assigns
-                )
-                .execute(pool)
-                .await?;
-            }
-            Some(TripData::Bus { .. }) => {
-                sqlx::query!(
+        sqlx::query!(
                     r#"
                     INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
-                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
+                    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
                     ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
                     "#,
                     &ids,
@@ -165,24 +136,85 @@ impl Trip<TripData> {
                     &created_ats,
                     &update_ats,
                     &deviations as &[Option<i32>]
-                )
-                .execute(pool)
-                .await?;
-            }
-            None => {
-                tracing::warn!("No trips in insert");
-            }
-        }
+        )
+        .execute(pool)
+        .await?;
+
+        // match values.first().map(|t| &t.data) {
+        //     Some(TripData::Train { .. }) => {
+        //         // get express and assigned from each trip. If first one is train that means they all are
+        //         let (expresses, assigns): (Vec<bool>, Vec<bool>) = values
+        //             .iter()
+        //             .map(|v| match &v.data {
+        //                 TripData::Train {
+        //                     express, assigned, ..
+        //                 } => (*express, *assigned),
+        //                 _ => unreachable!("all trips should be the same type"),
+        //             })
+        //             .unzip();
+
+        //         sqlx::query!(
+        //             r#"
+        //             INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, express, assigned)
+        //             SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::bool[], $10::bool[])
+        //             ON CONFLICT (id) DO UPDATE SET assigned = EXCLUDED.assigned, updated_at = EXCLUDED.updated_at
+        //             "#,
+        //             &ids,
+        //             &mta_ids,
+        //             &vehicle_ids,
+        //             &route_ids,
+        //             &directions as &[Option<i16>],
+        //             &created_ats,
+        //             &update_ats,
+        //             &deviations as &[Option<i32>],
+        //             &expresses,
+        //             &assigns
+        //         )
+        //         .execute(pool)
+        //         .await?;
+        //     }
+        //     Some(TripData::Bus { .. }) => {
+        //         sqlx::query!(
+        //             r#"
+        //             INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
+        //             SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
+        //             ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
+        //             "#,
+        //             &ids,
+        //             &mta_ids,
+        //             &vehicle_ids,
+        //             &route_ids,
+        //             &directions as &[Option<i16>],
+        //             &created_ats,
+        //             &update_ats,
+        //             &deviations as &[Option<i32>]
+        //         )
+        //         .execute(pool)
+        //         .await?;
+        //     }
+        //     None => {
+        //         tracing::warn!("No trips in insert");
+        //     }
+        // }
 
         Ok(())
     }
 
     // finds trip in db by matching mta_id, train_id, created_at, and direction, returns tuple of (found, changed) indicating if trip was found and if it is different than current trip in db
     pub async fn find(&mut self, pool: &PgPool) -> Result<(bool, bool), sqlx::Error> {
-        let res = sqlx::query!(
+        let res = sqlx::query_as!(
+            Trip,
             r#"
             SELECT
-                *
+                id,
+                mta_id,
+                vehicle_id,
+                route_id,
+                direction,
+                created_at,
+                updated_at,
+                deviation,
+                route_type as "route_type: RouteType"
             FROM
                 realtime.trip
             WHERE
@@ -209,17 +241,50 @@ impl Trip<TripData> {
                 self.id = t.id;
                 // self.created_at = t.created_at;
 
-                let changed = match &self.data {
-                    TripData::Train {
-                        express, assigned, ..
-                    } => t.express != Some(*express) || t.assigned != Some(*assigned),
-                    TripData::Bus { .. } => t.deviation != self.deviation,
-                };
+                // let changed = match &self.data {
+                //     TripData::Train {
+                //         express, assigned, ..
+                //     } => t.express != Some(*express) || t.assigned != Some(*assigned),
+                //     TripData::Bus { .. } => t.deviation != self.deviation,
+                // };
+                let changed = t.deviation != self.deviation;
 
                 Ok((true, changed))
             }
             None => Ok((false, true)),
         }
+    }
+
+    // TODO: use postgis to get geom as geojson
+    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Trip,
+            r#"
+            SELECT
+                t.id,
+                t.mta_id,
+                t.vehicle_id,
+                t.route_id,
+                t.direction,
+                t.created_at,
+                t.updated_at,
+                t.deviation,
+                t.route_type as "route_type: RouteType"
+            FROM realtime.trip t
+            WHERE
+                t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
+                AND t.id = ANY(
+                    SELECT t.id
+                    FROM realtime.trip t
+                    LEFT JOIN realtime.stop_time st ON st.trip_id = t.id
+                    WHERE st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
+                )
+            ORDER BY t.created_at DESC
+            "#,
+            at
+        )
+        .fetch_all(pool)
+        .await
     }
 
     // when daylight savings time changes, this will error so we need to handle that
@@ -261,116 +326,106 @@ impl Trip<TripData> {
 
         Ok(())
     }
-}
 
-impl Trip<serde_json::Value> {
-    // TODO: order by updated_at desc for everything
-    pub async fn get_all(pool: &PgPool, at: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            Trip::<serde_json::Value>,
-            r#"
-            WITH latest_positions AS (
-                SELECT DISTINCT ON (vehicle_id)
-                    vehicle_id,
-                    mta_id,
-                    stop_id,
-                    status,
-                    bearing,
-                    passengers,
-                    capacity,
-                    ST_X(geom) as lon,
-                    ST_Y(geom) as lat,
-                    recorded_at
-                FROM realtime.position
-                ORDER BY vehicle_id, recorded_at DESC
-            )
-            SELECT
-                t.id,
-                t.mta_id,
-                t.vehicle_id,
-                t.route_id,
-                t.direction,
-                t.created_at,
-                t.updated_at,
-                t.deviation,
-                CASE
-                    WHEN t.assigned IS NOT NULL THEN jsonb_build_object(
-                        'stop_id', p.stop_id,
-                        'status', p.status,
-                        'express', t.express,
-                        'assigned', t.assigned
-                    )
-                    ELSE jsonb_build_object(
-                        'stop_id', p.stop_id,
-                        'status', p.status,
-                        'lat', p.lat,
-                        'lon', p.lon,
-                        'bearing', p.bearing,
-                        'passengers', p.passengers,
-                        'capacity', p.capacity
-                    )
-                END AS data
-            FROM realtime.trip t
-            LEFT JOIN latest_positions p ON t.vehicle_id = p.vehicle_id
-            WHERE
-                t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')
-                AND t.id = ANY(
-                    SELECT t.id
-                    FROM realtime.trip t
-                    LEFT JOIN realtime.stop_time st ON st.trip_id = t.id
-                    WHERE st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')
-                )
-            ORDER BY t.created_at DESC
-            "#,
-            at
-        )
-        .fetch_all(pool)
-        .await
-    }
-
-    // TODO: i dont think we need result
     pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
-        let features = trips
-            .iter()
-            .filter_map(|t| {
-                let data = t.data.as_object()?;
-
-                // Get coordinates from the data object
-                let lon = data.get("lon")?.as_f64()?;
-                let lat = data.get("lat")?.as_f64()?;
-
-                Some(serde_json::json!({
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [lon, lat]
-                    },
-                    "id": t.id,
-                    "properties": {
-                        "id": t.id,
-                        "mta_id": t.mta_id,
-                        "vehicle_id": t.vehicle_id,
-                        "route_id": t.route_id,
-                        "direction": t.direction,
-                        "stop_id": data.get("stop_id"),
-                        "status": data.get("status"),
-                        "capacity": data.get("capacity"),
-                        "passengers": data.get("passengers"),
-                        "deviation": t.deviation,
-                        "bearing": data.get("bearing"),
-                        "created_at": t.created_at,
-                        "updated_at": t.updated_at
-                    },
-                }))
-            })
-            .collect::<Vec<_>>();
-
+        // TODO: remove this once caching logic is improved
         Ok(serde_json::json!({
             "type": "FeatureCollection",
-            "features": features
+            "features": []
         }))
     }
+
+    // TODO: use postgis to get geom as geojson
+    // pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
+    //     let features = trips
+    //         .iter()
+    //         .filter_map(|t| {
+    //             let data_value = serde_json::to_value(&t.data).ok()?;
+    //             let data = data_value.as_object()?;
+
+    //             // Get coordinates from the data object
+    //             let lon = data.get("lon")?.as_f64()?;
+    //             let lat = data.get("lat")?.as_f64()?;
+
+    //             Some(serde_json::json!({
+    //                 "type": "Feature",
+    //                 "geometry": {
+    //                     "type": "Point",
+    //                     "coordinates": [lon, lat]
+    //                 },
+    //                 "id": t.id,
+    //                 "properties": {
+    //                     "id": t.id,
+    //                     "mta_id": t.mta_id,
+    //                     "vehicle_id": t.vehicle_id,
+    //                     "route_id": t.route_id,
+    //                     "direction": t.direction,
+    //                     "stop_id": data.get("stop_id"),
+    //                     "status": data.get("status"),
+    //                     "capacity": data.get("capacity"),
+    //                     "passengers": data.get("passengers"),
+    //                     "deviation": t.deviation,
+    //                     "bearing": data.get("bearing"),
+    //                     "created_at": t.created_at,
+    //                     "updated_at": t.updated_at
+    //                 },
+    //             }))
+    //         })
+    //         .collect::<Vec<_>>();
+
+    //     Ok(serde_json::json!({
+    //         "type": "FeatureCollection",
+    //         "features": features
+    //     }))
+    // }
 }
+
+// impl Trip {
+//     // TODO: order by updated_at desc for everything
+
+//     // TODO: i dont think we need result
+//     pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
+//         let features = trips
+//             .iter()
+//             .filter_map(|t| {
+//                 let data = t.data.as_object()?;
+
+//                 // Get coordinates from the data object
+//                 let lon = data.get("lon")?.as_f64()?;
+//                 let lat = data.get("lat")?.as_f64()?;
+
+//                 Some(serde_json::json!({
+//                     "type": "Feature",
+//                     "geometry": {
+//                         "type": "Point",
+//                         "coordinates": [lon, lat]
+//                     },
+//                     "id": t.id,
+//                     "properties": {
+//                         "id": t.id,
+//                         "mta_id": t.mta_id,
+//                         "vehicle_id": t.vehicle_id,
+//                         "route_id": t.route_id,
+//                         "direction": t.direction,
+//                         "stop_id": data.get("stop_id"),
+//                         "status": data.get("status"),
+//                         "capacity": data.get("capacity"),
+//                         "passengers": data.get("passengers"),
+//                         "deviation": t.deviation,
+//                         "bearing": data.get("bearing"),
+//                         "created_at": t.created_at,
+//                         "updated_at": t.updated_at
+//                     },
+//                 }))
+//             })
+//             .collect::<Vec<_>>();
+
+//         Ok(serde_json::json!({
+//             "type": "FeatureCollection",
+//             "features": features
+//         }))
+//     }
+// }
 
 #[derive(Error, Debug)]
 pub enum IntoTripError {

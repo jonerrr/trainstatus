@@ -22,16 +22,21 @@ CREATE TABLE IF NOT EXISTS static.stop (
     id INTEGER PRIMARY KEY,
     name VARCHAR NOT NULL,
     geom geometry(POINT, 4326) NOT NULL,
-    route_type static.route_type NOT NULL,
-    -- train fields
-    ada BOOLEAN,
-    north_headsign VARCHAR,
-    south_headsign VARCHAR,
-    -- transfers INTEGER [],
-    notes VARCHAR,
-    borough static.borough,
-    -- bus fields
-    direction static.bus_direction
+    -- route_type static.route_type NOT NULL,
+
+    data JSONB NOT NULL
+    -- bus JSONB,
+    -- train JSONB
+
+    -- -- train fields
+    -- ada BOOLEAN,
+    -- north_headsign VARCHAR,
+    -- south_headsign VARCHAR,
+    -- -- transfers INTEGER [],
+    -- notes VARCHAR,
+    -- borough static.borough,
+    -- -- bus fields
+    -- direction static.bus_direction
 );
 
 CREATE TABLE IF NOT EXISTS static.stop_transfer (
@@ -55,10 +60,14 @@ CREATE TABLE IF NOT EXISTS static.route_stop (
     route_id VARCHAR REFERENCES static.route(id) ON DELETE CASCADE,
     stop_id INTEGER REFERENCES static.stop(id) ON DELETE CASCADE,
     stop_sequence SMALLINT NOT NULL,
+
+    data JSONB NOT NULL,
+    -- bus JSONB,
+    -- train JSONB,
     -- train fields
-    stop_type static.stop_type,
+    -- stop_type static.stop_type,
     -- bus fields
-    headsign VARCHAR,
-    direction SMALLINT,
+    -- headsign VARCHAR,
+    -- direction SMALLINT,
     PRIMARY KEY (route_id, stop_id)
 )
