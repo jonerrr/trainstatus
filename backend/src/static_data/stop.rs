@@ -455,8 +455,8 @@ impl Stop {
                 COALESCE(
                     array_agg(st.to_stop_id) FILTER (WHERE st.to_stop_id IS NOT NULL),
                     ARRAY[]::INTEGER[]
-                ) AS "transfers!: Vec<i32>",
-                array_agg(rs.*) AS "routes!: Vec<RouteStop>"
+                ) AS transfers,
+                jsonb_agg(rs.*) AS routes
                 -- json_agg(rs ORDER BY rs.route_id) AS routes
             FROM
                 static.stop s

@@ -45,13 +45,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             .map(|v| {
                 (
                     v.vehicle_id,
-                    (
-                        v.occupancy_count,
-                        v.occupancy_capacity,
-                        v.status,
-                        v.phase, // TODO: maybe separate status and phase
-                                 // format!("{} | {}", v.status, v.phase),
-                    ),
+                    (v.occupancy_count, v.occupancy_capacity, v.status, v.phase),
                 )
             })
             .collect();
