@@ -8,12 +8,15 @@ use sqlx::PgPool;
 //     "Q", "R", "W", "H", "FS", "GS", "SI",
 // ];
 
+#[tracing::instrument(skip(pool), level = "info")]
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let feed = decode(
         "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fall-alerts",
         "alerts",
     )
     .await?;
+    
+    tracing::info!(entity_count = feed.entity.len(), "Processing alerts");
 
     // This is used to set alerts not in feed to false
     let mut in_feed_ids = vec![];
@@ -280,6 +283,7 @@ pub struct Alert {
 }
 
 impl Alert {
+    #[tracing::instrument(skip(values, tx), fields(count = values.len()), level = "debug")]
     pub async fn insert(
         values: Vec<Self>,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -455,6 +459,7 @@ pub struct ActivePeriod {
 }
 
 impl ActivePeriod {
+    #[tracing::instrument(skip(values, tx), fields(count = values.len()), level = "debug")]
     pub async fn insert(
         values: Vec<Self>,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -495,6 +500,7 @@ pub struct AffectedEntity {
 }
 
 impl AffectedEntity {
+    #[tracing::instrument(skip(values, tx), fields(count = values.len()), level = "debug")]
     pub async fn insert(
         values: Vec<Self>,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
