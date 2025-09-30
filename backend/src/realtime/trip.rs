@@ -95,6 +95,11 @@ impl Trip {
     // maybe use db function or procedure or prepared statement
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         // using UNNEST to insert multiple rows at once https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
+        if values.is_empty() {
+            tracing::info!("No trips to insert");
+            return Ok(());
+        }
+
         let ids = values.iter().map(|v| v.id).collect::<Vec<i32>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
         let vehicle_ids = values
@@ -121,11 +126,14 @@ impl Trip {
             .iter()
             .map(|v| v.deviation)
             .collect::<Vec<Option<i32>>>();
+        let route_types = values.iter().map(|v| v.route_type).collect::<Vec<_>>();
+        // .unwrap_or(RouteType::Subway);
 
+        // TODO: maybe also update vehicle_id
         sqlx::query!(
                     r#"
-                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation)
-                    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[])
+                    INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, route_type)
+                    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::static.route_type[])
                     ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
                     "#,
                     &ids,
@@ -135,7 +143,8 @@ impl Trip {
                     &directions as &[Option<i16>],
                     &created_ats,
                     &update_ats,
-                    &deviations as &[Option<i32>]
+                    &deviations as &[Option<i32>],
+                    &route_types as _
         )
         .execute(pool)
         .await?;
