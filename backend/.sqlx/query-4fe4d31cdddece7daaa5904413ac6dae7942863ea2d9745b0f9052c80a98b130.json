@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                t.id,\n                t.mta_id,\n                t.vehicle_id,\n                t.route_id,\n                t.direction,\n                t.created_at,\n                t.updated_at,\n                t.deviation,\n                t.route_type as \"route_type: RouteType\"\n            FROM realtime.trip t\n            WHERE\n                t.updated_at >= (($1)::timestamp with time zone - INTERVAL '5 minutes')\n                AND t.id = ANY(\n                    SELECT t.id\n                    FROM realtime.trip t\n                    LEFT JOIN realtime.stop_time st ON st.trip_id = t.id\n                    WHERE st.arrival BETWEEN $1 AND ($1 + INTERVAL '4 hours')\n                )\n            ORDER BY t.created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "mta_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "vehicle_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "route_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "direction",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "deviation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "route_type: RouteType",
+        "type_info": {
+          "Custom": {
+            "name": "static.route_type",
+            "kind": {
+              "Enum": [
+                "train",
+                "bus"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "4fe4d31cdddece7daaa5904413ac6dae7942863ea2d9745b0f9052c80a98b130"
+}

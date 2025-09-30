@@ -252,38 +252,37 @@ impl Route {
 
         gtfs_routes
             .into_iter()
-            .filter_map(|r| {
+            .map(|r| {
                 // filter out express routes
-                if r.route_id.ends_with("X") {
-                    None
-                } else {
-                    let geom = shapes
-                        .get(&r.route_id)
-                        .map(|g| Some(g.clone().into()))
-                        .unwrap_or_else(|| {
-                            tracing::warn!("no geometry for route {}", r.route_id);
-                            None
-                        });
+                // if r.route_id.ends_with("X") {
+                //     None
+                // } else {
+                let geom = shapes
+                    .get(&r.route_id)
+                    .map(|g| Some(g.clone().into()))
+                    .unwrap_or_else(|| {
+                        tracing::warn!("no geometry for route {}", r.route_id);
+                        None
+                    });
 
-                    // Some routes are missing colors, so we need to fill them in
-                    // TODO: maybe check if blank and then fill in
-                    let route_color = match r.route_id.as_str() {
-                        // SI Color from MTA website
-                        "SI" => "0F61A9".to_string(),
-                        // From GS route color in static GTFS
-                        "FS" | "H" => "6D6E71".to_string(),
-                        _ => r.route_color,
-                    };
+                // Some routes are missing colors, so we need to fill them in
+                // TODO: maybe check if blank and then fill in
+                let route_color = match r.route_id.as_str() {
+                    // SI Color from MTA website
+                    "SI" => "0F61A9".to_string(),
+                    // From GS route color in static GTFS
+                    "FS" | "H" => "6D6E71".to_string(),
+                    _ => r.route_color,
+                };
 
-                    Some(Route {
-                        id: r.route_id,
-                        long_name: r.route_long_name,
-                        short_name: r.route_short_name,
-                        color: route_color,
-                        shuttle: false,
-                        geom,
-                        route_type: RouteType::Train,
-                    })
+                Route {
+                    id: r.route_id,
+                    long_name: r.route_long_name,
+                    short_name: r.route_short_name,
+                    color: route_color,
+                    shuttle: false,
+                    geom,
+                    route_type: RouteType::Train,
                 }
             })
             .collect::<Vec<Route>>()
@@ -361,7 +360,7 @@ impl Route {
                     id: s.code,
                     name: s.name,
                     geom: Point::new(s.lon as f64, s.lat as f64).into(),
-                    route_type: RouteType::Bus,
+                    // route_type: RouteType::Bus,
                     // TODO: calculate bus transfers myself
                     transfers: vec![],
                     // stop routes inserted later

@@ -4,7 +4,7 @@ use crate::AppState;
 use crate::api::{TimeParams, parse_list};
 use crate::realtime::alert::Alert;
 use crate::realtime::stop_time::StopTime;
-use crate::realtime::trip::{Trip, TripData};
+use crate::realtime::trip::Trip;
 use axum::extract::Query;
 use axum::{extract::State, response::IntoResponse};
 use chrono::{DateTime, Utc};
@@ -29,7 +29,7 @@ pub struct TripsParameters {
         TripsParameters, TimeParams
     ),
     responses(
-        (status = 200, description = "Subway and bus trips", body = [Trip<TripData>])
+        (status = 200, description = "Subway and bus trips", body = [Trip])
     )
 )]
 pub async fn trips_handler(
@@ -67,9 +67,9 @@ pub struct StopTimesParameters {
     /// Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
     #[serde(default)]
     filter_arrival: bool,
-    /// Includes the `actual_track` and `scheduled_track` in the response.
-    #[serde(default)]
-    include_tracks: bool,
+    // /// Includes the `actual_track` and `scheduled_track` in the response.
+    // #[serde(default)]
+    // include_tracks: bool,
 }
 
 #[utoipa::path(
@@ -91,9 +91,9 @@ pub async fn stop_times_handler(
     match (
         params.bus_route_ids.is_empty(),
         current_time.user_specified,
-        params.include_tracks,
+        // params.include_tracks,
     ) {
-        (true, false, false) => {
+        (true, false) => {
             let mut conn = state.redis_pool.get().await?;
             let stop_times: String = conn.get("stop_times").await?;
 
@@ -118,7 +118,7 @@ pub async fn stop_times_handler(
                 Some(&params.bus_route_ids),
                 params.only_bus,
                 params.filter_arrival,
-                params.include_tracks,
+                // params.include_tracks,
             )
             .await?;
             Ok((json_headers().clone(), serde_json::to_string(&stop_times)?))

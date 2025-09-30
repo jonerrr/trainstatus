@@ -1,17 +1,19 @@
 use super::{
     ImportError, decode, oba,
     position::{IntoPositionError, Position, PositionData},
-    stop_time::{IntoStopTimeError, StopTime},
-    trip::{IntoTripError, Trip, TripData},
+    stop_time::{StopTime, StopTimeUpdateWithTrip},
+    trip::{IntoTripError, Trip},
 };
-use crate::feed::{TripUpdate, VehiclePosition, trip_update::StopTimeUpdate};
-use chrono::{DateTime, Utc};
+use crate::{
+    feed::{TripUpdate, VehiclePosition},
+    static_data::route::RouteType,
+};
+use chrono::Utc;
 use geo::Point;
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::*;
 use serde::{Deserialize as _, Deserializer};
 use sqlx::PgPool;
-use uuid::Uuid;
 
 const ENDPOINTS: [(&str, &str); 2] = [
     ("https://gtfsrt.prod.obanyc.com/tripUpdates", "bus_trips"),
@@ -37,7 +39,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     // let oba_positions: Vec<Position> = oba_vehicles.into_iter().map(|v| v.into()).collect();
     // create map of vehicle_id to (passengers, capacity)
-    let oba_map: std::collections::HashMap<String, (Option<i32>, Option<i32>, String)> =
+    let oba_map: std::collections::HashMap<String, (Option<i32>, Option<i32>, String, String)> =
         oba_vehicles
             .into_iter()
             .map(|v| {
@@ -46,20 +48,21 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     (
                         v.occupancy_count,
                         v.occupancy_capacity,
-                        // TODO: maybe separate status and phase
-                        format!("{} | {}", v.status, v.phase),
+                        v.status,
+                        v.phase, // TODO: maybe separate status and phase
+                                 // format!("{} | {}", v.status, v.phase),
                     ),
                 )
             })
             .collect();
 
-    let mut trips: Vec<Trip<TripData>> = vec![];
+    let mut trips: Vec<Trip> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
-            let mut trip: Trip<TripData> = match BusTripUpdate(&trip_update).try_into() {
+            let mut trip: Trip = match BusTripUpdate(&trip_update).try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error converting trip: {:?}", e);
@@ -89,7 +92,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 .filter_map(|st| {
                     StopTimeUpdateWithTrip {
                         stop_time: st,
-                        trip: &trip,
+                        trip_id: trip.id,
+                        is_train: false,
                     }
                     .try_into()
                     .ok()
@@ -113,17 +117,19 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     }
                 };
             let oba_data = oba_map.get(&position.vehicle_id);
-            if let Some((oba_passengers, oba_capacity, oba_status)) = oba_data {
+            if let Some((oba_passengers, oba_capacity, oba_status, oba_phase)) = oba_data {
                 if let PositionData::Bus {
                     passengers,
                     capacity,
                     status,
+                    phase,
                     ..
                 } = &mut position.data
                 {
                     *passengers = *oba_passengers;
                     *capacity = *oba_capacity;
                     *status = Some(oba_status.to_string());
+                    *phase = Some(oba_phase.to_string());
                 }
             }
 
@@ -204,7 +210,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
 struct BusTripUpdate<'a>(&'a TripUpdate);
 
-impl<'a> TryFrom<BusTripUpdate<'a>> for Trip<TripData> {
+impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
     type Error = IntoTripError;
 
     fn try_from(value: BusTripUpdate<'a>) -> Result<Self, Self::Error> {
@@ -234,7 +240,7 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip<TripData> {
         };
 
         Ok(Trip {
-            id: Uuid::now_v7(),
+            id: 0,
             mta_id: trip_id,
             vehicle_id,
             created_at,
@@ -242,51 +248,52 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip<TripData> {
             direction: Some(direction),
             deviation: value.0.delay,
             route_id,
-            data: TripData::default_bus(),
+            route_type: RouteType::Bus,
+            // data: TripData::default_bus(),
         })
     }
 }
 
 // can't reuse train version otherwise we get trait conflict
-struct StopTimeUpdateWithTrip<'a> {
-    stop_time: StopTimeUpdate,
-    trip: &'a Trip<TripData>,
-}
+// struct StopTimeUpdateWithTrip<'a> {
+//     stop_time: StopTimeUpdate,
+//     trip: &'a Trip,
+// }
 
-impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
-    type Error = IntoStopTimeError;
+// impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
+//     type Error = IntoStopTimeError;
 
-    fn try_from(value: StopTimeUpdateWithTrip<'a>) -> Result<Self, Self::Error> {
-        let stop_id: i32 = value.stop_time.stop_id.unwrap().parse().unwrap();
-        let arrival = value
-            .stop_time
-            .arrival
-            .ok_or(IntoStopTimeError::Arrival)?
-            .time
-            .and_then(|t| DateTime::from_timestamp(t, 0));
-        let departure = value
-            .stop_time
-            .departure
-            .ok_or(IntoStopTimeError::Departure)?
-            .time
-            .and_then(|t| DateTime::from_timestamp(t, 0));
-        // Maybe remove stop_sequence bc it's not used for anything
-        // let stop_sequence = value
-        //     .stop_time
-        //     .stop_sequence
-        //     .ok_or(IntoStopTimeError::StopSequence)? as i16;
+//     fn try_from(value: StopTimeUpdateWithTrip<'a>) -> Result<Self, Self::Error> {
+//         let stop_id: i32 = value.stop_time.stop_id.unwrap().parse().unwrap();
+//         let arrival = value
+//             .stop_time
+//             .arrival
+//             .ok_or(IntoStopTimeError::Arrival)?
+//             .time
+//             .and_then(|t| DateTime::from_timestamp(t, 0));
+//         let departure = value
+//             .stop_time
+//             .departure
+//             .ok_or(IntoStopTimeError::Departure)?
+//             .time
+//             .and_then(|t| DateTime::from_timestamp(t, 0));
+//         // Maybe remove stop_sequence bc it's not used for anything
+//         // let stop_sequence = value
+//         //     .stop_time
+//         //     .stop_sequence
+//         //     .ok_or(IntoStopTimeError::StopSequence)? as i16;
 
-        Ok::<_, IntoStopTimeError>(StopTime {
-            trip_id: value.trip.id,
-            stop_id,
-            arrival: arrival.unwrap(),
-            departure: departure.unwrap(),
-            // TODO: make enum for stoptime and dont have scheduled_track and actual_track for bus
-            scheduled_track: None,
-            actual_track: None,
-        })
-    }
-}
+//         Ok::<_, IntoStopTimeError>(StopTime {
+//             trip_id: value.trip.id,
+//             stop_id,
+//             arrival: arrival.unwrap(),
+//             departure: departure.unwrap(),
+//             // TODO: make enum for stoptime and dont have scheduled_track and actual_track for bus
+//             scheduled_track: None,
+//             actual_track: None,
+//         })
+//     }
+// }
 
 // can't reuse train version otherwise we get trait conflict
 struct BusVehiclePosition(VehiclePosition);
@@ -321,14 +328,17 @@ impl TryFrom<BusVehiclePosition> for Position {
             mta_id,
             stop_id,
             recorded_at: Utc::now(),
-            status: None,
+            // status: None,
+            geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
             data: PositionData::Bus {
-                geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
+                // geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
                 bearing: position.bearing.unwrap(),
                 // these will be added from OBA api
+                // TODO: find a way to get merge OBA and GTFS position data.
                 passengers: None,
                 capacity: None,
                 status: None,
+                phase: None,
             },
             // vehicle_type: super::position::VehicleType::Bus,
             // data: PositionData::Train {

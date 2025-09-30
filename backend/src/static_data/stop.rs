@@ -1,9 +1,8 @@
-use super::route::RouteType;
 use geo::{Geometry, Point};
 use geozero::wkb;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
-use sqlx::{FromRow, PgPool, QueryBuilder, Row, postgres::PgRow};
+use sqlx::{FromRow, PgPool, Row, postgres::PgRow};
 use utoipa::ToSchema;
 
 // generic is StopData for importing but serde_json value for exporting
@@ -24,11 +23,13 @@ pub struct Stop {
     #[schema(schema_with = point_schema)]
     // pub geom: Point,
     pub geom: Geometry,
-    pub route_type: RouteType,
+    // pub route_type: RouteType,
     /// List of stop IDs that are transfers. Currently only for train stops
     pub transfers: Vec<i32>,
+    // #[sqlx(json)]
     pub data: StopData,
-    pub routes: Vec<StopRoute>,
+    // #[sqlx(json)]
+    pub routes: Vec<RouteStop>,
 }
 
 // although it would probably be more performant make a generic and use serde_json, this will be cached anyways and its simpler
@@ -43,9 +44,30 @@ impl FromRow<'_, PgRow> for Stop {
         //     .geometry
         //     .ok_or_else(|| sqlx::Error::Decode("Geometry field is null or invalid".into()))?;
 
-        let route_type = row.try_get::<RouteType, _>("route_type")?;
+        // let route_type = row.try_get::<RouteType, _>("route_type")?;
+        let data_json = row.try_get::<serde_json::Value, _>("data")?;
+        let data: StopData = serde_json::from_value(data_json).map_err(|e| {
+            sqlx::Error::Decode(
+                format!(
+                    "Failed to decode StopData: {}, for stop {}",
+                    e,
+                    row.try_get::<i32, _>("id").unwrap()
+                )
+                .into(),
+            )
+        })?;
 
-        let routes = row.try_get::<serde_json::Value, _>("routes")?;
+        let routes_json = row.try_get::<serde_json::Value, _>("routes")?;
+        let routes = serde_json::from_value::<Vec<RouteStop>>(routes_json).map_err(|e| {
+            sqlx::Error::Decode(
+                format!(
+                    "Failed to decode RouteStop: {}, for stop {}",
+                    e,
+                    row.try_get::<i32, _>("id").unwrap()
+                )
+                .into(),
+            )
+        })?;
 
         Ok(Self {
             id: row.try_get("id")?,
@@ -64,19 +86,9 @@ impl FromRow<'_, PgRow> for Stop {
                     .into(),
                 )
             })?,
-            data: match route_type {
-                RouteType::Train => StopData::Train {
-                    ada: row.try_get("ada")?,
-                    notes: row.try_get("notes")?,
-                    north_headsign: row.try_get("north_headsign")?,
-                    south_headsign: row.try_get("south_headsign")?,
-                    borough: row.try_get("borough")?,
-                },
-                RouteType::Bus => StopData::Bus {
-                    direction: row.try_get("direction")?,
-                },
-            },
-            routes: serde_json::from_value::<Vec<StopRoute>>(routes).unwrap(),
+            data,
+            routes,
+            // routes: serde_json::from_value::<Vec<StopRoute>>(routes).unwrap(),
             // routes: match route_type {
             //     RouteType::Train => {
             //         let routes: Vec<serde_json::Value> = row.try_get("routes")?;
@@ -93,13 +105,13 @@ impl FromRow<'_, PgRow> for Stop {
             //             .collect()
             //     }
             // },
-            route_type,
+            // route_type,
         })
     }
 }
 
 #[derive(ToSchema, Deserialize, Serialize)]
-#[serde(untagged)]
+#[serde(tag = "type", content = "data")]
 pub enum StopRoute {
     /// Bus
     Bus {
@@ -145,8 +157,8 @@ pub fn point_schema() -> utoipa::openapi::schema::Object {
 }
 
 /// Stop data changes based on the `route_type`
-#[derive(Serialize, ToSchema)]
-#[serde(untagged)]
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", content = "data")]
 pub enum StopData {
     Train {
         ada: bool,
@@ -166,7 +178,7 @@ pub enum StopData {
     },
 }
 
-#[derive(sqlx::Type, Serialize, ToSchema)]
+#[derive(sqlx::Type, Serialize, Deserialize, ToSchema)]
 #[sqlx(type_name = "static.borough", rename_all = "snake_case")]
 pub enum Borough {
     Brooklyn,
@@ -176,7 +188,7 @@ pub enum Borough {
     Manhattan,
 }
 
-#[derive(sqlx::Type, Serialize, Clone, ToSchema)]
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, ToSchema)]
 #[sqlx(type_name = "static.bus_direction", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum BusDirection {
@@ -191,19 +203,23 @@ pub enum BusDirection {
     Unknown,
 }
 
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct RouteStop {
     pub route_id: String,
     pub stop_id: i32,
     pub stop_sequence: i16,
+    // #[sqlx(json)]
     pub data: RouteStopData,
 }
 
+#[derive(ToSchema, Deserialize, Serialize, Clone)]
+#[serde(tag = "type", content = "data")]
 pub enum RouteStopData {
     Train { stop_type: StopType },
     Bus { headsign: String, direction: i16 },
 }
 
-#[derive(sqlx::Type, ToSchema, Deserialize, Serialize)]
+#[derive(sqlx::Type, Clone, ToSchema, Deserialize, Serialize)]
 #[sqlx(type_name = "static.stop_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum StopType {
@@ -255,101 +271,30 @@ impl Stop {
             .iter()
             .map(|r| wkb::Encode(r.geom.clone().into()))
             .collect();
-        let route_types: Vec<_> = values.iter().map(|s| &s.route_type).collect();
-
-        // StopData fields
-        let adas: Vec<Option<bool>> = values
+        let datas = values
             .iter()
-            .map(|s| match &s.data {
-                StopData::Train { ada, .. } => Some(*ada),
-                StopData::Bus { .. } => None,
-            })
-            .collect();
-
-        let north_headsigns: Vec<Option<&String>> = values
-            .iter()
-            .map(|s| match &s.data {
-                StopData::Train { north_headsign, .. } => Some(north_headsign),
-                StopData::Bus { .. } => None,
-            })
-            .collect();
-
-        let south_headsigns: Vec<Option<&String>> = values
-            .iter()
-            .map(|s| match &s.data {
-                StopData::Train { south_headsign, .. } => Some(south_headsign),
-                StopData::Bus { .. } => None,
-            })
-            .collect();
-
-        // let transfers: Vec<Option<&Vec<i32>>> = values
-        //     .iter()
-        //     .map(|s| match &s.data {
-        //         StopData::Train { transfers, .. } => Some(transfers),
-        //         StopData::Bus { .. } => None,
-        //     })
-        //     .collect();
-
-        let notes: Vec<Option<&Option<String>>> = values
-            .iter()
-            .map(|s| match &s.data {
-                StopData::Train { notes, .. } => Some(notes),
-                StopData::Bus { .. } => None,
-            })
-            .collect();
-
-        let boroughs: Vec<Option<&Borough>> = values
-            .iter()
-            .map(|s| match &s.data {
-                StopData::Train { borough, .. } => Some(borough),
-                StopData::Bus { .. } => None,
-            })
-            .collect();
-
-        let directions: Vec<Option<&BusDirection>> = values
-            .iter()
-            .map(|s| match &s.data {
-                StopData::Bus { direction } => Some(direction),
-                StopData::Train { .. } => None,
-            })
-            .collect();
+            .map(|s| serde_json::to_value(&s.data).unwrap())
+            .collect::<Vec<_>>();
+        // let route_types: Vec<_> = values.iter().map(|s| &s.route_type).collect();
 
         sqlx::query!(
             r#"
-            INSERT INTO static.stop (id, name, geom, route_type, ada, north_headsign, south_headsign, notes, borough, direction)
+            INSERT INTO static.stop (id, name, geom, data)
             SELECT * FROM UNNEST(
                 $1::INTEGER[],
                 $2::TEXT[],
                 $3::GEOMETRY[],
-                $4::static.route_type[],
-                $5::BOOLEAN[],
-                $6::TEXT[],
-                $7::TEXT[],
-                $8::TEXT[],
-                $9::static.borough[],
-                $10::static.bus_direction[]
+                $4::JSONB[]
             )
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 geom = EXCLUDED.geom,
-                route_type = EXCLUDED.route_type,
-                ada = EXCLUDED.ada,
-                north_headsign = EXCLUDED.north_headsign,
-                south_headsign = EXCLUDED.south_headsign,
-                notes = EXCLUDED.notes,
-                borough = EXCLUDED.borough,
-                direction = EXCLUDED.direction
+                data = EXCLUDED.data
             "#,
             &ids,
             &names as _,
             &geoms as _,
-            &route_types as _,
-            &adas as _,
-            &north_headsigns as _,
-            &south_headsigns as _,
-            &notes as _,
-            &boroughs as _,
-            &directions as _,
+            &datas as _,
         )
         .execute(pool)
         .await
@@ -443,7 +388,7 @@ impl Stop {
                     id: stop_id,
                     name: station_data.stop_name.to_owned(),
                     geom: Point::new(station.stop.lon as f64, station.stop.lat as f64).into(),
-                    route_type: RouteType::Train,
+                    // route_type: RouteType::Train,
                     // route stops are scraped and inserted in the routes import
                     routes: vec![],
                     // transfers are now stored in their own table
@@ -506,35 +451,13 @@ impl Stop {
                 s.id,
                 s.name,
                 s.geom,
-                s.route_type,
-                -- stop data
-                s.ada,
-                s.north_headsign,
-                s.south_headsign,
-                s.notes,
-                s.borough,
-                s.direction,
+                s.data,
                 COALESCE(
                     array_agg(st.to_stop_id) FILTER (WHERE st.to_stop_id IS NOT NULL),
                     ARRAY[]::INTEGER[]
-                ) AS transfers,
-                -- stop routes
-                json_agg(
-                    CASE
-                        WHEN s.route_type = 'train' THEN jsonb_build_object(
-                            'id', rs.route_id,
-                            'stop_sequence', rs.stop_sequence,
-                            'type', rs.stop_type
-                        )
-                        ELSE jsonb_build_object(
-                            'id', rs.route_id,
-                            'stop_sequence', rs.stop_sequence,
-                            'headsign', rs.headsign,
-                            'direction', rs.direction
-                        )
-                    END
-                    ORDER BY rs.route_id
-                ) AS routes
+                ) AS "transfers!: Vec<i32>",
+                array_agg(rs.*) AS "routes!: Vec<RouteStop>"
+                -- json_agg(rs ORDER BY rs.route_id) AS routes
             FROM
                 static.stop s
             LEFT JOIN static.stop_transfer st ON
@@ -542,8 +465,7 @@ impl Stop {
             LEFT JOIN static.route_stop rs ON
                 s.id = rs.stop_id
             GROUP BY
-                s.id, s.name, s.geom, s.route_type, s.ada, s.north_headsign,
-                s.south_headsign, s.notes, s.borough, s.direction
+                s.id, s.name, s.geom, s.data
         "#,
         )
         .fetch_all(pool)
@@ -552,52 +474,36 @@ impl Stop {
 }
 
 impl RouteStop {
-    // TODO: use unnest instead of chunking
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {
-        for v in values.iter() {
-            let mut dupes = vec![];
+        let route_ids: Vec<String> = values.iter().map(|rs| rs.route_id.clone()).collect();
+        let stop_ids: Vec<i32> = values.iter().map(|rs| rs.stop_id).collect();
+        let stop_sequences: Vec<i16> = values.iter().map(|rs| rs.stop_sequence).collect();
+        let datas: Vec<serde_json::Value> = values
+            .iter()
+            .map(|rs| serde_json::to_value(&rs.data).unwrap())
+            .collect();
 
-            for t_stop in values.iter() {
-                if v.route_id == t_stop.route_id && v.stop_id == t_stop.stop_id {
-                    dupes.push((t_stop.stop_id, &t_stop.route_id));
-                }
-            }
-            if dupes.len() > 1 {
-                dbg!("duplicate: ", dupes);
-            }
-
-            // dbg!(&v.route_id, &v.stop_id);
-        }
-
-        for chunk in values.chunks(32000 / 6) {
-            let mut query_builder = QueryBuilder::new(
-                "INSERT INTO static.route_stop (route_id, stop_id, stop_sequence, stop_type, headsign, direction)",
-            );
-            query_builder.push_values(chunk, |mut b, stop| {
-                b.push_bind(&stop.route_id)
-                    .push_bind(stop.stop_id)
-                    .push_bind(stop.stop_sequence);
-
-                match &stop.data {
-                    RouteStopData::Bus {
-                        headsign,
-                        direction,
-                    } => {
-                        b.push_bind(None::<StopType>)
-                            .push_bind(headsign)
-                            .push_bind(direction);
-                    }
-                    RouteStopData::Train { stop_type } => {
-                        b.push_bind(stop_type)
-                            .push_bind(None::<String>)
-                            .push_bind(None::<i16>);
-                    }
-                }
-            });
-            query_builder.push("ON CONFLICT (route_id, stop_id) DO UPDATE SET stop_sequence = EXCLUDED.stop_sequence, stop_type = EXCLUDED.stop_type, headsign = EXCLUDED.headsign, direction = EXCLUDED.direction");
-            let query = query_builder.build();
-            query.execute(pool).await.unwrap();
-        }
+        sqlx::query!(
+            r#"
+            INSERT INTO static.route_stop (route_id, stop_id, stop_sequence, data)
+            SELECT * FROM UNNEST(
+                $1::TEXT[],
+                $2::INTEGER[],
+                $3::SMALLINT[],
+                $4::JSONB[]
+            )
+            ON CONFLICT (route_id, stop_id) DO UPDATE SET
+                stop_sequence = EXCLUDED.stop_sequence,
+                data = EXCLUDED.data
+            "#,
+            &route_ids,
+            &stop_ids,
+            &stop_sequences,
+            &datas,
+        )
+        .execute(pool)
+        .await
+        .unwrap();
     }
 }
 

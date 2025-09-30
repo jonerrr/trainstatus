@@ -3,17 +3,19 @@ use std::collections::HashSet;
 use super::{
     ImportError, decode,
     position::{IntoPositionError, Position, PositionData},
-    stop_time::{IntoStopTimeError, StopTime},
-    trip::{IntoTripError, Trip, TripData},
+    stop_time::StopTime,
+    trip::{IntoTripError, Trip},
 };
 use crate::{
-    feed::{TripDescriptor, VehiclePosition, trip_update::StopTimeUpdate},
-    static_data::stop::convert_stop_id,
+    feed::{TripDescriptor, VehiclePosition},
+    realtime::stop_time::StopTimeUpdateWithTrip,
+    static_data::{route::RouteType, stop::convert_stop_id},
 };
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sqlx::PgPool;
-use uuid::Uuid;
+
+// TODO UP NEXT: continue converting to data jsonb column instead of generics or storing flat
 
 const ENDPOINTS: [(&str, &str); 8] = [
     (
@@ -64,7 +66,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     // (trip, updated or new)
     // let mut trips: Vec<(Trip, bool)> = vec![];
-    let mut trips: Vec<Trip<TripData>> = vec![];
+    let mut trips: Vec<Trip> = vec![];
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
     // if there was an error parsing position, we delete existing position
@@ -72,7 +74,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
-            let mut trip: Trip<TripData> = match trip_update.trip.try_into() {
+            let mut trip: Trip = match trip_update.trip.try_into() {
                 Ok(t) => t,
                 Err(e) => {
                     tracing::error!("Error parsing trip: {:?}", e);
@@ -111,7 +113,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                 .filter_map(|st| {
                     StopTimeUpdateWithTrip {
                         stop_time: st,
-                        trip: &trip,
+                        trip_id: trip.id,
+                        is_train: true,
                     }
                     .try_into()
                     .ok()
@@ -276,20 +279,20 @@ mod tests {
     }
 }
 
-impl TryFrom<TripDescriptor> for Trip<TripData> {
+impl TryFrom<TripDescriptor> for Trip {
     type Error = IntoTripError;
 
     fn try_from(value: TripDescriptor) -> Result<Self, Self::Error> {
         let trip_id = value.trip_id.ok_or(IntoTripError::TripId)?;
         let route_id = value.route_id.ok_or(IntoTripError::RouteId)?;
-        let (route_id, express) = parse_route_id(route_id);
+        let route_id = parse_route_id(route_id);
 
         let nyct_trip = value
             .nyct_trip_descriptor
             // testing debug information by formatting value
             .ok_or(IntoTripError::NyctTripDescriptor)?;
         let vehicle_id = nyct_trip.train_id.as_ref().ok_or(IntoTripError::TrainId)?;
-        let assigned = nyct_trip.is_assigned.unwrap_or(false);
+        // let assigned = nyct_trip.is_assigned.unwrap_or(false);
 
         let direction = match nyct_trip.direction {
             Some(d) => match d {
@@ -322,7 +325,7 @@ impl TryFrom<TripDescriptor> for Trip<TripData> {
         let created_at = Self::created_at(start_date, start_time)?;
 
         Ok(Trip {
-            id: Uuid::now_v7(),
+            id: 0,
             mta_id: trip_id.to_owned(),
             vehicle_id: vehicle_id.to_owned(),
             created_at,
@@ -330,23 +333,25 @@ impl TryFrom<TripDescriptor> for Trip<TripData> {
             direction,
             route_id,
             deviation: None,
-            data: TripData::default_train(express, assigned),
+            route_type: RouteType::Train,
+            // data: TripData::default_train(express, assigned),
         })
     }
 }
 
-fn parse_route_id(route_id: String) -> (String, bool) {
+fn parse_route_id(route_id: String) -> String {
     let mut route_id = route_id.to_owned();
     if route_id == "SS" {
         route_id = "SI".to_string();
     };
 
-    let mut express = false;
-    if route_id.ends_with('X') {
-        route_id.pop();
-        express = true;
-    }
-    (route_id, express)
+    route_id
+    // let mut express = false;
+    // if route_id.ends_with('X') {
+    //     route_id.pop();
+    //     express = true;
+    // }
+    // (route_id, express)
 }
 
 // const FAKE_STOP_IDS: [&str; 28] = [
@@ -408,80 +413,89 @@ fn parse_route_id(route_id: String) -> (String, bool) {
 //     Some(original_stop_id)
 // }
 
-#[derive(Debug)]
-struct StopTimeUpdateWithTrip<'a> {
-    stop_time: StopTimeUpdate,
-    trip: &'a Trip<TripData>,
-}
+// #[derive(Debug)]
+// struct StopTimeUpdateWithTrip<'a> {
+//     stop_time: StopTimeUpdate,
+//     trip: &'a Trip,
+// }
 
-impl<'a> TryFrom<StopTimeUpdateWithTrip<'a>> for StopTime {
-    type Error = IntoStopTimeError;
+// impl TryFrom<StopTimeUpdateWithTrip<'_>> for StopTime {
+//     type Error = IntoStopTimeError;
 
-    fn try_from(value: StopTimeUpdateWithTrip<'a>) -> Result<Self, Self::Error> {
-        let mut stop_id = value.stop_time.stop_id.ok_or(IntoStopTimeError::StopId)?;
-        // Remove direction from stop id
-        stop_id.pop();
-        let stop_id = convert_stop_id(stop_id).ok_or(IntoStopTimeError::FakeStop)?;
-        // if stop_id == 766589 {
-        //     println!("{:?}", &value);
-        // }
+//     fn try_from(value: StopTimeUpdateWithTrip) -> Result<Self, Self::Error> {
+//         let mut stop_id = value.stop_time.stop_id.ok_or(IntoStopTimeError::StopId)?;
+//         // Remove direction from stop id
+//         stop_id.pop();
+//         let stop_id = convert_stop_id(stop_id).ok_or(IntoStopTimeError::FakeStop)?;
+//         // if stop_id == 766589 {
+//         //     println!("{:?}", &value);
+//         // }
 
-        let arrival = match value.stop_time.arrival {
-            Some(a) => a.time,
-            // arrival is none for first stop of trip, so we put the departure instead
-            None => match value.stop_time.departure {
-                Some(d) => d.time,
-                None => return Err(IntoStopTimeError::Arrival),
-            },
-        }
-        .ok_or(IntoStopTimeError::Arrival)?;
+//         let arrival = match value.stop_time.arrival {
+//             Some(a) => a.time,
+//             // arrival is none for first stop of trip, so we put the departure instead
+//             None => match value.stop_time.departure {
+//                 Some(d) => d.time,
+//                 None => return Err(IntoStopTimeError::Arrival),
+//             },
+//         }
+//         .ok_or(IntoStopTimeError::Arrival)?;
 
-        let departure = match value.stop_time.departure {
-            Some(d) => d.time,
-            // departure is none for last stop of trip
-            None => match value.stop_time.arrival {
-                Some(a) => a.time,
-                None => return Err(IntoStopTimeError::Departure),
-            },
-        }
-        .ok_or(IntoStopTimeError::Departure)?;
+//         let departure = match value.stop_time.departure {
+//             Some(d) => d.time,
+//             // departure is none for last stop of trip
+//             None => match value.stop_time.arrival {
+//                 Some(a) => a.time,
+//                 None => return Err(IntoStopTimeError::Departure),
+//             },
+//         }
+//         .ok_or(IntoStopTimeError::Departure)?;
 
-        let arrival = DateTime::from_timestamp(arrival, 0).ok_or(IntoStopTimeError::Arrival)?;
-        let departure =
-            DateTime::from_timestamp(departure, 0).ok_or(IntoStopTimeError::Departure)?;
+//         let arrival = DateTime::from_timestamp(arrival, 0).ok_or(IntoStopTimeError::Arrival)?;
+//         let departure =
+//             DateTime::from_timestamp(departure, 0).ok_or(IntoStopTimeError::Departure)?;
 
-        let (scheduled_track, actual_track) = match value.stop_time.nyct_stop_time_update {
-            Some(nyct) => (nyct.scheduled_track, nyct.actual_track),
-            None => (None, None),
-        };
+//         let (scheduled_track, actual_track) = match value.stop_time.nyct_stop_time_update {
+//             Some(nyct) => (nyct.scheduled_track, nyct.actual_track),
+//             None => (None, None),
+//         };
 
-        Ok(StopTime {
-            trip_id: value.trip.id,
-            stop_id,
-            arrival,
-            departure,
-            scheduled_track,
-            actual_track,
-        })
-    }
-}
+//         Ok(StopTime {
+//             trip_id: value.trip.id,
+//             stop_id,
+//             arrival,
+//             departure,
+//             data: StopTimeData::Train {
+//                 scheduled_track,
+//                 actual_track,
+//             },
+//             // scheduled_track,
+//             // actual_track,
+//         })
+//     }
+// }
 
 impl TryFrom<VehiclePosition> for Position {
     type Error = IntoPositionError;
 
     fn try_from(value: VehiclePosition) -> Result<Self, Self::Error> {
         let trip = value.trip.ok_or(IntoPositionError::Trip)?;
-        let mut trip: Trip<TripData> = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
+        // let mut trip: Trip = trip.try_into().map_err(|_| IntoPositionError::Trip)?;
+        let mut nyct_trip = trip.nyct_trip_descriptor.ok_or(IntoPositionError::Trip)?;
 
+        let vehicle_id = nyct_trip
+            .train_id
+            .as_ref()
+            .ok_or(IntoPositionError::VehicleId)?;
         let mut stop_id = value.stop_id.ok_or(IntoPositionError::StopId)?;
         // Remove N or S from stop id
         let direction = stop_id.pop();
         let stop_id = convert_stop_id(stop_id).ok_or(IntoPositionError::FakeStop {
-            vehicle_id: trip.vehicle_id.clone(),
+            vehicle_id: vehicle_id.to_owned(),
         })?;
 
-        if trip.direction.is_none() {
-            trip.direction = match direction {
+        if nyct_trip.direction.is_none() {
+            nyct_trip.direction = match direction {
                 Some('N') => Some(1),
                 Some('S') => Some(0),
                 _ => None,
@@ -495,13 +509,6 @@ impl TryFrom<VehiclePosition> for Position {
         //     // maybe create trip instead of returning error
         // }
 
-        // let current_stop_sequence = value.current_stop_sequence.map(|s| s as i16);
-        // let status = match value.current_status {
-        //     Some(0) => Status::Incoming,
-        //     Some(1) => Status::AtStop,
-        //     Some(2) => Status::InTransitTo,
-        //     _ => Status::None,
-        // };
         let status = match value.current_status {
             Some(0) => Some("incoming".into()),
             Some(1) => Some("at_stop".into()),
@@ -514,12 +521,16 @@ impl TryFrom<VehiclePosition> for Position {
             DateTime::from_timestamp(recorded_at as i64, 0).ok_or(IntoPositionError::UpdatedAt)?;
 
         Ok(Position {
-            vehicle_id: trip.vehicle_id,
-            mta_id: Some(trip.mta_id),
+            vehicle_id: vehicle_id.to_owned(),
+            mta_id: trip.trip_id,
             stop_id: Some(stop_id),
             recorded_at,
-            status,
-            data: PositionData::Train,
+            // status,
+            geom: None,
+            data: PositionData::Train {
+                assigned: nyct_trip.is_assigned.unwrap_or(false),
+                status,
+            },
             // data: PositionData::Train {
             //     trip_id: trip.id,
             //     current_stop_sequence: current_stop_sequence.unwrap_or(0),

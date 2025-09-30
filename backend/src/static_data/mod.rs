@@ -196,14 +196,13 @@ pub async fn cache_all(
     let (bus_stop_features, train_stop_features) = stops.iter().fold(
         (Vec::new(), Vec::new()),
         |(mut bus_acc, mut train_acc), s| {
+            // TODO: make properties not nested. Should probably use postgis to convert to geojson
             let feature = json!({
                 "type": "Feature",
                 "id": s.id,
                 "properties": {
                     "id": s.id,
                     "name": s.name,
-                    "route_type": s.route_type,
-                    "routes": s.routes,
                     "data": s.data,
                 },
                 "geometry": {
@@ -212,9 +211,9 @@ pub async fn cache_all(
                 },
             });
 
-            match s.route_type {
-                route::RouteType::Bus => bus_acc.push(feature),
-                route::RouteType::Train => train_acc.push(feature),
+            match s.data {
+                stop::StopData::Bus { .. } => bus_acc.push(feature),
+                stop::StopData::Train { .. } => train_acc.push(feature),
             }
 
             (bus_acc, train_acc)
@@ -309,9 +308,9 @@ pub async fn cache_all(
     let (bus_stops, train_stops) = stops.iter().fold(
         (Vec::new(), Vec::new()),
         |(mut bus_acc, mut train_acc), s| {
-            match s.route_type {
-                route::RouteType::Bus => bus_acc.push(s),
-                route::RouteType::Train => train_acc.push(s),
+            match s.data {
+                stop::StopData::Bus { .. } => bus_acc.push(s),
+                stop::StopData::Train { .. } => train_acc.push(s),
             }
 
             (bus_acc, train_acc)
