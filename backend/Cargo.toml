@@ -9,7 +9,7 @@ debug = true
 
 
 [dependencies]
-axum = { version = "0.8.4", features = ["ws"] }
+axum = { version = "0.8.5", features = ["ws"] }
 bb8 = "0.9.0"
 bb8-redis = "0.24.0"
 blake3 = "1.8.2"
@@ -27,13 +27,13 @@ itertools = "0.14.0"
 polyline = "0.11.0"
 prost = "0.14.1"
 rayon = "1.11.0"
-redis = "0.32.5"
-regex = "1.11.2"
+redis = "0.32.6"
+regex = "1.11.3"
 reqwest = { version = "0.12.23", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-serde = { version = "1.0.226", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["raw_value"] }
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio-rustls",
@@ -42,7 +42,7 @@ sqlx = { version = "0.8.6", features = [
     "uuid",
     "json",
 ] }
-thiserror = "2.0.16"
+thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = ["full"] }
 # tokio-stream = { version = "0.1.16", features = ["sync"] }
 # tokio-tungstenite = "0.24.0"
