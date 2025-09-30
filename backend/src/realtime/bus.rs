@@ -23,6 +23,7 @@ const ENDPOINTS: [(&str, &str); 2] = [
     ),
 ];
 
+#[tracing::instrument(skip(pool), level = "info")]
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let futures = ENDPOINTS.iter().map(|e| decode(e.0, e.1));
     let feeds = futures::future::join_all(futures)
@@ -30,10 +31,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         .into_iter()
         .filter_map(|f| f.ok())
         .collect::<Vec<_>>();
+
     let entities = feeds
         .into_iter()
         .flat_map(|f| f.entity.into_iter())
         .collect::<Vec<_>>();
+
+    tracing::info!(entity_count = entities.len(), "Processing bus entities");
 
     let oba_vehicles = oba::decode().await?;
 
@@ -54,19 +58,22 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
+    let parse_span = tracing::info_span!("parse_bus_entities");
+    let _parse_guard = parse_span.enter();
+
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
             let mut trip: Trip = match BusTripUpdate(&trip_update).try_into() {
                 Ok(t) => t,
                 Err(e) => {
-                    tracing::error!("Error converting trip: {:?}", e);
+                    tracing::error!(error = ?e, "Error converting trip");
                     continue;
                 }
             };
 
             if trip.vehicle_id == "deleted" {
                 trip.delete(pool).await.unwrap_or_else(|e| {
-                    tracing::error!("Error deleting cancelled trip: {:?}", e);
+                    tracing::error!(error = ?e, trip_mta_id = %trip.mta_id, "Error deleting cancelled trip");
                 });
                 continue;
             }
@@ -76,7 +83,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             // }
 
             trip.find(pool).await.unwrap_or_else(|e| {
-                tracing::error!("Error finding trip: {:?}", e);
+                tracing::error!(error = ?e, trip_mta_id = %trip.mta_id, "Error finding trip");
                 (false, true)
             });
 
@@ -103,9 +110,9 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
                     Ok(p) => p,
                     Err(e) => {
                         tracing::error!(
-                            "Error converting position: {:?}\n{:#?}",
-                            e,
-                            vehicle_position
+                            error = ?e,
+                            vehicle_position = ?vehicle_position,
+                            "Error converting position"
                         );
                         continue;
                     }
@@ -131,10 +138,20 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         }
     }
 
+    drop(_parse_guard);
+
+    tracing::info!(
+        trip_count = trips.len(),
+        stop_time_count = stop_times.len(),
+        position_count = positions.len(),
+        "Inserting bus data into database"
+    );
+
     Trip::insert(trips, pool).await?;
     StopTime::insert(stop_times, pool).await?;
     Position::insert(positions, pool).await?;
 
+    tracing::info!("Bus import completed successfully");
     Ok(())
 }
 

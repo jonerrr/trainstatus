@@ -52,6 +52,7 @@ const ENDPOINTS: [(&str, &str); 8] = [
     ),
 ];
 
+#[tracing::instrument(skip(pool), level = "info")]
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let futures = ENDPOINTS.iter().map(|e| decode(e.0, e.1));
     let feeds = futures::future::join_all(futures)
@@ -59,10 +60,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         .into_iter()
         .filter_map(|f| f.ok())
         .collect::<Vec<_>>();
+
     let entities = feeds
         .into_iter()
         .flat_map(|f| f.entity.into_iter())
         .collect::<Vec<_>>();
+
+    tracing::info!(entity_count = entities.len(), "Processing train entities");
 
     // (trip, updated or new)
     // let mut trips: Vec<(Trip, bool)> = vec![];
@@ -72,12 +76,15 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // if there was an error parsing position, we delete existing position
     let mut delete_position_vehicle_ids = vec![];
 
+    let parse_span = tracing::info_span!("parse_entities");
+    let _parse_guard = parse_span.enter();
+
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
             let mut trip: Trip = match trip_update.trip.try_into() {
                 Ok(t) => t,
                 Err(e) => {
-                    tracing::error!("Error parsing trip: {:?}", e);
+                    tracing::error!(error = ?e, "Error parsing trip");
                     continue;
                 }
             };
@@ -102,7 +109,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             // if trip is found, then the id is replaced with the existing one in the DB
             // TODO: remove changed or something
             let (_found, _changed) = trip.find(pool).await.unwrap_or_else(|e| {
-                tracing::error!("Error finding trip: {:?}", e);
+                tracing::error!(error = ?e, trip_mta_id = %trip.mta_id, "Error finding trip");
                 (false, true)
             });
             // dbg!(&trip);
@@ -133,7 +140,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             let position: Position = match vehicle.try_into() {
                 Ok(p) => p,
                 Err(e) => {
-                    tracing::debug!("Error parsing position: {:?}", e);
+                    tracing::debug!(error = ?e, "Error parsing position");
                     if let IntoPositionError::FakeStop { vehicle_id } = e {
                         delete_position_vehicle_ids.push(vehicle_id);
                     }
@@ -143,6 +150,8 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             positions.push(position);
         }
     }
+
+    drop(_parse_guard);
 
     // let updated_trips = trips.iter().filter(|t| t.1).map(|t| t.0.clone()).collect();
     // let updated_trips = updated_trips_global.lock().await;
@@ -178,8 +187,19 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
     let pos_duplicates: Vec<_> = pos_counts.iter().filter(|&(_, &count)| count > 1).collect();
     if !pos_duplicates.is_empty() {
-        tracing::warn!("Duplicate positions found: {:?}", pos_duplicates);
+        tracing::warn!(
+            duplicate_count = pos_duplicates.len(),
+            "Duplicate positions found: {:?}",
+            pos_duplicates
+        );
     }
+
+    tracing::info!(
+        trip_count = trips.len(),
+        stop_time_count = stop_times.len(),
+        position_count = positions.len(),
+        "Inserting train data into database"
+    );
 
     Trip::insert(trips, pool).await?;
     tracing::debug!("trips inserted");
@@ -204,7 +224,11 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     //     );
     // }
     if !duplicates.is_empty() {
-        tracing::warn!("Ignoring duplicate train stop times\n{:?}", duplicates);
+        tracing::warn!(
+            duplicate_count = duplicates.len(),
+            "Ignoring duplicate train stop times\n{:?}",
+            duplicates
+        );
         // dbg!(stop_times.len());
         stop_times.retain(|v| !dupe_st.contains(v));
         // dbg!(stop_times.len());
@@ -213,14 +237,22 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     StopTime::insert(stop_times, pool).await?;
     tracing::debug!("stop times inserted");
     Position::insert(positions, pool).await?;
+    tracing::debug!("positions inserted");
 
-    sqlx::query!(
-        "DELETE FROM realtime.position WHERE vehicle_id = ANY($1)",
-        &delete_position_vehicle_ids
-    )
-    .execute(pool)
-    .await?;
+    if !delete_position_vehicle_ids.is_empty() {
+        tracing::debug!(
+            count = delete_position_vehicle_ids.len(),
+            "Deleting positions for fake stops"
+        );
+        sqlx::query!(
+            "DELETE FROM realtime.position WHERE vehicle_id = ANY($1)",
+            &delete_position_vehicle_ids
+        )
+        .execute(pool)
+        .await?;
+    }
 
+    tracing::info!("Train import completed successfully");
     Ok(())
 }
 

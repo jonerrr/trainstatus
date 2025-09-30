@@ -159,6 +159,7 @@ impl StopTime {
         // }
     }
 
+    #[tracing::instrument(skip(values, pool), fields(count = values.len()), level = "debug")]
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         let trip_ids = values.iter().map(|v| v.trip_id).collect::<Vec<_>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();

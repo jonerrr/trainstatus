@@ -93,10 +93,11 @@ pub struct Trip {
 impl Trip {
     // TODO: insert individually instead of bulk insert so if theres some constraint violation it only fails that one
     // maybe use db function or procedure or prepared statement
+    #[tracing::instrument(skip(values, pool), fields(count = values.len()), level = "debug")]
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         // using UNNEST to insert multiple rows at once https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-bind-an-array-to-a-values-clause-how-can-i-do-bulk-inserts
         if values.is_empty() {
-            tracing::info!("No trips to insert");
+            tracing::debug!("No trips to insert");
             return Ok(());
         }
 
@@ -336,7 +337,7 @@ impl Trip {
         Ok(())
     }
 
-    pub async fn to_geojson(trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
+    pub async fn to_geojson(_trips: &[Self]) -> Result<serde_json::Value, serde_json::Error> {
         // TODO: remove this once caching logic is improved
         Ok(serde_json::json!({
             "type": "FeatureCollection",

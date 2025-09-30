@@ -34,6 +34,7 @@ pub fn debug_gtfs() -> &'static bool {
     DEBUG_GTFS.get_or_init(|| var("DEBUG_GTFS").is_ok())
 }
 
+#[tracing::instrument(fields(url = %url, name = %name), level = "debug")]
 pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, ImportError> {
     let data = reqwest::Client::new()
         .get(url)
@@ -44,6 +45,8 @@ pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, ImportError> {
 
     // TODO: remove clone
     let feed = FeedMessage::decode(data.clone())?;
+    
+    tracing::debug!(entity_count = feed.entity.len(), "Decoded GTFS feed");
 
     if *debug_gtfs() {
         let debug_path = format!("./gtfs/{}.pb", name);
@@ -170,6 +173,9 @@ pub async fn import(
     // TODO: find a better way to do this (use channels to notify when data changes or something)
     tokio::spawn(async move {
         loop {
+            let cache_span = tracing::info_span!("cache_realtime_data");
+            let _guard = cache_span.enter();
+            
             // callback hell alert
             match trip::Trip::get_all(&c_pool, Utc::now()).await {
                 Ok(trips) => {
@@ -203,37 +209,39 @@ pub async fn import(
                                         ),
                                     ];
                                     if let Err(err) = conn.mset::<&str, String, ()>(&items).await {
-                                        tracing::error!("failed to cache data in redis: {}", err);
+                                        tracing::error!(error = %err, "failed to cache data in redis");
                                         sleep(Duration::from_secs(35)).await;
                                         continue;
                                     }
+                                    tracing::debug!("Successfully cached realtime data in redis");
                                 }
                                 Err(err) => {
-                                    tracing::error!("failed to cache geojson: {}", err);
+                                    tracing::error!(error = %err, "failed to cache geojson");
                                     sleep(Duration::from_secs(35)).await;
                                     continue;
                                 }
                             },
                             Err(err) => {
-                                tracing::error!("failed to cache alerts: {}", err);
+                                tracing::error!(error = %err, "failed to cache alerts");
                                 sleep(Duration::from_secs(35)).await;
                                 continue;
                             }
                         },
                         Err(err) => {
-                            tracing::error!("failed to cache stop times: {}", err);
+                            tracing::error!(error = %err, "failed to cache stop times");
                             sleep(Duration::from_secs(35)).await;
                             continue;
                         }
                     }
                 }
                 Err(err) => {
-                    tracing::error!("failed to cache trips: {}", err);
+                    tracing::error!(error = %err, "failed to cache trips");
                     sleep(Duration::from_secs(35)).await;
                     continue;
                 }
             }
-
+            
+            drop(_guard);
             sleep(Duration::from_secs(25)).await;
         }
     });

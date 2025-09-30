@@ -89,9 +89,10 @@ pub enum PositionData {
 
 impl Position {
     // TODO: maybe don't insert if position has same geom
+    #[tracing::instrument(skip(values, pool), fields(count = values.len()), level = "debug")]
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
         if values.is_empty() {
-            tracing::warn!("No positions to insert");
+            tracing::debug!("No positions to insert");
             return Ok(());
         }
 
