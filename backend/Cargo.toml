@@ -22,7 +22,7 @@ geo = { version = "0.31.0", features = ["use-serde"] }
 geozero = { version = "0.14.0", features = ["with-postgis-sqlx"] }
 headers = "0.4.1"
 http = "1.2.0"
-indicatif = "0.18.0"
+indicatif = "0.18.1"
 itertools = "0.14.0"
 polyline = "0.11.0"
 prost = "0.14.1"
