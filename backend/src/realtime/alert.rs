@@ -7,7 +7,8 @@ use sqlx::PgPool;
 //     "1", "2", "3", "4", "5", "6", "7", "A", "C", "E", "B", "D", "F", "M", "G", "J", "Z", "L", "N",
 //     "Q", "R", "W", "H", "FS", "GS", "SI",
 // ];
-
+// TODO up next: figure out how to handle inserting / updating alerts now that a serial is used for the id.
+// the on conflict will error everytime bc the id will be 0
 #[tracing::instrument(skip(pool), level = "info")]
 pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let feed = decode(
@@ -15,7 +16,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
         "alerts",
     )
     .await?;
-    
+
     tracing::info!(entity_count = feed.entity.len(), "Processing alerts");
 
     // This is used to set alerts not in feed to false
@@ -130,9 +131,9 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             .map(|entity| {
                 let route_id = entity.route_id.clone().and_then(|r| {
                     // Standardize route id
-                    if r.ends_with('X') {
-                        Some(r[..r.len() - 1].to_string())
-                    } else if r == "SS" {
+                    // if r.ends_with('X') {
+                    // Some(r[..r.len() - 1].to_string())
+                    if r == "SS" {
                         Some("SI".to_owned())
                         // X80 is in the alert api but not anywhere else so it causes a foreign key constraint error
                         // see: https://groups.google.com/g/mtadeveloperresources/c/ZFnhNRrTlr8/m/K8oNzFrBAgAJ
