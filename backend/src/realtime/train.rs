@@ -357,7 +357,7 @@ impl TryFrom<TripDescriptor> for Trip {
         let created_at = Self::created_at(start_date, start_time)?;
 
         Ok(Trip {
-            id: 0,
+            id: uuid::Uuid::now_v7(),
             mta_id: trip_id.to_owned(),
             vehicle_id: vehicle_id.to_owned(),
             created_at,
@@ -553,6 +553,7 @@ impl TryFrom<VehiclePosition> for Position {
             DateTime::from_timestamp(recorded_at as i64, 0).ok_or(IntoPositionError::UpdatedAt)?;
 
         Ok(Position {
+            id: uuid::Uuid::now_v7(),
             vehicle_id: vehicle_id.to_owned(),
             mta_id: trip.trip_id,
             stop_id: Some(stop_id),

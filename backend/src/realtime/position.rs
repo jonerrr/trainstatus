@@ -4,11 +4,13 @@ use geozero::wkb;
 use serde::{Deserialize, Serialize};
 // use serde::Serialize;
 use sqlx::PgPool;
+use uuid::Uuid;
 // use utoipa::ToSchema;
 // use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct Position {
+    pub id: Uuid,
     pub vehicle_id: String,
     pub mta_id: Option<String>,
     pub stop_id: Option<i32>,
@@ -96,6 +98,7 @@ impl Position {
             return Ok(());
         }
 
+        let ids = values.iter().map(|v| v.id).collect::<Vec<Uuid>>();
         let vehicle_ids = values
             .iter()
             .map(|v| v.vehicle_id.clone())
@@ -116,6 +119,7 @@ impl Position {
         sqlx::query!(
             r#"
             INSERT INTO realtime.position (
+                id,
                 vehicle_id,
                 mta_id,
                 stop_id,
@@ -124,13 +128,15 @@ impl Position {
                 recorded_at
             )
             SELECT
-                unnest($1::text[]),
+                unnest($1::uuid[]),
                 unnest($2::text[]),
-                unnest($3::int[]),
-                unnest($4::geometry[]),
-                unnest($5::JSONB[]),
-                unnest($6::timestamptz[])
+                unnest($3::text[]),
+                unnest($4::int[]),
+                unnest($5::geometry[]),
+                unnest($6::JSONB[]),
+                unnest($7::timestamptz[])
             "#,
+            &ids,
             &vehicle_ids,
             &mta_ids as &[Option<String>],
             &stop_ids as &[Option<i32>],

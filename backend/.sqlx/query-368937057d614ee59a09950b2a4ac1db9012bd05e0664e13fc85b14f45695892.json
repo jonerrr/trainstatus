@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.stop_time (trip_id, stop_id, arrival, departure, data)\n            SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::jsonb[])\n            ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, data = EXCLUDED.data\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "368937057d614ee59a09950b2a4ac1db9012bd05e0664e13fc85b14f45695892"
+}

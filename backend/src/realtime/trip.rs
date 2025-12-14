@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use thiserror::Error;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::static_data::route::RouteType;
 
@@ -11,7 +12,7 @@ use crate::static_data::route::RouteType;
 // TODO: remove generics and create impl for FromRow
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize, ToSchema, FromRow)]
 pub struct Trip {
-    pub id: i32,
+    pub id: Uuid,
     /// This the ID from the MTA feed
     #[schema(example = "097550_1..S03R")]
     pub mta_id: String,
@@ -101,7 +102,7 @@ impl Trip {
             return Ok(());
         }
 
-        let ids = values.iter().map(|v| v.id).collect::<Vec<i32>>();
+        let ids = values.iter().map(|v| v.id).collect::<Vec<Uuid>>();
         let mta_ids = values.iter().map(|v| v.mta_id.clone()).collect::<Vec<_>>();
         let vehicle_ids = values
             .iter()
@@ -134,7 +135,7 @@ impl Trip {
         sqlx::query!(
                     r#"
                     INSERT INTO realtime.trip (id, mta_id, vehicle_id, route_id, direction, created_at, updated_at, deviation, route_type)
-                    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::static.route_type[])
+                    SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::smallint[], $6::timestamptz[], $7::timestamptz[], $8::integer[], $9::static.route_type[])
                     ON CONFLICT (id) DO UPDATE SET deviation = EXCLUDED.deviation, updated_at = EXCLUDED.updated_at
                     "#,
                     &ids,

@@ -3,10 +3,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, prelude::FromRow};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq, FromRow, ToSchema)]
 pub struct StopTime {
-    pub trip_id: i32,
+    pub trip_id: Uuid,
     pub stop_id: i32,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
@@ -161,7 +162,7 @@ impl StopTime {
 
     #[tracing::instrument(skip(values, pool), fields(count = values.len()), level = "debug")]
     pub async fn insert(values: Vec<Self>, pool: &PgPool) -> Result<(), sqlx::Error> {
-        let trip_ids = values.iter().map(|v| v.trip_id).collect::<Vec<_>>();
+        let trip_ids = values.iter().map(|v| v.trip_id).collect::<Vec<Uuid>>();
         let stop_ids = values.iter().map(|v| v.stop_id).collect::<Vec<_>>();
         let arrivals = values.iter().map(|v| v.arrival).collect::<Vec<_>>();
         let departures = values.iter().map(|v| v.departure).collect::<Vec<_>>();
@@ -181,7 +182,7 @@ impl StopTime {
         sqlx::query!(
             r#"
             INSERT INTO realtime.stop_time (trip_id, stop_id, arrival, departure, data)
-            SELECT * FROM UNNEST($1::int[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::jsonb[])
+            SELECT * FROM UNNEST($1::uuid[], $2::int[], $3::timestamptz[], $4::timestamptz[], $5::jsonb[])
             ON CONFLICT (trip_id, stop_id) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, data = EXCLUDED.data
             "#,
             &trip_ids,
@@ -198,7 +199,7 @@ impl StopTime {
 #[derive(Debug)]
 pub struct StopTimeUpdateWithTrip {
     pub stop_time: StopTimeUpdate,
-    pub trip_id: i32,
+    pub trip_id: Uuid,
     pub is_train: bool, // New field to distinguish train vs. bus
 }
 
