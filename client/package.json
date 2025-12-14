@@ -1,0 +1,15 @@
+{
+  "name": "@trainstatus/client",
+  "version": "0.1.0",
+  "description": "API Client for trainstatus",
+  "exports": {
+    ".": "./src/client/index.ts",
+    "./*": "./src/client/*.ts"
+  },
+  "scripts": {
+    "openapi-ts": "openapi-ts"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "catalog:"
+  }
+}

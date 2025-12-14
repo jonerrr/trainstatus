@@ -23,7 +23,7 @@ node_modules
 .vercel
 .svelte-kit
 build
-
+*.log
 # OS
 .DS_Store
 Thumbs.db

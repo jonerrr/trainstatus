@@ -1,6 +1,6 @@
 // use api::websocket::{Clients, Update};
 use axum::{
-    ServiceExt,
+    Json, ServiceExt,
     body::Body,
     error_handling::HandleErrorLayer,
     extract::Request,
@@ -181,9 +181,11 @@ async fn main() {
     };
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        //TODO: use env var for version prefix
         .nest("/v1", api::router(state))
         .split_for_parts();
+
+    // Clone for openapi.json route
+    let openapi_schema = api.clone();
 
     let app = router
         .merge(Scalar::with_url("/docs", api))
@@ -195,6 +197,7 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
+        .route("/openapi.json", get(move || async { Json(openapi_schema) }))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
