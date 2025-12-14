@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS realtime.alert (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     last_in_feed TIMESTAMP WITH TIME ZONE NOT NULL,
-    display_before_active INTEGER
+    display_before_active INTEGER,
+    UNIQUE (created_at, alert_type)
 );
 
 CREATE TABLE IF NOT EXISTS realtime.active_period (

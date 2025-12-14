@@ -23,12 +23,10 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let mut in_feed_ids = vec![];
     // This will be used to delete the cloned alerts
     let mut cloned_mta_ids: Vec<String> = vec![];
-    // This is used to delete existing active periods and affected entities for alerts that already exist. Otherwise there may be duplicates
-    let mut existing_alert_ids: Vec<i32> = vec![];
 
     let mut alerts: Vec<Alert> = vec![];
-    let mut active_periods: Vec<ActivePeriod> = vec![];
-    let mut affected_entities: Vec<AffectedEntity> = vec![];
+    let mut active_periods: Vec<(usize, ActivePeriod)> = vec![];
+    let mut affected_entities: Vec<(usize, AffectedEntity)> = vec![];
 
     for entity in feed.entity {
         let Some(feed_alert) = entity.alert else {
@@ -86,12 +84,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
         let alert_exists = alert.find(pool).await?;
         // There could be duplicate alerts in the feed so I need to remove them
-        if alert_exists && alerts.iter().any(|a| a.id == alert.id) {
+        if alert_exists
+            && alerts
+                .iter()
+                .any(|a| a.created_at == alert.created_at && a.alert_type == alert.alert_type)
+        {
             tracing::debug!("Skipping duplicate alert in feed");
             continue;
-        }
-        if alert_exists {
-            existing_alert_ids.push(alert.id);
         }
 
         in_feed_ids.push(alert.id);
@@ -103,7 +102,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             // cloned_ids.push(alert.id);
         }
 
-        let mut alert_active_periods = feed_alert
+        let alert_active_periods = feed_alert
             .active_period
             .iter()
             .map(|ap| {
@@ -120,7 +119,7 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             .collect::<Vec<_>>();
         // tracing::info!("active period: {:?}", end - start);
 
-        let mut alert_affected_entities = feed_alert
+        let alert_affected_entities = feed_alert
             .informed_entity
             .iter()
             // Remove all MNR and LIRR alerts
@@ -179,23 +178,50 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             .collect::<Vec<_>>();
 
         alerts.push(alert);
-        active_periods.append(&mut alert_active_periods);
-        affected_entities.append(&mut alert_affected_entities);
+        // Store indices to update alert_id later after insert
+        let alert_idx = alerts.len() - 1;
+        for ap in alert_active_periods {
+            active_periods.push((alert_idx, ap));
+        }
+        for ae in alert_affected_entities {
+            affected_entities.push((alert_idx, ae));
+        }
     }
 
     // Remove duplicate alerts and their active periods and affected entities
-    // TODO: check if this is required still
-    let mut cloned_ids = vec![];
-    alerts.retain(|a| {
-        if cloned_mta_ids.contains(&a.mta_id) {
-            cloned_ids.push(a.id);
-            false
-        } else {
-            true
+    // Build a set of indices to remove
+    let mut remove_indices = std::collections::HashSet::new();
+    for (idx, alert) in alerts.iter().enumerate() {
+        if cloned_mta_ids.contains(&alert.mta_id) {
+            remove_indices.insert(idx);
         }
-    });
-    active_periods.retain(|a| !cloned_ids.contains(&a.alert_id));
-    affected_entities.retain(|a| !cloned_ids.contains(&a.alert_id));
+    }
+    // Filter out removed alerts and remap indices
+    let mut idx_map: Vec<Option<usize>> = vec![None; alerts.len()];
+    let mut new_idx = 0usize;
+    alerts = alerts
+        .into_iter()
+        .enumerate()
+        .filter_map(|(old_idx, alert)| {
+            if remove_indices.contains(&old_idx) {
+                None
+            } else {
+                idx_map[old_idx] = Some(new_idx);
+                new_idx += 1;
+                Some(alert)
+            }
+        })
+        .collect();
+    active_periods.retain(|(idx, _)| idx_map[*idx].is_some());
+    active_periods = active_periods
+        .into_iter()
+        .map(|(idx, ap)| (idx_map[idx].unwrap(), ap))
+        .collect();
+    affected_entities.retain(|(idx, _)| idx_map[*idx].is_some());
+    affected_entities = affected_entities
+        .into_iter()
+        .map(|(idx, ae)| (idx_map[idx].unwrap(), ae))
+        .collect();
 
     let mut transaction = pool.begin().await?;
 
@@ -220,28 +246,31 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     .execute(&mut *transaction)
     .await?;
 
-    // Delete existing active periods and affected entities
-    sqlx::query!(
-        "DELETE FROM realtime.affected_entity WHERE alert_id = ANY($1)",
-        &existing_alert_ids
-    )
-    .execute(&mut *transaction)
-    .await?;
-    sqlx::query!(
-        "DELETE FROM realtime.active_period WHERE alert_id = ANY($1)",
-        &existing_alert_ids
-    )
-    .execute(&mut *transaction)
-    .await?;
-
     let start_time = std::time::Instant::now();
     let alerts_count = alerts.len();
     let active_periods_count = active_periods.len();
     let affected_entities_count = affected_entities.len();
 
-    Alert::insert(alerts, &mut transaction).await?;
+    // Insert alerts and get back the real IDs
+    let alert_ids = Alert::insert(alerts, &mut transaction).await?;
     let alerts_duration = start_time.elapsed();
     tracing::debug!("Inserted {} alerts in {:?}", alerts_count, alerts_duration);
+
+    // Now update the alert_id on active_periods and affected_entities
+    let active_periods: Vec<ActivePeriod> = active_periods
+        .into_iter()
+        .map(|(idx, mut ap)| {
+            ap.alert_id = alert_ids[idx];
+            ap
+        })
+        .collect();
+    let affected_entities: Vec<AffectedEntity> = affected_entities
+        .into_iter()
+        .map(|(idx, mut ae)| {
+            ae.alert_id = alert_ids[idx];
+            ae
+        })
+        .collect();
 
     let active_periods_start = std::time::Instant::now();
     ActivePeriod::insert(active_periods, &mut transaction).await?;
@@ -284,12 +313,16 @@ pub struct Alert {
 }
 
 impl Alert {
+    /// Insert alerts and return the IDs (in the same order as input)
     #[tracing::instrument(skip(values, tx), fields(count = values.len()), level = "debug")]
     pub async fn insert(
         values: Vec<Self>,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    ) -> Result<(), sqlx::Error> {
-        let ids = values.iter().map(|a| a.id).collect::<Vec<_>>();
+    ) -> Result<Vec<i32>, sqlx::Error> {
+        if values.is_empty() {
+            return Ok(vec![]);
+        }
+
         let mta_ids = values.iter().map(|a| a.mta_id.clone()).collect::<Vec<_>>();
         let alert_types = values
             .iter()
@@ -317,52 +350,62 @@ impl Alert {
             .iter()
             .map(|a| a.display_before_active)
             .collect::<Vec<_>>();
-        // add last_in_feed as utc::now for each alert
         let last_in_feed = values.iter().map(|_| Utc::now()).collect::<Vec<_>>();
 
-        sqlx::query!(r#"
-        INSERT INTO realtime.alert (
-            id,
-            mta_id,
-            alert_type,
-            header_plain,
-            header_html,
-            description_plain,
-            description_html,
-            created_at,
-            updated_at,
-            last_in_feed,
-            display_before_active
+        // Use ON CONFLICT (created_at) since that's the natural key for alerts
+        // RETURNING id to get the actual IDs (whether inserted or updated)
+        let rows = sqlx::query!(
+            r#"
+            INSERT INTO realtime.alert (
+                mta_id,
+                alert_type,
+                header_plain,
+                header_html,
+                description_plain,
+                description_html,
+                created_at,
+                updated_at,
+                last_in_feed,
+                display_before_active
+            )
+            SELECT
+                unnest($1::text[]),
+                unnest($2::text[]),
+                unnest($3::text[]),
+                unnest($4::text[]),
+                unnest($5::text[]),
+                unnest($6::text[]),
+                unnest($7::timestamptz[]),
+                unnest($8::timestamptz[]),
+                unnest($9::timestamptz[]),
+                unnest($10::int[])
+            ON CONFLICT (created_at, alert_type) DO UPDATE SET
+                mta_id = EXCLUDED.mta_id,
+                alert_type = EXCLUDED.alert_type,
+                header_plain = EXCLUDED.header_plain,
+                header_html = EXCLUDED.header_html,
+                description_plain = EXCLUDED.description_plain,
+                description_html = EXCLUDED.description_html,
+                updated_at = EXCLUDED.updated_at,
+                last_in_feed = EXCLUDED.last_in_feed,
+                display_before_active = EXCLUDED.display_before_active
+            RETURNING id
+            "#,
+            &mta_ids,
+            &alert_types,
+            &header_plains,
+            &header_htmls,
+            &description_plains as &[Option<String>],
+            &description_htmls as &[Option<String>],
+            &created_ats,
+            &updated_ats,
+            &last_in_feed,
+            &display_before_actives
         )
-        SELECT
-            unnest($1::int[]),
-            unnest($2::text[]),
-            unnest($3::text[]),
-            unnest($4::text[]),
-            unnest($5::text[]),
-            unnest($6::text[]),
-            unnest($7::text[]),
-            unnest($8::timestamptz[]),
-            unnest($9::timestamptz[]),
-            unnest($10::timestamptz[]),
-            unnest($11::int[])
-        ON CONFLICT (id) DO UPDATE SET alert_type = EXCLUDED.alert_type, header_plain = EXCLUDED.header_plain, header_html = EXCLUDED.header_html, description_plain = EXCLUDED.description_plain, description_html = EXCLUDED.description_html, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at, last_in_feed = EXCLUDED.last_in_feed, display_before_active = EXCLUDED.display_before_active
-        "#,
-        &ids,
-        &mta_ids,
-        &alert_types,
-        &header_plains,
-        &header_htmls,
-        &description_plains as &[Option<String>],
-        &description_htmls as &[Option<String>],
-        &created_ats,
-        &updated_ats,
-        &last_in_feed,
-        &display_before_actives)
-        .execute(&mut **tx)
+        .fetch_all(&mut **tx)
         .await?;
 
-        Ok(())
+        Ok(rows.into_iter().map(|r| r.id).collect())
     }
 
     pub async fn get_all(

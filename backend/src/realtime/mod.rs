@@ -45,7 +45,7 @@ pub async fn decode(url: &str, name: &str) -> Result<FeedMessage, ImportError> {
 
     // TODO: remove clone
     let feed = FeedMessage::decode(data.clone())?;
-    
+
     tracing::debug!(entity_count = feed.entity.len(), "Decoded GTFS feed");
 
     if *debug_gtfs() {
@@ -175,7 +175,7 @@ pub async fn import(
         loop {
             let cache_span = tracing::info_span!("cache_realtime_data");
             let _guard = cache_span.enter();
-            
+
             // callback hell alert
             match trip::Trip::get_all(&c_pool, Utc::now()).await {
                 Ok(trips) => {
@@ -240,7 +240,7 @@ pub async fn import(
                     continue;
                 }
             }
-            
+
             drop(_guard);
             sleep(Duration::from_secs(25)).await;
         }

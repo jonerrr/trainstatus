@@ -57,7 +57,7 @@ impl AppState {
             Ok(value) => value,
             Err(err) => {
                 // if theres a type error, that means the cache probably got reset
-                if err.kind() == redis::ErrorKind::TypeError {
+                if err.kind() == redis::ErrorKind::UnexpectedReturnType {
                     // recache static data
                     cache_all(&self.pg_pool, &self.redis_pool).await?;
 
@@ -81,7 +81,7 @@ impl AppState {
             Ok(values) => values,
             Err(err) => {
                 // if theres a type error, that means the cache probably got reset
-                if err.kind() == redis::ErrorKind::TypeError {
+                if err.kind() == redis::ErrorKind::UnexpectedReturnType {
                     // recache static data
                     cache_all(&self.pg_pool, &self.redis_pool).await?;
 

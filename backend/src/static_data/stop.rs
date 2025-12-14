@@ -228,6 +228,9 @@ pub enum StopType {
     LateNight,
     RushHourOneDirection,
     RushHour,
+    WeekdayOnly,        // Stop type 5 - Train serves this stop weekdays ~6am-9:30pm only
+    NightsWeekendsOnly, // Stop type 6 - Train serves this stop nights and weekends only
+    Unknown,            // Just in case the MTA adds a new stop type we don't know about yet
 }
 
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
@@ -310,7 +313,7 @@ impl Stop {
 
         transfers.retain(|t| t.to_stop_id != t.from_stop_id);
         // keep the records that aren't the fake south ferry loop stop
-        transfers.retain(|t| (t.from_stop_id != "140" && t.to_stop_id != "140"));
+        transfers.retain(|t| t.from_stop_id != "140" && t.to_stop_id != "140");
         let transfers = transfers
             .into_iter()
             .map(|t| Transfer {
@@ -342,7 +345,7 @@ impl Stop {
             //     .collect::<Vec<RouteStop>>();
         }
 
-        stations.sort_by_key(|s| (s.stop_id.clone()));
+        stations.sort_by_key(|s| s.stop_id.clone());
         stations.dedup_by(|a, b| a.stop_id == b.stop_id);
 
         let stop_ids = stations
@@ -558,7 +561,7 @@ where
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StationResponse {
     #[serde(deserialize_with = "de_remove_prefix")]
@@ -590,7 +593,16 @@ impl From<StationResponse> for RouteStop {
             2 => StopType::LateNight,
             3 => StopType::RushHour,
             4 => StopType::RushHourOneDirection,
-            _ => unreachable!(),
+            5 => StopType::WeekdayOnly,
+            6 => StopType::NightsWeekendsOnly,
+            _ => {
+                tracing::warn!(
+                    "Unknown stop type {} for stop {}",
+                    value.stop_type,
+                    value.stop_id
+                );
+                StopType::Unknown
+            }
         };
 
         // let stop_id = value

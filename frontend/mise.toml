@@ -1,5 +1,9 @@
 [tools]
 node = "latest"
 pnpm = "latest"
+
+[tasks.dev]
+run = "pnpm dev"
+
 [env]
 # VITE_ALLOWED_HOSTS = ""
