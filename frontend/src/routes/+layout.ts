@@ -7,6 +7,8 @@ import type { LayoutLoad } from './$types';
 export const load: LayoutLoad = async ({ fetch, url }) => {
 	const stops_promise = fetch('/api/v1/stops').then((res) => res.json());
 	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
+	// const stops_promise = stopsHandler().then((res) => res.data!);
+	// const routes_promise = routesHandler().then((res) => res.data!);
 
 	const at = url.searchParams.get('at') ?? undefined;
 
