@@ -253,17 +253,29 @@ impl Route {
         gtfs_routes
             .into_iter()
             .map(|r| {
-                // filter out express routes
-                // if r.route_id.ends_with("X") {
-                //     None
-                // } else {
-                let geom = shapes
-                    .get(&r.route_id)
-                    .map(|g| Some(g.clone().into()))
-                    .unwrap_or_else(|| {
-                        tracing::warn!("no geometry for route {}", r.route_id);
-                        None
-                    });
+                // For express routes (ending with X), try to use the local route geometry
+                let geom = if r.route_id.ends_with("X") {
+                    let local_route_id = r.route_id.trim_end_matches('X');
+                    shapes
+                        .get(local_route_id)
+                        .map(|g| Some(g.clone().into()))
+                        .unwrap_or_else(|| {
+                            tracing::warn!(
+                                "no geometry for express route {} (tried local route {})",
+                                r.route_id,
+                                local_route_id
+                            );
+                            None
+                        })
+                } else {
+                    shapes
+                        .get(&r.route_id)
+                        .map(|g| Some(g.clone().into()))
+                        .unwrap_or_else(|| {
+                            tracing::warn!("no geometry for route {}", r.route_id);
+                            None
+                        })
+                };
 
                 // Some routes are missing colors, so we need to fill them in
                 // TODO: maybe check if blank and then fill in

@@ -1,7 +1,14 @@
 [tools]
-rust = "latest"
+# rust = "latest"
 # installing with mise caused the rust vscode extension not to work
 # protoc = "latest"
+
+[tasks.start-containers]
+run = "podman compose up -d"
+
+[tasks.dev]
+depends = ["start-containers"]
+run = "cargo run"
 
 [env]
 # RUST_LOG = "backend=debug"
