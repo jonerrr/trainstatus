@@ -1,5 +1,5 @@
  CREATE TABLE IF NOT EXISTS realtime.trip (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     mta_id VARCHAR NOT NULL,
     vehicle_id VARCHAR NOT NULL,
     route_id VARCHAR NOT NULL REFERENCES static.route(id),
@@ -22,7 +22,7 @@
 );
 
 CREATE TABLE IF NOT EXISTS realtime.stop_time (
-    trip_id INTEGER REFERENCES realtime.trip(id) ON DELETE CASCADE,
+    trip_id UUID REFERENCES realtime.trip(id) ON DELETE CASCADE,
     stop_id INTEGER REFERENCES static.stop(id),
     arrival TIMESTAMP WITH TIME ZONE NOT NULL,
     departure TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS realtime.stop_time (
 -- );
 
 CREATE TABLE IF NOT EXISTS realtime.position (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     vehicle_id VARCHAR NOT NULL,
     mta_id VARCHAR,
     stop_id INTEGER REFERENCES static.stop(id),

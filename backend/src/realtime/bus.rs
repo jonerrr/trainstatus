@@ -251,7 +251,7 @@ impl<'a> TryFrom<BusTripUpdate<'a>> for Trip {
         };
 
         Ok(Trip {
-            id: 0,
+            id: uuid::Uuid::now_v7(),
             mta_id: trip_id,
             vehicle_id,
             created_at,
@@ -335,6 +335,7 @@ impl TryFrom<BusVehiclePosition> for Position {
 
         // TODO: should we use status from gtfs
         Ok(Position {
+            id: uuid::Uuid::now_v7(),
             vehicle_id,
             mta_id,
             stop_id,

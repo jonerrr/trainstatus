@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.position (\n                id,\n                vehicle_id,\n                mta_id,\n                stop_id,\n                geom,\n                data,\n                recorded_at\n            )\n            SELECT\n                unnest($1::uuid[]),\n                unnest($2::text[]),\n                unnest($3::text[]),\n                unnest($4::int[]),\n                unnest($5::geometry[]),\n                unnest($6::JSONB[]),\n                unnest($7::timestamptz[])\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "Int4Array",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9a4ad807f2b1d0f4e50abac3f5ad2a48c95f0b0e094a9813bddb807e162d8309"
+}

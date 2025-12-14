@@ -1,7 +1,7 @@
 services:
   postgis:
     container_name: postgis
-    image: postgis/postgis:17-3.6-alpine
+    image: docker.io/postgis/postgis:18-3.6-alpine
     ports:
       - 5432:5432
     environment:
@@ -9,8 +9,8 @@ services:
       - POSTGRES_PASSWORD=trains
       - POSTGRES_DB=trains
     volumes:
-      - trainstatus-db:/var/lib/postgresql/data:z
-      - ./postgresql.conf:/etc/postgresql/postgresql.conf:z,ro
+      - trainstatus-db:/var/lib/postgresql/data:Z
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:Z,ro
     shm_size: 1g
 
   valkey:
@@ -30,8 +30,8 @@ services:
       - postgis
     command: ["--config", "/config/martin.yml"]
     volumes:
-      - ./martin.yml:/config/martin.yml:z,ro
-      - ./sprites:/sprites:z,ro
+      - ./martin.yml:/config/martin.yml:Z,ro
+      - ./sprites:/sprites:Z,ro
 
   # ts-backend:
   #   environment:

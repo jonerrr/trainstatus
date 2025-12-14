@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.affected_entity (\n                alert_id,\n                route_id,\n                stop_id,\n                sort_order\n            )\n            SELECT\n                data.alert_id,\n                data.route_id,\n                data.stop_id,\n                data.sort_order\n            FROM (\n                SELECT\n                    unnest($1::uuid[]) as alert_id,\n                    unnest($2::text[]) as route_id,\n                    unnest($3::int[]) as stop_id,\n                    unnest($4::int[]) as sort_order\n            ) data\n            LEFT JOIN static.route r ON data.route_id = r.id\n            LEFT JOIN static.stop s ON data.stop_id = s.id\n            WHERE (data.route_id IS NULL OR r.id IS NOT NULL)\n            AND (data.stop_id IS NULL OR s.id IS NOT NULL)\n            ON CONFLICT DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "Int4Array",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81588845ca5aac58ba7680e48584a1de106b8e562afede23f66598a168bb99c9"
+}
