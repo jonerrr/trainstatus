@@ -22,7 +22,7 @@ pub struct StopTime {
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, ToSchema, Hash, Eq)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type")]
 pub enum StopTimeData {
     Train {
         #[serde(skip_serializing_if = "Option::is_none")]

@@ -73,15 +73,11 @@ export type RouteStop = {
 };
 
 export type RouteStopData = {
-    data: {
-        stop_type: StopType;
-    };
+    stop_type: StopType;
     type: 'Train';
 } | {
-    data: {
-        direction: number;
-        headsign: string;
-    };
+    direction: number;
+    headsign: string;
     type: 'Bus';
 };
 
@@ -90,8 +86,13 @@ export type RouteType = 'train' | 'bus';
 export type Stop = {
     data: StopData;
     geom: {
-        x: number;
-        y: number;
+        coordinates: {
+            Point: {
+                x: number;
+                y: number;
+            };
+        };
+        type: 'Point';
     };
     /**
      * Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
@@ -109,21 +110,17 @@ export type Stop = {
  * Stop data changes based on the `route_type`
  */
 export type StopData = {
-    data: {
-        ada: boolean;
-        borough: Borough;
-        north_headsign: string;
-        /**
-         * Notes about ADA accessibility at the stop
-         */
-        notes?: string | null;
-        south_headsign: string;
-    };
+    ada: boolean;
+    borough: Borough;
+    north_headsign: string;
+    /**
+     * Notes about ADA accessibility at the stop
+     */
+    notes?: string | null;
+    south_headsign: string;
     type: 'Train';
 } | {
-    data: {
-        direction: BusDirection;
-    };
+    direction: BusDirection;
     type: 'Bus';
 };
 
@@ -136,10 +133,8 @@ export type StopTime = {
 };
 
 export type StopTimeData = {
-    data: {
-        actual_track?: string | null;
-        scheduled_track?: string | null;
-    };
+    actual_track?: string | null;
+    scheduled_track?: string | null;
     type: 'Train';
 } | {
     type: 'Bus';
