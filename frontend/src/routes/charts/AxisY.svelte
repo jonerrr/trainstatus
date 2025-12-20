@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+
 	const { yScale, width } = getContext('LayerCake');
 
 	const ticks = $derived($yScale.domain());

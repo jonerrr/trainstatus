@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { CloudOff, Settings } from '@lucide/svelte';
 	import { fade } from 'svelte/transition';
+
 	import { pushState } from '$app/navigation';
+
+	import { CloudOff, Settings } from '@lucide/svelte';
 
 	interface Props {
 		offline: boolean;

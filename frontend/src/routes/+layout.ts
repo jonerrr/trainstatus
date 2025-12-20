@@ -1,7 +1,11 @@
-import { type Route, type Stop, is_bus, is_train } from '$lib/static';
-import { trips } from '$lib/trips.svelte';
-import { stop_times } from '$lib/stop_times.svelte';
 import { alerts } from '$lib/alerts.svelte';
+import { search_schema } from '$lib/schemas';
+import { type Route, type Stop, is_bus, is_train } from '$lib/static';
+import { stop_times } from '$lib/stop_times.svelte';
+import { trips } from '$lib/trips.svelte';
+
+import { validateSearchParams } from 'runed/kit';
+
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ fetch, url }) => {
@@ -10,7 +14,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 	// const stops_promise = stopsHandler().then((res) => res.data!);
 	// const routes_promise = routesHandler().then((res) => res.data!);
 
-	const at = url.searchParams.get('at') ?? undefined;
+	// const at = url.searchParams.get('at') ?? undefined;
 
 	// let finished = url.pathname.startsWith('/charts');
 

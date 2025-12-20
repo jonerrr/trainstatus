@@ -1,10 +1,12 @@
 <script lang="ts" generics="T extends string | number">
 	import type { Snippet } from 'svelte';
+
 	// import { slide } from 'svelte/transition';
 	// import { quintOut } from 'svelte/easing';
 	import { pushState } from '$app/navigation';
-	import type { PersistedRune } from './util.svelte';
+
 	import Pin from './Pin.svelte';
+	import type { PersistedRune } from './util.svelte';
 
 	interface Props {
 		state: App.PageState;

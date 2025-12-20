@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { line } from 'd3-shape';
 	import { getContext } from 'svelte';
+
 	import { pushState } from '$app/navigation';
-	import { type Trip } from '$lib/trips.svelte';
+
 	import { type Route } from '$lib/static';
+	import { type Trip } from '$lib/trips.svelte';
+
+	import { line } from 'd3-shape';
 
 	const { xGet, yGet, data } = getContext('LayerCake');
 

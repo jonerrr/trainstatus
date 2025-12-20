@@ -1,9 +1,10 @@
-import FlexSearch from 'flexsearch';
 import type { Stop } from '$lib/static';
 
+import { Index } from 'flexsearch';
+
 interface Indexes {
-	train: FlexSearch.Index;
-	bus: FlexSearch.Index;
+	train: Index;
+	bus: Index;
 }
 
 interface Stops {
@@ -12,12 +13,12 @@ interface Stops {
 }
 
 export class StopSearch {
-	indexes = $state(<Indexes>{});
-	stops = $state(<Stops>{});
+	indexes = $state({} as Indexes);
+	stops = $state({} as Stops);
 
 	constructor(bus_data: Stop<'bus'>[], train_data: Stop<'train'>[]) {
-		this.indexes['train'] = new FlexSearch.Index({ tokenize: 'forward' });
-		this.indexes['bus'] = new FlexSearch.Index({ tokenize: 'forward' });
+		this.indexes['train'] = new Index({ tokenize: 'forward' });
+		this.indexes['bus'] = new Index({ tokenize: 'forward' });
 
 		train_data.forEach((stop, i) => {
 			this.indexes['train'].add(i, stop.name);

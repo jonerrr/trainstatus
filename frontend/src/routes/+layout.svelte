@@ -1,17 +1,22 @@
 <script lang="ts">
-	import '../app.css';
-	import '@fontsource/inter';
-	import { page } from '$app/state';
-	import { replaceState } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
-	import { trips } from '$lib/trips.svelte';
-	import { stop_times, monitored_bus_routes } from '$lib/stop_times.svelte';
-	import { alerts } from '$lib/alerts.svelte';
-	import Navbar from '$lib/Navbar.svelte';
+
+	import { SvelteSet } from 'svelte/reactivity';
+
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
+	import Navbar from '$lib/Navbar.svelte';
+	import { alerts } from '$lib/alerts.svelte';
+	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
+	import { trips } from '$lib/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+
+	import '@fontsource/inter';
+
+	import '../app.css';
 
 	let { children, data } = $props();
 
@@ -59,13 +64,6 @@
 					});
 				}
 			}
-		});
-
-		window.addEventListener('offline', (_e) => {
-			offline = true;
-		});
-		window.addEventListener('online', (_e) => {
-			offline = false;
 		});
 
 		// const finished = $derived(page.url.pathname.startsWith('/charts'));
@@ -195,6 +193,8 @@
 		});
 	});
 </script>
+
+<svelte:window ononline={() => (offline = false)} onoffline={() => (offline = true)} />
 
 <Header {offline} />
 <!--  h-[calc(100dvh-7.5rem)] -->

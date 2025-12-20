@@ -1,6 +1,8 @@
 import { SvelteMap } from 'svelte/reactivity';
-import type { Route, Stop } from './static';
+
 import { page } from '$app/state';
+
+import type { Route, Stop } from './static';
 import { current_time } from './util.svelte';
 
 export interface Trip<T = TripData, R = never> {

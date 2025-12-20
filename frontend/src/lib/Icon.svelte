@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
-	import { type Route } from './static';
+
 	import { alerts } from '$lib/alerts.svelte';
+
 	import icons from './icons';
+	import { type Route } from './static';
 
 	// TODO: combine w and h into size
 	const {

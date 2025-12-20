@@ -1,18 +1,22 @@
 <script lang="ts">
-	import { BusFront, TrainFront } from '@lucide/svelte';
-	import { tick, type Snippet } from 'svelte';
-	import { crossfade, slide } from 'svelte/transition';
+	import { type Snippet, tick } from 'svelte';
+
 	import { cubicInOut } from 'svelte/easing';
+	import { crossfade, slide } from 'svelte/transition';
+
 	import { browser } from '$app/environment';
-	import { item_heights, persisted_rune, type PersistedRune } from './util.svelte';
-	import { monitored_bus_routes } from './stop_times.svelte';
-	import TripButton from './Trip/Button.svelte';
-	import StopButton from './Stop/Button.svelte';
-	import RouteButton from './Route/Button.svelte';
-	import Pin from './Pin.svelte';
-	import type { Route, Stop } from './static';
-	import type { BusTripData, TrainTripData, Trip } from './trips.svelte';
 	import { pushState } from '$app/navigation';
+
+	import { BusFront, TrainFront } from '@lucide/svelte';
+
+	import Pin from './Pin.svelte';
+	import RouteButton from './Route/Button.svelte';
+	import StopButton from './Stop/Button.svelte';
+	import TripButton from './Trip/Button.svelte';
+	import type { Route, Stop } from './static';
+	import { monitored_bus_routes } from './stop_times.svelte';
+	import type { BusTripData, TrainTripData, Trip } from './trips.svelte';
+	import { type PersistedRune, item_heights, persisted_rune } from './util.svelte';
 
 	// [ element, estimated size]
 	interface ItemComponents {
@@ -268,6 +272,7 @@
 
 		<div class="rounded-full border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
 			{#snippet tab_button(value: 'train' | 'bus', data: unknown[])}
+				<!-- TODO: if other agencies are supported, allow users to configure what each tab shows (e.g. subway and bus, or subway and LIRR) -->
 				{#if data.length}
 					{@const Icon = tab_icons[value]}
 					<div transition:slide={{ axis: 'x', duration: 250 }}>

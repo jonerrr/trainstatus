@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { type BusStopDirection } from '$lib/static';
+
 	import {
-		ArrowDownLeft,
 		ArrowDown,
+		ArrowDownLeft,
 		ArrowDownRight,
-		ArrowRight,
 		ArrowLeft,
+		ArrowRight,
+		ArrowUp,
 		ArrowUpLeft,
-		ArrowUpRight,
-		ArrowUp
+		ArrowUpRight
 	} from '@lucide/svelte';
 
 	const { direction }: { direction: BusStopDirection } = $props();

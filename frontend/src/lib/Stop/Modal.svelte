@@ -1,31 +1,34 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { pushState } from '$app/navigation';
-	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
+	import { page } from '$app/state';
+
+	import BusCapacity from '$lib/BusCapacity.svelte';
+	import Button from '$lib/Button.svelte';
+	import Icon from '$lib/Icon.svelte';
+	import ModalList from '$lib/ModalList.svelte';
+	import { alerts } from '$lib/alerts.svelte';
 	import {
 		type Route,
 		type Stop,
 		type TrainStopData,
-		is_train as is_train_stop,
 		is_bus as is_bus_stop,
+		is_train as is_train_stop,
 		main_stop_routes
 	} from '$lib/static';
+	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import {
-		trips as rt_trips,
+		type Trip,
+		type TripData,
 		TripDirection,
 		is_bus,
 		is_train,
-		type Trip,
-		type TripData
+		trips as rt_trips
 	} from '$lib/trips.svelte';
-	import { alerts } from '$lib/alerts.svelte';
-	import { persisted_rune, current_time } from '$lib/util.svelte';
-	import Icon from '$lib/Icon.svelte';
-	import ModalList from '$lib/ModalList.svelte';
-	import Button from '$lib/Button.svelte';
-	import BusCapacity from '$lib/BusCapacity.svelte';
-	import BusArrow from './BusArrow.svelte';
+	import { current_time, persisted_rune } from '$lib/util.svelte';
+
 	import { CircleAlert } from '@lucide/svelte';
+
+	import BusArrow from './BusArrow.svelte';
 
 	interface Props {
 		show_previous: boolean;

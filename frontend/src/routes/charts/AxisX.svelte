@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import dayjs from 'dayjs';
-	import { timeMinute } from 'd3-time';
+
 	import { current_time } from '$lib/util.svelte';
+
+	import { timeMinute } from 'd3-time';
+	import dayjs from 'dayjs';
 
 	const { height, xScale } = getContext('LayerCake');
 
