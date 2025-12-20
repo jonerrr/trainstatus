@@ -76,9 +76,6 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     // if there was an error parsing position, we delete existing position
     let mut delete_position_vehicle_ids = vec![];
 
-    let parse_span = tracing::info_span!("parse_entities");
-    let _parse_guard = parse_span.enter();
-
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
             let mut trip: Trip = match trip_update.trip.try_into() {
@@ -150,8 +147,6 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             positions.push(position);
         }
     }
-
-    drop(_parse_guard);
 
     // let updated_trips = trips.iter().filter(|t| t.1).map(|t| t.0.clone()).collect();
     // let updated_trips = updated_trips_global.lock().await;
