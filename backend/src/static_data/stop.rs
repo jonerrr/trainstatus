@@ -5,10 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{FromRow, PgPool, Row, postgres::PgRow};
 use utoipa::ToSchema;
 
-// generic is StopData for importing but serde_json value for exporting
 #[derive(Serialize, ToSchema)]
-// TODO: actually don't use serde_json value for routes, make a proper struct
-// #[schema(as = Stop<StopData, Option<serde_json::Value>>)]
 pub struct Stop {
     /// Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
     #[schema(example = 101)]
@@ -110,30 +107,29 @@ impl FromRow<'_, PgRow> for Stop {
     }
 }
 
-#[derive(ToSchema, Deserialize, Serialize)]
-#[serde(tag = "type", content = "data")]
-pub enum StopRoute {
-    /// Bus
-    Bus {
-        #[schema(example = 1)]
-        /// Direction is from MTA's bus API. Can be 0 or 1
-        direction: i8,
-        headsign: String,
-        id: String,
-        stop_sequence: i32,
-    },
-    /// Train
-    Train {
-        id: String,
-        stop_sequence: i32,
-        #[serde(rename = "type")]
-        stop_type: StopType,
-    },
-}
+// #[derive(ToSchema, Deserialize, Serialize)]
+// #[serde(tag = "type")]
+// pub enum StopRoute {
+//     /// Bus
+//     Bus {
+//         #[schema(example = 1)]
+//         /// Direction is from MTA's bus API. Can be 0 or 1
+//         direction: i8,
+//         headsign: String,
+//         id: String,
+//         stop_sequence: i32,
+//     },
+//     /// Train
+//     Train {
+//         id: String,
+//         stop_sequence: i32,
+//         #[serde(rename = "type")]
+//         stop_type: StopType,
+//     },
+// }
 
-// TODO: make this actually follow the response schema
 pub fn point_schema() -> utoipa::openapi::schema::Object {
-    utoipa::openapi::schema::ObjectBuilder::new()
+    let point_coords = utoipa::openapi::schema::ObjectBuilder::new()
         .schema_type(utoipa::openapi::schema::Type::Object)
         .property(
             "x",
@@ -153,12 +149,31 @@ pub fn point_schema() -> utoipa::openapi::schema::Object {
         )
         .required("x")
         .required("y")
+        .build();
+
+    let coordinates = utoipa::openapi::schema::ObjectBuilder::new()
+        .schema_type(utoipa::openapi::schema::Type::Object)
+        .property("Point", point_coords)
+        .required("Point")
+        .build();
+
+    utoipa::openapi::schema::ObjectBuilder::new()
+        .schema_type(utoipa::openapi::schema::Type::Object)
+        .property("coordinates", coordinates)
+        .property(
+            "type",
+            utoipa::openapi::schema::ObjectBuilder::new()
+                .schema_type(utoipa::openapi::schema::Type::String)
+                .enum_values(Some(vec!["Point"])),
+        )
+        .required("coordinates")
+        .required("type")
         .build()
 }
 
 /// Stop data changes based on the `route_type`
 #[derive(Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type")]
 pub enum StopData {
     Train {
         ada: bool,
@@ -213,7 +228,7 @@ pub struct RouteStop {
 }
 
 #[derive(ToSchema, Deserialize, Serialize, Clone)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type")]
 pub enum RouteStopData {
     Train { stop_type: StopType },
     Bus { headsign: String, direction: i16 },
