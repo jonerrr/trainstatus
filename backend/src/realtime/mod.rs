@@ -13,6 +13,7 @@ use tokio::sync::Notify;
 use std::sync::{Arc, OnceLock};
 use std::{env::var, time::Duration};
 use thiserror::Error;
+use tracing::Instrument;
 // use tokio::sync::RwLock;
 use tokio::{
     fs::{create_dir, write},
@@ -173,75 +174,70 @@ pub async fn import(
     // TODO: find a better way to do this (use channels to notify when data changes or something)
     tokio::spawn(async move {
         loop {
-            let cache_span = tracing::info_span!("cache_realtime_data");
-            let _guard = cache_span.enter();
-
-            // callback hell alert
-            match trip::Trip::get_all(&c_pool, Utc::now()).await {
-                Ok(trips) => {
-                    match stop_time::StopTime::get_all(
-                        &c_pool,
-                        Utc::now(),
-                        None,
-                        false,
-                        false,
-                        // false,
-                    )
-                    .await
-                    {
-                        Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now(), true)
-                            .await
+            async {
+                // callback hell alert
+                match trip::Trip::get_all(&c_pool, Utc::now()).await {
+                    Ok(trips) => {
+                        match stop_time::StopTime::get_all(
+                            &c_pool,
+                            Utc::now(),
+                            None,
+                            false,
+                            false,
+                            // false,
+                        )
+                        .await
                         {
-                            Ok(alerts) => match trip::Trip::to_geojson(&trips).await {
-                                Ok(geojson) => {
-                                    let Ok(mut conn) = redis_pool.get().await else {
-                                        tracing::error!("failed to get redis connection");
-                                        sleep(Duration::from_secs(35)).await;
-                                        continue;
-                                    };
-                                    let items = [
-                                        ("trips", serde_json::to_string(&trips).unwrap()),
-                                        ("stop_times", serde_json::to_string(&stop_times).unwrap()),
-                                        ("alerts", serde_json::to_string(&alerts).unwrap()),
-                                        (
-                                            "bus_trips_geojson",
-                                            serde_json::to_string(&geojson).unwrap(),
-                                        ),
-                                    ];
-                                    if let Err(err) = conn.mset::<&str, String, ()>(&items).await {
-                                        tracing::error!(error = %err, "failed to cache data in redis");
-                                        sleep(Duration::from_secs(35)).await;
-                                        continue;
+                            Ok(stop_times) => match alert::Alert::get_all(&c_pool, Utc::now(), true)
+                                .await
+                            {
+                                Ok(alerts) => match trip::Trip::to_geojson(&trips).await {
+                                    Ok(geojson) => {
+                                        let Ok(mut conn) = redis_pool.get().await else {
+                                            tracing::error!("failed to get redis connection");
+                                            return;
+                                        };
+                                        let items = [
+                                            ("trips", serde_json::to_string(&trips).unwrap()),
+                                            (
+                                                "stop_times",
+                                                serde_json::to_string(&stop_times).unwrap(),
+                                            ),
+                                            ("alerts", serde_json::to_string(&alerts).unwrap()),
+                                            (
+                                                "bus_trips_geojson",
+                                                serde_json::to_string(&geojson).unwrap(),
+                                            ),
+                                        ];
+                                        if let Err(err) =
+                                            conn.mset::<&str, String, ()>(&items).await
+                                        {
+                                            tracing::error!(error = %err, "failed to cache data in redis");
+                                            return;
+                                        }
+                                        tracing::debug!("Successfully cached realtime data in redis");
                                     }
-                                    tracing::debug!("Successfully cached realtime data in redis");
-                                }
+                                    Err(err) => {
+                                        tracing::error!(error = %err, "failed to cache geojson");
+                                    }
+                                },
                                 Err(err) => {
-                                    tracing::error!(error = %err, "failed to cache geojson");
-                                    sleep(Duration::from_secs(35)).await;
-                                    continue;
+                                    tracing::error!(error = %err, "failed to cache alerts");
                                 }
                             },
                             Err(err) => {
-                                tracing::error!(error = %err, "failed to cache alerts");
-                                sleep(Duration::from_secs(35)).await;
-                                continue;
+                                tracing::error!(error = %err, "failed to cache stop times");
                             }
-                        },
-                        Err(err) => {
-                            tracing::error!(error = %err, "failed to cache stop times");
-                            sleep(Duration::from_secs(35)).await;
-                            continue;
                         }
                     }
-                }
-                Err(err) => {
-                    tracing::error!(error = %err, "failed to cache trips");
-                    sleep(Duration::from_secs(35)).await;
-                    continue;
+                    Err(err) => {
+                        tracing::error!(error = %err, "failed to cache trips");
+                    }
                 }
             }
+            .instrument(tracing::info_span!("cache_realtime_data"))
+            .await;
 
-            drop(_guard);
             sleep(Duration::from_secs(25)).await;
         }
     });

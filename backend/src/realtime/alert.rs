@@ -84,12 +84,13 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
 
         let alert_exists = alert.find(pool).await?;
         // There could be duplicate alerts in the feed so I need to remove them
+        // TODO: update alert unique constraint since i dont think created at and alert_type is sufficient
         if alert_exists
             && alerts
                 .iter()
                 .any(|a| a.created_at == alert.created_at && a.alert_type == alert.alert_type)
         {
-            tracing::debug!("Skipping duplicate alert in feed");
+            tracing::warn!("Skipping duplicate alert in feed");
             continue;
         }
 

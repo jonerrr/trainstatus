@@ -58,9 +58,6 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
     let mut stop_times: Vec<StopTime> = vec![];
     let mut positions: Vec<Position> = vec![];
 
-    let parse_span = tracing::info_span!("parse_bus_entities");
-    let _parse_guard = parse_span.enter();
-
     for entity in entities {
         if let Some(trip_update) = entity.trip_update {
             let mut trip: Trip = match BusTripUpdate(&trip_update).try_into() {
@@ -137,8 +134,6 @@ pub async fn import(pool: &PgPool) -> Result<(), ImportError> {
             positions.push(position);
         }
     }
-
-    drop(_parse_guard);
 
     tracing::info!(
         trip_count = trips.len(),
