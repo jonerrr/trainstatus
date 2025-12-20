@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
 	import type { Snippet } from 'svelte';
+
 	// import { crossfade, slide } from 'svelte/transition';
 	// import { cubicInOut, quintOut } from 'svelte/easing';
 

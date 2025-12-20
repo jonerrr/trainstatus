@@ -1,6 +1,8 @@
 import { SvelteSet } from 'svelte/reactivity';
-import type { Trip } from './trips.svelte';
+
 import { page } from '$app/state';
+
+import type { Trip } from './trips.svelte';
 
 export interface StopTime<T = never | Trip> {
 	trip_id: string;

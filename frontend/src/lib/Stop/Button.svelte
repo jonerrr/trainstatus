@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+
 	import { page } from '$app/state';
-	import { is_bus, is_train, main_stop_routes, type Route, type Stop } from '$lib/static';
-	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
-	import { trips as rt_trips, TripDirection } from '$lib/trips.svelte';
-	import { current_time } from '$lib/util.svelte';
-	import BusArrow from './BusArrow.svelte';
+
 	import Icon from '$lib/Icon.svelte';
+	import { type Route, type Stop, is_bus, is_train, main_stop_routes } from '$lib/static';
+	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
+	import { TripDirection, trips as rt_trips } from '$lib/trips.svelte';
+	import { current_time } from '$lib/util.svelte';
+
+	import BusArrow from './BusArrow.svelte';
 
 	interface Props {
 		data: Stop<'train' | 'bus'>;

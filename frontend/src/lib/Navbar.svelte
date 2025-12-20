@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { Home, Clock, CircleAlert } from '@lucide/svelte';
 	import { page } from '$app/state';
+
 	import { current_time } from '$lib/util.svelte';
+
+	import { CircleAlert, Clock, Home } from '@lucide/svelte';
 
 	interface Routes {
 		[key: string]: [Icon: typeof Home | typeof Clock | typeof CircleAlert, href: string];

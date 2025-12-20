@@ -1,12 +1,15 @@
 <script lang="ts">
+	import { updated } from '$app/state';
+
+	import Icon from '$lib/Icon.svelte';
+	import { alerts as rt_alerts } from '$lib/alerts.svelte';
+	import { type Route } from '$lib/static';
+	import { debounce } from '$lib/util.svelte';
+
+	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
-	import { ChevronRight, ChevronLeft } from '@lucide/svelte';
-	import { alerts as rt_alerts } from '$lib/alerts.svelte';
-	import { debounce } from '$lib/util.svelte';
-	import { type Route } from '$lib/static';
-	import Icon from '$lib/Icon.svelte';
-	import { updated } from '$app/state';
+
 	dayjs.extend(relativeTime);
 
 	interface ModalProps {

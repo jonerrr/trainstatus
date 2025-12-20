@@ -1,18 +1,20 @@
 <script lang="ts">
-	import dayjs from 'dayjs';
 	import { onMount } from 'svelte';
+
+	import { current_time } from '$lib/util.svelte';
+
 	import {
 		BookText,
-		CodeXml,
-		Hourglass,
+		ChartLine,
 		CircleX,
-		Info,
-		Settings,
-		Map,
+		CodeXml,
 		ExternalLink,
-		ChartLine
+		Hourglass,
+		Info,
+		Map,
+		Settings
 	} from '@lucide/svelte';
-	import { current_time } from '$lib/util.svelte';
+	import dayjs from 'dayjs';
 
 	let headerRef = $state<HTMLDivElement>();
 

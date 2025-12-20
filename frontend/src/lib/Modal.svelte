@@ -1,23 +1,27 @@
 <script lang="ts">
-	import { CircleX, Share, ClipboardCheck, History, Timer, AlarmClock } from '@lucide/svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import {
-		stop_pins_rune,
-		trip_pins_rune,
-		route_pins_rune,
-		type PersistedRune,
-		persisted_rune,
-		current_time
-	} from '$lib/util.svelte';
-	import { is_bus, type Stop } from './static';
-	import { monitored_bus_routes } from './stop_times.svelte';
-	import StopModal from '$lib/Stop/Modal.svelte';
-	import TripModal from '$lib/Trip/Modal.svelte';
+
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import SettingsModal from '$lib/Settings/Modal.svelte';
+	import StopModal from '$lib/Stop/Modal.svelte';
+	import TripModal from '$lib/Trip/Modal.svelte';
+	import {
+		type PersistedRune,
+		current_time,
+		persisted_rune,
+		route_pins_rune,
+		stop_pins_rune,
+		trip_pins_rune
+	} from '$lib/util.svelte';
+
+	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
+
 	import Pin from './Pin.svelte';
-	import { is_bus_route, type Trip, type TripData } from './trips.svelte';
+	import { type Stop, is_bus } from './static';
+	import { monitored_bus_routes } from './stop_times.svelte';
+	import { type Trip, type TripData, is_bus_route } from './trips.svelte';
+
 	// import { Tween } from 'svelte/motion';
 	// import { cubicOut } from 'svelte/easing';
 

@@ -1,17 +1,21 @@
 <script lang="ts">
-	import { LayerCake, Svg, flatten } from 'layercake';
-	import { Download, Search, ChevronDown, X, Check } from '@lucide/svelte';
-	import { scaleTime, scalePoint } from 'd3-scale';
+	import { onMount } from 'svelte';
+
 	import { page } from '$app/state';
-	import { TripDirection, trips } from '$lib/trips.svelte';
-	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
+
+	import Icon from '$lib/Icon.svelte';
 	import { type Route } from '$lib/static';
+	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
+	import { TripDirection, trips } from '$lib/trips.svelte';
+	import { current_time } from '$lib/util.svelte';
+
+	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
+	import { scalePoint, scaleTime } from 'd3-scale';
+	import { LayerCake, Svg, flatten } from 'layercake';
+
 	import AxisX from './AxisX.svelte';
 	import AxisY from './AxisY.svelte';
 	import Lines from './Lines.svelte';
-	import { current_time } from '$lib/util.svelte';
-	import { onMount } from 'svelte';
-	import Icon from '$lib/Icon.svelte';
 
 	let routes = $state<Route[]>([page.data.routes['3']]);
 	let direction = $state<TripDirection>(TripDirection.North);

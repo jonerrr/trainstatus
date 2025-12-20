@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
+
+	import Icon from '$lib/Icon.svelte';
 	import { type StopTime } from '$lib/stop_times.svelte';
 	import { is_train_route } from '$lib/trips.svelte';
-	import Icon from '$lib/Icon.svelte';
-	import { pushState } from '$app/navigation';
 
 	interface TransferProps {
 		transfer_stop_times: StopTime[];

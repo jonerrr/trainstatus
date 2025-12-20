@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { route_pins_rune } from '$lib/util.svelte';
+
 	import List from '$lib/List.svelte';
 	import type { Route } from '$lib/static';
+	import { route_pins_rune } from '$lib/util.svelte';
 
 	const { bus_routes, train_routes } = $derived(
 		Object.values(page.data.routes).reduce(

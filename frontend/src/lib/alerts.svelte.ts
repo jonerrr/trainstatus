@@ -1,4 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
+
 import icons from './icons';
 
 export interface Alert {

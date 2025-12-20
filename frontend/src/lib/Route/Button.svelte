@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Route } from '$lib/static';
-	import { alerts as rt_alerts } from '$lib/alerts.svelte';
-	import type { PersistedRune } from '$lib/util.svelte';
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
+	import { alerts as rt_alerts } from '$lib/alerts.svelte';
+	import type { Route } from '$lib/static';
+	import type { PersistedRune } from '$lib/util.svelte';
 
 	interface Props {
 		data: Route;

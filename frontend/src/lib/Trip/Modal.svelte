@@ -1,15 +1,19 @@
 <script lang="ts">
-	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
-	import { page } from '$app/state';
 	import { slide } from 'svelte/transition';
-	import { stop_times as rt_stop_times, type StopTime } from '$lib/stop_times.svelte';
-	import { current_time } from '$lib/util.svelte';
-	import { is_train, type Stop } from '$lib/static';
-	import { is_bus_route, is_train_route, trips, type Trip, type TripData } from '$lib/trips.svelte';
+
+	import { page } from '$app/state';
+
+	import BusCapacity from '$lib/BusCapacity.svelte';
+	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
-	import Button from '$lib/Button.svelte';
-	import BusCapacity from '$lib/BusCapacity.svelte';
+	import { type Stop, is_train } from '$lib/static';
+	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
+	import { type Trip, type TripData, is_bus_route, is_train_route, trips } from '$lib/trips.svelte';
+	import { current_time } from '$lib/util.svelte';
+
+	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
+
 	import Transfers from './Transfers.svelte';
 
 	interface Props {
