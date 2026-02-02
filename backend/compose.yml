@@ -19,19 +19,19 @@ services:
     ports:
       - 6379:6379
 
-  martin:
-    container_name: martin
-    image: ghcr.io/maplibre/martin:latest
-    ports:
-      - 3000:3000
-    environment:
-      - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
-    depends_on:
-      - postgis
-    command: ["--config", "/config/martin.yml"]
-    volumes:
-      - ./martin.yml:/config/martin.yml:Z,ro
-      - ./sprites:/sprites:Z,ro
+  # martin:
+  #   container_name: martin
+  #   image: ghcr.io/maplibre/martin:latest
+  #   ports:
+  #     - 3000:3000
+  #   environment:
+  #     - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
+  #   depends_on:
+  #     - postgis
+  #   command: ["--config", "/config/martin.yml"]
+  #   volumes:
+  #     - ./martin.yml:/config/martin.yml:Z,ro
+  #     - ./sprites:/sprites:Z,ro
 
   # ts-backend:
   #   environment:

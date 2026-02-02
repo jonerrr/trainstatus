@@ -84,7 +84,7 @@ impl FromRow<'_, PgRow> for Route {
 
 #[derive(sqlx::Type, Serialize, Deserialize, Debug, PartialEq, ToSchema, Hash, Eq, Clone, Copy)]
 #[sqlx(type_name = "static.route_type", rename_all = "snake_case")]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum RouteType {
     Train,
     Bus,

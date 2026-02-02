@@ -21,10 +21,7 @@ use std::{
 };
 use tokio::{
     signal,
-    sync::{
-        Notify,
-        broadcast::{self, Sender},
-    },
+    sync::broadcast::{self, Sender},
 };
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
@@ -38,33 +35,47 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
+use crate::{
+    sources::{
+        StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
+    },
+    stores::{route::RouteStore, stop::StopStore, trip::TripStore},
+};
+
 mod api;
-mod realtime;
-mod static_data;
+mod engines;
+mod integrations;
+mod macros;
+mod models;
+mod sources;
+mod stores;
 
 #[allow(clippy::all)]
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
 
-// https://stackoverflow.com/a/77249700
-pub fn api_key() -> &'static str {
-    // you need bustime api key to run this
-    static API_KEY: OnceLock<String> = OnceLock::new();
-    API_KEY.get_or_init(|| var("API_KEY").expect("Missing API_KEY "))
-}
-
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone)]
 struct AppState {
-    pg_pool: sqlx::PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    route_store: RouteStore,
+    stop_store: StopStore,
+    trip_store: TripStore,
+    // pg_pool: sqlx::PgPool,
+    // redis_pool: bb8::Pool<RedisConnectionManager>,
     // rx: crossbeam::channel::Receiver<Vec<Update>>,
     // clients: Clients,
     // tx: Sender<serde_json::Value>,
     // shutdown_tx: Sender<()>,
     // initial_data: Arc<RwLock<serde_json::Value>>,
+}
+
+// https://stackoverflow.com/a/77249700
+pub fn mta_oba_api_key() -> &'static str {
+    // you need bustime api key to run this
+    static API_KEY: OnceLock<String> = OnceLock::new();
+    API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").unwrap())
 }
 
 #[tokio::main]
@@ -77,15 +88,12 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
     tracing::info!("Starting Train Status API v{}", VERSION);
-    let read_only = var("READ_ONLY").is_ok();
-    if read_only {
-        tracing::info!("Running in read-only mode");
-    }
+    // let read_only = var("READ_ONLY").is_ok();
+    // if read_only {
+    //     tracing::info!("Running in read-only mode");
+    // }
 
-    let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
-        .expect("DATABASE_URL env not set")
-        .parse()
-        .unwrap();
+    let pg_connect_option: PgConnectOptions = var("DATABASE_URL").unwrap().parse().unwrap();
     let pg_pool = PgPoolOptions::new()
         .max_connections(100)
         .connect_with(pg_connect_option)
@@ -97,8 +105,7 @@ async fn main() {
         .expect("Failed to run database migrations");
 
     // Connect to redis and create a pool
-    let manager =
-        RedisConnectionManager::new(var("REDIS_URL").expect("REDIS_URL env not set")).unwrap();
+    let manager = RedisConnectionManager::new(var("REDIS_URL").unwrap()).unwrap();
     let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
     // Test Redis connection
@@ -117,25 +124,67 @@ async fn main() {
         _ => panic!("Failed read redis ping response"),
     }
 
-    if !read_only {
-        let notify = Arc::new(Notify::new());
-        let notify2 = notify.clone();
+    let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());
+    let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
+    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), redis_pool.clone());
+    // let stop_time_store =
+    //     stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
+    let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
+    let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
 
-        static_data::import(
-            pg_pool.clone(),
-            notify,
-            redis_pool.clone(),
-            var("FORCE_UPDATE").is_ok(),
-            false,
-        )
-        .await;
-        // Wait for static data to be loaded
-        notify2.notified().await;
-    }
-    // cache static data. It will also cache after each refresh
-    static_data::cache_all(&pg_pool, &redis_pool)
-        .await
-        .expect("Failed to cache static data");
+    // We use Arc so the engine can share ownership of the adapter traits
+    let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
+        Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
+        Arc::new(sources::mta_bus::static_data::MtaBusStatic),
+        // Arc::new(njt::rail_static::NjtRailStatic),
+    ];
+
+    let static_controller =
+        engines::static_data::run(&pg_pool, &route_store, &stop_store, static_adapters).await;
+
+    let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
+        Arc::new(MtaSubwayRealtime),
+        Arc::new(MtaBusRealtime),
+        // Arc::new(njt::rail_realtime::NjtRailRealtime),
+    ];
+
+    engines::realtime::run(
+        // &pg_pool,
+        &trip_store,
+        // &stop_time_store,
+        &position_store,
+        realtime_adapters,
+        static_controller.clone(),
+    )
+    .await;
+
+    let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
+        Arc::new(sources::mta_bus::alert::MtaBusAlerts),
+        Arc::new(sources::mta_subway::alerts::MtaSubwayAlerts),
+        // Arc::new(njt::rail_alerts::NjtRailAlerts),
+    ];
+
+    engines::alerts::run(&alert_store, alert_adapters).await;
+
+    // if !read_only {
+    //     let notify = Arc::new(Notify::new());
+    //     let notify2 = notify.clone();
+
+    //     static_data::import(
+    //         pg_pool.clone(),
+    //         notify,
+    //         redis_pool.clone(),
+    //         var("FORCE_UPDATE").is_ok(),
+    //         false,
+    //     )
+    //     .await;
+    //     // Wait for static data to be loaded
+    //     notify2.notified().await;
+    // }
+    // // cache static data. It will also cache after each refresh
+    // static_data::cache_all(&pg_pool, &redis_pool)
+    //     .await
+    //     .expect("Failed to cache static data");
 
     // This will store alerts and trips for initial websocket load
     // null in rust :explode:
@@ -144,7 +193,7 @@ async fn main() {
     // let (tx, rx) = unbounded::<Vec<Update>>();
     // tx, initial_data.clone()
 
-    realtime::import(pg_pool.clone(), redis_pool.clone(), read_only).await;
+    // realtime::import(pg_pool.clone(), redis_pool.clone(), read_only).await;
 
     let cors_layer =
         CorsLayer::new()
@@ -169,15 +218,12 @@ async fn main() {
     )]
     struct ApiDoc;
 
+    let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
+
     let state = AppState {
-        pg_pool,
-        redis_pool,
-        // updated_trips,
-        // tx,
-        // rx,
-        // clients: ws_clients,
-        // shutdown_tx: shutdown_tx.clone(),
-        // initial_data,
+        route_store,
+        stop_store,
+        trip_store,
     };
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())

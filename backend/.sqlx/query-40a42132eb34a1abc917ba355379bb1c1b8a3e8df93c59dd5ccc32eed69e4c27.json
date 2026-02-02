@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.stop_transfer (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type, min_transfer_time)\n            SELECT * FROM UNNEST(\n                $1::TEXT[],\n                $2::source_enum[],\n                $3::TEXT[],\n                $4::source_enum[],\n                $5::SMALLINT[],\n                $6::SMALLINT[]\n            )\n            ON CONFLICT (from_stop_id, from_stop_source, to_stop_id, to_stop_source) DO UPDATE SET\n                transfer_type = EXCLUDED.transfer_type,\n                min_transfer_time = EXCLUDED.min_transfer_time\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Int2Array",
+        "Int2Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40a42132eb34a1abc917ba355379bb1c1b8a3e8df93c59dd5ccc32eed69e4c27"
+}

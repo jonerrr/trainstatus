@@ -1,3 +1,3 @@
-DROP TABLE IF EXISTS static.route;
+DROP INDEX IF EXISTS idx_route_geom;
 
-DROP TYPE IF EXISTS static.route_type;
+DROP TABLE IF EXISTS static.route;

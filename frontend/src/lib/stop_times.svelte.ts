@@ -4,6 +4,13 @@ import { page } from '$app/state';
 
 import type { Trip } from './trips.svelte';
 
+// goal
+// const stopTimes = useStopTimes
+// stopTimes.at = Date.now()
+// const arrivals = stopTimes.getArrivals(stop_id)
+// const departures = stopTimes.getDepartures(stop_id)
+// can have like route.existing_alert that is reactive
+
 export interface StopTime<T = never | Trip> {
 	trip_id: string;
 	stop_id: number;

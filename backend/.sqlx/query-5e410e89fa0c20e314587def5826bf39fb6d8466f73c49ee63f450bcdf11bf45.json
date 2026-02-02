@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.route_stop (route_id, source, stop_id, stop_sequence, data)\n            SELECT * FROM UNNEST(\n                $1::TEXT[],\n                $2::source_enum[],\n                $3::TEXT[],\n                $4::SMALLINT[],\n                $5::JSONB[]\n            )\n            ON CONFLICT (route_id, source, stop_id) DO UPDATE SET\n                stop_sequence = EXCLUDED.stop_sequence,\n                data = EXCLUDED.data\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        "Int2Array",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5e410e89fa0c20e314587def5826bf39fb6d8466f73c49ee63f450bcdf11bf45"
+}

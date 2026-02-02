@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH input_rows AS (\n                SELECT * FROM UNNEST(\n                    $1::uuid[], $2::text[], $3::text[], $4::text[], $5::source_enum[],\n                    $6::smallint[], $7::timestamptz[], $8::timestamptz[], $9::jsonb[]\n                ) AS t(input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)\n            ),\n            inserted_rows AS (\n                INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)\n                SELECT input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data\n                FROM input_rows\n                ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET\n                    data = EXCLUDED.data,\n                    updated_at = EXCLUDED.updated_at\n                RETURNING id, original_id, vehicle_id, created_at, direction\n            )\n            SELECT\n                inserted_rows.id AS actual_id,\n                input_rows.input_id\n            FROM inserted_rows\n            JOIN input_rows ON\n                inserted_rows.original_id = input_rows.original_id AND\n                inserted_rows.vehicle_id = input_rows.vehicle_id AND\n                inserted_rows.created_at = input_rows.created_at AND\n                inserted_rows.direction IS NOT DISTINCT FROM input_rows.direction\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "actual_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "input_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Int2Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "39621eb7b171da5b208d9888be3edfbf0a8f228eb28fae201b803324b1412efc"
+}

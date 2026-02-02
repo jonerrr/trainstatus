@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH input_data AS (\n                SELECT\n                    unnest($1::uuid[]) as new_id,\n                    unnest($2::text[]) as original_id,\n                    unnest($3::source_enum[]) as source,\n                    unnest($4::timestamptz[]) as created_at,\n                    unnest($5::timestamptz[]) as updated_at,\n                    unnest($6::timestamptz[]) as recorded_at,\n                    unnest($7::jsonb[]) as data\n            ),\n            upserted AS (\n                INSERT INTO realtime.alert (\n                    id,\n                    original_id,\n                    source,\n                    created_at,\n                    updated_at,\n                    recorded_at,\n                    data\n                )\n                SELECT\n                    new_id,\n                    original_id,\n                    source,\n                    created_at,\n                    updated_at,\n                    recorded_at,\n                    data\n                FROM input_data\n                ON CONFLICT (created_at, original_id, source) DO UPDATE SET\n                    updated_at = EXCLUDED.updated_at,\n                    recorded_at = EXCLUDED.recorded_at,\n                    data = EXCLUDED.data\n                RETURNING id, created_at, original_id, source\n            )\n            SELECT u.id\n            FROM input_data i\n            JOIN upserted u ON i.created_at = u.created_at\n                AND i.original_id = u.original_id\n                AND i.source = u.source\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "14f86bfd9e1ffbf73b5c1df8ac83f2956ac897dbeb1d3057c1737d488e2d33d6"
+}

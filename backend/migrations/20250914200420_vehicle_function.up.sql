@@ -6,7 +6,7 @@ BEGIN
   SELECT INTO mvt ST_AsMVT(tile, 'latest_vehicle_position', 4096, 'geom') FROM (
     SELECT DISTINCT ON (vehicle_id)
       vehicle_id,
-      mta_id,
+      original_id,
       stop_id,
       status,
       bearing,

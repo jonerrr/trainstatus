@@ -1,26 +1,48 @@
-use crate::{AppState, static_data::cache_all};
+use crate::AppState;
 use axum::{
     extract::{FromRequestParts, Query},
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, TimeZone, Utc};
-use http::{HeaderMap, request::Parts};
-use redis::AsyncCommands;
+use http::{HeaderMap, StatusCode, request::Parts};
 use serde::{Deserialize, Deserializer};
 use std::sync::OnceLock;
+use tracing::error;
 use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-pub mod errors;
-pub mod realtime;
+// pub mod errors;
+// pub mod realtime;
 // pub mod websocket;
 pub mod static_data;
+pub mod util;
+
+pub struct AppError(anyhow::Error);
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        error!("Internal server error: {}", self.0);
+
+        (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong :(").into_response()
+    }
+}
+
+// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
+// `Result<_, AppError>`. That way you don't need to do that manually.
+impl<E> From<E> for AppError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
+}
 
 pub fn router(state: AppState) -> OpenApiRouter {
     OpenApiRouter::new()
-        .routes(routes!(realtime::alerts_handler))
-        .routes(routes!(realtime::stop_times_handler))
-        .routes(routes!(realtime::trips_handler))
+        // .routes(routes!(realtime::alerts_handler))
+        // .routes(routes!(realtime::stop_times_handler))
+        // .routes(routes!(realtime::trips_handler))
         .routes(routes!(static_data::routes_handler))
         .routes(routes!(static_data::stops_handler))
         .with_state(state)
@@ -48,52 +70,52 @@ where
         .collect())
 }
 
-impl AppState {
-    // wrapper for redis get that handles when the cache is reset
-    // only use for getting static data
-    pub async fn get_from_cache(&self, key: &str) -> Result<String, errors::ServerError> {
-        let mut conn = self.redis_pool.get().await?;
-        let value: String = match conn.get(key).await {
-            Ok(value) => value,
-            Err(err) => {
-                // if theres a type error, that means the cache probably got reset
-                if err.kind() == redis::ErrorKind::UnexpectedReturnType {
-                    // recache static data
-                    cache_all(&self.pg_pool, &self.redis_pool).await?;
+// impl AppState {
+//     // wrapper for redis get that handles when the cache is reset
+//     // only use for getting static data
+//     pub async fn get_from_cache(&self, key: &str) -> Result<String, errors::ServerError> {
+//         let mut conn = self.redis_pool.get().await?;
+//         let value: String = match conn.get(key).await {
+//             Ok(value) => value,
+//             Err(err) => {
+//                 // if theres a type error, that means the cache probably got reset
+//                 if err.kind() == redis::ErrorKind::UnexpectedReturnType {
+//                     // recache static data
+//                     cache_all(&self.pg_pool, &self.redis_pool).await?;
 
-                    // conn.get(key).await?
-                    return Box::pin(self.get_from_cache(key)).await;
-                }
-                return Err(errors::ServerError::Redis(err));
-            }
-        };
-        Ok(value)
-    }
+//                     // conn.get(key).await?
+//                     return Box::pin(self.get_from_cache(key)).await;
+//                 }
+//                 return Err(errors::ServerError::Redis(err));
+//             }
+//         };
+//         Ok(value)
+//     }
 
-    // same as above but for mget
-    // currently only used for getting stop/route and hash
-    pub async fn mget_from_cache(
-        &self,
-        keys: &[&str; 2],
-    ) -> Result<(String, String), errors::ServerError> {
-        let mut conn = self.redis_pool.get().await?;
-        let values: (String, String) = match conn.mget(keys).await {
-            Ok(values) => values,
-            Err(err) => {
-                // if theres a type error, that means the cache probably got reset
-                if err.kind() == redis::ErrorKind::UnexpectedReturnType {
-                    // recache static data
-                    cache_all(&self.pg_pool, &self.redis_pool).await?;
+//     // same as above but for mget
+//     // currently only used for getting stop/route and hash
+//     pub async fn mget_from_cache(
+//         &self,
+//         keys: &[&str; 2],
+//     ) -> Result<(String, String), errors::ServerError> {
+//         let mut conn = self.redis_pool.get().await?;
+//         let values: (String, String) = match conn.mget(keys).await {
+//             Ok(values) => values,
+//             Err(err) => {
+//                 // if theres a type error, that means the cache probably got reset
+//                 if err.kind() == redis::ErrorKind::UnexpectedReturnType {
+//                     // recache static data
+//                     cache_all(&self.pg_pool, &self.redis_pool).await?;
 
-                    // conn.mget(keys).await?
-                    return Box::pin(self.mget_from_cache(keys)).await;
-                }
-                return Err(errors::ServerError::Redis(err));
-            }
-        };
-        Ok(values)
-    }
-}
+//                     // conn.mget(keys).await?
+//                     return Box::pin(self.mget_from_cache(keys)).await;
+//                 }
+//                 return Err(errors::ServerError::Redis(err));
+//             }
+//         };
+//         Ok(values)
+//     }
+// }
 
 // this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
 // #[derive(Debug)]

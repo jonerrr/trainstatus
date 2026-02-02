@@ -7,7 +7,7 @@ DROP INDEX IF EXISTS realtime.idx_stop_time_arrival;
 
 DROP INDEX IF EXISTS realtime.idx_position_recorded_at;
 DROP INDEX IF EXISTS realtime.idx_position_vehicle_id;
-DROP INDEX IF EXISTS realtime.idx_position_mta_id;
+DROP INDEX IF EXISTS realtime.idx_position_original_id;
 DROP INDEX IF EXISTS realtime.idx_position_gix;
 
 DROP TABLE IF EXISTS realtime.position;

@@ -6,6 +6,9 @@
 [tasks.start-containers]
 run = "podman compose up -d"
 
+[tasks.csp]
+run = "cargo sqlx prepare"
+
 [tasks.dev]
 depends = ["start-containers"]
 run = "cargo run"

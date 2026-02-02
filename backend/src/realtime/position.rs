@@ -61,7 +61,7 @@ pub struct Position {
 // }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum PositionData {
     Train {
         assigned: bool,

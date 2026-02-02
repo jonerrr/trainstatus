@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT updated_at\n        FROM source\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_rail",
+                "lirr",
+                "mnr"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "738e5ce761375b7ecc390b7a968a6c47673b4b0101ca722920e1e0d60cfce419"
+}

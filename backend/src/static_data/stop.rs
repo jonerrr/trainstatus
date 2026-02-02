@@ -5,6 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{FromRow, PgPool, Row, postgres::PgRow};
 use utoipa::ToSchema;
 
+use crate::api::util::point_schema;
+
 #[derive(Serialize, ToSchema)]
 pub struct Stop {
     /// Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
@@ -128,52 +130,9 @@ impl FromRow<'_, PgRow> for Stop {
 //     },
 // }
 
-pub fn point_schema() -> utoipa::openapi::schema::Object {
-    let point_coords = utoipa::openapi::schema::ObjectBuilder::new()
-        .schema_type(utoipa::openapi::schema::Type::Object)
-        .property(
-            "x",
-            utoipa::openapi::schema::ObjectBuilder::new()
-                .schema_type(utoipa::openapi::schema::Type::Number)
-                .format(Some(utoipa::openapi::SchemaFormat::KnownFormat(
-                    utoipa::openapi::KnownFormat::Double,
-                ))),
-        )
-        .property(
-            "y",
-            utoipa::openapi::schema::ObjectBuilder::new()
-                .schema_type(utoipa::openapi::schema::Type::Number)
-                .format(Some(utoipa::openapi::SchemaFormat::KnownFormat(
-                    utoipa::openapi::KnownFormat::Double,
-                ))),
-        )
-        .required("x")
-        .required("y")
-        .build();
-
-    let coordinates = utoipa::openapi::schema::ObjectBuilder::new()
-        .schema_type(utoipa::openapi::schema::Type::Object)
-        .property("Point", point_coords)
-        .required("Point")
-        .build();
-
-    utoipa::openapi::schema::ObjectBuilder::new()
-        .schema_type(utoipa::openapi::schema::Type::Object)
-        .property("coordinates", coordinates)
-        .property(
-            "type",
-            utoipa::openapi::schema::ObjectBuilder::new()
-                .schema_type(utoipa::openapi::schema::Type::String)
-                .enum_values(Some(vec!["Point"])),
-        )
-        .required("coordinates")
-        .required("type")
-        .build()
-}
-
 /// Stop data changes based on the `route_type`
 #[derive(Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type")]
+#[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopData {
     Train {
         ada: bool,
@@ -195,6 +154,7 @@ pub enum StopData {
 
 #[derive(sqlx::Type, Serialize, Deserialize, ToSchema)]
 #[sqlx(type_name = "static.borough", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Borough {
     Brooklyn,
     Queens,
@@ -204,8 +164,8 @@ pub enum Borough {
 }
 
 #[derive(sqlx::Type, Serialize, Deserialize, Clone, ToSchema)]
-#[sqlx(type_name = "static.bus_direction", rename_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "static.bus_direction", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum BusDirection {
     SW,
     S,
@@ -228,7 +188,7 @@ pub struct RouteStop {
 }
 
 #[derive(ToSchema, Deserialize, Serialize, Clone)]
-#[serde(tag = "type")]
+#[serde(tag = "source", rename_all = "snake_case")]
 pub enum RouteStopData {
     Train { stop_type: StopType },
     Bus { headsign: String, direction: i16 },
@@ -259,6 +219,7 @@ const FAKE_STOP_IDS: [&str; 28] = [
 
 // This takes train stop_id and converts it to a number by converting the unicode value of each character to a number
 // returns none if stop_id is invalid
+// TODO: use base38 or similar encoding instead of this hacky method (which isn't bijective)
 pub fn convert_stop_id(stop_id: String) -> Option<i32> {
     if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
         return None;
@@ -280,6 +241,40 @@ pub fn convert_stop_id(stop_id: String) -> Option<i32> {
     }
     Some(stop_id.parse().unwrap())
 }
+
+// pub fn convert_stop_id(stop_id: String) -> Option<i64> {
+//     if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+//         return None;
+//     }
+
+//     let mut result: i64 = 0;
+//     for byte in stop_id.bytes() {
+//         let val = match byte {
+//             b'0'..=b'9' => byte - b'0',
+//             b'A'..=b'Z' => byte - b'A' + 10,
+//             b'a'..=b'z' => byte - b'a' + 10, // Handle lowercase just in case
+//             b'-' => 36,
+//             b'_' => 37,
+//             _ => return None, // Invalid character for our encoding
+//         };
+
+//         // Check for overflow (approx 12 chars max for i64)
+//         result = result.checked_mul(38)?.checked_add(val as i64)?;
+//     }
+//     Some(result)
+// }
+
+// // Helper to convert back (useful for debugging or API responses)
+// pub fn decode_stop_id(mut id: i64) -> String {
+//     if id == 0 { return "0".to_string(); }
+//     let mut chars = Vec::new();
+//     while id > 0 {
+//         let rem = (id % 38) as usize;
+//         chars.push(ID_ALPHABET[rem] as char);
+//         id /= 38;
+//     }
+//     chars.into_iter().rev().collect()
+// }
 
 impl Stop {
     pub async fn insert(values: Vec<Self>, pool: &PgPool) {

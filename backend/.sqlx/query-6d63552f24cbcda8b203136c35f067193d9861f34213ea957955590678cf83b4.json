@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM realtime.alert WHERE original_id = ANY($1) AND source = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_rail",
+                "lirr",
+                "mnr"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6d63552f24cbcda8b203136c35f067193d9861f34213ea957955590678cf83b4"
+}

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.route (id, source, long_name, short_name, color, data, geom)\n            SELECT\n                u.id,\n                u.source,\n                u.long_name,\n                u.short_name,\n                u.color,\n                u.data,\n                ST_SetSRID(u.geom, 4326)\n            FROM\n                unnest(\n                    $1::text[],\n                    $2::source_enum[],\n                    $3::text[],\n                    $4::text[],\n                    $5::text[],\n                    $6::jsonb[],\n                    $7::geometry[]\n                ) AS u(id, source, long_name, short_name, color, data, geom)\n            ON CONFLICT (id, source) DO UPDATE SET\n                long_name = EXCLUDED.long_name,\n                short_name = EXCLUDED.short_name,\n                color = EXCLUDED.color,\n                data = EXCLUDED.data,\n                geom = EXCLUDED.geom\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "JsonbArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e48bd1329ced18b36cad48c8042fc8d094861f022697032174897ac2e1bb3a94"
+}
