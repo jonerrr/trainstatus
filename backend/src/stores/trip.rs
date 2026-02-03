@@ -82,18 +82,19 @@ impl TripStore {
         .await?)
     }
 
-    /// Bulk insert trips with their stop times so we can remap to the correct trip IDs
+    /// Bulk insert trips with their stop times so we can remap to the correct trip IDs.
+    /// Returns a map of input_id -> actual_id for callers that need to reference the saved trips.
     #[tracing::instrument(skip(self, data), fields(source = %source.as_str(), count = data.len()), level = "debug")]
     pub async fn save_all(
         &self,
         source: Source,
         data: &[(Trip, Vec<StopTime>)],
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<HashMap<Uuid, Uuid>> {
         let start = Instant::now();
 
         if data.is_empty() {
             tracing::debug!("No trips to insert");
-            return Ok(());
+            return Ok(HashMap::new());
         }
 
         // Prepare vectors for bulk insert
@@ -178,7 +179,8 @@ impl TripStore {
                 }
             }
         }
-
+        // im inserting the stop times in the same functions as trips since the stop time struct doesn't have a trip_id field
+        // might want to return the mapping or put this in a separate function later (so it can cache and invalidate that cache)
         if !st_trip_ids.is_empty() {
             sqlx::query!(
                 r#"
@@ -198,6 +200,7 @@ impl TripStore {
             )
             .execute(&self.pg_pool)
             .await?;
+            // TODO: invalidate stop time cache if we have one
         }
 
         let elapsed = start.elapsed();
@@ -213,7 +216,7 @@ impl TripStore {
         let key = format!("trips:{}", source.as_str());
         let mut conn = self.redis_pool.get().await?;
         let _: redis::RedisResult<()> = conn.del(&key).await;
-
-        Ok(())
+        // might want to insert positions from here instead of returning the map
+        Ok(id_map)
     }
 }

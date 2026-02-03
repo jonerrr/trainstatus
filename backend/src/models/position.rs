@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use geo::{Geometry, Point};
+use geo::Geometry;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -15,16 +15,6 @@ pub struct VehiclePosition {
     pub data: PositionData,
     /// Point geometry stored as Geometry for WKB encoding compatibility
     pub geom: Option<Geometry>,
-}
-
-/// Trip geometry accumulator (for appending to trip_geometry table)
-#[derive(Clone)]
-pub struct TripGeometry {
-    pub trip_id: Uuid,
-    // TODO: also store bearing, speed, and maybe make generic so it can be point or linestring
-    /// Point to append to the trip's linestring
-    pub point: Geometry,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

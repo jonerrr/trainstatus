@@ -5,12 +5,9 @@
     route_id VARCHAR NOT NULL,
     source source_enum NOT NULL,
     direction SMALLINT,
-    -- for bus, only date part is from GTFS
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     data JSONB NOT NULL,
-
-    -- TODO: what if we created a geom col that is updated by a trigger on position insert?
 
     UNIQUE (original_id, vehicle_id, created_at, direction),
     FOREIGN KEY (route_id, source) REFERENCES static.route(id, source) ON DELETE CASCADE
@@ -45,7 +42,7 @@ CREATE INDEX idx_vehicle_position_trip_id ON realtime.vehicle_position (trip_id)
 CREATE INDEX idx_vehicle_position_gix ON realtime.vehicle_position USING GIST(geom);
 
 -- Trip geometry (LineString that accumulates position points over trip lifetime)
--- Points are appended via upsert when new positions come in
+-- Points are appended when new positions come in
 CREATE TABLE IF NOT EXISTS realtime.trip_geometry (
     trip_id UUID PRIMARY KEY REFERENCES realtime.trip(id) ON DELETE CASCADE,
     geom geometry(LINESTRING, 4326) NOT NULL,

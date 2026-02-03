@@ -1,6 +1,5 @@
 use crate::engines::static_data::StaticController;
 use crate::integrations::gtfs_realtime;
-use crate::integrations::gtfs_realtime::ProcessedVehicle;
 use crate::models::source::Source;
 use crate::models::stop::FAKE_STOP_IDS;
 use crate::models::{
@@ -114,6 +113,7 @@ impl GtfsSource for MtaSubwayRealtime {
             None => {
                 // Fallback: Parse from trip_id (e.g. 098550_1..N03R -> 09:50:30)
                 let origin_time = match mta_id.split_once('_') {
+                    // TODO: maybe put the parsing logic in the parse_origin_time function since its being used in multiple places
                     Some((time_str, _)) => match time_str.parse::<i32>() {
                         Ok(t) => t / 100,
                         Err(_) => return (None, vec![]),
@@ -190,7 +190,7 @@ impl GtfsSource for MtaSubwayRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<ProcessedVehicle> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
         let trip = vehicle.trip?;
         let nyct_trip = trip.nyct_trip_descriptor?;
 
@@ -216,20 +216,17 @@ impl GtfsSource for MtaSubwayRealtime {
         let updated_at = vehicle.timestamp?;
         let updated_at = DateTime::from_timestamp(updated_at as i64, 0)?;
 
-        // Trains don't have GPS coordinates, so no geometry
-        Some(ProcessedVehicle {
-            position: VehiclePosition {
-                vehicle_id,
-                trip_id: None, // Will be linked later if needed
-                stop_id: Some(stop_id.to_string()),
-                updated_at,
-                geom: None,
-                data: PositionData::MtaSubway(MtaSubwayData {
-                    assigned: nyct_trip.is_assigned.unwrap_or(false),
-                    status,
-                }),
-            },
-            geometry: None, // No GPS for trains
+        // Trains don't have GPS coordinates, so no geometry (no trip_geometry created)
+        Some(VehiclePosition {
+            vehicle_id,
+            trip_id: None, // Trains don't need trip_id linking since no GPS
+            stop_id: Some(stop_id.to_string()),
+            updated_at,
+            geom: None,
+            data: PositionData::MtaSubway(MtaSubwayData {
+                assigned: nyct_trip.is_assigned.unwrap_or(false),
+                status,
+            }),
         })
     }
 }
@@ -273,7 +270,8 @@ fn parse_route_id(route_id: String) -> String {
     }
 }
 
-fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
+/// Parses the MTA's origin time format into NaiveTime.
+pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
     let minutes = origin_time as f64 / 100.0;
     let total_seconds = (minutes * 60.0) as i64;
     let normalized = total_seconds.rem_euclid(24 * 60 * 60);

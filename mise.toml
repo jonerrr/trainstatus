@@ -1,1 +1,8 @@
 experimental_monorepo_root = true
+
+[monorepo]
+config_roots = ["science", "backend", "frontend"]
+
+[env]
+DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
+REDIS_URL = "redis://localhost:6379"

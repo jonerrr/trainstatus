@@ -1,15 +1,15 @@
 use crate::engines::static_data::StaticController;
 use crate::integrations::gtfs_realtime;
-use crate::integrations::gtfs_realtime::ProcessedVehicle;
 use crate::integrations::oba;
 use crate::models::source::Source;
 use crate::models::trip::Trip;
 use crate::models::{
-    position::{MtaBusData, PositionData, TripGeometry, VehiclePosition},
+    position::{MtaBusData, PositionData, VehiclePosition},
     trip::{StopTime, StopTimeData},
 };
 use crate::mta_oba_api_key;
 use crate::sources::RealtimeAdapter;
+use crate::sources::mta_subway::realtime::parse_origin_time;
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{
@@ -17,10 +17,10 @@ use crate::{
     integrations::gtfs_realtime::GtfsSource,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 const AGENCIES: [&str; 2] = ["MTABC", "MTA NYCT"];
@@ -82,7 +82,7 @@ impl GtfsSource for MtaBusRealtime {
             None => return (None, vec![]),
         };
 
-        // TODO: handle deleted trips using vehicle.schedule_relationship
+        // TODO: handle cancelled trips using vehicle.schedule_relationship
         // Extract vehicle/bus ID from the TripUpdate
         let vehicle = match update.vehicle {
             Some(v) => v,
@@ -107,22 +107,21 @@ impl GtfsSource for MtaBusRealtime {
             Err(_) => return (None, vec![]),
         };
 
-        // let start_time = match trip_desc.start_time {
-        //     Some(t) => match NaiveTime::parse_from_str(&t, "%H:%M:%S") {
-        //         Ok(time) => time,
-        //         Err(_) => return (None, vec![]),
-        //     },
-        //     None => {
-        //         // For buses, we might not always have a start time
-        //         // Use midnight as fallback (TODO: maybe use current time or first stop time instead)
-        //         match NaiveTime::from_hms_opt(0, 0, 0) {
-        //             Some(time) => time,
-        //             None => return (None, vec![]),
-        //         }
-        //     }
-        // };
-        // start_time seems to always be missing for buses, so use current time instead
-        let created_at = match Trip::created_at(start_date, Utc::now().time()) {
+        // Parse start time from trip ID (e.g. QV_A6-Weekday-SDon-070500_Q45_552 -> 070500 -> 07:05:00)
+        // Format: {prefix}_{schedule}-{day}-{type}-{HHMMSS}_{route}_{block}
+        // Fallback to midnight if unparseable - this is deterministic and ensures the same trip
+        // always gets the same created_at (required for the unique constraint to work correctly).
+        // Some MTA Bus Co trips use a different format that doesn't include the origin time.
+        let start_time = parse_bus_origin_time(&mta_id).unwrap_or_else(|| {
+            warn!(
+                trip_id = mta_id,
+                "Failed to parse origin time from trip ID, falling back to midnight",
+            );
+            // TODO: it might be possible for there to be multiple trips with the same trip_id but different start times, although hopefully the vehicle_id uniqueness helps avoid conflicts
+            NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+        });
+
+        let created_at = match Trip::created_at(start_date, start_time) {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
@@ -174,7 +173,7 @@ impl GtfsSource for MtaBusRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<ProcessedVehicle> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -186,26 +185,23 @@ impl GtfsSource for MtaBusRealtime {
             .and_then(|t| DateTime::from_timestamp(t as i64, 0))
             .unwrap_or_else(Utc::now);
 
-        let point: geo::Geometry = Point::new(position.longitude as f64, position.latitude as f64).into();
+        let point: geo::Geometry =
+            Point::new(position.longitude as f64, position.latitude as f64).into();
 
-        Some(ProcessedVehicle {
-            position: VehiclePosition {
-                vehicle_id,
-                trip_id: None, // Will be set during OBA merge or trip linking
-                stop_id,
-                updated_at,
-                geom: Some(point.clone()),
-                data: PositionData::MtaBus(MtaBusData {
-                    bearing: position.bearing.unwrap_or(0.0),
-                    // These will be populated by OBA data
-                    passengers: None,
-                    capacity: None,
-                    status: None,
-                    phase: None,
-                }),
-            },
-            // For buses, we create geometry but trip_id will be linked later
-            geometry: None, // Will be created after trip linking
+        Some(VehiclePosition {
+            vehicle_id,
+            trip_id: None, // Will be set during trip linking
+            stop_id,
+            updated_at,
+            geom: Some(point),
+            data: PositionData::MtaBus(MtaBusData {
+                bearing: position.bearing.unwrap_or(0.0),
+                // These will be populated by OBA data
+                passengers: None,
+                capacity: None,
+                status: None,
+                phase: None,
+            }),
         })
     }
 }
@@ -256,7 +252,7 @@ impl RealtimeAdapter for MtaBusRealtime {
         };
 
         let mut data = Vec::new();
-        let mut positions = Vec::new();
+        let mut positions: Vec<VehiclePosition> = Vec::new();
 
         // Build a map of vehicle_id -> trip for linking positions to trips
         let mut vehicle_to_trip: HashMap<String, Uuid> = HashMap::new();
@@ -276,17 +272,17 @@ impl RealtimeAdapter for MtaBusRealtime {
 
                 // Process vehicles and merge with OBA data
                 if let Some(vehicle) = entity.vehicle {
-                    if let Some(mut processed) = self.process_vehicle(vehicle) {
+                    if let Some(mut position) = self.process_vehicle(vehicle) {
                         // Merge OBA data if available
-                        if let Some(oba_data) = oba_map.get(&processed.position.vehicle_id) {
-                            if let PositionData::MtaBus(data) = &mut processed.position.data {
+                        if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
+                            if let PositionData::MtaBus(data) = &mut position.data {
                                 data.passengers = oba_data.occupancy_count;
                                 data.capacity = oba_data.occupancy_capacity;
                                 data.status = Some(oba_data.status.clone());
                                 data.phase = Some(oba_data.phase.clone());
                             }
                         }
-                        positions.push(processed);
+                        positions.push(position);
                     }
                 }
             }
@@ -300,14 +296,13 @@ impl RealtimeAdapter for MtaBusRealtime {
 
         // 4. Save data with FK retry logic
         let mut attempts = 0;
-        loop {
+        let id_map = loop {
             if attempts >= 2 {
-                error!("Failed to save bus trips after retries");
-                break;
+                anyhow::bail!("Failed to save bus trips after retries");
             }
 
             match trip_store.save_all(GtfsSource::source(self), &data).await {
-                Ok(_) => break,
+                Ok(map) => break map,
                 Err(e) => {
                     // Check for Postgres Foreign Key Violation (Code 23503)
                     if let Some(db_err) = e
@@ -321,8 +316,7 @@ impl RealtimeAdapter for MtaBusRealtime {
                                 .ensure_updated(GtfsSource::source(self))
                                 .await
                             {
-                                error!("Ensure update failed: {}", update_err);
-                                break;
+                                anyhow::bail!("Ensure update failed: {}", update_err);
                             }
 
                             attempts += 1;
@@ -333,36 +327,23 @@ impl RealtimeAdapter for MtaBusRealtime {
                     return Err(e);
                 }
             }
-        }
+        };
 
-        // 5. Link positions to trips and build geometries
-        let mut vehicle_positions = Vec::new();
-        let mut trip_geometries = Vec::new();
-
-        for mut processed in positions {
-            // Link position to trip via vehicle_id
-            if let Some(&trip_id) = vehicle_to_trip.get(&processed.position.vehicle_id) {
-                processed.position.trip_id = Some(trip_id);
-
-                // Create trip geometry if we have a point
-                if let Some(ref point) = processed.position.geom {
-                    trip_geometries.push(TripGeometry {
-                        trip_id,
-                        point: point.clone(),
-                        updated_at: processed.position.updated_at,
-                    });
+        // 5. Link positions to trips via vehicle_id
+        // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
+        // The database trigger will automatically update trip_geometry
+        for position in &mut positions {
+            if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id) {
+                // Translate input_id to actual DB id
+                if let Some(&actual_id) = id_map.get(&input_id) {
+                    position.trip_id = Some(actual_id);
                 }
             }
-
-            vehicle_positions.push(processed.position);
         }
 
-        // 6. Save positions and geometries
+        // 6. Save positions (trigger handles trip_geometry automatically)
         position_store
-            .save_vehicle_positions(GtfsSource::source(self), &vehicle_positions)
-            .await?;
-        position_store
-            .save_trip_geometries(&trip_geometries)
+            .save_vehicle_positions(GtfsSource::source(self), &positions)
             .await?;
 
         Ok(())
@@ -376,4 +357,30 @@ fn parse_prefixed_id(id: String) -> String {
     id.split_once('_')
         .map(|(_, suffix)| suffix.to_string())
         .unwrap_or(id)
+}
+// TODO: test and confirm timestamp format matches subway trip id time format
+/// Parse the origin time from a bus trip ID.
+/// Example: QV_A6-Weekday-SDon-070500_Q45_552 -> 070500 -> 11:45:00
+/// This works for most MTA bus trips, however MTA Bus Co trips have a completely different format that doesn't include the origin time
+fn parse_bus_origin_time(trip_id: &str) -> Option<NaiveTime> {
+    // Split by underscores: ["QV", "A6-Weekday-SDon-070500", "Q45", "552"]
+    let parts: Vec<&str> = trip_id.split('_').collect();
+    if parts.len() < 2 {
+        return None;
+    }
+
+    // The second part contains the schedule info with time at the end
+    // e.g., "A6-Weekday-SDon-070500"
+    let schedule_part = parts[1];
+    let schedule_segments: Vec<&str> = schedule_part.split('-').collect();
+
+    let time_str = schedule_segments.last()?;
+    // it doesn't always have to be 6 chars
+    // if time_str.len() != 6 {
+    //     return None;
+    // }
+
+    let time_num = time_str.parse::<i32>().ok()? / 100;
+
+    parse_origin_time(time_num)
 }

@@ -1,6 +1,6 @@
 use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
 use crate::models::{
-    position::{TripGeometry, VehiclePosition as VehiclePositionModel},
+    position::VehiclePosition as VehiclePositionModel,
     trip::{StopTime, Trip},
 };
 use crate::stores::position::PositionStore;
@@ -10,14 +10,6 @@ use prost::Message;
 use std::collections::HashMap;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
-
-/// Result from processing a vehicle position
-pub struct ProcessedVehicle {
-    /// The vehicle position for upsert
-    pub position: VehiclePositionModel,
-    /// Optional trip geometry point (only if vehicle has GPS coordinates)
-    pub geometry: Option<TripGeometry>,
-}
 
 pub trait GtfsSource: Send + Sync {
     /// Friendly name for logging
@@ -30,9 +22,8 @@ pub trait GtfsSource: Send + Sync {
     /// We return both because StopTimes usually need the Trip's UUID.
     fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>);
 
-    /// Maps a raw VehiclePosition to a ProcessedVehicle.
-    /// Returns position data and optionally geometry data (if GPS is available).
-    fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<ProcessedVehicle>;
+    /// Maps a raw VehiclePosition to a VehiclePositionModel.
+    fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<VehiclePositionModel>;
 }
 
 // TODO: add arg that saves the pbs and deserialized data to disk for debugging
@@ -68,6 +59,7 @@ pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
 }
 
 /// The main pipeline: Fetch -> Process -> Save (w/ FK Retry)
+/// Trip geometries are automatically updated by a database trigger when vehicle positions are saved
 #[instrument(skip(adapter, static_controller, trip_store, position_store), fields(source = ?adapter.source()))]
 pub async fn run_pipeline<T: GtfsSource>(
     adapter: &T,
@@ -85,66 +77,53 @@ pub async fn run_pipeline<T: GtfsSource>(
 
     let mut data = Vec::new();
     let mut positions = Vec::new();
-    let mut geometries = Vec::new();
 
-    // Build a map of (original_id, vehicle_id, direction) -> trip_id for linking positions to trips
-    // We'll populate this after saving trips
-    let mut trip_lookup: HashMap<(String, String, Option<i16>), Uuid> = HashMap::new();
+    // Build a map of vehicle_id -> input_trip_id for linking positions to trips
+    let mut vehicle_to_trip: HashMap<String, Uuid> = HashMap::new();
 
     for feed in feeds {
         for entity in feed.entity {
             if let Some(update) = entity.trip_update {
                 let (trip_opt, new_stop_times) = adapter.process_trip(update);
                 if let Some(trip) = trip_opt {
-                    // Add to lookup for linking vehicle positions
-                    trip_lookup.insert(
-                        (
-                            trip.original_id.clone(),
-                            trip.vehicle_id.clone(),
-                            trip.direction,
-                        ),
-                        trip.id,
-                    );
+                    // Map vehicle_id to trip_id for position linking
+                    vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
                     data.push((trip, new_stop_times));
                 }
             }
 
             if let Some(vehicle) = entity.vehicle {
-                if let Some(processed) = adapter.process_vehicle(vehicle) {
-                    positions.push(processed.position);
-                    if let Some(geom) = processed.geometry {
-                        geometries.push(geom);
-                    }
+                if let Some(pos) = adapter.process_vehicle(vehicle) {
+                    positions.push(pos);
                 }
             }
         }
     }
 
     info!(
-        "Fetched {} trips, {} positions, {} geometries for {:?}",
+        "Fetched {} trips, {} positions for {:?}",
         data.len(),
         positions.len(),
-        geometries.len(),
         adapter.source()
     );
 
     // Save trips first to get the actual IDs
-    trip_store.save_all(adapter.source(), &data).await?;
+    let id_map = trip_store.save_all(adapter.source(), &data).await?;
 
-    // Link positions to their trips using the lookup
-    for pos in &mut positions {
-        if pos.trip_id.is_none() {
-            // Try to find matching trip - we need original_id which we don't have anymore
-            // The subway doesn't use trip_id linking anyway since trains don't have GPS
-            // For buses, the trip_id is set during process_vehicle
+    // Link positions to trips via vehicle_id
+    // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
+    for position in &mut positions {
+        if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id) {
+            if let Some(&actual_id) = id_map.get(&input_id) {
+                position.trip_id = Some(actual_id);
+            }
         }
     }
 
-    // Save positions and geometries
+    // Save positions (trigger handles trip_geometry automatically for positions with trip_id and geom)
     position_store
         .save_vehicle_positions(adapter.source(), &positions)
         .await?;
-    position_store.save_trip_geometries(&geometries).await?;
 
     Ok(())
 }

@@ -1,7 +1,4 @@
-use crate::models::{
-    position::{TripGeometry, VehiclePosition},
-    source::Source,
-};
+use crate::models::{position::VehiclePosition, source::Source};
 use bb8_redis::RedisConnectionManager;
 use geo::Geometry;
 use geozero::wkb;
@@ -24,6 +21,7 @@ impl PositionStore {
     }
 
     /// Bulk upsert vehicle positions (updates current state only, no history)
+    /// A database trigger automatically updates trip_geometry when positions with trip_id and geom are upserted
     #[tracing::instrument(skip(self, positions), fields(source = %source.as_str(), count = positions.len()), level = "debug")]
     pub async fn save_vehicle_positions(
         &self,
@@ -91,42 +89,6 @@ impl PositionStore {
         let key = format!("positions:{}", source.as_str());
         let mut conn = self.redis_pool.get().await?;
         let _: redis::RedisResult<()> = conn.del(&key).await;
-
-        Ok(())
-    }
-
-    /// Bulk upsert trip geometries - appends new points to existing linestrings
-    /// Only processes geometries that have actual points (buses with GPS)
-    #[tracing::instrument(skip(self, geometries), fields(count = geometries.len()), level = "debug")]
-    pub async fn save_trip_geometries(&self, geometries: &[TripGeometry]) -> anyhow::Result<()> {
-        if geometries.is_empty() {
-            tracing::debug!("No trip geometries to upsert");
-            return Ok(());
-        }
-
-        // Process each geometry individually since we need to handle the append logic
-        for geom in geometries {
-            let point = wkb::Encode(geom.point.clone());
-
-            // For new trips, create a linestring from the single point
-            // For existing trips, append the point using our custom function
-            sqlx::query!(
-                r#"
-                INSERT INTO realtime.trip_geometry (trip_id, geom, updated_at)
-                VALUES ($1, ST_MakeLine(ARRAY[$2::geometry]), $3)
-                ON CONFLICT (trip_id) DO UPDATE SET
-                    geom = append_point_to_linestring(realtime.trip_geometry.geom, $2::geometry),
-                    updated_at = $3
-                "#,
-                geom.trip_id,
-                point as _,
-                geom.updated_at,
-            )
-            .execute(&self.pg_pool)
-            .await?;
-        }
-
-        tracing::debug!("Upserted {} trip geometries", geometries.len());
 
         Ok(())
     }

@@ -9,16 +9,60 @@ DECLARE
 BEGIN
     -- Get the last point of the existing linestring
     last_point := ST_EndPoint(existing_geom);
-    
+
     -- Skip if the new point is the same as the last point (within ~1m tolerance)
+    -- TODO: probably just do basic equality check and don't cast to geography
     IF ST_DWithin(new_point::geography, last_point::geography, 1) THEN
         RETURN existing_geom;
     END IF;
-    
+
     -- Append the new point to the linestring
     RETURN ST_AddPoint(existing_geom, new_point);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE;
+
+-- Trigger function to automatically update trip_geometry when vehicle_position changes
+CREATE OR REPLACE FUNCTION realtime.update_trip_geometry()
+RETURNS TRIGGER AS $$
+DECLARE
+    existing_geom geometry;
+    new_geom geometry;
+BEGIN
+    -- Only process if we have both a trip_id and a point geometry
+    IF NEW.trip_id IS NULL OR NEW.geom IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Check if trip_geometry exists for this trip
+    SELECT geom INTO existing_geom
+    FROM realtime.trip_geometry
+    WHERE trip_id = NEW.trip_id;
+
+    IF existing_geom IS NULL THEN
+        -- First point: create a new linestring with two identical points
+        -- (PostGIS requires at least 2 points for a valid linestring)
+        INSERT INTO realtime.trip_geometry (trip_id, geom, updated_at)
+        VALUES (NEW.trip_id, ST_MakeLine(NEW.geom, NEW.geom), NEW.updated_at);
+    ELSE
+        -- Check if the new point is different from the last point (within ~1m)
+        IF NOT ST_DWithin(NEW.geom::geography, ST_EndPoint(existing_geom)::geography, 1) THEN
+            -- Append the new point to the existing linestring
+            UPDATE realtime.trip_geometry
+            SET geom = ST_AddPoint(existing_geom, NEW.geom),
+                updated_at = NEW.updated_at
+            WHERE trip_id = NEW.trip_id;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger on vehicle_position
+CREATE TRIGGER trg_update_trip_geometry
+    AFTER INSERT OR UPDATE ON realtime.vehicle_position
+    FOR EACH ROW
+    EXECUTE FUNCTION realtime.update_trip_geometry();
 
 CREATE OR REPLACE FUNCTION realtime.latest_vehicle_position(z integer, x integer, y integer)
 RETURNS bytea AS $$
