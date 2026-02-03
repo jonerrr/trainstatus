@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO realtime.trip_geometry (trip_id, geom, updated_at)\n                VALUES ($1, ST_MakeLine(ARRAY[$2::geometry]), $3)\n                ON CONFLICT (trip_id) DO UPDATE SET\n                    geom = append_point_to_linestring(realtime.trip_geometry.geom, $2::geometry),\n                    updated_at = $3\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "geometry",
+            "kind": "Simple"
+          }
+        },
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b4e7bc0c7be37455663dac8d4d1ae964b539ecbf8e550dd6ebe0c2d746c07de7"
+}

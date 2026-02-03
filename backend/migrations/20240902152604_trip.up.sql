@@ -28,57 +28,31 @@ CREATE TABLE IF NOT EXISTS realtime.stop_time (
     FOREIGN KEY (stop_id, source) REFERENCES static.stop(id, source) ON DELETE CASCADE
 );
 
--- CREATE TYPE status_enum AS ENUM (
---     -- train
---     'none',
---     'incoming',
---     'at_stop',
---     'in_transit_to',
---     -- bus
---     'spooking',
---     'layover',
---     'no_progress'
--- );
-
--- CREATE TYPE vehicle_enum AS ENUM ('train', 'bus');
--- CREATE TABLE IF NOT EXISTS position (
---     vehicle_id VARCHAR PRIMARY KEY,
---     original_id VARCHAR,
---     stop_id VARCHAR REFERENCES static.stop(id),
---     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
---     data JSONB NOT NULL,
---     -- -- status status NOT NULL,
---     -- bus JSONB,
---     -- train JSONB
---     -- train
---     -- trip_id UUID UNIQUE REFERENCES trip(id) ON DELETE CASCADE,
---     -- current_stop_sequence SMALLINT,
---     -- bus
---     -- -- vehicle_type vehicle_type,
---     -- lat REAL,
---     -- lon REAL,
---     -- bearing REAL,
---     -- passengers INTEGER,
---     -- capacity INTEGER
--- );
-
-CREATE TABLE IF NOT EXISTS realtime.position (
-    id UUID PRIMARY KEY,
+-- Current vehicle position (upserted, no history - just latest state)
+CREATE TABLE IF NOT EXISTS realtime.vehicle_position (
     vehicle_id VARCHAR NOT NULL,
-    original_id VARCHAR,
-    stop_id VARCHAR,
     source source_enum NOT NULL,
-    data JSONB NOT NULL,
+    trip_id UUID REFERENCES realtime.trip(id) ON DELETE SET NULL,
+    stop_id VARCHAR,
     geom geometry(POINT, 4326),
-    recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
-
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (vehicle_id, source),
     FOREIGN KEY (stop_id, source) REFERENCES static.stop(id, source) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_position_recorded_at ON realtime.position (recorded_at);
-CREATE INDEX idx_position_vehicle_id ON realtime.position (vehicle_id);
-CREATE INDEX idx_position_original_id ON realtime.position (original_id);
-CREATE INDEX idx_position_gix ON realtime.position USING GIST(geom);
+CREATE INDEX idx_vehicle_position_trip_id ON realtime.vehicle_position (trip_id);
+CREATE INDEX idx_vehicle_position_gix ON realtime.vehicle_position USING GIST(geom);
+
+-- Trip geometry (LineString that accumulates position points over trip lifetime)
+-- Points are appended via upsert when new positions come in
+CREATE TABLE IF NOT EXISTS realtime.trip_geometry (
+    trip_id UUID PRIMARY KEY REFERENCES realtime.trip(id) ON DELETE CASCADE,
+    geom geometry(LINESTRING, 4326) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_trip_geometry_gix ON realtime.trip_geometry USING GIST(geom);
 
 CREATE INDEX idx_trip_created_at ON realtime.trip (created_at);
 

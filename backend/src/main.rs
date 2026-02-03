@@ -72,6 +72,7 @@ struct AppState {
 }
 
 // https://stackoverflow.com/a/77249700
+// TODO: panic or better error msg when not found
 pub fn mta_oba_api_key() -> &'static str {
     // you need bustime api key to run this
     static API_KEY: OnceLock<String> = OnceLock::new();
@@ -121,7 +122,7 @@ async fn main() {
         redis::Value::SimpleString(s) => {
             assert_eq!(s, "PONG");
         }
-        _ => panic!("Failed read redis ping response"),
+        _ => panic!("Failed to read redis ping response"),
     }
 
     let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());

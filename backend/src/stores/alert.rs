@@ -54,8 +54,8 @@ impl AlertStore {
                 cloned_mta_ids,
                 source as Source
             )
-            .await?;
             .execute(&mut *tx)
+            .await?;
             tracing::debug!("Deleted {} cloned alerts", cloned_mta_ids.len());
         }
 

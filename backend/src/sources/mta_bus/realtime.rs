@@ -1,10 +1,11 @@
 use crate::engines::static_data::StaticController;
 use crate::integrations::gtfs_realtime;
+use crate::integrations::gtfs_realtime::ProcessedVehicle;
 use crate::integrations::oba;
 use crate::models::source::Source;
 use crate::models::trip::Trip;
 use crate::models::{
-    position::{MtaBusData, Position, PositionData},
+    position::{MtaBusData, PositionData, TripGeometry, VehiclePosition},
     trip::{StopTime, StopTimeData},
 };
 use crate::mta_oba_api_key;
@@ -12,7 +13,7 @@ use crate::sources::RealtimeAdapter;
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{
-    feed::{TripUpdate, VehiclePosition},
+    feed::{TripUpdate, VehiclePosition as GtfsVehiclePosition},
     integrations::gtfs_realtime::GtfsSource,
 };
 use async_trait::async_trait;
@@ -173,35 +174,38 @@ impl GtfsSource for MtaBusRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<Position> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<ProcessedVehicle> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
         let position = vehicle.position?;
-        let original_id = vehicle.trip.and_then(|t| t.trip_id);
         let stop_id = vehicle.stop_id;
 
-        let recorded_at = vehicle
+        let updated_at = vehicle
             .timestamp
             .and_then(|t| DateTime::from_timestamp(t as i64, 0))
             .unwrap_or_else(Utc::now);
 
-        Some(Position {
-            id: Uuid::now_v7(),
-            vehicle_id,
-            original_id,
-            stop_id,
-            // source: GtfsSource::source(self),
-            recorded_at,
-            geom: Some(Point::new(position.longitude as f64, position.latitude as f64).into()),
-            data: PositionData::MtaBus(MtaBusData {
-                bearing: position.bearing.unwrap_or(0.0),
-                // These will be populated by OBA data
-                passengers: None,
-                capacity: None,
-                status: None,
-                phase: None,
-            }),
+        let point: geo::Geometry = Point::new(position.longitude as f64, position.latitude as f64).into();
+
+        Some(ProcessedVehicle {
+            position: VehiclePosition {
+                vehicle_id,
+                trip_id: None, // Will be set during OBA merge or trip linking
+                stop_id,
+                updated_at,
+                geom: Some(point.clone()),
+                data: PositionData::MtaBus(MtaBusData {
+                    bearing: position.bearing.unwrap_or(0.0),
+                    // These will be populated by OBA data
+                    passengers: None,
+                    capacity: None,
+                    status: None,
+                    phase: None,
+                }),
+            },
+            // For buses, we create geometry but trip_id will be linked later
+            geometry: None, // Will be created after trip linking
         })
     }
 }
@@ -218,10 +222,8 @@ impl RealtimeAdapter for MtaBusRealtime {
 
     async fn run(
         &self,
-        // pool: &PgPool,
         static_controller: &StaticController,
         trip_store: &TripStore,
-        // stop_time_store: &StopTimeStore,
         position_store: &PositionStore,
     ) -> anyhow::Result<()> {
         // 0. Ensure static data is loaded before processing realtime data
@@ -256,6 +258,9 @@ impl RealtimeAdapter for MtaBusRealtime {
         let mut data = Vec::new();
         let mut positions = Vec::new();
 
+        // Build a map of vehicle_id -> trip for linking positions to trips
+        let mut vehicle_to_trip: HashMap<String, Uuid> = HashMap::new();
+
         // 3. Process GTFS feeds
         for feed in feeds {
             for entity in feed.entity {
@@ -263,23 +268,25 @@ impl RealtimeAdapter for MtaBusRealtime {
                 if let Some(update) = entity.trip_update {
                     let (trip_opt, new_stop_times) = self.process_trip(update);
                     if let Some(trip) = trip_opt {
+                        // Map vehicle_id to trip_id for position linking
+                        vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
                         data.push((trip, new_stop_times));
                     }
                 }
 
                 // Process vehicles and merge with OBA data
                 if let Some(vehicle) = entity.vehicle {
-                    if let Some(mut position) = self.process_vehicle(vehicle) {
+                    if let Some(mut processed) = self.process_vehicle(vehicle) {
                         // Merge OBA data if available
-                        if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
-                            if let PositionData::MtaBus(data) = &mut position.data {
+                        if let Some(oba_data) = oba_map.get(&processed.position.vehicle_id) {
+                            if let PositionData::MtaBus(data) = &mut processed.position.data {
                                 data.passengers = oba_data.occupancy_count;
                                 data.capacity = oba_data.occupancy_capacity;
                                 data.status = Some(oba_data.status.clone());
                                 data.phase = Some(oba_data.phase.clone());
                             }
                         }
-                        positions.push(position);
+                        positions.push(processed);
                     }
                 }
             }
@@ -328,11 +335,34 @@ impl RealtimeAdapter for MtaBusRealtime {
             }
         }
 
-        // stop_time_store
-        //     .save_all(GtfsSource::source(self), &stop_times)
-        //     .await?;
+        // 5. Link positions to trips and build geometries
+        let mut vehicle_positions = Vec::new();
+        let mut trip_geometries = Vec::new();
+
+        for mut processed in positions {
+            // Link position to trip via vehicle_id
+            if let Some(&trip_id) = vehicle_to_trip.get(&processed.position.vehicle_id) {
+                processed.position.trip_id = Some(trip_id);
+
+                // Create trip geometry if we have a point
+                if let Some(ref point) = processed.position.geom {
+                    trip_geometries.push(TripGeometry {
+                        trip_id,
+                        point: point.clone(),
+                        updated_at: processed.position.updated_at,
+                    });
+                }
+            }
+
+            vehicle_positions.push(processed.position);
+        }
+
+        // 6. Save positions and geometries
         position_store
-            .save_all(GtfsSource::source(self), &positions)
+            .save_vehicle_positions(GtfsSource::source(self), &vehicle_positions)
+            .await?;
+        position_store
+            .save_trip_geometries(&trip_geometries)
             .await?;
 
         Ok(())

@@ -114,7 +114,7 @@ impl TripStore {
         // Bulk insert/upsert trips and get mapping from input_id -> actual_id
         // We use a CTE to map the input_id (which we generated) to the actual_id (from DB)
         // matching on the unique constraint columns.
-        let records = sqlx::query!(
+        let records  = sqlx::query!(
             r#"
             WITH input_rows AS (
                 SELECT * FROM UNNEST(

@@ -1,21 +1,21 @@
 use crate::engines::static_data::StaticController;
 use crate::integrations::gtfs_realtime;
+use crate::integrations::gtfs_realtime::ProcessedVehicle;
 use crate::models::source::Source;
 use crate::models::stop::FAKE_STOP_IDS;
 use crate::models::{
-    position::{MtaSubwayData, Position, PositionData},
+    position::{MtaSubwayData, PositionData, VehiclePosition},
     trip::{MtaSubwayStopTimeData, StopTime, StopTimeData, Trip, TripData},
 };
 use crate::sources::RealtimeAdapter;
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{
-    feed::{TripUpdate, VehiclePosition},
+    feed::{TripUpdate, VehiclePosition as GtfsVehiclePosition},
     integrations::gtfs_realtime::GtfsSource,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-// use sqlx::PgPool;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -190,7 +190,7 @@ impl GtfsSource for MtaSubwayRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<Position> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<ProcessedVehicle> {
         let trip = vehicle.trip?;
         let nyct_trip = trip.nyct_trip_descriptor?;
 
@@ -213,20 +213,23 @@ impl GtfsSource for MtaSubwayRealtime {
             _ => None,
         };
 
-        let recorded_at = vehicle.timestamp?;
-        let recorded_at = DateTime::from_timestamp(recorded_at as i64, 0)?;
-        // TODO: maybe try generating geom using shapes and interpolating?
-        Some(Position {
-            id: Uuid::now_v7(),
-            vehicle_id,
-            original_id: trip.trip_id,
-            stop_id: Some(stop_id.to_string()),
-            recorded_at,
-            geom: None,
-            data: PositionData::MtaSubway(MtaSubwayData {
-                assigned: nyct_trip.is_assigned.unwrap_or(false),
-                status,
-            }),
+        let updated_at = vehicle.timestamp?;
+        let updated_at = DateTime::from_timestamp(updated_at as i64, 0)?;
+
+        // Trains don't have GPS coordinates, so no geometry
+        Some(ProcessedVehicle {
+            position: VehiclePosition {
+                vehicle_id,
+                trip_id: None, // Will be linked later if needed
+                stop_id: Some(stop_id.to_string()),
+                updated_at,
+                geom: None,
+                data: PositionData::MtaSubway(MtaSubwayData {
+                    assigned: nyct_trip.is_assigned.unwrap_or(false),
+                    status,
+                }),
+            },
+            geometry: None, // No GPS for trains
         })
     }
 }

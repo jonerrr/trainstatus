@@ -1,4 +1,7 @@
-use crate::models::{position::Position, source::Source};
+use crate::models::{
+    position::{TripGeometry, VehiclePosition},
+    source::Source,
+};
 use bb8_redis::RedisConnectionManager;
 use geo::Geometry;
 use geozero::wkb;
@@ -20,77 +23,110 @@ impl PositionStore {
         }
     }
 
-    /// Bulk insert positions (and invalidate cache)
+    /// Bulk upsert vehicle positions (updates current state only, no history)
     #[tracing::instrument(skip(self, positions), fields(source = %source.as_str(), count = positions.len()), level = "debug")]
-    pub async fn save_all(&self, source: Source, positions: &[Position]) -> anyhow::Result<()> {
+    pub async fn save_vehicle_positions(
+        &self,
+        source: Source,
+        positions: &[VehiclePosition],
+    ) -> anyhow::Result<()> {
         if positions.is_empty() {
-            tracing::debug!("No positions to insert");
+            tracing::debug!("No vehicle positions to upsert");
             return Ok(());
         }
 
-        let ids = positions.iter().map(|v| v.id).collect::<Vec<Uuid>>();
-        let vehicle_ids = positions
-            .iter()
-            .map(|v| v.vehicle_id.clone())
-            .collect::<Vec<_>>();
-        let original_ids = positions
-            .iter()
-            .map(|v| v.original_id.clone())
-            .collect::<Vec<_>>();
-        let stop_ids = positions
-            .iter()
-            .map(|v| v.stop_id.clone())
-            .collect::<Vec<_>>();
-        let recorded_ats = positions.iter().map(|v| v.recorded_at).collect::<Vec<_>>();
+        let vehicle_ids: Vec<String> = positions.iter().map(|v| v.vehicle_id.clone()).collect();
+        let trip_ids: Vec<Option<Uuid>> = positions.iter().map(|v| v.trip_id).collect();
+        let stop_ids: Vec<Option<String>> = positions.iter().map(|v| v.stop_id.clone()).collect();
+        let updated_ats: Vec<_> = positions.iter().map(|v| v.updated_at).collect();
         let geoms: Vec<Option<wkb::Encode<Geometry>>> = positions
             .iter()
-            .map(|v| v.geom.clone().map(|g| wkb::Encode(g)))
-            .collect::<Vec<_>>();
-        let datas = positions
+            .map(|v| v.geom.clone().map(wkb::Encode))
+            .collect();
+        let datas: Vec<serde_json::Value> = positions
             .iter()
             .map(|v| serde_json::to_value(&v.data).unwrap())
-            .collect::<Vec<_>>();
+            .collect();
 
         sqlx::query!(
             r#"
-            INSERT INTO realtime.position (
-                id,
+            INSERT INTO realtime.vehicle_position (
                 vehicle_id,
-                original_id,
-                stop_id,
                 source,
+                trip_id,
+                stop_id,
                 geom,
                 data,
-                recorded_at
+                updated_at
             )
             SELECT
-                unnest($1::uuid[]),
-                unnest($2::text[]),
-                unnest($3::text[]),
+                unnest($1::text[]),
+                unnest($2::source_enum[]),
+                unnest($3::uuid[]),
                 unnest($4::text[]),
-                unnest($5::source_enum[]),
-                unnest($6::geometry[]),
-                unnest($7::JSONB[]),
-                unnest($8::timestamptz[])
+                unnest($5::geometry[]),
+                unnest($6::JSONB[]),
+                unnest($7::timestamptz[])
+            ON CONFLICT (vehicle_id, source) DO UPDATE SET
+                trip_id = EXCLUDED.trip_id,
+                stop_id = EXCLUDED.stop_id,
+                geom = EXCLUDED.geom,
+                data = EXCLUDED.data,
+                updated_at = EXCLUDED.updated_at
             "#,
-            &ids,
             &vehicle_ids,
-            &original_ids as &[Option<String>],
-            &stop_ids as &[Option<String>],
             &vec![source; positions.len()] as _,
+            &trip_ids as _,
+            &stop_ids as _,
             &geoms as _,
             &datas,
-            &recorded_ats,
+            &updated_ats,
         )
         .execute(&self.pg_pool)
         .await?;
 
-        tracing::debug!("Inserted {} positions", positions.len());
+        tracing::debug!("Upserted {} vehicle positions", positions.len());
 
         // Invalidate Cache
         let key = format!("positions:{}", source.as_str());
         let mut conn = self.redis_pool.get().await?;
         let _: redis::RedisResult<()> = conn.del(&key).await;
+
+        Ok(())
+    }
+
+    /// Bulk upsert trip geometries - appends new points to existing linestrings
+    /// Only processes geometries that have actual points (buses with GPS)
+    #[tracing::instrument(skip(self, geometries), fields(count = geometries.len()), level = "debug")]
+    pub async fn save_trip_geometries(&self, geometries: &[TripGeometry]) -> anyhow::Result<()> {
+        if geometries.is_empty() {
+            tracing::debug!("No trip geometries to upsert");
+            return Ok(());
+        }
+
+        // Process each geometry individually since we need to handle the append logic
+        for geom in geometries {
+            let point = wkb::Encode(geom.point.clone());
+
+            // For new trips, create a linestring from the single point
+            // For existing trips, append the point using our custom function
+            sqlx::query!(
+                r#"
+                INSERT INTO realtime.trip_geometry (trip_id, geom, updated_at)
+                VALUES ($1, ST_MakeLine(ARRAY[$2::geometry]), $3)
+                ON CONFLICT (trip_id) DO UPDATE SET
+                    geom = append_point_to_linestring(realtime.trip_geometry.geom, $2::geometry),
+                    updated_at = $3
+                "#,
+                geom.trip_id,
+                point as _,
+                geom.updated_at,
+            )
+            .execute(&self.pg_pool)
+            .await?;
+        }
+
+        tracing::debug!("Upserted {} trip geometries", geometries.len());
 
         Ok(())
     }

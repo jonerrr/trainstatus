@@ -1,23 +1,30 @@
 use chrono::{DateTime, Utc};
-use geo::Geometry;
+use geo::{Geometry, Point};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{impl_discriminated_data, models::source::Source};
 
+/// Current vehicle position (for upsert into vehicle_position table)
 #[derive(Clone)]
-pub struct Position {
-    pub id: Uuid,
+pub struct VehiclePosition {
     pub vehicle_id: String,
-    pub original_id: Option<String>,
+    pub trip_id: Option<Uuid>,
     pub stop_id: Option<String>,
-    // pub source: Source,
-    // pub status: Option<String>,
-    pub recorded_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub data: PositionData,
+    /// Point geometry stored as Geometry for WKB encoding compatibility
     pub geom: Option<Geometry>,
-    // TODO: remove this probably
-    // pub vehicle_type: VehicleType,
+}
+
+/// Trip geometry accumulator (for appending to trip_geometry table)
+#[derive(Clone)]
+pub struct TripGeometry {
+    pub trip_id: Uuid,
+    // TODO: also store bearing, speed, and maybe make generic so it can be point or linestring
+    /// Point to append to the trip's linestring
+    pub point: Geometry,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
