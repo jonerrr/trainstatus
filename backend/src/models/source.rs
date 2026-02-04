@@ -8,9 +8,9 @@ pub enum Source {
     MtaSubway,
     MtaBus,
     // below not implemented yet
-    Lirr,
-    Mnr,
-    NjtRail,
+    // Lirr,
+    // Mnr,
+    // NjtRail,
 }
 
 impl Source {
@@ -18,9 +18,9 @@ impl Source {
         match self {
             Source::MtaSubway => "mta_subway",
             Source::MtaBus => "mta_bus",
-            Source::Lirr => "lirr",
-            Source::Mnr => "mnr",
-            Source::NjtRail => "njt_rail",
+            // Source::Lirr => "lirr",
+            // Source::Mnr => "mnr",
+            // Source::NjtRail => "njt_rail",
         }
     }
 }

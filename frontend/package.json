@@ -18,7 +18,7 @@
 		"@sveltejs/kit": "catalog:",
 		"@sveltejs/vite-plugin-svelte": "catalog:",
 		"@tailwindcss/forms": "catalog:",
-		"@trainstatus/client": "workspace:0.1.0",
+		"@trainstatus/client": "workspace:*",
 		"@trivago/prettier-plugin-sort-imports": "catalog:",
 		"@types/d3-scale": "catalog:",
 		"@types/d3-shape": "catalog:",
@@ -49,7 +49,7 @@
 		"dayjs": "catalog:",
 		"flexsearch": "catalog:",
 		"layercake": "catalog:",
-		"runed": "^0.37.0",
+		"runed": "catalog:",
 		"valibot": "catalog:"
 	}
 }

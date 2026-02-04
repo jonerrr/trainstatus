@@ -4,6 +4,9 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | (string & {});
 };
 
+/**
+ * API response for alerts - flattened with all related data
+ */
 export type ApiAlert = {
     /**
      * Alert type, if planned it will start with "Planned"
@@ -27,8 +30,9 @@ export type ApiAlert = {
      */
     header_html: string;
     id: string;
+    original_id: string;
     /**
-     * Start time of alert
+     * Start time of alert (earliest active period)
      */
     start_time: string;
     updated_at: string;
@@ -49,39 +53,65 @@ export type ApiAlertEntity = {
     stop_id?: string | null;
 };
 
-export type Borough = 'Brooklyn' | 'Queens' | 'Bronx' | 'StatenIsland' | 'Manhattan';
+export type Borough = 'brooklyn' | 'queens' | 'bronx' | 'staten_island' | 'manhattan';
 
-export type BusDirection = 'sw' | 's' | 'se' | 'e' | 'w' | 'ne' | 'nw' | 'n' | 'unknown';
+/**
+ * Direction of the stop. Currently only for bus stops
+ */
+export type CompassDirection = 's_w' | 's' | 's_e' | 'e' | 'w' | 'n_e' | 'n_w' | 'n' | 'unknown';
+
+export type MtaBusData = {
+    direction: CompassDirection;
+};
+
+export type MtaSubwayData = {
+    ada: boolean;
+    borough: Borough;
+    north_headsign: string;
+    /**
+     * Notes about ADA accessibility at the stop
+     */
+    notes?: string | null;
+    south_headsign: string;
+};
 
 export type Route = {
     color: string;
+    data: RouteData;
     id: string;
     long_name: string;
-    route_type: RouteType;
     short_name: string;
-    /**
-     * This is currently only used for bus routes. It will be false for all trains.
-     */
-    shuttle: boolean;
+};
+
+/**
+ * Stop data changes based on the `Source`
+ */
+export type RouteData = (MtaBusData & {
+    source: 'mta_bus';
+}) | {
+    source: 'mta_subway';
 };
 
 export type RouteStop = {
     data: RouteStopData;
     route_id: string;
-    stop_id: number;
+    stop_id: string;
     stop_sequence: number;
 };
 
 export type RouteStopData = {
+    source: 'mta_subway';
     stop_type: StopType;
-    type: 'Train';
 } | {
+    /**
+     * Direction of bus trips that serve this stop
+     */
     direction: number;
     headsign: string;
-    type: 'Bus';
+    source: 'mta_bus';
 };
 
-export type RouteType = 'train' | 'bus';
+export type Source = 'mta_subway' | 'mta_bus';
 
 export type Stop = {
     data: StopData;
@@ -94,97 +124,93 @@ export type Stop = {
         };
         type: 'Point';
     };
-    /**
-     * Stop IDs come from the MTA's API, but (GTFS) train stop IDs are converted to numbers using their unicode values
-     */
-    id: number;
+    id: string;
     name: string;
     routes: Array<RouteStop>;
     /**
      * List of stop IDs that are transfers. Currently only for train stops
      */
-    transfers: Array<number>;
+    transfers: Array<string>;
 };
 
 /**
- * Stop data changes based on the `route_type`
+ * Stop data changes based on the `Source`
  */
-export type StopData = {
-    ada: boolean;
-    borough: Borough;
-    north_headsign: string;
-    /**
-     * Notes about ADA accessibility at the stop
-     */
-    notes?: string | null;
-    south_headsign: string;
-    type: 'Train';
-} | {
-    direction: BusDirection;
-    type: 'Bus';
-};
+export type StopData = (MtaSubwayData & {
+    source: 'mta_subway';
+}) | (MtaBusData & {
+    source: 'mta_bus';
+});
 
 export type StopTime = {
     arrival: string;
     data: StopTimeData;
     departure: string;
-    stop_id: number;
+    stop_id: string;
     trip_id: string;
 };
 
 export type StopTimeData = {
     actual_track?: string | null;
     scheduled_track?: string | null;
-    type: 'Train';
+    source: 'mta_subway';
 } | {
-    type: 'Bus';
+    source: 'mta_bus';
 };
 
 export type StopType = 'full_time' | 'part_time' | 'late_night' | 'rush_hour_one_direction' | 'rush_hour' | 'weekday_only' | 'nights_weekends_only' | 'unknown';
 
 export type Trip = {
     /**
-     * For trains, this is the start time of the trip.
-     * For buses, this is the start date of the trip + the current time the trip was first seen in the feed.
+     * For the MTA subway, this is the start time of the trip.
+     * For the MTA buses, this is the start date of the trip + the current time the trip was first seen in the feed.
      */
     created_at: string;
+    data: TripData;
     /**
-     * This is the deviation from the schedule in seconds.
-     * It currently only applies to buses.
-     * A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
-     */
-    deviation?: number | null;
-    /**
-     * For trains, 0 is southbound, 1 is northbound.
-     * For buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
+     * For the MTA subway, 1 is northbound, 3 is southbound.
+     * For the MTA buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
      */
     direction?: number | null;
     id: string;
     /**
-     * This the ID from the MTA feed
+     * Original trip identifier from the data source
      */
-    mta_id: string;
+    original_id: string;
     route_id: string;
-    route_type: RouteType;
     updated_at: string;
     vehicle_id: string;
 };
 
+/**
+ * Trip data changes based on the `Source`
+ */
+export type TripData = (MtaBusData & {
+    source: 'mta_bus';
+}) | {
+    source: 'mta_subway';
+};
+
 export type AlertsHandlerData = {
     body?: never;
-    path?: never;
+    path: {
+        /**
+         * Data source
+         */
+        source: Source;
+    };
     query?: {
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
         at?: number;
     };
-    url: '/v1/alerts';
+    url: '/v1/alerts/{source}';
 };
 
 export type AlertsHandlerResponses = {
     /**
-     * Subway and bus alerts
+     * Alerts for the specified source
      */
     200: Array<ApiAlert>;
 };
@@ -193,18 +219,14 @@ export type AlertsHandlerResponse = AlertsHandlerResponses[keyof AlertsHandlerRe
 
 export type RoutesHandlerData = {
     body?: never;
-    path?: never;
-    query?: {
+    path: {
         /**
-         * Return in GeoJSON format instead of JSON
+         * Data source
          */
-        geojson?: boolean;
-        /**
-         * Filter by route type. If none provided, all routes are returned.
-         */
-        route_type?: null | RouteType;
+        source: Source;
     };
-    url: '/v1/routes';
+    query?: never;
+    url: '/v1/routes/{source}';
 };
 
 export type RoutesHandlerResponses = {
@@ -218,16 +240,17 @@ export type RoutesHandlerResponse = RoutesHandlerResponses[keyof RoutesHandlerRe
 
 export type StopTimesHandlerData = {
     body?: never;
-    path?: never;
+    path: {
+        /**
+         * Data source
+         */
+        source: Source;
+    };
     query?: {
         /**
-         * Comma-separated list of bus route IDs to include in response. Be sure to URL encode this.
+         * Comma-separated list of route IDs to filter by. Be sure to URL encode this.
          */
-        bus_route_ids?: Array<string>;
-        /**
-         * Only return bus stop times. If `bus_route_ids` is not specified, this will return all TRAIN stop times.
-         */
-        only_bus?: boolean;
+        route_ids?: Array<string>;
         /**
          * Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
          */
@@ -237,12 +260,12 @@ export type StopTimesHandlerData = {
          */
         at?: number;
     };
-    url: '/v1/stop_times';
+    url: '/v1/stop_times/{source}';
 };
 
 export type StopTimesHandlerResponses = {
     /**
-     * Subway and bus stop times. Unlike other routes, by default this will ONLY return train routes unless specified.
+     * Stop times for the specified source
      */
     200: Array<StopTime>;
 };
@@ -251,23 +274,19 @@ export type StopTimesHandlerResponse = StopTimesHandlerResponses[keyof StopTimes
 
 export type StopsHandlerData = {
     body?: never;
-    path?: never;
-    query?: {
+    path: {
         /**
-         * Return in GeoJSON format instead of JSON
+         * Data source
          */
-        geojson?: boolean;
-        /**
-         * Filter by route type. If none provided, all routes are returned.
-         */
-        route_type?: null | RouteType;
+        source: Source;
     };
-    url: '/v1/stops';
+    query?: never;
+    url: '/v1/stops/{source}';
 };
 
 export type StopsHandlerResponses = {
     /**
-     * Subway and bus stops
+     * Source stops
      */
     200: Array<Stop>;
 };
@@ -276,23 +295,24 @@ export type StopsHandlerResponse = StopsHandlerResponses[keyof StopsHandlerRespo
 
 export type TripsHandlerData = {
     body?: never;
-    path?: never;
-    query?: {
+    path: {
         /**
-         * Return in GeoJSON format instead of JSON
+         * Data source
          */
-        geojson?: boolean;
+        source: Source;
+    };
+    query?: {
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
         at?: number;
     };
-    url: '/v1/trips';
+    url: '/v1/trips/{source}';
 };
 
 export type TripsHandlerResponses = {
     /**
-     * Subway and bus trips
+     * Trips for the specified source
      */
     200: Array<Trip>;
 };

@@ -39,7 +39,10 @@ use crate::{
     sources::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
     },
-    stores::{route::RouteStore, stop::StopStore, trip::TripStore},
+    stores::{
+        alert::AlertStore, route::RouteStore, stop::StopStore, stop_time::StopTimeStore,
+        trip::TripStore,
+    },
 };
 
 mod api;
@@ -62,6 +65,8 @@ struct AppState {
     route_store: RouteStore,
     stop_store: StopStore,
     trip_store: TripStore,
+    stop_time_store: StopTimeStore,
+    alert_store: AlertStore,
     // pg_pool: sqlx::PgPool,
     // redis_pool: bb8::Pool<RedisConnectionManager>,
     // rx: crossbeam::channel::Receiver<Vec<Update>>,
@@ -215,16 +220,22 @@ async fn main() {
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
-    )
+    ),
+    // See: https://github.com/juhaku/utoipa/issues/1425
+    components(schemas(models::source::Source))
     )]
     struct ApiDoc;
 
     let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
+    let stop_time_store =
+        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
 
     let state = AppState {
         route_store,
         stop_store,
         trip_store,
+        stop_time_store,
+        alert_store,
     };
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())

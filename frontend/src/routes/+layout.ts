@@ -1,5 +1,5 @@
 import { alerts } from '$lib/alerts.svelte';
-import { search_schema } from '$lib/schemas';
+import { searchSchema } from '$lib/schemas';
 import { type Route, type Stop, is_bus, is_train } from '$lib/static';
 import { stop_times } from '$lib/stop_times.svelte';
 import { trips } from '$lib/trips.svelte';
@@ -9,6 +9,11 @@ import { validateSearchParams } from 'runed/kit';
 import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ fetch, url }) => {
+	const { searchParams } = validateSearchParams(url, searchSchema);
+	// print all search params
+	const paramsObject = Object.fromEntries(searchParams.entries());
+	console.dir({ paramsObject });
+
 	const stops_promise = fetch('/api/v1/stops').then((res) => res.json());
 	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
 	// const stops_promise = stopsHandler().then((res) => res.data!);
@@ -17,7 +22,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 	// const at = url.searchParams.get('at') ?? undefined;
 
 	// let finished = url.pathname.startsWith('/charts');
-
+	const at = searchParams.at ?? undefined;
 	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
 		stops_promise,
 		routes_promise,

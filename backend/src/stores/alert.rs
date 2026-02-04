@@ -2,10 +2,68 @@ use crate::models::{
     alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation},
     source::Source,
 };
+use crate::stores::read_through;
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use redis::AsyncCommands;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::time::Duration;
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+/// API response for alerts - flattened with all related data
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ApiAlert {
+    pub id: Uuid,
+    pub original_id: String,
+    #[schema(example = "Boarding Change")]
+    /// Alert type, if planned it will start with "Planned"
+    pub alert_type: String,
+    /// Alert header in HTML format
+    pub header_html: String,
+    /// Alert description in HTML format
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description_html: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// Start time of alert (earliest active period)
+    pub start_time: DateTime<Utc>,
+    /// End time of alert. If null, there is no end time yet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<DateTime<Utc>>,
+    /// Entities affected by alert
+    pub entities: Vec<ApiAlertEntity>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ApiAlertEntity {
+    /// Affected route ID
+    #[schema(example = "A")]
+    pub route_id: String,
+    /// The priority of the alert for the entity in ascending order
+    pub sort_order: i32,
+    /// Affected stop ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop_id: Option<String>,
+}
+
+/// Raw row from alert query for sqlx mapping
+#[derive(sqlx::FromRow)]
+struct AlertRow {
+    id: Uuid,
+    original_id: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    data: serde_json::Value,
+    // Aggregated fields from JOINs
+    header_html: Option<String>,
+    description_html: Option<String>,
+    start_time: Option<DateTime<Utc>>,
+    end_time: Option<DateTime<Utc>>,
+    // JSON aggregated entities
+    entities: serde_json::Value,
+}
 
 #[derive(Clone)]
 pub struct AlertStore {
@@ -21,6 +79,147 @@ impl AlertStore {
         }
     }
 
+    /// Gets all alerts for a specific source, optionally filtered by a specific time.
+    /// If a time is specified, alerts are not cached.
+    /// Returns alerts formatted for the API with flattened translations and entities.
+    pub async fn get_all(
+        &self,
+        source: Source,
+        at: Option<DateTime<Utc>>,
+    ) -> anyhow::Result<Vec<ApiAlert>> {
+        if let Some(at) = at {
+            return self.query_all_alerts(source, at).await;
+        }
+
+        let key = format!("alerts:{}", source.as_str());
+        read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
+            self.query_all_alerts(source, Utc::now()).await
+        })
+        .await
+    }
+
+    /// Internal helper function to query alerts without caching
+    async fn query_all_alerts(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+    ) -> anyhow::Result<Vec<ApiAlert>> {
+        // Get alerts with all related data in a single query using JOINs and aggregation
+        let rows = sqlx::query_as::<_, AlertRow>(
+            r#"
+            SELECT
+                a.id,
+                a.original_id,
+                a.created_at,
+                a.updated_at,
+                a.data,
+                -- Get HTML header translation
+                (
+                    SELECT t.text
+                    FROM realtime.alert_translation t
+                    WHERE t.alert_id = a.id
+                        AND t.section = 'header'
+                        AND t.format = 'html'
+                        AND t.language = 'en'
+                    LIMIT 1
+                ) as header_html,
+                -- Get HTML description translation
+                (
+                    SELECT t.text
+                    FROM realtime.alert_translation t
+                    WHERE t.alert_id = a.id
+                        AND t.section = 'description'
+                        AND t.format = 'html'
+                        AND t.language = 'en'
+                    LIMIT 1
+                ) as description_html,
+                -- Get earliest start time from active periods
+                (
+                    SELECT MIN(ap.start_time)
+                    FROM realtime.active_period ap
+                    WHERE ap.alert_id = a.id
+                ) as start_time,
+                -- Get latest end time from active periods (NULL if any period has no end)
+                (
+                    SELECT
+                        CASE
+                            WHEN EXISTS (
+                                SELECT 1 FROM realtime.active_period ap
+                                WHERE ap.alert_id = a.id AND ap.end_time IS NULL
+                            ) THEN NULL
+                            ELSE MAX(ap.end_time)
+                        END
+                    FROM realtime.active_period ap
+                    WHERE ap.alert_id = a.id
+                ) as end_time,
+                -- Aggregate entities as JSON array
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'route_id', ae.route_id,
+                                'sort_order', ae.sort_order,
+                                'stop_id', ae.stop_id
+                            )
+                            ORDER BY ae.sort_order
+                        )
+                        FROM realtime.affected_entity ae
+                        WHERE ae.alert_id = a.id AND ae.route_id IS NOT NULL
+                    ),
+                    '[]'::json
+                ) as entities
+            FROM realtime.alert a
+            WHERE
+                a.source = $1
+                AND EXISTS (
+                    SELECT 1 FROM realtime.active_period ap
+                    WHERE ap.alert_id = a.id
+                        AND ap.start_time <= $2
+                        AND (ap.end_time IS NULL OR ap.end_time >= $2)
+                )
+            ORDER BY a.updated_at DESC
+            "#,
+        )
+        .bind(source)
+        .bind(at)
+        .fetch_all(&self.pg_pool)
+        .await?;
+
+        // Transform rows into API response format
+        let alerts = rows
+            .into_iter()
+            .filter_map(|row| {
+                // Extract alert_type from data JSON
+                let alert_type = row
+                    .data
+                    .get("alert_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
+
+                // Parse entities from JSON
+                let entities: Vec<ApiAlertEntity> =
+                    serde_json::from_value(row.entities).unwrap_or_default();
+
+                Some(ApiAlert {
+                    id: row.id,
+                    original_id: row.original_id,
+                    alert_type,
+                    header_html: row.header_html?,
+                    description_html: row.description_html,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                    start_time: row.start_time?,
+                    end_time: row.end_time,
+                    entities,
+                })
+            })
+            .collect();
+
+        Ok(alerts)
+    }
+
+    // TODO: fix affected entities being duplicated. It seems like it creates an affected entity for every active period, even if its the same entity
     /// Bulk insert alerts with their related translations, active periods and affected entities
     /// This should be called with all collections together to maintain consistency
     #[tracing::instrument(skip(self, alerts, translations, active_periods, affected_entities, cloned_mta_ids), fields(

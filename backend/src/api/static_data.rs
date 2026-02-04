@@ -1,30 +1,18 @@
-// use super::errors::ServerError;
-use super::json_headers;
 use crate::AppState;
-use crate::api::AppError;
+use crate::api::{AppError, Parameters};
 use crate::models::route::Route;
 use crate::models::source::Source;
 use crate::models::stop::Stop;
 use axum::Json;
 use axum::extract::{Path, State};
-use http::{HeaderMap, header};
-use serde::Deserialize;
-use utoipa::IntoParams;
+use http::HeaderMap;
 
-#[derive(Deserialize, IntoParams)]
-pub struct Parameters {
-    /// Data source
-    source: Source,
-    // /// Return in GeoJSON format instead of JSON
-    // #[serde(default)]
-    // geojson: bool,
-    // /// Filter by route type. If none provided, all routes are returned.
-    // #[serde(default)]
-    // route_type: Option<route::RouteType>,
-}
 // TODO: implement etag again
-pub fn cache_headers(hash: String) -> HeaderMap {
-    let mut headers = json_headers().clone();
+#[allow(dead_code)]
+fn cache_headers(hash: String) -> HeaderMap {
+    use http::header;
+    let mut headers = HeaderMap::new();
+    headers.insert("content-type", "application/json".parse().unwrap());
     headers.insert(header::ETAG, hash.parse().unwrap());
     headers.insert(
         header::CACHE_CONTROL,
@@ -40,8 +28,7 @@ pub fn cache_headers(hash: String) -> HeaderMap {
     path = "/routes/{source}",
     tag = "STATIC",
     params(
-        Parameters
-        // ("source" = Source, Path, description = "The source to get routes for"),
+        ("source" = Source, Path, description = "Data source")
     ),
     responses(
         (status = 200, description = "Subway and bus routes. WARNING: W train geometry is missing.", body = [Route]),
@@ -77,7 +64,7 @@ pub async fn routes_handler(
     path = "/stops/{source}",
     tag = "STATIC",
     params(
-        Parameters
+        ("source" = Source, Path, description = "Data source")
     ),
     responses(
         (status = 200, description = "Source stops", body = [Stop]),

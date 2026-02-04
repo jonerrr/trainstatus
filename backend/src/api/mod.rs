@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{AppState, models::source::Source};
 use axum::{
     extract::{FromRequestParts, Query},
     response::{IntoResponse, Response},
@@ -12,8 +12,8 @@ use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 // pub mod errors;
-// pub mod realtime;
 // pub mod websocket;
+pub mod realtime;
 pub mod static_data;
 pub mod util;
 
@@ -40,15 +40,16 @@ where
 
 pub fn router(state: AppState) -> OpenApiRouter {
     OpenApiRouter::new()
-        // .routes(routes!(realtime::alerts_handler))
-        // .routes(routes!(realtime::stop_times_handler))
-        // .routes(routes!(realtime::trips_handler))
+        .routes(routes!(realtime::alerts_handler))
+        .routes(routes!(realtime::stop_times_handler))
+        .routes(routes!(realtime::trips_handler))
         .routes(routes!(static_data::routes_handler))
         .routes(routes!(static_data::stops_handler))
         .with_state(state)
 }
 
 // not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
+#[allow(dead_code)]
 pub fn json_headers() -> &'static HeaderMap {
     static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
     HEADERS.get_or_init(|| {
@@ -116,6 +117,18 @@ where
 //         Ok(values)
 //     }
 // }
+
+#[derive(Deserialize, IntoParams)]
+pub struct Parameters {
+    /// Data source
+    source: Source,
+    // /// Return in GeoJSON format instead of JSON
+    // #[serde(default)]
+    // geojson: bool,
+    // /// Filter by route type. If none provided, all routes are returned.
+    // #[serde(default)]
+    // route_type: Option<route::RouteType>,
+}
 
 // this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
 // #[derive(Debug)]

@@ -7,7 +7,7 @@ pub mod alert;
 pub mod position;
 pub mod route;
 pub mod stop;
-// pub mod stop_time;
+pub mod stop_time;
 pub mod trip;
 
 /// Tries to get value from Redis. If missing, runs the `fetch` closure,

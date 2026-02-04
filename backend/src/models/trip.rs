@@ -18,7 +18,7 @@ pub struct Trip {
     pub vehicle_id: String,
     #[schema(example = "1")]
     pub route_id: String,
-    /// For the MTA subway, 0 is southbound, 1 is northbound.
+    /// For the MTA subway, 1 is northbound, 3 is southbound.
     /// For the MTA buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
     pub direction: Option<i16>,
     /// For the MTA subway, this is the start time of the trip.
