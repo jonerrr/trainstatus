@@ -7,14 +7,7 @@
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import { alerts } from '$lib/alerts.svelte';
-	import {
-		type Route,
-		type Stop,
-		type TrainStopData,
-		is_bus as is_bus_stop,
-		is_train as is_train_stop,
-		main_stop_routes
-	} from '$lib/static';
+	import { type Route, type Stop, main_stop_routes } from '$lib/static';
 	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import {
 		type Trip,

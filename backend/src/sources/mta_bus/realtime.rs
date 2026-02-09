@@ -20,6 +20,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
 use std::collections::HashMap;
+use tracing::debug;
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -113,7 +114,7 @@ impl GtfsSource for MtaBusRealtime {
         // always gets the same created_at (required for the unique constraint to work correctly).
         // Some MTA Bus Co trips use a different format that doesn't include the origin time.
         let start_time = parse_bus_origin_time(&mta_id).unwrap_or_else(|| {
-            warn!(
+            debug!(
                 trip_id = mta_id,
                 "Failed to parse origin time from trip ID, falling back to midnight",
             );

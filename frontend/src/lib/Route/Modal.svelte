@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { updated } from '$app/state';
+	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
 	import { alerts as rt_alerts } from '$lib/alerts.svelte';
@@ -33,7 +33,7 @@
 
 	let scroll_area: HTMLDivElement | undefined;
 
-	function manage_scroll(node: HTMLDivElement) {
+	const manage_scroll: Attachment = (node) => {
 		const observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
@@ -58,12 +58,8 @@
 		const alert_els = Array.from(node.children) as HTMLDivElement[];
 		alert_els.forEach((el) => observer.observe(el));
 
-		return {
-			destroy() {
-				alert_els.forEach((el) => observer.unobserve(el));
-			}
-		};
-	}
+		return () => alert_els.forEach((el) => observer.unobserve(el));
+	};
 
 	function scroll_to_alert(i: number) {
 		// console.log(i);
@@ -85,7 +81,7 @@
 </script>
 
 <header class="flex items-center gap-1 p-1">
-	<Icon width={36} height={36} express={false} link={false} {route} />
+	<Icon width={36} height={36} link={false} {route} />
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if alerts.length && idx < alerts.length}
@@ -98,11 +94,11 @@
 
 <!-- handle arrow keys -->
 <svelte:window
-	onkeydown={($event) => {
-		if ($event.key === 'ArrowLeft' && idx > 0) {
+	onkeydown={(event) => {
+		if (event.key === 'ArrowLeft' && idx > 0) {
 			// if we don't debounce, clicking arrow key twice really fast will get the scroll stuck
 			debounce_scroll_to_alert(idx - 1);
-		} else if ($event.key === 'ArrowRight' && idx < alerts.length - 1) {
+		} else if (event.key === 'ArrowRight' && idx < alerts.length - 1) {
 			debounce_scroll_to_alert(idx + 1);
 		}
 	}}
@@ -111,7 +107,7 @@
 <div
 	class="scrollbar-hidden flex snap-x snap-mandatory gap-2 overflow-x-scroll bg-neutral-950"
 	bind:this={scroll_area}
-	use:manage_scroll
+	{@attach manage_scroll}
 >
 	{#each alerts as alert}
 		<article

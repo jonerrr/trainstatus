@@ -9,7 +9,7 @@ services:
       - POSTGRES_PASSWORD=trains
       - POSTGRES_DB=trains
     volumes:
-      - trainstatus-db:/var/lib/postgresql:Z
+      - trainstatus-db:/var/lib/postgresql
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:Z,ro
     shm_size: 1g
 

@@ -2,15 +2,15 @@
 	import { pushState } from '$app/navigation';
 
 	import { alerts } from '$lib/alerts.svelte';
+	import icons from '$lib/icons';
 
-	import icons from './icons';
-	import { type Route } from './static';
+	import { RouteIcon } from '@lucide/svelte';
+	import { type Route } from '@trainstatus/client';
 
 	// TODO: combine w and h into size
 	const {
 		route,
 		link,
-		express,
 		class: class_name,
 		width = 16,
 		height = 16,
@@ -18,7 +18,6 @@
 	}: {
 		route: Route;
 		link: boolean;
-		express: boolean;
 		class?: string;
 		width?: number;
 		height?: number;
@@ -40,7 +39,7 @@
 	{/if}
 {/snippet} -->
 
-{#if route.route_type === 'bus'}
+{#if route.data.source === 'mta_bus'}
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
@@ -58,8 +57,8 @@
 		<!-- {@render alert_icon()} -->
 	</div>
 {:else}
-	{@const icon_name = express ? route.id + 'X' : route.id}
-	{@const icon = icons.find((i) => i.name === icon_name)!}
+	<!-- {@const icon_name = express ? route.id + 'X' : route.id} -->
+	{@const icon = icons.find((i) => i.name === route.id)!}
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}

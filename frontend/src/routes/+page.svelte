@@ -1,195 +1,96 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
-	import {
-		type Route,
-		type Stop,
-		calculate_route_height,
-		calculate_stop_height,
-		is_bus,
-		is_train
-	} from '$lib/static';
-	import {
-		type BusTripData,
-		type TrainTripData,
-		type Trip,
-		calculate_trip_height,
-		is_bus_route,
-		is_train_route,
-		trips
-	} from '$lib/trips.svelte';
-	import {
-		get_position,
-		haversine,
-		persisted_rune,
-		route_pins_rune,
-		stop_pins_rune,
-		trip_pins_rune
-	} from '$lib/util.svelte';
+	import { calculate_stop_height } from '$lib/static';
+	import { haversine } from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
+	import type { Source, Stop } from '@trainstatus/client';
+	import { PersistedState, useGeolocation } from 'runed';
 
-	const { pinned_bus_stops, pinned_train_stops } = $derived(
-		stop_pins_rune.value
-			.map((id) => page.data.stops[id])
-			.reduce(
-				(acc: { pinned_bus_stops: Stop<'bus'>[]; pinned_train_stops: Stop<'train'>[] }, stop) => {
-					if (is_bus(stop)) {
-						acc.pinned_bus_stops.push(stop);
-					} else if (is_train(stop)) {
-						acc.pinned_train_stops.push(stop);
-					}
-					return acc;
-				},
-				{ pinned_bus_stops: [], pinned_train_stops: [] }
-			)
-	);
-
-	const { pinned_bus_routes, pinned_train_routes } = $derived(
-		route_pins_rune.value
-			.map((id) => page.data.routes[id])
-			.reduce(
-				(acc: { pinned_bus_routes: Route[]; pinned_train_routes: Route[] }, route) => {
-					if (route.route_type === 'bus') {
-						acc.pinned_bus_routes.push(route);
-					} else {
-						acc.pinned_train_routes.push(route);
-					}
-					return acc;
-				},
-				{ pinned_bus_routes: [], pinned_train_routes: [] }
-			)
-	);
-
-	// TODO: maybe shouldn't remove trips if current_time was specified
-	$effect.pre(() => {
-		trips.trips;
-		const valid_trips = untrack(() => trip_pins_rune.value.filter((id) => trips.trips.has(id)));
-
-		// console.log('removing old trip pins');
-		trip_pins_rune.value = valid_trips;
-	});
-
-	// need to define interface here bc my IDE was acting up
-	interface AccumulatedTrips {
-		pinned_bus_trips: Trip<BusTripData, Route>[];
-		pinned_train_trips: Trip<TrainTripData, Route>[];
-	}
-
-	// TODO: prevent pinned trips from updating twice
-	const { pinned_bus_trips, pinned_train_trips } = $derived(
-		trip_pins_rune.value
-			.map((id) => trips.trips.get(id)!)
-			.reduce(
-				(acc: AccumulatedTrips, trip) => {
-					if (!trip) {
-						console.log('trip not found');
-					}
-					const route = page.data.routes[trip.route_id];
-
-					if (is_bus_route(route, trip)) {
-						acc.pinned_bus_trips.push({ ...trip, route });
-						// monitored_trip_routes.push(route.id);
-					} else if (is_train_route(route, trip)) {
-						acc.pinned_train_trips.push({ ...trip, route });
-					}
-					return acc;
-				},
-				{ pinned_bus_trips: [], pinned_train_trips: [] }
-			)
-	);
-
-	const location_status = persisted_rune<'unknown' | 'loading' | 'granted' | 'denied'>(
+	// Geolocation state
+	const location_status = new PersistedState<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
 		'unknown'
 	);
+	const location = useGeolocation({
+		immediate: ['unknown', 'granted'].includes(location_status.current)
+	});
 
-	let nearby_train_stops = $state.raw<Stop<'train'>[]>([]);
-	let nearby_bus_stops = $state.raw<Stop<'bus'>[]>([]);
+	const isLoading = $derived(
+		location.position.coords.latitude === Number.POSITIVE_INFINITY && location.error === null
+	);
 
-	async function get_nearby_stops() {
-		location_status.value = 'loading';
-		try {
-			const position = await get_position();
-			nearby_train_stops = page.data.train_stops
-				.map((stop: Stop<'train'>) => {
-					const distance = haversine(
-						position.coords.latitude,
-						position.coords.longitude,
-						stop.lat,
-						stop.lon
-					);
-					return { ...stop, distance };
-				})
-				.sort((a, b) => a.distance - b.distance);
-
-			nearby_bus_stops = page.data.bus_stops
-				.map((stop: Stop<'bus'>) => {
-					const distance = haversine(
-						position.coords.latitude,
-						position.coords.longitude,
-						stop.lat,
-						stop.lon
-					);
-					return { ...stop, distance };
-				})
-				.sort((a, b) => a.distance - b.distance);
-
-			location_status.value = 'granted';
-		} catch (e) {
-			console.error('Error getting location', e);
-			location_status.value = 'denied';
-			nearby_bus_stops = [];
-			nearby_train_stops = [];
+	// Update location status based on geolocation state
+	$effect(() => {
+		if (location.error) {
+			location_status.current = 'denied';
+		} else if (location.position.coords.latitude !== Number.POSITIVE_INFINITY && !location.error) {
+			location_status.current = 'granted';
 		}
-	}
-	// const nearby_stops = $derived.by(() => {
-	// 	if (location_status.value === 'loading') {
-	// 		return get_nearby_stops();
-	// 	} else {
-	// 		return { nearby_bus_stops: [], nearby_train_stops: [] };
-	// 	}
-	// });
+	});
 
-	switch (location_status.value) {
-		case 'granted':
-		case 'loading':
-			get_nearby_stops();
-			break;
-		default:
-			// shows the nearby stop list even when we don't have location
-			// nearby_bus_stops = [];
-			// nearby_train_stops = [];
-			break;
+	// Interface for stops with distance
+	interface StopWithDistance extends Stop {
+		distance: number;
 	}
 
-	// use this to calculate the height for the nearby stops list
+	interface SourceData {
+		source: Source;
+		data: StopWithDistance[];
+	}
+
+	// Compute nearby stops sorted by distance for each source
+	const nearby_stops = $derived.by((): SourceData[] => {
+		// If we have location, sort stops by distance
+		if (!isLoading && !location.error) {
+			return page.data.stops.map((source) => {
+				const data = source.data
+					.map((stop: Stop) => {
+						const distance = haversine(
+							location.position.coords.latitude,
+							location.position.coords.longitude,
+							stop.geom.coordinates.Point.y,
+							stop.geom.coordinates.Point.x
+						);
+						return { ...stop, distance };
+					})
+					.sort((a, b) => a.distance - b.distance);
+				return { source: source.source, data };
+			});
+		}
+		// Return unsorted data if no location
+		return page.data.stops.map((source) => ({
+			source: source.source,
+			data: source.data.map((stop: Stop) => ({ ...stop, distance: Infinity }))
+		}));
+	});
+
+	// Height calculation
 	let list_height = $state(0);
 	let pin_list_height = $state(0);
 	const nearby_list_height = $derived(list_height - pin_list_height);
-
-	// $inspect({ nearby_list_height });
 </script>
 
 {#snippet locate_button()}
 	<button
-		onclick={get_nearby_stops}
-		class="locate-button {location_status.value === 'granted'
-			? 'locate-active'
-			: location_status.value === 'denied'
-				? 'locate-denied'
-				: 'locate-inactive'}"
+		onclick={() => location.resume()}
+		class={{
+			'locate-button': true,
+			'locate-active': location_status.current === 'granted',
+			'locate-denied': location_status.current === 'denied',
+			'locate-inactive':
+				location_status.current === 'unknown' || location_status.current === 'loading'
+		}}
 		aria-label="Nearby stops"
 		title="Nearby stops"
 	>
-		{#if location_status.value === 'denied'}
+		{#if location_status.current === 'denied'}
 			<LocateOff />
-		{:else if location_status.value === 'granted'}
+		{:else if location_status.current === 'granted'}
 			<LocateFixed />
-		{:else if location_status.value === 'loading'}
+		{:else if isLoading}
 			<Locate class="animate-spin" />
 		{:else}
 			<Locate />
@@ -201,61 +102,19 @@
 <div class="flex max-h-[calc(100dvh-10.5rem)] flex-col" bind:offsetHeight={list_height}>
 	<!-- Pinned items section - no scroll -->
 	<div class="flex-none overflow-hidden" bind:offsetHeight={pin_list_height}>
-		{#if trip_pins_rune.value.length}
-			<List
-				title="Pinned Trips"
-				bus_data={pinned_bus_trips}
-				train_data={pinned_train_trips}
-				type="trip"
-				pin_rune={trip_pins_rune}
-				height_calc={calculate_trip_height}
-				items_before_scroll={2}
-				class="max-h-[25dvh]"
-			/>
-		{/if}
-
-		{#if route_pins_rune.value.length}
-			<List
-				title="Pinned Routes"
-				bus_data={pinned_bus_routes}
-				train_data={pinned_train_routes}
-				pin_rune={route_pins_rune}
-				type="route"
-				height_calc={calculate_route_height}
-				items_before_scroll={2}
-				class="max-h-[25dvh]"
-			/>
-		{/if}
-
-		<!-- TODO: loading pinned stops in SSR always puts the 1 as the first -->
-		{#if stop_pins_rune.value.length}
-			<List
-				title="Pinned stops"
-				bus_data={pinned_bus_stops}
-				train_data={pinned_train_stops}
-				pin_rune={stop_pins_rune}
-				type="stop"
-				height_calc={calculate_stop_height}
-				items_before_scroll={2}
-				ssr_min={0}
-				class="max-h-[25dvh]"
-			/>
-		{/if}
+		<!-- Pinned items can be added here later -->
 	</div>
 
 	<div>
-		<!-- {#if nearby_bus_stops && nearby_train_stops} -->
 		<List
 			title="Nearby Stops"
 			type="stop"
 			style="max-height: {nearby_list_height}px"
-			bus_data={nearby_bus_stops}
-			train_data={nearby_train_stops}
-			pin_rune={stop_pins_rune}
-			{locate_button}
+			sources={nearby_stops}
+			pins={stop_pins}
+			header_slot={locate_button}
 			height_calc={calculate_stop_height}
 		/>
-		<!-- {/if} -->
 	</div>
 </div>
 

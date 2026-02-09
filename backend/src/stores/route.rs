@@ -44,7 +44,8 @@ impl RouteStore {
                     FROM
                         static.route
                     WHERE
-                        source = $1"#,
+                        source = $1
+                    ORDER BY short_name"#,
                 )
                 .bind(source)
                 .fetch_all(&self.pg_pool)

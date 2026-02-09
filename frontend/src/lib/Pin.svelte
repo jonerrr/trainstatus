@@ -1,58 +1,45 @@
-<script lang="ts" generics="T extends string | number">
+<script lang="ts">
 	import { Pin } from '@lucide/svelte';
+	import type { Source } from '@trainstatus/client';
+	import type { PersistedState } from 'runed';
 
-	import type { PersistedRune } from './util.svelte';
+	import { type Pins } from './stores.svelte';
 
-	// TODO: not sure if i need to bind
 	let {
-		pin_rune = $bindable(),
-		id = $bindable(),
+		pins,
+		id,
+		source,
 		class: class_name,
 		size
 	}: {
-		pin_rune: PersistedRune<T[]>;
-		id: T;
+		pins: PersistedState<Pins>;
+		id: string;
+		source: Source;
 		class?: string;
 		size?: string;
 	} = $props();
+
+	const is_pinned = $derived(pins.current[source].includes(id));
+
+	function toggle_pin() {
+		if (is_pinned) {
+			pins.current = {
+				...pins.current,
+				[source]: pins.current[source].filter((p_id) => p_id !== id)
+			};
+		} else {
+			pins.current = {
+				...pins.current,
+				[source]: [...pins.current[source], id]
+			};
+		}
+	}
 </script>
 
-<button
-	onclick={() => {
-		pin_rune.value = pin_rune.value.includes(id)
-			? pin_rune.value.filter((p_id) => p_id !== id)
-			: [...pin_rune.value, id];
-	}}
-	aria-label="Pin to home screen"
-	class={class_name}
->
-	{#if pin_rune.value.includes(id)}
+<button onclick={toggle_pin} aria-label="Pin to home screen" class={class_name}>
+	{#if is_pinned}
 		<Pin {size} fill="#fff" />
 	{:else}
 		<Pin {size} />
 	{/if}
 </button>
-
-<!-- <style>
-	@keyframes wiggle {
-		0% {
-			transform: rotate(0deg);
-		}
-		80% {
-			transform: rotate(0deg);
-		}
-		85% {
-			transform: rotate(10deg);
-		}
-		95% {
-			transform: rotate(-10deg);
-		}
-		100% {
-			transform: rotate(0deg);
-		}
-	}
-
-	.wiggle {
-		animation: wiggle 1s ease-in-out;
-	}
-</style> -->

@@ -1,31 +1,31 @@
 <script lang="ts">
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
-	import { alerts as rt_alerts } from '$lib/alerts.svelte';
-	import type { Route } from '$lib/static';
-	import type { PersistedRune } from '$lib/util.svelte';
+
+	import type { Route } from '@trainstatus/client';
 
 	interface Props {
 		data: Route;
-		pin_rune: PersistedRune<string[]>;
 	}
 
 	let { data }: Props = $props();
 
-	const alerts = $derived(
-		rt_alerts.alerts_by_route
-			.get(data.id)
-			?.sort(
-				(a, b) =>
-					b.entities.find((e) => e.route_id === data.id)!.sort_order -
-					a.entities.find((e) => e.route_id === data.id)!.sort_order
-			) ?? []
-	);
+	// TODO: alert stuff
+	// const alerts = $derived(
+	// 	rt_alerts.alerts_by_route
+	// 		.get(data.id)
+	// 		?.sort(
+	// 			(a, b) =>
+	// 				b.entities.find((e) => e.route_id === data.id)!.sort_order -
+	// 				a.entities.find((e) => e.route_id === data.id)!.sort_order
+	// 		) ?? []
+	// );
+	const alerts: any[] = [];
 </script>
 
 <!-- <Button state={{ modal: 'route', data }} {pin_rune}> -->
 <section class="flex items-center gap-1">
-	<Icon height={36} width={36} express={false} link={true} route={data} />
+	<Icon height={36} width={36} link={true} route={data} />
 	{#if alerts.length}
 		<div class="font-semibold">
 			{alerts[0].alert_type}

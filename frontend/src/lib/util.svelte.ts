@@ -1,4 +1,38 @@
 import { browser } from '$app/environment';
+import { page } from '$app/state';
+
+// export function manageTitle() {
+// 	let crumbs = $state([]);
+
+// }
+
+class PageTitle {
+	// make private probably
+	crumbs = $state([]);
+	url_mappings = {
+		'/': 'Home',
+		'/stops': 'Stops',
+		'/routes': 'Routes',
+		'/alerts': 'Alerts'
+	};
+
+	constructor() {
+		// this.text = $state(text);
+	}
+
+	text = $derived.by(() => {
+		// TODO: use page.url and page.state to generate title and breadcrumbs
+		// page.url
+		return `${this.url_mappings[page.url.pathname]} | Train Status`;
+	});
+
+	// reset = () => {
+	// 	this.text = '';
+	// 	this.done = false;
+	// }
+}
+
+export const page_title = new PageTitle();
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -35,6 +69,46 @@ export function get_position(): Promise<GeolocationPosition> {
 		navigator.geolocation.getCurrentPosition(res, rej);
 	});
 }
+
+// if user specified unix timestamp, it is stored here.
+function currentTime() {
+	let time = $state<number | undefined>();
+
+	return {
+		// returns undefined here bc some components need to know if it was user specified
+		get value(): number | undefined {
+			return time;
+		},
+
+		get ms(): number {
+			return time ? time * 1000 : new Date().getTime();
+		},
+
+		set value(newValue: number | undefined) {
+			// js time is in milliseconds
+			time = newValue;
+		}
+	};
+}
+
+export const current_time = currentTime();
+
+interface ItemHeights {
+	[key: string]: number;
+}
+
+// export function list_max_height(init: number = 0) {
+// 	const height = browser
+// 		? document
+// 				.querySelectorAll('.sub-height')
+// 				.values()
+// 				.reduce((acc, el) => {
+// 					acc += (el as HTMLElement).offsetHeight;
+// 					return acc;
+// 				}, init)
+// 		: 124 + init;
+// 	return `max-h-[calc(100dvh-${height}px)]`;
+// }
 
 export interface PersistedRune<T> {
 	value: T;
@@ -103,46 +177,6 @@ export function persisted_rune<T>(key: string, init_value: T) {
 	};
 }
 
-// if user specified unix timestamp, it is stored here.
-function currentTime() {
-	let time = $state<number | undefined>();
-
-	return {
-		// returns undefined here bc some components need to know if it was user specified
-		get value(): number | undefined {
-			return time;
-		},
-
-		get ms(): number {
-			return time ? time * 1000 : new Date().getTime();
-		},
-
-		set value(newValue: number | undefined) {
-			// js time is in milliseconds
-			time = newValue;
-		}
-	};
-}
-
-export const current_time = currentTime();
-
-interface ItemHeights {
-	[key: string]: number;
-}
-
-// export function list_max_height(init: number = 0) {
-// 	const height = browser
-// 		? document
-// 				.querySelectorAll('.sub-height')
-// 				.values()
-// 				.reduce((acc, el) => {
-// 					acc += (el as HTMLElement).offsetHeight;
-// 					return acc;
-// 				}, init)
-// 		: 124 + init;
-// 	return `max-h-[calc(100dvh-${height}px)]`;
-// }
-
 export const item_heights = $state<ItemHeights>({});
 
 // interface PinStorage {
@@ -156,7 +190,7 @@ export const item_heights = $state<ItemHeights>({});
 // 	routes: ['4', 'M15'],
 // 	trips: []
 // });
-
-export const stop_pins_rune = persisted_rune<number[]>('stop_pins', [106, 400086]);
-export const route_pins_rune = persisted_rune<string[]>('route_pins', ['4', 'M15']);
-export const trip_pins_rune = persisted_rune<string[]>('trip_pins', []);
+// temp, will remove once migrated to runed
+export const stop_pins_rune = { value: [] };
+export const route_pins_rune = { value: [] };
+export const trip_pins_rune = { value: [] };

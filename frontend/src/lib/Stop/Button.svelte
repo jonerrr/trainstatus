@@ -6,17 +6,20 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { type Route, type Stop, is_bus, is_train, main_stop_routes } from '$lib/static';
+	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import { is_mta_bus, is_mta_subway, main_stop_routes } from '$lib/static';
 	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
 	import { TripDirection, trips as rt_trips } from '$lib/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
-	import BusArrow from './BusArrow.svelte';
+	import type { Route, Stop } from '@trainstatus/client';
 
 	interface Props {
-		data: Stop<'train' | 'bus'>;
+		data: Stop;
 	}
 	let { data }: Props = $props();
+
+	const source_routes = $derived(page.data.routes[data.data.source]);
 
 	interface StopTimeData extends StopTime {
 		eta: number;
@@ -67,7 +70,7 @@
 				route_id
 			};
 
-			if (is_train(data)) {
+			if (is_mta_subway(data.data)) {
 				const target_map = trip.direction === TripDirection.North ? nb_st_by_route : sb_st_by_route;
 
 				if (!target_map.has(route_id)) {
@@ -91,12 +94,35 @@
 		}
 	};
 
+	// TODO: add back current stop and active stop route combinations
 	// TODO: fix 1 train showing up at dekalb ave for some reason
-	const current_stop_routes = $derived(main_stop_routes(data).map((r) => page.data.routes[r.id]));
+	// const current_stop_routes = $derived(main_stop_routes(data).map((r) => page.data.routes[r.id]));
+	const default_stop_routes = $derived(data.routes.map((r) => source_routes[r.route_id]));
 	// combine current stop routes with other active routes at stop
 	// TODO: use nb_st_by_route and sb_st_by_route to get active routes instead of creating new set
-	const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
+	// const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
 	// const all_stop_routes = $derived(current_stop_routes);
+	// TODO: fix all stop routes
+	const all_stop_routes = $derived.by(() => {
+		const routes: Route[] = [];
+		// const route_ids = new Set<string>();
+
+		// add main stop routes first
+		for (const route of data.routes) {
+			routes.push(source_routes[route.route_id]);
+			// route_ids.add(route.id);
+		}
+
+		// add active routes next
+		// for (const route of active_routes) {
+		// 	if (!route_ids.has(route.id)) {
+		// 		routes.push(route);
+		// 		route_ids.add(route.id);
+		// 	}
+		// }
+
+		return routes;
+	});
 </script>
 
 <!-- eta used by bus and train -->
@@ -109,11 +135,11 @@
 	{/key}
 {/snippet}
 
-{#if is_train(data)}
+{#if data.data.source === 'mta_subway'}
 	<div class="grid w-full grid-cols-1 gap-1">
 		<div class="flex items-center gap-1">
-			{#each current_stop_routes as route (route.id)}
-				<Icon height={24} width={24} express={false} link={false} {route} />
+			{#each default_stop_routes as route (route.id)}
+				<Icon height={24} width={24} link={false} {route} />
 			{/each}
 
 			<div class="my-auto text-left text-lg font-medium">
@@ -136,7 +162,7 @@
 					{@const route_stop_times = stop_times.get(route.id) ?? []}
 					<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
 					<div class="flex items-center gap-1">
-						<Icon height={20} width={20} express={false} link={false} {route} />
+						<Icon height={20} width={20} link={false} {route} />
 						<div class="flex items-center gap-1">
 							{#if route_stop_times.length}
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
@@ -151,7 +177,7 @@
 			</div>
 		</div>
 	{/snippet}
-{:else if is_bus(data)}
+{:else if data.data.source === 'mta_bus'}
 	<!-- TODO: make spacing consistent (use grid maybe idk) -->
 	<div class="flex flex-col text-white">
 		<div class="flex items-center">
@@ -164,16 +190,17 @@
 		</div>
 
 		<div class="flex flex-col">
-			{#each data.routes as stop_route (stop_route.id)}
-				{@const route = page.data.routes[stop_route.id] as Route}
+			{#each data.routes as route_stop (route_stop.route_id)}
+				{@const route = source_routes[route_stop.route_id]}
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
-				{@const route_stop_times = nb_st_by_route.get(stop_route.id) ?? []}
+				{@const route_stop_times = nb_st_by_route.get(route_stop.route_id) ?? []}
 
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
-					<Icon {route} link={false} express={false} />
+					<Icon {route} link={false} />
 					<div class="flex flex-col">
 						<div>
-							{stop_route.headsign}
+							<!-- TODO: handle other sources -->
+							{route_stop.data.source === 'mta_bus' && route_stop.data.headsign}
 						</div>
 						<div class="flex gap-2 pr-1">
 							{#if rt_stop_times.updating_routes.has(route.id)}

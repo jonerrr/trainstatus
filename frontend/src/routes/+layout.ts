@@ -1,9 +1,10 @@
 import { alerts } from '$lib/alerts.svelte';
 import { searchSchema } from '$lib/schemas';
-import { type Route, type Stop, is_bus, is_train } from '$lib/static';
+import { default_sources } from '$lib/sources';
 import { stop_times } from '$lib/stop_times.svelte';
 import { trips } from '$lib/trips.svelte';
 
+import type { Route, Source, Stop } from '@trainstatus/client';
 import { validateSearchParams } from 'runed/kit';
 
 import type { LayoutLoad } from './$types';
@@ -14,55 +15,39 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 	const paramsObject = Object.fromEntries(searchParams.entries());
 	console.dir({ paramsObject });
 
-	const stops_promise = fetch('/api/v1/stops').then((res) => res.json());
-	const routes_promise = fetch('/api/v1/routes').then((res) => res.json());
-	// const stops_promise = stopsHandler().then((res) => res.data!);
-	// const routes_promise = routesHandler().then((res) => res.data!);
+	const at = searchParams.get('at') ?? undefined;
 
-	// const at = url.searchParams.get('at') ?? undefined;
-
-	// let finished = url.pathname.startsWith('/charts');
-	const at = searchParams.at ?? undefined;
-	const [stops, routes]: [Stop<'bus' | 'train'>[], Route[], void, void, void] = await Promise.all([
-		stops_promise,
-		routes_promise,
-		trips.update(fetch, at),
-		stop_times.update(fetch, [], false, at),
-		alerts.update(fetch, at)
+	// Fetch stops and routes for all sources in parallel
+	const [stopsResults, routesResults] = await Promise.all([
+		Promise.all(
+			default_sources.map(async (source) => ({
+				source,
+				data: (await fetch(`/api/v1/stops/${source}`).then((res) => res.json())) as Stop[]
+			}))
+		),
+		Promise.all(
+			default_sources.map(async (source) => ({
+				source,
+				data: (await fetch(`/api/v1/routes/${source}`).then((res) => res.json())) as Route[]
+			}))
+		)
+		// TODO: add back realtime apis
 	]);
 
-	const routes_obj: {
-		[id: string]: Route;
-	} = {};
-	for (const route of routes) {
-		routes_obj[route.id] = route;
+	// Convert arrays to objects keyed by source
+	const stops: App.PageData['stops'] = {};
+	for (const { source, data } of stopsResults) {
+		stops[source] = Object.fromEntries(data.map((stop) => [stop.id, stop]));
 	}
 
-	const stops_obj: {
-		[id: number]: Stop<'bus' | 'train'>;
-	} = {};
-	for (const stop of stops) {
-		stops_obj[stop.id] = stop;
+	const routes: App.PageData['routes'] = {};
+	for (const { source, data } of routesResults) {
+		routes[source] = Object.fromEntries(data.map((route) => [route.id, route]));
 	}
-
-	const { bus_stops, train_stops } = stops.reduce(
-		(acc: { bus_stops: Stop<'bus'>[]; train_stops: Stop<'train'>[] }, stop) => {
-			if (is_bus(stop)) {
-				acc.bus_stops.push(stop);
-			} else if (is_train(stop)) {
-				acc.train_stops.push(stop);
-			}
-			return acc;
-		},
-		{ bus_stops: [], train_stops: [] }
-	);
 
 	return {
-		stops: stops_obj,
-		bus_stops,
-		train_stops,
-		routes: routes_obj,
+		stops,
+		routes,
 		at
-		// initial_promise: Promise.all([trips.update(fetch), stop_times.update(fetch, [])])
 	};
 };
