@@ -36,17 +36,16 @@
 		distance: number;
 	}
 
-	interface SourceData {
-		source: Source;
-		data: StopWithDistance[];
-	}
+	const source_order: Source[] = ['mta_subway', 'mta_bus'];
 
 	// Compute nearby stops sorted by distance for each source
-	const nearby_stops = $derived.by((): SourceData[] => {
-		// If we have location, sort stops by distance
-		if (!isLoading && !location.error) {
-			return page.data.stops.map((source) => {
-				const data = source.data
+	const nearby_stops = $derived.by((): Record<Source, StopWithDistance[]> => {
+		const result = {} as Record<Source, StopWithDistance[]>;
+		const has_location = !isLoading && !location.error;
+		for (const source of source_order) {
+			const data = page.data.stops[source] ?? [];
+			if (has_location) {
+				result[source] = data
 					.map((stop: Stop) => {
 						const distance = haversine(
 							location.position.coords.latitude,
@@ -57,14 +56,11 @@
 						return { ...stop, distance };
 					})
 					.sort((a, b) => a.distance - b.distance);
-				return { source: source.source, data };
-			});
+			} else {
+				result[source] = data.map((stop: Stop) => ({ ...stop, distance: Infinity }));
+			}
 		}
-		// Return unsorted data if no location
-		return page.data.stops.map((source) => ({
-			source: source.source,
-			data: source.data.map((stop: Stop) => ({ ...stop, distance: Infinity }))
-		}));
+		return result;
 	});
 
 	// Height calculation

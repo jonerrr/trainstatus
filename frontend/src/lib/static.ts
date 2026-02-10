@@ -1,7 +1,5 @@
 // Re-export types from the client package
-import type { Route, Stop, StopData, StopRoute } from '@trainstatus/client';
-
-export type { Route, Stop, StopRoute };
+import type { Route, Source, Stop, StopData, StopRoute } from '@trainstatus/client';
 
 // Type guards for source-specific data
 export const is_mta_bus = (data: StopData): data is StopData & { source: 'mta_bus' } => {

@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
-	import type { Route } from '$lib/static';
 	import { route_pins } from '$lib/stores.svelte';
 
 	// const { bus_routes, train_routes } = $derived(

@@ -19,7 +19,7 @@
 	}
 	let { data }: Props = $props();
 
-	const source_routes = $derived(page.data.routes[data.data.source]);
+	const source_routes = $derived(page.data.routes_by_id[data.data.source]);
 
 	interface StopTimeData extends StopTime {
 		eta: number;
@@ -33,14 +33,14 @@
 	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const active_routes = $state(new SvelteSet<Route>());
 
-	$effect(() => {
-		rt_stop_times?.by_stop_id;
-		rt_trips.trips;
-		data;
+	// $effect(() => {
+	// 	rt_stop_times?.by_stop_id;
+	// 	rt_trips.trips;
+	// 	data;
 
-		// console.log('Triggering update for', data.name);
-		untrack(() => updateRouteMaps());
-	});
+	// 	// console.log('Triggering update for', data.name);
+	// 	untrack(() => updateRouteMaps());
+	// });
 
 	const updateRouteMaps = () => {
 		// Clear existing maps

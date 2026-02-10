@@ -4,7 +4,7 @@ import { PersistedState } from 'runed';
 export type Pins = {
 	[K in Source]: string[];
 };
-
+// TODO: maybe have separate PersistedState for each source
 export const stop_pins = new PersistedState<Pins>('stop_pins', {
 	mta_subway: ['106'],
 	mta_bus: ['400086']

@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { tick } from 'svelte';
-
 	import { cubicInOut } from 'svelte/easing';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { crossfade, slide } from 'svelte/transition';
@@ -30,11 +28,7 @@
 		mta_bus: 'Bus'
 	};
 
-	// Data structure for each source
-	interface SourceData<T> {
-		source: Source;
-		data: T[];
-	}
+	const source_order: Source[] = ['mta_subway', 'mta_bus'];
 
 	// Estimated heights for virtualization
 	const estimated_heights = {
@@ -52,7 +46,7 @@
 		// item type for rendering and modal
 		type: ItemType;
 		// data organized by source
-		sources: SourceData<Stop | Route>[];
+		sources: Record<Source, (Stop | Route)[]>;
 		// persisted state for pinned items
 		pins?: PersistedState<Pins>;
 		// persisted state for selected source tab
@@ -117,8 +111,15 @@
 	// TODO: check here if source is empty and switch to first available (instead of using $effect)
 	const active_source = $derived(selected_source.current);
 
+	const source_entries = $derived.by(() =>
+		source_order.map((source) => ({
+			source,
+			data: sources[source] ?? []
+		}))
+	);
+
 	// Get available sources (those with data)
-	const available_sources = $derived(sources.filter((s) => s.data.length > 0));
+	const available_sources = $derived(source_entries.filter((s) => s.data.length > 0));
 
 	// Auto-switch to first available source if current has no data
 	// $effect(() => {
@@ -129,7 +130,7 @@
 	// });
 
 	// Get items for current source
-	const items = $derived(sources.find((s) => s.source === active_source)?.data ?? []);
+	const items = $derived(sources[active_source] ?? []);
 
 	const [send, receive] = crossfade({
 		duration: 300,
@@ -295,8 +296,8 @@
 			<div class="rounded-full border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
 				<!-- TODO: doesn't need to be a snippet anymore -->
 				{#snippet source_tab(source: Source)}
-					{@const source_data = sources.find((s) => s.source === source)}
-					{#if source_data && source_data.data.length > 0}
+					{@const source_data = sources[source] ?? []}
+					{#if source_data.length > 0}
 						{@const Icon = source_icons[source]}
 						<div transition:slide={{ axis: 'x', duration: 250 }}>
 							<!-- 		class="relative flex items-center gap-2 rounded-full px-4 py-1 transition-all duration-200 {active_source.current ===
@@ -311,8 +312,6 @@
 									}
 								]}
 								onclick={() => {
-									console.log('clicked');
-									// active_source = source;
 									selected_source.current = source;
 								}}
 								aria-label={`Show ${source_names[source]} items`}
@@ -333,7 +332,7 @@
 				{/snippet}
 
 				<div class="flex gap-1">
-					{#each sources as { source } (source)}
+					{#each source_entries as { source } (source)}
 						{@render source_tab(source)}
 					{/each}
 				</div>

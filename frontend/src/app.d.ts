@@ -16,8 +16,11 @@ declare global {
 			// 	source: Source;
 			// 	data: Route[];
 			// }[];
-			stops: Record<Source, Record<string, Stop>>;
-			routes: Record<Source, Record<string, Route>>;
+			stops: Record<Source, Stop[]>;
+			routes: Record<Source, Route[]>;
+
+			stops_by_id: Record<Source, Record<string, Stop>>;
+			routes_by_id: Record<Source, Record<string, Route>>;
 			// trips: {
 			// 	[id: string]: Trip;
 			// };

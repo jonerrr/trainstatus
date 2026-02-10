@@ -49,7 +49,7 @@
 			show_alert_icon && 'ring-3 ring-red-800'
 		]}
 		onclick={() => {
-			if (link) pushState('', { modal: 'route', data: route });
+			if (link) pushState('', { modal: { type: 'route', data: route, source: route.data.source } });
 		}}
 	>
 		{route.short_name}
@@ -64,7 +64,7 @@
 		aria-label={link ? route.short_name : undefined}
 		class={['relative appearance-none', show_alert_icon && 'ring-3 rounded-full ring-red-800']}
 		onclick={() => {
-			if (link) pushState('', { modal: 'route', data: route });
+			if (link) pushState('', { modal: { type: 'route', data: route, source: route.data.source } });
 		}}
 	>
 		<svg class={class_name} {width} {height} viewBox="0 0 90 90">

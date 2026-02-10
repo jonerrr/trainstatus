@@ -34,20 +34,26 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 		// TODO: add back realtime apis
 	]);
 
-	// Convert arrays to objects keyed by source
+	// TODO: fix type errors. I could use object.entries or something, but i need to test the performance implications of that first
 	const stops: App.PageData['stops'] = {};
+	const stops_by_id: App.PageData['stops_by_id'] = {};
 	for (const { source, data } of stopsResults) {
-		stops[source] = Object.fromEntries(data.map((stop) => [stop.id, stop]));
+		stops[source] = data;
+		stops_by_id[source] = Object.fromEntries(data.map((stop) => [stop.id, stop]));
 	}
 
 	const routes: App.PageData['routes'] = {};
+	const routes_by_id: App.PageData['routes_by_id'] = {};
 	for (const { source, data } of routesResults) {
-		routes[source] = Object.fromEntries(data.map((route) => [route.id, route]));
+		routes[source] = data;
+		routes_by_id[source] = Object.fromEntries(data.map((route) => [route.id, route]));
 	}
 
 	return {
 		stops,
 		routes,
+		stops_by_id,
+		routes_by_id,
 		at
 	};
 };
