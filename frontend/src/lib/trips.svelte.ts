@@ -2,8 +2,38 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { page } from '$app/state';
 
-import type { Route, Stop } from './static';
+import { resource } from 'runed';
+
 import { current_time } from './util.svelte';
+
+// const tripResource = resource(
+// 	() => params.at,
+// 	async (at, prevAt, { signal }) => {
+// 		const query = new URLSearchParams();
+// 		if (at) query.set('at', at.toString());
+
+// 		const res = await fetch(`/api/v1/trips/${source}?${query}`, { signal });
+
+// 		if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+// 		if (!res.ok) throw new Error('Failed to fetch trips');
+
+// 		const data: Trip<TripData>[] = await res.json();
+
+// 		return new SvelteMap(
+// 			data.map((trip) => [
+// 				trip.id,
+// 				{
+// 					...trip,
+// 					created_at: new Date(trip.created_at),
+// 					updated_at: new Date(trip.updated_at)
+// 				}
+// 			])
+// 		);
+// 	},
+// 	{
+// 		initialValue: new SvelteMap()
+// 	}
+// );
 
 export interface Trip<T = TripData, R = never> {
 	id: string;

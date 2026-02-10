@@ -65,6 +65,7 @@ pub async fn stop_times_handler(
     current_time: CurrentTime,
 ) -> Result<Json<Vec<StopTime>>, AppError> {
     // MtaBus has too many stop times to return at once, require route_ids filter
+    // TODO: probably should return an error instead of just an empty response
     if source == Source::MtaBus && params.route_ids.is_empty() {
         return Ok(Json(vec![]));
     }

@@ -52,7 +52,7 @@
 	// 	search_input;
 
 	// 	// TODO: figure out how to safely set the type of stops and remove ts-ignore-error
-	// 	// TODO: use debounce from runed lib
+	// 	// TODO: use debounce/throttle from runed lib https://runed.dev/docs/utilities/throttled
 	// 	debounce(() => {
 	// 		if (search_input === '') {
 	// 			clear_search();

@@ -2,7 +2,9 @@ import { SvelteSet } from 'svelte/reactivity';
 
 import { page } from '$app/state';
 
-import type { Trip } from './trips.svelte';
+import type { Trip } from '$lib/trips.svelte';
+
+import { resource } from 'runed';
 
 // goal
 // const stopTimes = useStopTimes
@@ -10,6 +12,112 @@ import type { Trip } from './trips.svelte';
 // const arrivals = stopTimes.getArrivals(stop_id)
 // const departures = stopTimes.getDepartures(stop_id)
 // can have like route.existing_alert that is reactive
+
+// Global state for monitored routes (kept as requested)
+export const monitored_bus_routes = new SvelteSet<string>();
+
+// Helper to index stop times (same as before)
+function indexStopTimes(data: StopTime[]) {
+	const byTrip: Record<string, StopTime[]> = {};
+	const byStop: Record<number, StopTime[]> = {};
+
+	for (const st of data) {
+		if (typeof st.arrival === 'string') st.arrival = new Date(st.arrival);
+		if (typeof st.departure === 'string') st.departure = new Date(st.departure);
+		(byTrip[st.trip_id] ??= []).push(st);
+		(byStop[st.stop_id] ??= []).push(st);
+	}
+	return { byTrip, byStop };
+}
+
+interface StopTimeOptions {
+	requireRoutes?: boolean; // If true, only fetch if routes are monitored (e.g. buses)
+	monitoredRoutes?: SvelteSet<string>;
+}
+
+// // export function createStopTimes(
+// // 	source: string,
+// // 	params: { at: number },
+// // 	options: StopTimeOptions = {}
+// // ) {
+// // 	const { requireRoutes = false, monitoredRoutes } = options;
+
+// 	const stResource = resource(
+// 		() => ({
+// 			at: params.at,
+// 			// If we don't care about routes (Subway), pass null so it doesn't trigger updates
+// 			routes: requireRoutes && monitoredRoutes ? Array.from(monitoredRoutes) : null
+// 		}),
+// 		async ({ at, routes }, prev, { signal, data: prevData }) => {
+// 			// 1. If we require routes but have none, return empty
+// 			if (requireRoutes && (!routes || routes.length === 0)) {
+// 				return [];
+// 			}
+
+// 			const query = new URLSearchParams();
+// 			if (at) query.set('at', at.toString());
+
+// 			// 2. Logic for partial updates (Buses)
+// 			let fetchRoutes = routes;
+// 			let isPartialUpdate = false;
+
+// 			// If time hasn't changed, but routes HAVE changed, we might only need new ones
+// 			if (requireRoutes && prev && prev.at === at && prevData && prev.routes) {
+// 				const prevSet = new Set(prev.routes);
+// 				const newRoutes = routes!.filter(r => !prevSet.has(r));
+
+// 				if (newRoutes.length > 0) {
+// 					fetchRoutes = newRoutes;
+// 					isPartialUpdate = true;
+// 				} else if (routes!.length < prev.routes.length) {
+// 					// Routes were removed: We can just filter the existing data without fetching
+// 					const currentSet = new Set(routes);
+// 					// This logic depends on your API, but usually filtering client side is fine here
+// 					// For simplicity in this example, we'll just return the filtered previous data
+// 					// Note: Realistically you might want to re-fetch to be safe, but this saves bandwidth
+// 					return prevData;
+// 				}
+// 			}
+
+// 			// 3. Prepare Query
+// 			if (requireRoutes && fetchRoutes) {
+// 				query.set('route_ids', fetchRoutes.join(','));
+// 			}
+
+// 			const res = await fetch(`/api/v1/stop_times/${source}?${query}`, { signal });
+// 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+
+// 			const newData: StopTime[] = await res.json();
+
+// 			// 4. Merge Logic
+// 			if (isPartialUpdate && prevData) {
+// 				const newTripIds = new Set(newData.map(st => st.trip_id));
+// 				return [
+// 					...prevData.filter(st => !newTripIds.has(st.trip_id)),
+// 					...newData
+// 				];
+// 			}
+
+// 			return newData;
+// 		},
+// 		{
+// 			initialValue: [],
+// 			debounce: 100 // Slight debounce for UI sliders
+// 		}
+// 	);
+
+// 	// Derived indexes that update automatically
+// 	const indexes = $derived(indexStopTimes(stResource.current ?? []));
+
+// // 	return {
+// // 		get stop_times() { return stResource.current; },
+// // 		get by_trip_id() { return indexes.byTrip; },
+// // 		get by_stop_id() { return indexes.byStop; },
+// // 		get loading() { return stResource.loading; },
+// // 		get error() { return stResource.error; },
+// // 		update: stResource.refetch
+// // 	};
+// // }
 
 export interface StopTime<T = never | Trip> {
 	trip_id: string;
@@ -192,4 +300,4 @@ export function createStopTimes() {
 
 export const stop_times = createStopTimes();
 
-export const monitored_bus_routes = $state(new SvelteSet<string>());
+// export const monitored_bus_routes = $state(new SvelteSet<string>());
