@@ -5,9 +5,10 @@ use crate::models::{
 };
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
-use crate::{engines::static_data::StaticController, models::source::Source};
+use crate::{debug_rt_data, engines::static_data::StaticController, models::source::Source};
 use prost::Message;
 use std::collections::HashMap;
+use tokio::fs::{create_dir, write};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
@@ -26,19 +27,56 @@ pub trait GtfsSource: Send + Sync {
     fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<VehiclePositionModel>;
 }
 
-// TODO: add arg that saves the pbs and deserialized data to disk for debugging
 /// Fetches and decodes a list of GTFS-RT URLs concurrently.
+/// If DEBUG_RT_DATA env var is set, saves raw protobuf and decoded data to ./gtfs/ for debugging.
 pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
-    let futures = urls.into_iter().map(|url| async move {
+    let futures = urls.into_iter().enumerate().map(|(idx, url)| async move {
         match reqwest::get(&url).await {
             Ok(resp) => match resp.bytes().await {
-                Ok(bytes) => match FeedMessage::decode(bytes) {
-                    Ok(msg) => Some(msg),
-                    Err(e) => {
-                        error!("Failed to decode protobuf from {}: {}", url, e);
+                Ok(bytes) => {
+                    // Only clone bytes if debug mode is enabled
+                    let bytes_for_debug = if *debug_rt_data() {
+                        Some(bytes.clone())
+                    } else {
                         None
+                    };
+
+                    match FeedMessage::decode(bytes) {
+                        Ok(msg) => {
+                            if let Some(bytes) = bytes_for_debug {
+                                // Extract filename from URL or use index
+                                // TODO: improve default name
+                                let default_name = format!("feed_{}", idx);
+                                let name = url
+                                    .split('/')
+                                    .last()
+                                    .and_then(|s| s.split('?').next())
+                                    .unwrap_or(&default_name);
+
+                                // Create debug directory if it doesn't exist
+                                create_dir("./gtfs").await.ok();
+
+                                // Save raw protobuf
+                                let pb_path = format!("./gtfs/{}.pb", name);
+                                if let Err(e) = write(&pb_path, &bytes).await {
+                                    error!("Failed to write protobuf to {}: {}", pb_path, e);
+                                }
+
+                                // Save decoded debug output
+                                let txt_path = format!("./gtfs/{}.txt", name);
+                                let debug_output = format!("{:#?}", msg);
+                                if let Err(e) = write(&txt_path, debug_output).await {
+                                    error!("Failed to write debug output to {}: {}", txt_path, e);
+                                }
+                            }
+                            Some(msg)
+                        }
+                        Err(e) => {
+                            error!("Failed to decode protobuf from {}: {}", url, e);
+                            None
+                        }
                     }
-                },
+                }
                 Err(e) => {
                     error!("Failed to read bytes from {}: {}", url, e);
                     None

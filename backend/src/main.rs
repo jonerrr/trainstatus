@@ -84,6 +84,12 @@ pub fn mta_oba_api_key() -> &'static str {
     API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").unwrap())
 }
 
+/// If true, will save fetched GTFS-RT protobufs (and other rt data) and their decoded txt to disk for debugging. Set the `DEBUG_RT_DATA` env var to enable.
+pub fn debug_rt_data() -> &'static bool {
+    static DEBUG_RT_DATA: OnceLock<bool> = OnceLock::new();
+    DEBUG_RT_DATA.get_or_init(|| var("DEBUG_RT_DATA").is_ok())
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
