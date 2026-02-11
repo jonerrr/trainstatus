@@ -1,9 +1,9 @@
-use crate::feed::{Alert as GtfsAlert, FeedMessage};
+use crate::feed::Alert as GtfsAlert;
+use crate::integrations::gtfs_realtime::fetch;
 use crate::models::alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation};
 use crate::models::source::Source;
 use crate::stores::alert::AlertStore;
-use prost::Message;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 pub trait GtfsAlertSource: Send + Sync {
     fn source(&self) -> Source;
@@ -33,37 +33,6 @@ pub trait GtfsAlertSource: Send + Sync {
     fn parse_stop_id(&self, stop_id: String) -> Option<String> {
         Some(stop_id)
     }
-}
-
-/// Fetches and decodes a list of GTFS-RT alert feeds concurrently.
-pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
-    let futures = urls.into_iter().map(|url| async move {
-        match reqwest::get(&url).await {
-            Ok(resp) => match resp.bytes().await {
-                Ok(bytes) => match FeedMessage::decode(bytes) {
-                    Ok(msg) => Some(msg),
-                    Err(e) => {
-                        error!("Failed to decode protobuf from {}: {}", url, e);
-                        None
-                    }
-                },
-                Err(e) => {
-                    error!("Failed to read bytes from {}: {}", url, e);
-                    None
-                }
-            },
-            Err(e) => {
-                error!("Failed to fetch {}: {}", url, e);
-                None
-            }
-        }
-    });
-
-    futures::future::join_all(futures)
-        .await
-        .into_iter()
-        .flatten()
-        .collect()
 }
 
 /// Result of processing alerts from feeds

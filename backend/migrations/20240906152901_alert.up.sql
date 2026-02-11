@@ -36,15 +36,17 @@ CREATE TABLE IF NOT EXISTS realtime.affected_entity (
     stop_id VARCHAR,
     source source_enum NOT NULL,
     sort_order INTEGER NOT NULL,
-    UNIQUE (
-        alert_id,
-        route_id,
-        source,
-        stop_id,
-        sort_order
-    ),
     FOREIGN KEY (route_id, source) REFERENCES static.route(id, source) ON DELETE CASCADE,
     FOREIGN KEY (stop_id, source) REFERENCES static.stop(id, source) ON DELETE CASCADE
+);
+
+-- Use a unique index with COALESCE to treat NULL as a specific value for uniqueness
+-- This ensures that multiple rows with NULL stop_id are still considered duplicates
+CREATE UNIQUE INDEX idx_affected_entity_unique ON realtime.affected_entity (
+    alert_id,
+    COALESCE(route_id, ''),
+    source,
+    COALESCE(stop_id, '')
 );
 
 CREATE INDEX idx_alert_translation_alert_id ON realtime.alert_translation (alert_id);

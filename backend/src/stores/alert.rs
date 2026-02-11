@@ -18,6 +18,7 @@ pub struct ApiAlert {
     pub id: Uuid,
     pub original_id: String,
     #[schema(example = "Boarding Change")]
+    // TODO: correct examples for different sources
     /// Alert type, if planned it will start with "Planned"
     pub alert_type: String,
     /// Alert header in HTML format
@@ -258,6 +259,20 @@ impl AlertStore {
             tracing::debug!("Deleted {} cloned alerts", cloned_mta_ids.len());
         }
 
+        // let test_alert = alerts
+        //     .iter()
+        //     .find(|a| a.original_id == "lmm:planned_work:23514")
+        //     .cloned();
+        // if let Some(test_alert) = test_alert {
+        //     dbg!(&test_alert);
+        //     let test_aes = affected_entities
+        //         .iter()
+        //         .filter(|ae| ae.alert_id == test_alert.id)
+        //         .cloned()
+        //         .collect::<Vec<_>>();
+        //     dbg!(&test_aes);
+        // }
+
         // Insert alerts
         let ids = alerts.iter().map(|a| a.id).collect::<Vec<_>>();
         let original_ids = alerts
@@ -492,7 +507,7 @@ impl AlertStore {
                     LEFT JOIN static.stop s ON data.stop_id = s.id AND data.source = s.source
                     WHERE (data.route_id IS NULL OR r.id IS NOT NULL)
                     AND (data.stop_id IS NULL OR s.id IS NOT NULL)
-                    ON CONFLICT DO NOTHING
+                    ON CONFLICT (alert_id, COALESCE(route_id, ''), source, COALESCE(stop_id, '')) DO UPDATE SET sort_order = EXCLUDED.sort_order
                     "#,
                     &alert_ids,
                     &route_ids as &[Option<String>],
@@ -509,6 +524,8 @@ impl AlertStore {
 
         // Commit transaction
         tx.commit().await?;
+
+        // TODO: probably set end time for non-active alerts here
 
         // Invalidate Cache
         let key = format!("alerts:{}", source.as_str());
