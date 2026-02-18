@@ -12,7 +12,7 @@ export type ApiAlert = {
      * Alert type, if planned it will start with "Planned"
      */
     alert_type: string;
-    created_at: string;
+    created_at: Date;
     /**
      * Alert description in HTML format
      */
@@ -20,7 +20,7 @@ export type ApiAlert = {
     /**
      * End time of alert. If null, there is no end time yet.
      */
-    end_time?: string | null;
+    end_time?: Date | null;
     /**
      * Entities affected by alert
      */
@@ -34,8 +34,8 @@ export type ApiAlert = {
     /**
      * Start time of alert (earliest active period)
      */
-    start_time: string;
-    updated_at: string;
+    start_time: Date;
+    updated_at: Date;
 };
 
 export type ApiAlertEntity = {
@@ -143,9 +143,9 @@ export type StopData = (MtaSubwayData & {
 });
 
 export type StopTime = {
-    arrival: string;
+    arrival: Date;
     data: StopTimeData;
-    departure: string;
+    departure: Date;
     stop_id: string;
     trip_id: string;
 };
@@ -165,7 +165,7 @@ export type Trip = {
      * For the MTA subway, this is the start time of the trip.
      * For the MTA buses, this is the start date of the trip + the current time the trip was first seen in the feed.
      */
-    created_at: string;
+    created_at: Date;
     data: TripData;
     /**
      * For the MTA subway, 1 is northbound, 3 is southbound.
@@ -178,7 +178,7 @@ export type Trip = {
      */
     original_id: string;
     route_id: string;
-    updated_at: string;
+    updated_at: Date;
     vehicle_id: string;
 };
 
@@ -203,7 +203,7 @@ export type AlertsHandlerData = {
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
-        at?: number;
+        at?: bigint;
     };
     url: '/v1/alerts/{source}';
 };
@@ -258,7 +258,7 @@ export type StopTimesHandlerData = {
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
-        at?: number;
+        at?: bigint;
     };
     url: '/v1/stop_times/{source}';
 };
@@ -305,7 +305,7 @@ export type TripsHandlerData = {
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
-        at?: number;
+        at?: bigint;
     };
     url: '/v1/trips/{source}';
 };
