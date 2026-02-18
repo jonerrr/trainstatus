@@ -9,6 +9,7 @@ run = "podman compose up -d"
 [tasks.csp]
 run = "cargo sqlx prepare"
 
+# TODO: fix weird linker error when using mise dev monorepo task
 [tasks.dev]
 depends = ["start-containers"]
 run = "cargo run"
