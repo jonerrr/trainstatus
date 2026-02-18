@@ -9,23 +9,50 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
-	import { alerts } from '$lib/alerts.svelte';
-	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
-	import { trips } from '$lib/trips.svelte';
-	import { current_time, page_title } from '$lib/util.svelte';
+	import { alert_context, createAlertResource } from '$lib/alerts.svelte';
+	import { searchSchema } from '$lib/params.schema';
+	import { createTripResource, trip_context } from '$lib/trips.svelte';
+	import { route_info } from '$lib/util.svelte';
 
 	import '@fontsource/inter';
+	import { useInterval } from 'runed';
+	import { useSearchParams } from 'runed/kit';
 
 	import '../app.css';
 
 	let { children, data } = $props();
+
+	let offline = $state(false);
+
+	const params = useSearchParams(searchSchema);
+	// TODO: initalize all sources
+	// TODO: pass initial value from ssr (or somehow have this run during ssr)
+	const trips = createTripResource('mta_subway', params);
+	const alerts = createAlertResource('mta_subway', params);
+
+	trip_context.set(trips);
+	alert_context.set(alerts);
+
+	// TODO: set delay based on if offline or not
+	let delay = $state(5000);
+
+	// TODO: there might be issues with async interval
+	// maybe use interval.counter outside of callback function
+	// const interval = useInterval(() => delay, {
+	// 	async callback() {
+	// 		console.log('updating data');
+	// 		await trips.refetch();
+	// 		await alerts.refetch();
+	// 		offline = false;
+	// 	}
+	// });
+	// $inspect(alerts.current);
 
 	// let last_update = $state<Date>(new Date());
 	// let last_st_update = $state<Date>(new Date());
 	// // used to check if bus routes have changed
 	// let last_monitored_routes = $state(new SvelteSet<string>());
 	// // used to show offline icon in header
-	let offline = $state(false);
 	// // used to prevent multiple updates at the same time
 	// let is_updating = $state(false);
 
@@ -195,7 +222,7 @@
 </script>
 
 <svelte:head>
-	<title>{page_title.text}</title>
+	<title>{route_info.title}</title>
 </svelte:head>
 
 <svelte:window ononline={() => (offline = false)} onoffline={() => (offline = true)} />

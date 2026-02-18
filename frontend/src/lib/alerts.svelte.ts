@@ -1,6 +1,130 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import icons from './icons';
+import icons from '$lib/icons';
+import { LiveResource } from '$lib/rt-resource.svelte';
+
+import type { ApiAlert, Source } from '@trainstatus/client';
+import { Context, resource } from 'runed';
+
+interface AlertResource {
+	alerts: ApiAlert[];
+	alerts_by_route: SvelteMap<string, ApiAlert[]>;
+}
+
+export function createAlertResource(source: Source, params: { at?: number }) {
+	// const sourceDeps = () =>
+	// 	({
+	// 		at: params.at
+	// 	}) satisfies { at?: number };
+
+	const resource = new LiveResource<AlertResource>(
+		async (signal) => {
+			console.log('updating alerts');
+			const query = new URLSearchParams();
+			if (params.at) query.set('at', params.at.toString());
+
+			const res = await fetch(`/api/v1/alerts/${source}?${query}`, { signal });
+
+			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+			if (!res.ok) throw new Error('Failed to fetch alerts');
+
+			const data: ApiAlert[] = await res.json();
+
+			const alerts = data.map((alert) => ({
+				...alert,
+				header_html: parse_html(alert.header_html),
+				description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+				start_time: new Date(alert.start_time),
+				end_time: alert.end_time ? new Date(alert.end_time) : undefined,
+				updated_at: new Date(alert.updated_at),
+				created_at: new Date(alert.created_at)
+			}));
+
+			// alerts_by_route.clear();
+			// might not need to be a sveltemap
+			const alerts_by_route: SvelteMap<string, ApiAlert[]> = new SvelteMap();
+
+			// alerts_by_route = new SvelteMap<string, Alert[]>();
+			for (const alert of alerts) {
+				for (const entity of alert.entities) {
+					if (!alerts_by_route.has(entity.route_id)) {
+						alerts_by_route.set(entity.route_id, []);
+					}
+					// TODO: fix date types being strings
+					alerts_by_route.get(entity.route_id)!.push(alert);
+				}
+			}
+
+			return {
+				alerts,
+				alerts_by_route
+			};
+		},
+		{ interval: 5000, debounce: 500 }
+	);
+
+	$effect(() => {
+		if (params.at !== undefined) {
+			resource.refresh();
+		}
+	});
+	return resource;
+	// const alertResource = resource(
+	// 	() => params.at,
+	// 	async (at, prevAt, { signal }): Promise<AlertResource> => {
+	// 		const query = new URLSearchParams();
+	// 		if (at) query.set('at', at.toString());
+
+	// 		const res = await fetch(`/api/v1/alerts/${source}?${query}`, { signal });
+
+	// 		if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+	// 		if (!res.ok) throw new Error('Failed to fetch alerts');
+
+	// 		const data: ApiAlert[] = await res.json();
+
+	// 		const alerts = data.map((alert) => ({
+	// 			...alert,
+	// 			header_html: parse_html(alert.header_html),
+	// 			description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+	// 			start_time: new Date(alert.start_time),
+	// 			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
+	// 			updated_at: new Date(alert.updated_at),
+	// 			created_at: new Date(alert.created_at)
+	// 		}));
+
+	// 		// alerts_by_route.clear();
+	// 		// might not need to be a sveltemap
+	// 		const alerts_by_route: SvelteMap<string, ApiAlert[]> = new SvelteMap();
+
+	// 		// alerts_by_route = new SvelteMap<string, Alert[]>();
+	// 		for (const alert of alerts) {
+	// 			for (const entity of alert.entities) {
+	// 				if (!alerts_by_route.has(entity.route_id)) {
+	// 					alerts_by_route.set(entity.route_id, []);
+	// 				}
+	// 				// TODO: fix date types being strings
+	// 				alerts_by_route.get(entity.route_id)!.push(alert);
+	// 			}
+	// 		}
+
+	// 		return {
+	// 			alerts,
+	// 			alerts_by_route
+	// 		};
+	// 	},
+	// 	{
+	// 		initialValue: {
+	// 			alerts: [],
+	// 			alerts_by_route: new SvelteMap()
+	// 		},
+	// 		debounce: 500 // TODO: maybe do debounce instead or increase time
+	// 	}
+	// );
+
+	// return alertResource;
+}
+
+export const alert_context = new Context<ReturnType<typeof createAlertResource>>('alerts');
 
 export interface Alert {
 	id: string;

@@ -354,9 +354,9 @@
 	// $inspect(xDomain);
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
 	<title>Charts | Train Status</title>
-</svelte:head>
+</svelte:head> -->
 
 <div class="flex h-[calc(100dvh-8rem)] min-h-[300px] flex-col">
 	<div class="pl-3 text-xl font-bold">Charts</div>

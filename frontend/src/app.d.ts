@@ -44,26 +44,13 @@ declare global {
 			// dialog_open: boolean;
 			// dialog_id: T;
 			// null is not open
+			// type: 'stop' | 'trip' | 'route' | 'settings' | null;
 			modal:
 				| null
-				| {
-						type: 'stop';
-						data: Stop;
-						source: Source;
-				  }
-				| {
-						type: 'trip';
-						data: Trip;
-						source: Source;
-				  }
-				| {
-						type: 'route';
-						data: Route;
-						source: Source;
-				  }
-				| {
-						type: 'settings';
-				  };
+				| (Stop & { type: 'stop' })
+				| (Trip & { type: 'trip' })
+				| (Route & { type: 'route' })
+				| { type: 'settings' };
 			// TODO: require that if modal isn't null, data must be provided
 			// modal: 'stop' | 'trip' | 'route' | 'settings' | null;
 			// data?: Stop | Trip | Route;

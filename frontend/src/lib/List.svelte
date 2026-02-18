@@ -137,6 +137,7 @@
 		easing: cubicInOut
 	});
 
+	// TODO: actually don't use runed utilities for this stuff
 	// Viewport element and sizing using runed
 	let viewport_el = $state<HTMLDivElement>();
 	const viewport_size = new ElementSize(() => viewport_el);
@@ -168,62 +169,69 @@
 	});
 
 	// Item heights cache using SvelteMap for reactivity
+	// TODO: move to separate file so lists can share measured heights (for same items across sources)
 	const item_heights = new SvelteMap<string, number>();
-	let item_offsets: Record<number, number> = {};
 
-	// Reset offsets when items change
+	// Prefix sum array for O(1) offset lookups
+	let offsets = $state<number[]>([]);
+	let measured_total_height = $state(0);
+
+	// Rebuild offsets array when items or heights change (prefix sum calculation)
 	$effect(() => {
-		// maybe move this to derived
-		items;
-		item_offsets = {};
+		let running_offset = 0;
+		offsets = items.map((item) => {
+			const top = running_offset;
+			const height = item_heights.get(item.id) ?? height_calc(item);
+			running_offset += height;
+			return top;
+		});
+		measured_total_height = running_offset;
 	});
 
-	function getItemOffset(startIndex: number): number {
-		if (item_offsets[startIndex] !== undefined) {
-			return item_offsets[startIndex];
-		}
-		let offset = 0;
-		for (let i = 0; i < startIndex; i++) {
-			const itemId = items[i].id;
-			let height = item_heights.get(itemId);
-			if (!height) {
-				height = height_calc(items[i]);
-			}
-			offset += height;
-		}
-		item_offsets[startIndex] = offset;
-		return offset;
+	// O(1) lookup instead of O(n) iteration
+	function getItemOffset(index: number): number {
+		return offsets[index] ?? 0;
 	}
 
-	// Calculate start index based on scroll position
+	// Binary search for start index - O(log n) instead of O(n)
 	function calculateStartIndex() {
-		let start = 0;
-		let position = 0;
 		const scroll_top = scroll.y;
-		while (start < items.length) {
-			const item = items[start];
-			const height = item_heights.get(item.id) ?? height_calc(item);
-			if (position + height > scroll_top - overscan * height) break;
-			position += height;
-			start++;
+		if (items.length === 0 || scroll_top <= 0) return 0;
+
+		let low = 0;
+		let high = items.length - 1;
+
+		while (low <= high) {
+			const mid = Math.floor((low + high) / 2);
+			const top = offsets[mid] ?? 0;
+			const height = item_heights.get(items[mid].id) ?? height_calc(items[mid]);
+
+			if (top + height < scroll_top) {
+				low = mid + 1;
+			} else if (top > scroll_top) {
+				high = mid - 1;
+			} else {
+				return Math.max(0, mid - overscan);
+			}
 		}
-		return Math.max(0, start);
+		return Math.max(0, low - overscan);
 	}
 
 	// Calculate end index based on viewport height
 	function calculateEndIndex(start: number) {
-		let end = start;
-		let position = getItemOffset(start);
 		const scroll_top = scroll.y;
 		const viewport_height = viewport_size.height;
-		while (end < items.length) {
-			const item = items[end];
-			const height = item_heights.get(item.id) ?? height_calc(item) ?? 50;
-			position += height;
-			if (position > scroll_top + viewport_height + overscan * height) break;
-			end++;
+		const max_position = scroll_top + viewport_height;
+
+		for (let i = start; i < items.length; i++) {
+			const top = offsets[i] ?? 0;
+			const height = item_heights.get(items[i].id) ?? height_calc(items[i]);
+
+			if (top > max_position + overscan * height) {
+				return i;
+			}
 		}
-		return Math.min(end, items.length);
+		return items.length;
 	}
 
 	// Derive visible items with virtualization
@@ -246,6 +254,25 @@
 	// Calculate total height for the scroll container
 	function calculate_total_height() {
 		const total_items = Math.min(items_before_scroll ?? items.length, items.length);
+
+		// Use measured height if available and all items are included
+		if (
+			measured_total_height > 0 &&
+			(!items_before_scroll || items_before_scroll >= items.length)
+		) {
+			return measured_total_height;
+		}
+
+		// Otherwise calculate from offsets or estimates
+		if (total_items === 0) return 0;
+		if (offsets.length > total_items) {
+			return (
+				offsets[total_items - 1] +
+				(item_heights.get(items[total_items - 1].id) ?? height_calc(items[total_items - 1]))
+			);
+		}
+
+		// Fallback to manual calculation
 		let total = 0;
 		for (let i = 0; i < total_items; i++) {
 			const item = items[i];
@@ -256,15 +283,48 @@
 	}
 
 	const total_height = $derived.by(calculate_total_height);
-
-	// Action to measure item height - returns cleanup function
+	// TODO: convert to attachment
+	// Action to measure item height with scroll correction
 	function measureHeight(node: HTMLElement, id: string) {
-		// Measure immediately
-		item_heights.set(id, node.offsetHeight);
+		// Find the index of this item
+		const get_index = () => items.findIndex((item) => item.id === id);
 
-		// Re-measure on resize
+		// Measure immediately
+		const initial_height = node.offsetHeight;
+		item_heights.set(id, initial_height);
+
+		// Re-measure on resize with scroll correction
 		const observer = new ResizeObserver(() => {
-			item_heights.set(id, node.offsetHeight);
+			const new_height = node.offsetHeight;
+			const old_height = item_heights.get(id);
+
+			if (new_height !== old_height && old_height !== undefined) {
+				const delta = new_height - old_height;
+				const index = get_index();
+
+				// Update the height
+				item_heights.set(id, new_height);
+
+				// Update total height
+				measured_total_height += delta;
+
+				// Update all subsequent offsets
+				for (let i = index + 1; i < offsets.length; i++) {
+					offsets[i] += delta;
+				}
+
+				// Scroll correction: if item is above viewport, adjust scrollTop
+				// to prevent visible content from jumping
+				if (viewport_el && index >= 0) {
+					const current_start = calculateStartIndex();
+					if (index < current_start) {
+						viewport_el.scrollTop += delta;
+					}
+				}
+			} else if (old_height === undefined) {
+				// First measurement
+				item_heights.set(id, new_height);
+			}
 		});
 		observer.observe(node);
 
@@ -360,8 +420,7 @@
 							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
 							onclick={() => {
 								pushState('', {
-									// TODO: fix typing (caused by modal accepting different types of data based on type property)
-									modal: { type, data: $state.snapshot(data), source: active_source }
+									modal: { type, ...$state.snapshot(data) } as any
 								});
 							}}
 						>

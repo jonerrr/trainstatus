@@ -27,7 +27,7 @@
 
 	// const { current_time }: Props = $props();
 
-	let dialog_el = $state<HTMLDialogElement>();
+	// let dialog_el = $state<HTMLDialogElement>();
 
 	function close() {
 		// enable_scroll();
@@ -81,6 +81,16 @@
 		element.addEventListener('mousedown', handle_mouse_down);
 		element.addEventListener('mouseup', handle_mouse_up);
 		document.addEventListener('keydown', handle_keydown);
+
+		$effect(() => {
+			// TODO: why does this run twice on close
+			console.log(`modal update`, { state: page.state });
+			if (page.state.modal) {
+				element.showModal();
+			} else {
+				element.close();
+			}
+		});
 
 		return () => {
 			document.body.style.overflow = '';
@@ -273,7 +283,6 @@
 <!-- fixed bottom-0 left-0 right-0 -->
 <dialog
 	{@attach modal}
-	bind:this={dialog_el}
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal?.type === 'stop'}
@@ -282,20 +291,20 @@
 		{@render actions(
 			true,
 			's',
-			page.state.modal.data.id,
-			`Arrivals at ${page.state.modal.data.name}`,
-			page.state.modal.source,
+			page.state.modal.id,
+			`Arrivals at ${page.state.modal.name}`,
+			page.state.modal.data.source,
 			stop_pins
 		)}
 	{:else if page.state.modal?.type === 'route'}
-		<RouteModal route={page.state.modal.data} time_format={time_format.current} />
+		<RouteModal route={page.state.modal} time_format={time_format.current} />
 
 		{@render actions(
 			false,
 			'r',
-			page.state.modal.data.id,
-			`Alerts for ${page.state.modal.data.id}`,
-			page.state.modal.source,
+			page.state.modal.id,
+			`Alerts for ${page.state.modal.short_name}`,
+			page.state.modal.data.source,
 			route_pins
 		)}
 	{:else if page.state.modal?.type === 'trip'}

@@ -4,19 +4,7 @@
 	import List from '$lib/List.svelte';
 	import { route_pins } from '$lib/stores.svelte';
 
-	// const { bus_routes, train_routes } = $derived(
-	// 	Object.values(page.data.routes).reduce(
-	// 		(acc: { bus_routes: Route[]; train_routes: Route[] }, route) => {
-	// 			if (route.route_type === 'bus') {
-	// 				acc.bus_routes.push(route);
-	// 			} else {
-	// 				acc.train_routes.push(route);
-	// 			}
-	// 			return acc;
-	// 		},
-	// 		{ bus_routes: [], train_routes: [] }
-	// 	)
-	// );
+	// TODO: combine express and local
 </script>
 
 <!-- <svelte:head>

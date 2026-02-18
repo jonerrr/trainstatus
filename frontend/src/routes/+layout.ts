@@ -1,5 +1,5 @@
 import { alerts } from '$lib/alerts.svelte';
-import { searchSchema } from '$lib/schemas';
+import { searchSchema } from '$lib/params.schema';
 import { default_sources } from '$lib/sources';
 import { stop_times } from '$lib/stop_times.svelte';
 import { trips } from '$lib/trips.svelte';

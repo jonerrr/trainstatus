@@ -7,9 +7,9 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
-	import { is_mta_bus, is_mta_subway, main_stop_routes } from '$lib/static';
+	// import { is_mta_bus, is_mta_subway, main_stop_routes } from '$lib/static';
 	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
-	import { TripDirection, trips as rt_trips } from '$lib/trips.svelte';
+	import { trip_context } from '$lib/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import type { Route, Stop } from '@trainstatus/client';
@@ -29,6 +29,7 @@
 
 	type StopTimeByRoute = Map<string, StopTimeData[]>;
 
+	// TODO: use an array instead of hardcoded nb and sb maps
 	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
 	const active_routes = $state(new SvelteSet<Route>());

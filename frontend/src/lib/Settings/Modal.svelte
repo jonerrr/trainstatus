@@ -17,7 +17,7 @@
 	import dayjs from 'dayjs';
 
 	let headerRef = $state<HTMLDivElement>();
-
+	// TODO: maybe low-data mode (that doesn't fetch non-visible info)
 	onMount(() => {
 		// Set a tiny timeout to ensure the dialog is fully rendered
 		setTimeout(() => {

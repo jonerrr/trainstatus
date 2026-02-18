@@ -6,24 +6,42 @@ import { page } from '$app/state';
 
 // }
 
-class PageTitle {
+class RouteInfo {
 	// make private probably
-	crumbs = $state([]);
+	// crumbs = $state([]);
 	url_mappings = {
 		'/': 'Home',
 		'/stops': 'Stops',
 		'/routes': 'Routes',
-		'/alerts': 'Alerts'
-	};
+		'/alerts': 'Alerts',
+		'/charts': 'Charts'
+	} as const;
 
 	constructor() {
 		// this.text = $state(text);
 	}
 
-	text = $derived.by(() => {
+	// maybe manage monitored routes here or dialog state
+
+	title = $derived.by(() => {
 		// TODO: use page.url and page.state to generate title and breadcrumbs
-		// page.url
-		return `${this.url_mappings[page.url.pathname]} | Train Status`;
+
+		switch (page.state.modal?.type) {
+			case 'stop':
+				return `Stop: ${page.state.modal.name}`;
+			case 'route':
+				return `Route: ${page.state.modal.short_name}`;
+			case 'trip':
+				return `${page.state.modal.route_id} Trip`;
+			// TODO: settings
+		}
+
+		const title =
+			page.url.pathname in this.url_mappings
+				? this.url_mappings[page.url.pathname as keyof typeof this.url_mappings]
+				: '???';
+
+		return `${title} | Train Status`;
 	});
 
 	// reset = () => {
@@ -32,7 +50,7 @@ class PageTitle {
 	// }
 }
 
-export const page_title = new PageTitle();
+export const route_info = new RouteInfo();
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {

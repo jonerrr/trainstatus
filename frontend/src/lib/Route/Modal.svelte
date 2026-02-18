@@ -2,25 +2,27 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
-	import { alerts as rt_alerts } from '$lib/alerts.svelte';
-	import { type Route } from '$lib/static';
+	import { alert_context } from '$lib/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import type { Route } from '@trainstatus/client';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 
 	dayjs.extend(relativeTime);
 
-	interface ModalProps {
+	interface Props {
 		route: Route;
 		time_format: 'time' | 'countdown';
 	}
 
-	let { route, time_format }: ModalProps = $props();
+	let { route, time_format }: Props = $props();
 
-	const alerts = $derived(
-		rt_alerts.alerts_by_route
+	const alerts = alert_context.get();
+
+	const route_alerts = $derived(
+		alerts.value?.alerts_by_route
 			.get(route.id)
 			?.sort(
 				(a, b) =>
@@ -84,8 +86,8 @@
 	<Icon width={36} height={36} link={false} {route} />
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
-		{#if alerts.length && idx < alerts.length}
-			{alerts[idx].alert_type}
+		{#if route_alerts.length && idx < route_alerts.length}
+			{route_alerts[idx].alert_type}
 		{:else}
 			No alerts
 		{/if}
@@ -98,7 +100,7 @@
 		if (event.key === 'ArrowLeft' && idx > 0) {
 			// if we don't debounce, clicking arrow key twice really fast will get the scroll stuck
 			debounce_scroll_to_alert(idx - 1);
-		} else if (event.key === 'ArrowRight' && idx < alerts.length - 1) {
+		} else if (event.key === 'ArrowRight' && idx < route_alerts.length - 1) {
 			debounce_scroll_to_alert(idx + 1);
 		}
 	}}
@@ -109,7 +111,7 @@
 	bind:this={scroll_area}
 	{@attach manage_scroll}
 >
-	{#each alerts as alert}
+	{#each route_alerts as alert}
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
@@ -147,7 +149,7 @@
 		</article>
 	{/each}
 
-	{#if alerts.length > 1}
+	{#if route_alerts.length > 1}
 		<div class="absolute bottom-0 flex w-full -translate-y-16 items-center justify-center gap-2">
 			<!-- <div class="flex  w-fit"> -->
 
@@ -159,17 +161,17 @@
 			>
 				<ChevronLeft />
 			</button>
-			{#each alerts as _alert, i}
+			{#each route_alerts as _alert, i}
 				<button
-					class="size-3 rounded-full bg-neutral-300 {i !== idx && 'bg-neutral-500'}"
+					class={['size-3 rounded-full bg-neutral-300', { 'bg-neutral-500': i === idx }]}
 					aria-label="Scroll to alert"
 					onclick={() => scroll_to_alert(i)}
 				>
 				</button>
 			{/each}
 			<button
-				disabled={idx === alerts.length - 1}
-				class:text-neutral-500={idx === alerts.length - 1}
+				disabled={idx === route_alerts.length - 1}
+				class={{ 'text-neutral-500': idx === route_alerts.length - 1 }}
 				aria-label="Next alert"
 				onclick={() => scroll_to_alert(idx + 1)}
 			>

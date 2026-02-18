@@ -2,50 +2,103 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import { page } from '$app/state';
 
-import { resource } from 'runed';
+import { LiveResource } from '$lib/rt-resource.svelte';
 
-import { current_time } from './util.svelte';
+import type { Source, Trip } from '@trainstatus/client';
+import { Context } from 'runed';
 
-// const tripResource = resource(
-// 	() => params.at,
-// 	async (at, prevAt, { signal }) => {
-// 		const query = new URLSearchParams();
-// 		if (at) query.set('at', at.toString());
+type TripResource = SvelteMap<string, Trip>;
 
-// 		const res = await fetch(`/api/v1/trips/${source}?${query}`, { signal });
+export function createTripResource(source: Source, params: { at?: number }) {
+	const resource = new LiveResource<TripResource>(
+		async (signal) => {
+			console.log('updating trips');
+			const query = new URLSearchParams();
+			if (params.at) query.set('at', params.at.toString());
 
-// 		if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
-// 		if (!res.ok) throw new Error('Failed to fetch trips');
+			const res = await fetch(`/api/v1/trips/${source}?${query}`, { signal });
 
-// 		const data: Trip<TripData>[] = await res.json();
+			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+			if (!res.ok) throw new Error('Failed to fetch trips');
 
-// 		return new SvelteMap(
-// 			data.map((trip) => [
-// 				trip.id,
-// 				{
-// 					...trip,
-// 					created_at: new Date(trip.created_at),
-// 					updated_at: new Date(trip.updated_at)
-// 				}
-// 			])
-// 		);
-// 	},
-// 	{
-// 		initialValue: new SvelteMap()
-// 	}
-// );
+			const data: Trip[] = await res.json();
+			//TODO: compare map and for loop performance
+			return new SvelteMap(
+				data.map((trip) => [
+					trip.id,
+					{
+						...trip,
+						created_at: new Date(trip.created_at),
+						updated_at: new Date(trip.updated_at)
+					}
+				])
+			);
+		},
+		{
+			interval: 5000,
+			debounce: 500 // TODO: increase time
+		}
+	);
 
-export interface Trip<T = TripData, R = never> {
-	id: string;
-	mta_id: string;
-	route_id: string;
-	vehicle_id: string;
-	direction: TripDirection;
-	data: T;
-	created_at: Date;
-	updated_at: Date;
-	route: R;
+	$effect(() => {
+		if (params.at !== undefined) {
+			resource.refresh();
+		}
+	});
+
+	return resource;
 }
+
+export const trip_context = new Context<ReturnType<typeof createTripResource>>('trips');
+
+// export function createTripResource(source: Source, params: { at?: number }) {
+// 	const tripResource = resource(
+// 		() => params.at,
+// 		async (at, prevAt, { signal }) => {
+// 			const query = new URLSearchParams();
+// 			if (at) query.set('at', at.toString());
+
+// 			const res = await fetch(`/api/v1/trips/${source}?${query}`, { signal });
+
+// 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+// 			if (!res.ok) throw new Error('Failed to fetch trips');
+
+// 			// TODO: use new trip type
+// 			const data: Trip[] = await res.json();
+
+// 			return new SvelteMap(
+// 				data.map((trip) => [
+// 					trip.id,
+// 					{
+// 						...trip,
+// 						created_at: new Date(trip.created_at),
+// 						updated_at: new Date(trip.updated_at)
+// 					}
+// 				])
+// 			);
+// 		},
+// 		{
+// 			initialValue: new SvelteMap(),
+// 			throttle: 500 // TODO: maybe do debounce instead or increase time
+// 		}
+// 	);
+
+// 	return tripResource;
+// }
+// TODO: Rename
+// export const tripsNew = createTripResource('mta_subway');
+
+// export interface Trip<T = TripData, R = never> {
+// 	id: string;
+// 	mta_id: string;
+// 	route_id: string;
+// 	vehicle_id: string;
+// 	direction: TripDirection;
+// 	data: T;
+// 	created_at: Date;
+// 	updated_at: Date;
+// 	route: R;
+// }
 
 export type TripData = TrainTripData | BusTripData;
 

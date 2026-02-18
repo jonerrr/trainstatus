@@ -1,5 +1,4 @@
-// Re-export types from the client package
-import type { Route, Source, Stop, StopData, StopRoute } from '@trainstatus/client';
+import type { RouteStop, Stop, StopData } from '@trainstatus/client';
 
 // Type guards for source-specific data
 export const is_mta_bus = (data: StopData): data is StopData & { source: 'mta_bus' } => {
@@ -11,11 +10,11 @@ export const is_mta_subway = (data: StopData): data is StopData & { source: 'mta
 };
 
 // Get main routes for a stop (for subway, filter to main lines only)
-export const main_stop_routes = (stop: Stop): StopRoute[] => {
+export const main_stop_routes = (stop: Stop): RouteStop[] => {
 	if (is_mta_subway(stop.data)) {
 		// For subway stops, filter out express routes that are variants of local routes
 		// Express routes typically end in 'X' or have same base ID
-		const mainRoutes = new Map<string, StopRoute>();
+		const mainRoutes = new Map<string, RouteStop>();
 		for (const route of stop.routes) {
 			const baseId = route.route_id.replace(/X$/, '');
 			if (!mainRoutes.has(baseId) || !route.route_id.endsWith('X')) {
