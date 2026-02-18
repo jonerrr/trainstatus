@@ -2,6 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import icons from '$lib/icons';
 import { LiveResource } from '$lib/rt-resource.svelte';
+import { source_info } from '$lib/sources';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
 import { Context, resource } from 'runed';
@@ -60,7 +61,7 @@ export function createAlertResource(source: Source, params: { at?: number }) {
 				alerts_by_route
 			};
 		},
-		{ interval: 5000, debounce: 500 }
+		{ interval: source_info[source].refresh_interval, debounce: 500 }
 	);
 
 	$effect(() => {
@@ -146,6 +147,7 @@ export interface Entity {
 
 type Fetch = typeof fetch;
 
+// TODO: maybe move parsing to backend and standardize icon format (which will be important if we have other sources)
 const train_regex = /(\[(.+?)\])/gm;
 
 function parse_html(html: string) {
@@ -162,31 +164,30 @@ export function createAlerts() {
 	const alerts_by_route: SvelteMap<string, Alert[]> = $state(new SvelteMap());
 
 	async function update(fetch: Fetch, at?: string) {
-		const res = await fetch(`/api/v1/alerts${at ? `?at=${at}` : ''}`);
-		if (res.headers.has('x-sw-fallback')) {
-			throw new Error('Offline');
-		}
-		const data: Alert[] = await res.json();
-
-		alerts = data.map((alert) => ({
-			...alert,
-			header_html: parse_html(alert.header_html),
-			description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
-			start_time: new Date(alert.start_time),
-			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-			updated_at: new Date(alert.updated_at),
-			created_at: new Date(alert.created_at)
-		}));
-		alerts_by_route.clear();
-		// alerts_by_route = new SvelteMap<string, Alert[]>();
-		for (const alert of alerts) {
-			for (const entity of alert.entities) {
-				if (!alerts_by_route.has(entity.route_id)) {
-					alerts_by_route.set(entity.route_id, []);
-				}
-				alerts_by_route.get(entity.route_id)!.push(alert);
-			}
-		}
+		// const res = await fetch(`/api/v1/alerts${at ? `?at=${at}` : ''}`);
+		// if (res.headers.has('x-sw-fallback')) {
+		// 	throw new Error('Offline');
+		// }
+		// const data: Alert[] = await res.json();
+		// alerts = data.map((alert) => ({
+		// 	...alert,
+		// 	header_html: parse_html(alert.header_html),
+		// 	description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+		// 	start_time: new Date(alert.start_time),
+		// 	end_time: alert.end_time ? new Date(alert.end_time) : undefined,
+		// 	updated_at: new Date(alert.updated_at),
+		// 	created_at: new Date(alert.created_at)
+		// }));
+		// alerts_by_route.clear();
+		// // alerts_by_route = new SvelteMap<string, Alert[]>();
+		// for (const alert of alerts) {
+		// 	for (const entity of alert.entities) {
+		// 		if (!alerts_by_route.has(entity.route_id)) {
+		// 			alerts_by_route.set(entity.route_id, []);
+		// 		}
+		// 		alerts_by_route.get(entity.route_id)!.push(alert);
+		// 	}
+		// }
 	}
 
 	return {

@@ -3,6 +3,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { page } from '$app/state';
 
 import { LiveResource } from '$lib/rt-resource.svelte';
+import { source_info } from '$lib/sources';
 
 import type { Source, Trip } from '@trainstatus/client';
 import { Context } from 'runed';
@@ -35,7 +36,7 @@ export function createTripResource(source: Source, params: { at?: number }) {
 			);
 		},
 		{
-			interval: 5000,
+			interval: source_info[source].refresh_interval,
 			debounce: 500 // TODO: increase time
 		}
 	);
@@ -142,38 +143,36 @@ export enum TripDirection {
 type Fetch = typeof fetch;
 
 export function createTrips() {
-	let trips = $state(new SvelteMap<string, Trip<TripData>>());
+	// $state is redundant here
+	let trips = $state(new SvelteMap<string, Trip>());
 
 	// this returns true if there was an error (aka offline)
 	async function update(fetch: Fetch, at?: string) {
-		// if (page.url.pathname)
-		// try {
-		const params = new URLSearchParams();
-		if (at) {
-			params.set('at', at);
-		}
-		// if (finished) {
-		// 	params.set('finished', 'true');
-		// 	// params.set('at', Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000).toString());
+		// // if (page.url.pathname)
+		// // try {
+		// const params = new URLSearchParams();
+		// if (at) {
+		// 	params.set('at', at);
 		// }
-
-		const res = await fetch(`/api/v1/trips${params.size ? '?' + params.toString() : ''}`);
-		if (res.headers.has('x-sw-fallback')) {
-			throw new Error('Offline');
-		}
-
-		const data: Trip<TripData>[] = await res.json();
-
-		trips = new SvelteMap(
-			data.map((trip) => [
-				trip.id,
-				{
-					...trip,
-					created_at: new Date(trip.created_at),
-					updated_at: new Date(trip.updated_at)
-				}
-			])
-		);
+		// // if (finished) {
+		// // 	params.set('finished', 'true');
+		// // 	// params.set('at', Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000).toString());
+		// // }
+		// const res = await fetch(`/api/v1/trips${params.size ? '?' + params.toString() : ''}`);
+		// if (res.headers.has('x-sw-fallback')) {
+		// 	throw new Error('Offline');
+		// }
+		// const data: Trip<TripData>[] = await res.json();
+		// trips = new SvelteMap(
+		// 	data.map((trip) => [
+		// 		trip.id,
+		// 		{
+		// 			...trip,
+		// 			created_at: new Date(trip.created_at),
+		// 			updated_at: new Date(trip.updated_at)
+		// 		}
+		// 	])
+		// );
 	}
 
 	return {

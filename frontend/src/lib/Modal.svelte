@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
+	import { on } from 'svelte/events';
 
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -29,17 +30,141 @@
 
 	// let dialog_el = $state<HTMLDialogElement>();
 
+	// Physics constants derived from vaul-svelte
+	const VELOCITY_THRESHOLD = 0.4; // px/ms
+	const CLOSE_THRESHOLD = 0.25; // % of height
+	const DRAG_RESISTANCE = 8; // Rubber band strength
+
+	// State for drag physics
+	let is_dragging = $state(false);
+	let translate_y = $state(0);
+	let start_y = 0;
+	let start_time = 0;
+	let modal_height = 0;
+	let is_transitioning = $state(false);
+
+	// Derived style for the modal
+	// We disable CSS transitions while dragging so it feels responsive (1:1 movement)
+	let modal_style = $derived(
+		`transform: translate3d(0, ${translate_y}px, 0); ` +
+			`transition: ${is_transitioning ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none'};` +
+			// Important: prevent browser gestures like "back" or "refresh" while dragging
+			(is_dragging ? 'touch-action: none;' : '')
+	);
+
+	// Logarithmic dampening for "rubber banding" (dragging upwards past 0)
+	function dampen_value(v: number) {
+		return DRAG_RESISTANCE * (Math.log(v + 1) - 2);
+	}
+
 	function close() {
 		// enable_scroll();
 		pushState('', { modal: null });
 	}
 
-	const modal: Attachment<HTMLDialogElement> = (element) => {
+	const modal: Attachment<HTMLDialogElement> = (node) => {
 		document.body.style.overflow = 'hidden';
+
+		$effect(() => {
+			// TODO: why does this run twice on close
+			console.log(`modal update`, { state: page.state });
+			if (page.state.modal) {
+				node.showModal();
+			} else {
+				node.close();
+			}
+		});
+
+		// TODO: maybe need to handle when dialog has long scrollable content
+		// 		function handle_pointer_down(e: PointerEvent) {
+		//     // Check if target is inside a scrollable element that isn't at the top
+		//     let target = e.target as HTMLElement;
+		//     while (target && target !== element) {
+		//         if (target.scrollHeight > target.clientHeight) {
+		//             // It is scrollable. If we are not at the top, don't drag the modal.
+		//             if (target.scrollTop > 0) return;
+		//         }
+		//         target = target.parentElement as HTMLElement;
+		//     }
+
+		//     // ... rest of the function
+		//     element.setPointerCapture(e.pointerId);
+		// }
+		function handle_pointer_down(e: PointerEvent) {
+			// Ignore if clicking a button or specific non-draggable areas if needed
+			// if ((e.target as HTMLElement).closest('button')) return;
+
+			is_dragging = true;
+			is_transitioning = false;
+			start_y = e.screenY;
+			start_time = Date.now();
+			modal_height = node.getBoundingClientRect().height;
+
+			// Capture pointer to ensure we keep receiving events even if mouse leaves the modal
+			node.setPointerCapture(e.pointerId);
+		}
+
+		function handle_pointer_move(e: PointerEvent) {
+			if (!is_dragging) return;
+
+			const delta_y = e.screenY - start_y;
+
+			// If dragging down (positive delta), move 1:1
+			if (delta_y > 0) {
+				translate_y = delta_y;
+			}
+			// If dragging up (negative delta), apply resistance (dampening)
+			else {
+				translate_y = dampen_value(Math.abs(delta_y)) * -1;
+			}
+		}
+
+		function handle_pointer_up(e: PointerEvent) {
+			if (!is_dragging) return;
+
+			is_dragging = false;
+			is_transitioning = true; // Re-enable CSS transitions for the snap back/close
+			node.releasePointerCapture(e.pointerId);
+
+			const end_y = e.screenY;
+			const distance = end_y - start_y;
+			const time_taken = Date.now() - start_time;
+			const velocity = Math.abs(distance) / time_taken;
+
+			// 1. Velocity Check (Flick)
+			// Only close on flick if moving downwards
+			if (distance > 0 && velocity > VELOCITY_THRESHOLD) {
+				close_animate();
+				return;
+			}
+
+			// 2. Threshold Check (Drag distance)
+			// Close if dragged down more than 25% of height
+			if (distance > 0 && distance > modal_height * CLOSE_THRESHOLD) {
+				close_animate();
+				return;
+			}
+
+			// 3. Reset (Snap back)
+			// If neither condition met, bounce back to 0
+			translate_y = 0;
+		}
+
+		function close_animate() {
+			// Animate off screen
+			translate_y = modal_height; // Slide completely out of view
+
+			// Wait for animation to finish before actually closing state
+			setTimeout(() => {
+				close();
+				// Reset position for next open (though component usually remounts)
+				translate_y = 0;
+			}, 300);
+		}
 
 		// watch for clicks outside the dialog to close it
 		function handle_click(event: MouseEvent) {
-			if (event.target === element) {
+			if (event.target === node) {
 				close();
 			}
 		}
@@ -59,15 +184,15 @@
 		let startY: number;
 
 		function handle_mouse_down(event: MouseEvent) {
-			if (event.target !== element) return;
+			if (event.target !== node) return;
 
 			startX = event.pageX;
 			startY = event.pageY;
 		}
 
 		function handle_mouse_up(event: MouseEvent) {
-			// Only act if the mouse started and ended directly on the dialog element
-			if (event.target !== element) return;
+			// Only act if the mouse started and ended directly on the dialog node
+			if (event.target !== node) return;
 
 			const diffX = Math.abs(event.pageX - startX);
 			const diffY = Math.abs(event.pageY - startY);
@@ -77,27 +202,22 @@
 			}
 		}
 
-		element.addEventListener('click', handle_click);
-		element.addEventListener('mousedown', handle_mouse_down);
-		element.addEventListener('mouseup', handle_mouse_up);
-		document.addEventListener('keydown', handle_keydown);
+		const listeners_to_remove: Array<() => void> = [];
 
-		$effect(() => {
-			// TODO: why does this run twice on close
-			console.log(`modal update`, { state: page.state });
-			if (page.state.modal) {
-				element.showModal();
-			} else {
-				element.close();
-			}
-		});
+		listeners_to_remove.push(on(node, 'click', handle_click));
+		listeners_to_remove.push(on(node, 'mousedown', handle_mouse_down));
+		listeners_to_remove.push(on(node, 'mouseup', handle_mouse_up));
+		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
+
+		// physics events
+		listeners_to_remove.push(on(node, 'pointerdown', handle_pointer_down));
+		listeners_to_remove.push(on(node, 'pointermove', handle_pointer_move));
+		listeners_to_remove.push(on(node, 'pointerup', handle_pointer_up));
+		listeners_to_remove.push(on(node, 'pointercancel', handle_pointer_up)); // Handle cases where the pointer is canceled (e.g., system interrupts)
 
 		return () => {
 			document.body.style.overflow = '';
-			element.removeEventListener('mousedown', handle_mouse_down);
-			element.removeEventListener('mouseup', handle_mouse_up);
-			element.removeEventListener('click', handle_click);
-			document.removeEventListener('keydown', handle_keydown);
+			listeners_to_remove.forEach((off) => off());
 		};
 	};
 
@@ -283,6 +403,7 @@
 <!-- fixed bottom-0 left-0 right-0 -->
 <dialog
 	{@attach modal}
+	style={modal_style}
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal?.type === 'stop'}
@@ -336,3 +457,51 @@
 		animation: spin 0.5s linear;
 	}
 </style> -->
+<!-- TODO: disable animations using @media (prefers-reduced-motion: no-preference) { } -->
+<!-- TODO: fix animations not working -->
+<style>
+	/* 1. Base State (Closed/Exiting) */
+	dialog {
+		opacity: 0;
+		transform: translateY(100%);
+		/* allow-discrete ensures 'display' waits for the transition to finish before switching to 'none' */
+		transition:
+			opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+			transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+			overlay 0.3s cubic-bezier(0.32, 0.72, 0, 1) allow-discrete,
+			display 0.3s cubic-bezier(0.32, 0.72, 0, 1) allow-discrete;
+	}
+
+	/* 2. Open State */
+	dialog[open] {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	/* 3. Entry Animation (Starting Style) */
+	@starting-style {
+		dialog[open] {
+			opacity: 0;
+			transform: translateY(100%);
+		}
+	}
+
+	/* 4. Backdrop Animation */
+	dialog::backdrop {
+		background-color: transparent;
+		transition:
+			display 0.3s allow-discrete,
+			overlay 0.3s allow-discrete,
+			background-color 0.3s;
+	}
+
+	dialog[open]::backdrop {
+		background-color: rgb(0 0 0 / 50%);
+	}
+
+	@starting-style {
+		dialog[open]::backdrop {
+			background-color: transparent;
+		}
+	}
+</style>

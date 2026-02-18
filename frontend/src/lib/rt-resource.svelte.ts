@@ -5,7 +5,7 @@ interface LiveResourceOptions {
 	enabled?: boolean;
 	debounce?: number;
 }
-
+// TODO: probably take a default value for SSR
 export class LiveResource<T> {
 	// State
 	value = $state<T | undefined>(undefined);
@@ -23,6 +23,9 @@ export class LiveResource<T> {
 	#interval_timer: ReturnType<typeof setTimeout> | undefined;
 	#debounce_timer: ReturnType<typeof setTimeout> | undefined;
 	#abort_controller: AbortController | undefined;
+
+	// Pending resolvers waiting for next successful fetch
+	#pending_resolvers: Array<() => void> = [];
 
 	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions = {}) {
 		this.#fetcher = fetcher;
@@ -49,8 +52,6 @@ export class LiveResource<T> {
 	#startInterval() {
 		this.#stopInterval();
 		this.#interval_timer = setTimeout(() => {
-			// Interval always forces a refresh (bypassing debounce logic usually,
-			// but here we just call refresh which is safe)
 			this.refresh();
 		}, this.#interval_ms);
 	}
@@ -70,12 +71,9 @@ export class LiveResource<T> {
 	}
 
 	async refresh(immediate = false) {
-		// If we are already debouncing, clear the previous timer to "restart" the wait
 		this.#clearDebounce();
 
-		// If immediate is false and we have a debounce time set, delay the execution
 		if (!immediate && this.#debounce_ms > 0) {
-			// TODO: use existing debounce util
 			this.#debounce_timer = setTimeout(() => {
 				this.#executeFetch();
 			}, this.#debounce_ms);
@@ -83,6 +81,19 @@ export class LiveResource<T> {
 		}
 
 		return this.#executeFetch();
+	}
+
+	/**
+	 * Returns a promise that resolves after the next successful fetch completes.
+	 * Triggers a debounced refresh so multiple calls within the debounce window
+	 * are batched into a single request.
+	 */
+	next_refresh(): Promise<void> {
+		const promise = new Promise<void>((resolve) => {
+			this.#pending_resolvers.push(resolve);
+		});
+		this.refresh();
+		return promise;
 	}
 
 	async #executeFetch() {
@@ -99,15 +110,19 @@ export class LiveResource<T> {
 				this.error = null;
 				this.offline = false;
 				this.last_updated = new Date();
+
+				// Resolve all pending waiters
+				const resolvers = this.#pending_resolvers.splice(0);
+				for (const resolve of resolvers) resolve();
 			}
 		} catch (e) {
 			if (e instanceof Error && e.name === 'AbortError') return;
 			console.error('Resource fetch failed:', e);
 			this.error = e as Error;
 			if (e instanceof Error && e.message === 'Offline') this.offline = true;
+			// Don't resolve pending on error - they'll wait for next successful fetch
 		} finally {
 			this.is_fetching = false;
-			// Restart the interval only after the fetch is done
 			if (this.#enabled) this.#startInterval();
 		}
 	}
