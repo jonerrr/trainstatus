@@ -5,29 +5,14 @@
 	import { browser } from '$app/environment';
 	import { pushState } from '$app/navigation';
 
-	import { BusFront, TrainFront } from '@lucide/svelte';
+	import Pin from '$lib/Pin.svelte';
+	import RouteButton from '$lib/Route/Button.svelte';
+	import StopButton from '$lib/Stop/Button.svelte';
+	import { default_sources, source_info } from '$lib/sources/index.svelte';
+	import type { Pins } from '$lib/stores.svelte';
+
 	import type { Route, Source, Stop } from '@trainstatus/client';
 	import { ElementSize, PersistedState, ScrollState } from 'runed';
-
-	import Pin from './Pin.svelte';
-	import RouteButton from './Route/Button.svelte';
-	import StopButton from './Stop/Button.svelte';
-	import type { Pins } from './stores.svelte';
-
-	// TODO: probably put these mappings in sources.ts file
-	// Source icons mapping
-	const source_icons: Record<Source, typeof TrainFront> = {
-		mta_subway: TrainFront,
-		mta_bus: BusFront
-	};
-
-	// Source display names
-	const source_names: Record<Source, string> = {
-		mta_subway: 'Subway',
-		mta_bus: 'Bus'
-	};
-
-	const source_order: Source[] = ['mta_subway', 'mta_bus'];
 
 	// Estimated heights for virtualization
 	const estimated_heights = {
@@ -110,8 +95,8 @@
 	// TODO: check here if source is empty and switch to first available (instead of using $effect)
 	const active_source = $derived(selected_source.current);
 
-	const source_entries = $derived.by(() =>
-		source_order.map((source) => ({
+	const source_entries = $derived(
+		default_sources.map((source) => ({
 			source,
 			data: sources[source] ?? []
 		}))
@@ -374,7 +359,7 @@
 				{#snippet source_tab(source: Source)}
 					{@const source_data = sources[source] ?? []}
 					{#if source_data.length > 0}
-						{@const Icon = source_icons[source]}
+						{@const Icon = source_info[source].icon}
 						<div transition:slide={{ axis: 'x', duration: 250 }}>
 							<!-- 		class="relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200 {active_source.current ===
 									source && 'font-medium text-neutral-100'} {active_source.current !== source &&
@@ -390,10 +375,10 @@
 								onclick={() => {
 									selected_source.current = source;
 								}}
-								aria-label={`Show ${source_names[source]} items`}
+								aria-label={`Show ${source_info[source].name} items`}
 							>
 								<Icon class="h-4 w-4" />
-								<span>{source_names[source]}</span>
+								<span>{source_info[source].name}</span>
 
 								{#if active_source === source}
 									<div

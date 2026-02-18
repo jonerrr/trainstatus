@@ -25,6 +25,7 @@
 	// TODO: do we need $state here
 	const stops = page.data.stops;
 
+	// TODO: Fix switching sources causing lag
 	// let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 	// TODO: determine default source from users preferences or something
 	let selected_source = new PersistedState<Source>('stops_tab', 'mta_subway');

@@ -1,3 +1,4 @@
+import { BusFront, TrainFront } from '@lucide/svelte';
 import type { Source } from '@trainstatus/client';
 import { Context } from 'runed';
 
@@ -21,22 +22,12 @@ export function createMultiSourceContext<T>(name: string): Context<SourceMap<T>>
 	return new Context<SourceMap<T>>(name);
 }
 
-/**
- * Type guard to check if a source exists in the source map
- */
-// export function hasSource<T>(
-// 	map: SourceMap<T>,
-// 	source: Source
-// ): map is SourceMap<T> & Record<typeof source, T> {
-// 	return source in map;
-// }
-
 export const source_info = {
 	// TODO: increase refresh interval
-	// TODO: add icons
+	// TODO: use icons to differentiate between agencies
 	mta_bus: {
-		name: 'MTA Bus',
-		icon: 'TODO',
+		name: 'Bus',
+		icon: BusFront,
 		refresh_interval: {
 			trips: 5000,
 			stop_times: 5000,
@@ -47,8 +38,8 @@ export const source_info = {
 		monitor_routes: true
 	},
 	mta_subway: {
-		name: 'MTA Subway',
-		icon: 'TODO',
+		name: 'Subway',
+		icon: TrainFront,
 		refresh_interval: {
 			trips: 5000,
 			stop_times: 5000,
