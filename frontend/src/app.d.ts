@@ -1,4 +1,13 @@
-import type { Route, Source, Stop, Trip } from '@trainstatus/client';
+import type { AlertResource } from '$lib/sources/alerts.svelte';
+import type { StopTimesResource } from '$lib/sources/stop_times.svelte';
+import type { TripResource } from '$lib/sources/trips.svelte';
+
+import type { ApiAlert, Route, Source, Stop, StopTime, Trip } from '@trainstatus/client';
+
+interface RealtimeInitialValue<T> {
+	source: Source;
+	data: T;
+}
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
@@ -8,32 +17,15 @@ declare global {
 		// interface Locals {}
 		// maybe this should be maps
 		interface PageData {
-			// stops: {
-			// 	source: Source;
-			// 	data: Stop[];
-			// }[];
-			// routes: {
-			// 	source: Source;
-			// 	data: Route[];
-			// }[];
 			stops: Record<Source, Stop[]>;
 			routes: Record<Source, Route[]>;
-
 			stops_by_id: Record<Source, Record<string, Stop>>;
 			routes_by_id: Record<Source, Record<string, Route>>;
-			// trips: {
-			// 	[id: string]: Trip;
-			// };
-			// routes: {
-			// 	[id: string]: Route;
-			// };
-			// // stops: Stop<'bus' | 'train'>[];
-			// stops: {
-			// 	[id: number]: Stop;
-			// };
-			// bus_stops: Stop<'bus'>[];
-			// train_stops: Stop<'train'>[];
-			// initial current_time.value (can't set in layout load bc SSR)
+			// Initial realtime values as SourceMaps
+			initial_trips: RealtimeInitialValue<TripResource>[];
+			initial_stop_times: RealtimeInitialValue<StopTimesResource>[];
+			initial_alerts: RealtimeInitialValue<AlertResource>[];
+			// Current time param for RT fetches
 			at?: string;
 			// used to keep track of the current monitored
 			// current_monitored_routes: string[];

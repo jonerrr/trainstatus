@@ -6,38 +6,30 @@
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
-	import { alerts } from '$lib/alerts.svelte';
-	import { type Route, type Stop, main_stop_routes } from '$lib/static';
-	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
-	import {
-		type Trip,
-		type TripData,
-		TripDirection,
-		is_bus,
-		is_train,
-		trips as rt_trips
-	} from '$lib/trips.svelte';
-	import { current_time, persisted_rune } from '$lib/util.svelte';
+	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import { stop_times_context } from '$lib/sources/stop_times.svelte';
+	import { main_stop_routes } from '$lib/static';
+	import { current_time } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
-
-	import BusArrow from './BusArrow.svelte';
+	import type { Stop } from '@trainstatus/client';
+	import { PersistedState } from 'runed';
 
 	interface Props {
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
-		stop: Stop<'bus' | 'train'>;
+		stop: Stop;
 	}
 
 	// TODO: figure out why some stops randomly have the wrong trips showing (for example, a 5 train showing for 7 train grand central stop)
 
 	let { stop, show_previous, time_format }: Props = $props();
 
-	interface StopTimeWithTrip extends StopTime<Trip> {
-		eta: number;
-		route: Route;
-		// last_stop: StopTime<Trip>;
-	}
+	// interface StopTimeWithTrip extends StopTime<Trip> {
+	// 	eta: number;
+	// 	route: Route;
+	// 	// last_stop: StopTime<Trip>;
+	// }
 
 	const { stop_times, active_routes } = $derived.by(() => {
 		const now = current_time.ms;
@@ -66,7 +58,9 @@
 	// $inspect(active_routes);
 
 	// $inspect(stop_times);
-	let selected_direction = persisted_rune('direction', TripDirection.North);
+	// TODO: direction number is different depending on the source
+	let selected_direction = new PersistedState<number>('direction', 1);
+	// let selected_direction = persisted_rune('direction', TripDirection.North);
 	// if its a train, we only want to show stop times for the selected direction
 	let selected_stop_times = $derived(
 		stop.route_type === 'train'
@@ -115,7 +109,6 @@
 				<Icon
 					width={36}
 					height={36}
-					express={false}
 					link={true}
 					route={page.data.routes[route.id] as Route}
 					show_alerts
@@ -129,7 +122,6 @@
 				<Icon
 					width={36}
 					height={36}
-					express={false}
 					link={true}
 					route={page.data.routes[route.id] as Route}
 					show_alerts

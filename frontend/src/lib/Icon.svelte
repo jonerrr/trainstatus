@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
 
-	import { alerts } from '$lib/alerts.svelte';
 	import icons from '$lib/icons';
+	import { alert_context } from '$lib/sources/alerts.svelte';
 
 	import { RouteIcon } from '@lucide/svelte';
 	import { type Route } from '@trainstatus/client';
@@ -24,10 +24,12 @@
 		show_alerts?: boolean;
 	} = $props();
 
+	const alerts = $derived(alert_context.get()[route.data.source]);
+
 	const show_alert_icon = $derived.by(() => {
 		if (!show_alerts) return false;
 		// TODO: maybe differentiate between planned alerts, station notices, etc
-		return alerts.alerts_by_route.has(route.id);
+		return alerts.value?.alerts_by_route.has(route.id);
 	});
 
 	// const icon_name = $derived(route.route_type === 'bus' || !express ? route.id : route.id + 'X');
@@ -38,7 +40,7 @@
 		<div class="absolute top-0 right-0 size-3 rounded-full bg-orange-400"></div>
 	{/if}
 {/snippet} -->
-
+<!-- TODO: maybe do $state.snapshot for pushState -->
 {#if route.data.source === 'mta_bus'}
 	<div
 		role={link ? 'button' : undefined}
@@ -49,7 +51,7 @@
 			show_alert_icon && 'ring-3 ring-red-800'
 		]}
 		onclick={() => {
-			if (link) pushState('', { modal: { type: 'route', data: route, source: route.data.source } });
+			if (link) pushState('', { modal: { type: 'route', ...route } });
 		}}
 	>
 		{route.short_name}
@@ -64,7 +66,7 @@
 		aria-label={link ? route.short_name : undefined}
 		class={['relative appearance-none', show_alert_icon && 'ring-3 rounded-full ring-red-800']}
 		onclick={() => {
-			if (link) pushState('', { modal: { type: 'route', data: route, source: route.data.source } });
+			if (link) pushState('', { modal: { type: 'route', ...route } });
 		}}
 	>
 		<svg class={class_name} {width} {height} viewBox="0 0 90 90">

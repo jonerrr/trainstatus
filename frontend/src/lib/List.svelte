@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { cubicInOut } from 'svelte/easing';
-	import { SvelteMap } from 'svelte/reactivity';
 	import { crossfade, slide } from 'svelte/transition';
 
 	import { browser } from '$app/environment';
@@ -168,9 +167,11 @@
 		reset_scroll();
 	});
 
-	// Item heights cache using SvelteMap for reactivity
+	// Plain Map - NOT reactive. The $effect below tracks `items` only.
+	// Using SvelteMap here would cause the $effect to re-run O(n) times on initial render
+	// (once per visible item measured), making the total work O(n²) with thousands of stops.
 	// TODO: move to separate file so lists can share measured heights (for same items across sources)
-	const item_heights = new SvelteMap<string, number>();
+	const item_heights = new Map<string, number>();
 
 	// Prefix sum array for O(1) offset lookups
 	let offsets = $state<number[]>([]);
@@ -289,9 +290,24 @@
 		// Find the index of this item
 		const get_index = () => items.findIndex((item) => item.id === id);
 
-		// Measure immediately
+		// Measure immediately and correct the estimated offset
 		const initial_height = node.offsetHeight;
+		const item = items.find((i) => i.id === id);
+		const estimated = item ? height_calc(item) : initial_height;
+		const init_delta = initial_height - estimated;
 		item_heights.set(id, initial_height);
+
+		// Apply the delta between actual and estimated height incrementally
+		// (avoids a full O(n) offset rebuild for each measured item)
+		if (init_delta !== 0) {
+			const index = get_index();
+			if (index >= 0) {
+				measured_total_height += init_delta;
+				for (let i = index + 1; i < offsets.length; i++) {
+					offsets[i] += init_delta;
+				}
+			}
+		}
 
 		// Re-measure on resize with scroll correction
 		const observer = new ResizeObserver(() => {

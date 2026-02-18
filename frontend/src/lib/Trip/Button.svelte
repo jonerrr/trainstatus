@@ -4,9 +4,7 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import type { Route, Stop } from '$lib/static';
-	import { monitored_bus_routes, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
-	import { type Trip, type TripData, is_bus_route, is_train_route } from '$lib/trips.svelte';
+	import { type TripData, is_bus_route, is_train_route } from '$lib/sources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';

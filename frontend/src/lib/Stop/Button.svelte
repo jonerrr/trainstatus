@@ -1,129 +1,75 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
-	// import { is_mta_bus, is_mta_subway, main_stop_routes } from '$lib/static';
-	import { type StopTime, stop_times as rt_stop_times } from '$lib/stop_times.svelte';
-	import { trip_context } from '$lib/trips.svelte';
+	import { stop_times_context } from '$lib/sources/stop_times.svelte';
+	import { trip_context } from '$lib/sources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
-	import type { Route, Stop } from '@trainstatus/client';
+	import type { Stop, StopTime } from '@trainstatus/client';
+
+	type StopTimeWithETA = StopTime & { eta: number };
+	type StopTimesByRoute = Map<string, StopTimeWithETA[]>;
 
 	interface Props {
 		data: Stop;
 	}
-	let { data }: Props = $props();
 
-	const source_routes = $derived(page.data.routes_by_id[data.data.source]);
+	let { data: stop }: Props = $props();
 
-	interface StopTimeData extends StopTime {
-		eta: number;
-		direction: TripDirection;
-		route_id: string;
-	}
+	const routes = $derived(page.data.routes_by_id[stop.data.source]);
 
-	type StopTimeByRoute = Map<string, StopTimeData[]>;
+	const all_trips = trip_context.get();
+	const all_stop_times = stop_times_context.get();
 
-	// TODO: use an array instead of hardcoded nb and sb maps
-	const nb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
-	const sb_st_by_route = $state<StopTimeByRoute>(new SvelteMap());
-	const active_routes = $state(new SvelteSet<Route>());
+	const trips = $derived(all_trips[stop.data.source]);
+	const stop_times = $derived(all_stop_times[stop.data.source]);
 
-	// $effect(() => {
-	// 	rt_stop_times?.by_stop_id;
-	// 	rt_trips.trips;
-	// 	data;
+	const stop_times_by_direction = $derived.by(() => {
+		const stop_times_by_direction: Map<number, StopTimesByRoute> = new Map();
 
-	// 	// console.log('Triggering update for', data.name);
-	// 	untrack(() => updateRouteMaps());
-	// });
+		// Pre-populate both directions with all routes from stop data
+		if (stop.data.source === 'mta_subway') {
+			// TODO: find some way to not hardcode the directions (maybe have this info in the source data or something)
+			for (const direction of [1, 3]) {
+				const route_map: StopTimesByRoute = new Map();
+				for (const route of stop.routes) {
+					route_map.set(route.route_id, []);
+				}
+				stop_times_by_direction.set(direction, route_map);
+			}
+		}
 
-	const updateRouteMaps = () => {
-		// Clear existing maps
-		nb_st_by_route.clear();
-		sb_st_by_route.clear();
-
-		// Early exit if no data
-		// if (!rt_stop_times?.stop_times?.length) {
-		// 	return;
-		// }
-		const stop_times = rt_stop_times.by_stop_id[data.id] ?? [];
-
-		for (const st of stop_times) {
+		const current_stop_times = stop_times.by_stop_id.get(stop.id) ?? [];
+		// TODO: maybe end loop early if we get 2 trips for each route or something like that
+		for (const st of current_stop_times) {
 			if (st.arrival.getTime() < current_time.ms) continue;
-			const trip = rt_trips.trips.get(st.trip_id);
+			const trip = trips.value?.get(st.trip_id);
 			if (!trip) continue;
 
 			const route_id = trip.route_id;
-			active_routes.add(page.data.routes[route_id]);
+
+			if (!stop_times_by_direction.has(trip.direction)) {
+				stop_times_by_direction.set(trip.direction, new Map());
+			}
+
+			const target_map = stop_times_by_direction.get(trip.direction)!;
+			if (!target_map.has(route_id)) {
+				target_map.set(route_id, []);
+			}
 
 			const eta = (st.arrival.getTime() - current_time.ms) / 1000 / 60;
 
-			const stopTimeData = {
-				...st,
-				eta,
-				direction: trip.direction,
-				route_id
-			};
-
-			if (is_mta_subway(data.data)) {
-				const target_map = trip.direction === TripDirection.North ? nb_st_by_route : sb_st_by_route;
-
-				if (!target_map.has(route_id)) {
-					target_map.set(route_id, []);
-				}
-
-				const times = target_map.get(route_id)!;
-				if (times.length < 2) {
-					times.push(stopTimeData);
-				}
-			} else {
-				if (!nb_st_by_route.has(route_id)) {
-					nb_st_by_route.set(route_id, []);
-				}
-
-				const times = nb_st_by_route.get(route_id)!;
-				if (times.length < 2) {
-					times.push(stopTimeData);
-				}
-			}
-		}
-	};
-
-	// TODO: add back current stop and active stop route combinations
-	// TODO: fix 1 train showing up at dekalb ave for some reason
-	// const current_stop_routes = $derived(main_stop_routes(data).map((r) => page.data.routes[r.id]));
-	const default_stop_routes = $derived(data.routes.map((r) => source_routes[r.route_id]));
-	// combine current stop routes with other active routes at stop
-	// TODO: use nb_st_by_route and sb_st_by_route to get active routes instead of creating new set
-	// const all_stop_routes = $derived([...new Set(current_stop_routes.concat(...active_routes))]);
-	// const all_stop_routes = $derived(current_stop_routes);
-	// TODO: fix all stop routes
-	const all_stop_routes = $derived.by(() => {
-		const routes: Route[] = [];
-		// const route_ids = new Set<string>();
-
-		// add main stop routes first
-		for (const route of data.routes) {
-			routes.push(source_routes[route.route_id]);
-			// route_ids.add(route.id);
+			target_map.get(route_id)!.push({ ...st, eta });
 		}
 
-		// add active routes next
-		// for (const route of active_routes) {
-		// 	if (!route_ids.has(route.id)) {
-		// 		routes.push(route);
-		// 		route_ids.add(route.id);
-		// 	}
-		// }
-
-		return routes;
+		return stop_times_by_direction;
 	});
+
+	// $inspect(stop_times_by_direction);
+
+	const default_stop_routes = $derived(stop.routes.map((r) => routes[r.route_id]));
 </script>
 
 <!-- eta used by bus and train -->
@@ -135,8 +81,8 @@
 		</span>
 	{/key}
 {/snippet}
-
-{#if data.data.source === 'mta_subway'}
+<!-- TODO: show different message depending on if loading or theres actually no trips -->
+{#if stop.data.source === 'mta_subway'}
 	<div class="grid w-full grid-cols-1 gap-1">
 		<div class="flex items-center gap-1">
 			{#each default_stop_routes as route (route.id)}
@@ -144,16 +90,42 @@
 			{/each}
 
 			<div class="my-auto text-left text-lg font-medium">
-				{data.name}
+				{stop.name}
 			</div>
 		</div>
 		<div class="grid grid-cols-2 gap-8">
-			{@render arrivals(data.data.north_headsign, all_stop_routes, nb_st_by_route)}
-			{@render arrivals(data.data.south_headsign, all_stop_routes, sb_st_by_route)}
+			{#each stop_times_by_direction as [direction, stop_times_by_route] (direction)}
+				{@const headsign = direction === 1 ? stop.data.north_headsign : stop.data.south_headsign}
+				<div class="mt-auto flex flex-col">
+					<div class="table-cell max-w-[85%] text-left font-semibold">
+						{headsign}
+					</div>
+					<div class="flex flex-col gap-1">
+						{#each stop_times_by_route as [route_id, route_stop_times] (route_id)}
+							{@const route = routes[route_id]}
+							<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
+							<div class="flex items-center gap-1">
+								<Icon height={20} width={20} link={false} {route} />
+								<div class="flex items-center gap-1">
+									{#if route_stop_times.length}
+										{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
+											{@render eta(stop_time.eta)}
+										{/each}
+									{:else}
+										<div class="text-neutral-400">No trips</div>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/each}
+			<!-- {@render arrivals(stop.data.north_headsign, all_stop_routes, nb_st_by_route)}
+			{@render arrivals(stop.data.south_headsign, all_stop_routes, sb_st_by_route)} -->
 		</div>
 	</div>
 
-	{#snippet arrivals(headsign: string, routes: Route[], stop_times: StopTimeByRoute)}
+	<!-- {#snippet arrivals(headsign: string, routes: Route[], stop_times: StopTimeByRoute)}
 		<div class="mt-auto flex flex-col">
 			<div class="table-cell max-w-[85%] text-left font-semibold">
 				{headsign}
@@ -161,7 +133,6 @@
 			<div class="flex flex-col gap-1">
 				{#each routes as route (route.id)}
 					{@const route_stop_times = stop_times.get(route.id) ?? []}
-					<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === route.id)} -->
 					<div class="flex items-center gap-1">
 						<Icon height={20} width={20} link={false} {route} />
 						<div class="flex items-center gap-1">
@@ -177,24 +148,24 @@
 				{/each}
 			</div>
 		</div>
-	{/snippet}
-{:else if data.data.source === 'mta_bus'}
+	{/snippet} -->
+{:else if stop.data.source === 'mta_bus'}
 	<!-- TODO: make spacing consistent (use grid maybe idk) -->
 	<div class="flex flex-col text-white">
 		<div class="flex items-center">
 			<div>
-				<BusArrow direction={data.data.direction} />
+				<BusArrow direction={stop.data.direction} />
 			</div>
 			<div class="text-left text-lg font-medium">
-				{data.name}
+				{stop.name}
 			</div>
 		</div>
 
 		<div class="flex flex-col">
-			{#each data.routes as route_stop (route_stop.route_id)}
-				{@const route = source_routes[route_stop.route_id]}
+			{#each stop.routes as route_stop (route_stop.route_id)}
+				{@const route = routes[route_stop.route_id]}
 				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
-				{@const route_stop_times = nb_st_by_route.get(route_stop.route_id) ?? []}
+				{@const route_stop_times = []}
 
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
@@ -204,7 +175,8 @@
 							{route_stop.data.source === 'mta_bus' && route_stop.data.headsign}
 						</div>
 						<div class="flex gap-2 pr-1">
-							{#if rt_stop_times.updating_routes.has(route.id)}
+							<!-- TODO: improve loading (maybe using svelte's new await stuff) -->
+							<!-- {#if rt_stop_times.updating_routes.has(route.id)}
 								<div class="flex items-center gap-1 py-1">
 									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
 									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
@@ -213,12 +185,10 @@
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 									{@render eta(stop_time.eta)}
 								{/each}
-								<!-- check if trips contains trip with route_id and that there are no stop times -->
-								<!-- {:else if stop_times.length && !route_stop_times.length}
-									<div class="text-neutral-400">Loading...</div> -->
 							{:else}
 								<div class="text-neutral-400">No trips</div>
-							{/if}
+							{/if} -->
+							<div class="text-neutral-400">No trips</div>
 						</div>
 					</div>
 				</div>
@@ -227,6 +197,6 @@
 	</div>
 
 	<div class="self-start text-neutral-300">
-		#{data.id}
+		#{stop.id}
 	</div>
 {/if}

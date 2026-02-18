@@ -1,17 +1,19 @@
 <script lang="ts">
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
-	import { alert_context } from '$lib/alerts.svelte';
+	import { alert_context } from '$lib/sources/alerts.svelte';
 
 	import type { Route } from '@trainstatus/client';
-
-	const alerts = alert_context.get();
 
 	interface Props {
 		data: Route;
 	}
 
 	let { data }: Props = $props();
+
+	const all_alerts = alert_context.get();
+
+	const alerts = $derived(all_alerts[data.data.source]);
 
 	// TODO: alert stuff
 	const route_alerts = $derived(

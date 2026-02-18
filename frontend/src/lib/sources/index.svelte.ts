@@ -1,9 +1,74 @@
+import type { Source } from '@trainstatus/client';
+import { Context } from 'runed';
+
+/**
+ * Maps a Source to its corresponding resource instance.
+ * Use this to build multi-source context types.
+ *
+ * @example
+ * type MultiSourceTrips = SourceMap<TripResource>;
+ * // Equivalent to: Record<Source, TripResource>
+ */
+export type SourceMap<T> = Record<Source, T>;
+
+/**
+ * Helper to create a multi-source context with proper typing.
+ *
+ * @example
+ * export const trip_context = createMultiSourceContext<TripResource>('trips');
+ */
+export function createMultiSourceContext<T>(name: string): Context<SourceMap<T>> {
+	return new Context<SourceMap<T>>(name);
+}
+
+/**
+ * Type guard to check if a source exists in the source map
+ */
+// export function hasSource<T>(
+// 	map: SourceMap<T>,
+// 	source: Source
+// ): map is SourceMap<T> & Record<typeof source, T> {
+// 	return source in map;
+// }
+
+export const source_info = {
+	// TODO: increase refresh interval
+	// TODO: add icons
+	mta_bus: {
+		name: 'MTA Bus',
+		icon: 'TODO',
+		refresh_interval: {
+			trips: 5000,
+			stop_times: 5000,
+			alerts: 5000
+		},
+		// this means that this source requires including specific routes in the query params
+		// maybe find a better name for the param in the future
+		monitor_routes: true
+	},
+	mta_subway: {
+		name: 'MTA Subway',
+		icon: 'TODO',
+		refresh_interval: {
+			trips: 5000,
+			stop_times: 5000,
+			alerts: 5000
+		},
+		monitor_routes: false
+	}
+} as const;
+
+export const default_sources: Source[] = ['mta_bus', 'mta_subway'] as const;
+// TODO: allow changing sources
+
 type Fetcher<T> = (signal: AbortSignal) => Promise<T>;
 
-interface LiveResourceOptions {
+interface LiveResourceOptions<T> {
 	interval?: number;
 	enabled?: boolean;
 	debounce?: number;
+	// TODO: maybe make this required
+	initial_value?: T;
 }
 // TODO: probably take a default value for SSR
 export class LiveResource<T> {
@@ -27,11 +92,12 @@ export class LiveResource<T> {
 	// Pending resolvers waiting for next successful fetch
 	#pending_resolvers: Array<() => void> = [];
 
-	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions = {}) {
+	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions<T> = {}) {
 		this.#fetcher = fetcher;
 		if (options.interval) this.#interval_ms = options.interval;
 		if (options.enabled !== undefined) this.#enabled = options.enabled;
 		if (options.debounce) this.#debounce_ms = options.debounce;
+		if (options.initial_value !== undefined) this.value = options.initial_value;
 
 		$effect(() => {
 			if (this.#enabled) {

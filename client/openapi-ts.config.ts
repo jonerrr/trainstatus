@@ -5,6 +5,7 @@ export default defineConfig({
   output: "src/client",
   plugins: [
     "@hey-api/typescript",
+    // TODO: find a way to not include the transformers.gen.ts but still have the type be date
     { name: "@hey-api/transformers", dates: true },
   ],
 });

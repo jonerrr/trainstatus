@@ -3,8 +3,9 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { type StopTime } from '$lib/stop_times.svelte';
-	import { is_train_route } from '$lib/trips.svelte';
+	import { trip_context } from '$lib/sources/trips.svelte';
+
+	import type { StopTime } from '@trainstatus/client';
 
 	interface TransferProps {
 		transfer_stop_times: StopTime[];
@@ -12,24 +13,22 @@
 	}
 
 	const { time_format, transfer_stop_times }: TransferProps = $props();
+
+	const trips = trip_context.get()['mta_subway']; // TODO: don't hardcode mta_subway
 </script>
 
 <div class="flex flex-col bg-neutral-900 px-1 pb-1">
 	<div class="font-medium">Transfers:</div>
 	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
 		{#each transfer_stop_times as st (st.trip_id)}
-			{@const route = page.data.routes[st.trip.route_id]}
+			{@const trip = trips.value?.get(st.trip_id)!}
+			<!-- TODO: don't hardcode mta_subway. but right now its ok because mta_subway is the only one with transfers -->
+			{@const route = page.data.routes_by_id['mta_subway'][trip.route_id]}
 			<button
-				onclick={() => pushState('', { modal: 'trip', data: st.trip })}
+				onclick={() => pushState('', { modal: { type: 'trip', ...trip } })}
 				class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 			>
-				<Icon
-					width={18}
-					height={18}
-					{route}
-					link={false}
-					express={is_train_route(route, st.trip) && st.trip.data.express}
-				/>
+				<Icon width={18} height={18} {route} link={false} />
 				{#if time_format === 'time'}
 					{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
 				{:else}

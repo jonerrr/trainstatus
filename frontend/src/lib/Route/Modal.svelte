@@ -2,7 +2,7 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
-	import { alert_context } from '$lib/alerts.svelte';
+	import { alert_context } from '$lib/sources/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
@@ -19,7 +19,9 @@
 
 	let { route, time_format }: Props = $props();
 
-	const alerts = alert_context.get();
+	const all_alerts = alert_context.get();
+
+	const alerts = $derived(all_alerts[route.data.source]);
 
 	const route_alerts = $derived(
 		alerts.value?.alerts_by_route

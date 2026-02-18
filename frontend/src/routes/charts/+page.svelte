@@ -4,12 +4,11 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { type Route } from '$lib/static';
-	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
-	import { TripDirection, trips } from '$lib/trips.svelte';
+	import { monitored_bus_routes, stop_times_context } from '$lib/sources/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
+	import type { Route } from '@trainstatus/client';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { LayerCake, Svg, flatten } from 'layercake';
 

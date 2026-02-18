@@ -22,7 +22,8 @@
 	// });
 
 	// TODO: might need to use $state.snapshot on page.data.stops
-	const stops = $state(page.data.stops);
+	// TODO: do we need $state here
+	const stops = page.data.stops;
 
 	// let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 	// TODO: determine default source from users preferences or something
@@ -35,10 +36,11 @@
 		// reset stop ids
 		// stops['bus'] = page.data.bus_stops;
 		// stops['train'] = page.data.train_stops;
-		Object.keys(stops).forEach((key) => {
-			// @ts-ignore
-			stops[key] = page.data.stops[key];
-		});
+		// TODO: fix
+		// Object.keys(stops).forEach((key) => {
+		// 	// @ts-ignore
+		// 	stops[key] = page.data.stops[key];
+		// });
 
 		search_input = '';
 	}

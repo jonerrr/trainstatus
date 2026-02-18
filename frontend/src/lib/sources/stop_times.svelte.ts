@@ -1,17 +1,16 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import { LiveResource } from '$lib/rt-resource.svelte';
-import { source_info } from '$lib/sources';
+import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
 
 import type { Source, StopTime } from '@trainstatus/client';
-import { Context } from 'runed';
 
-export interface StopTimeIndex {
+// rename to resource maybe (which is what trips and alerts rt resource types are called)
+export interface StopTimesResource {
 	by_trip_id: SvelteMap<string, StopTime[]>;
 	by_stop_id: SvelteMap<string, StopTime[]>;
 }
 
-function index_stop_times(data: StopTime[]): StopTimeIndex {
+export function index_stop_times(data: StopTime[]): StopTimesResource {
 	const by_trip_id = new SvelteMap<string, StopTime[]>();
 	const by_stop_id = new SvelteMap<string, StopTime[]>();
 
@@ -31,17 +30,21 @@ function index_stop_times(data: StopTime[]): StopTimeIndex {
 	return { by_trip_id, by_stop_id };
 }
 
-const EMPTY_INDEX: StopTimeIndex = {
+const EMPTY_INDEX: StopTimesResource = {
 	by_trip_id: new SvelteMap(),
 	by_stop_id: new SvelteMap()
 };
 
-export function createStopTimesResource(source: Source, params: { at?: number } = {}) {
+export function createStopTimesResource(
+	source: Source,
+	params: { at?: number } = {},
+	initial_value: StopTimesResource
+) {
 	// SvelteSet is inherently reactive — the fetcher closes over it and reads
 	// the current snapshot on every invocation, so no $state() wrapper needed.
 	const monitored_routes = new SvelteSet<string>();
 
-	const live = new LiveResource<StopTimeIndex>(
+	const resource = new LiveResource<StopTimesResource>(
 		async (signal) => {
 			console.log('updating stop times');
 			const routes = [...monitored_routes];
@@ -66,33 +69,34 @@ export function createStopTimesResource(source: Source, params: { at?: number } 
 			return index_stop_times(data);
 		},
 		{
-			interval: source_info[source].refresh_interval,
+			initial_value,
+			interval: source_info[source].refresh_interval.stop_times,
 			debounce: 500
 		}
 	);
 
 	return {
 		get value() {
-			return live.value;
+			return resource.value;
 		},
 		get error() {
-			return live.error;
+			return resource.error;
 		},
 		get is_fetching() {
-			return live.is_fetching;
+			return resource.is_fetching;
 		},
 		get last_updated() {
-			return live.last_updated;
+			return resource.last_updated;
 		},
 		get offline() {
-			return live.offline;
+			return resource.offline;
 		},
 
 		get by_trip_id() {
-			return live.value?.by_trip_id ?? EMPTY_INDEX.by_trip_id;
+			return resource.value?.by_trip_id ?? EMPTY_INDEX.by_trip_id;
 		},
 		get by_stop_id() {
-			return live.value?.by_stop_id ?? EMPTY_INDEX.by_stop_id;
+			return resource.value?.by_stop_id ?? EMPTY_INDEX.by_stop_id;
 		},
 
 		get monitored_routes(): ReadonlySet<string> {
@@ -111,10 +115,10 @@ export function createStopTimesResource(source: Source, params: { at?: number } 
 			if (monitored_routes.has(route_id)) {
 				// Already tracked — resolve right away if we have data, otherwise
 				// wait for the next successful fetch (e.g. initial load still pending).
-				return live.value ? Promise.resolve() : live.next_refresh();
+				return resource.value ? Promise.resolve() : resource.next_refresh();
 			}
 			monitored_routes.add(route_id);
-			return live.next_refresh();
+			return resource.next_refresh();
 		},
 
 		/**
@@ -126,14 +130,13 @@ export function createStopTimesResource(source: Source, params: { at?: number } 
 		},
 
 		refresh(): Promise<void> | undefined {
-			return live.refresh();
+			return resource.refresh();
 		}
 	};
 }
 
-export type StopTimesResource = ReturnType<typeof createStopTimesResource>;
-
-export const stop_times_context = new Context<StopTimesResource>('stop_times');
+export const stop_times_context =
+	createMultiSourceContext<ReturnType<typeof createStopTimesResource>>('stop_times');
 
 // TODO: remove when finished refactoring
 export const monitored_bus_routes = new SvelteSet<string>();

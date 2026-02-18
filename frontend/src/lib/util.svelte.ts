@@ -50,6 +50,7 @@ class RouteInfo {
 	// }
 }
 
+// TODO: is this safe to instantiate here or will it cause SSR issues
 export const route_info = new RouteInfo();
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/

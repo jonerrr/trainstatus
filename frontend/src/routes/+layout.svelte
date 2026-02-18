@@ -1,40 +1,61 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
-
-	import { SvelteSet } from 'svelte/reactivity';
-
-	import { replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
-	import { alert_context, createAlertResource } from '$lib/alerts.svelte';
 	import { searchSchema } from '$lib/params.schema';
-	import { createTripResource, trip_context } from '$lib/trips.svelte';
+	import { alert_context, createAlertResource } from '$lib/sources/alerts.svelte';
+	import { createStopTimesResource, stop_times_context } from '$lib/sources/stop_times.svelte';
+	import { createTripResource, trip_context } from '$lib/sources/trips.svelte';
 	import { route_info } from '$lib/util.svelte';
 
 	import '@fontsource/inter';
-	import { useInterval } from 'runed';
 	import { useSearchParams } from 'runed/kit';
 
 	import '../app.css';
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	let offline = $state(false);
 
+	// TODO: don't use runed search params since they don't support shallow routing
+	// see: https://github.com/svecosystem/runed/issues/377
+	// i think i should probably store the current params in the route_info class
 	const params = useSearchParams(searchSchema);
-	// TODO: initalize all sources
-	// TODO: pass initial value from ssr (or somehow have this run during ssr)
-	const trips = createTripResource('mta_subway', params);
-	const alerts = createAlertResource('mta_subway', params);
 
-	trip_context.set(trips);
-	alert_context.set(alerts);
+	const { initial_trips, initial_stop_times, initial_alerts } = page.data;
+
+	trip_context.set(
+		Object.fromEntries(
+			initial_trips.map(({ source, data }) => [source, createTripResource(source, params, data)])
+		) as any
+	);
+
+	stop_times_context.set(
+		Object.fromEntries(
+			initial_stop_times.map(({ source, data }) => [
+				source,
+				createStopTimesResource(source, params, data)
+			])
+		) as any
+	);
+
+	alert_context.set(
+		Object.fromEntries(
+			initial_alerts.map(({ source, data }) => [source, createAlertResource(source, params, data)])
+		) as any
+	);
+	// TODO: pass initial value from ssr (or somehow have this run during ssr)
+	// const trips = createTripResource('mta_subway', params);
+	// const stop_times = createStopTimesResource('mta_subway', params);
+	// trip_context.set(trips);
+	// // alert_context.set(alerts);
+
+	// stop_times_context.set(stop_times);
 
 	// TODO: set delay based on if offline or not
-	let delay = $state(5000);
+	// let delay = $state(5000);
 
 	// TODO: there might be issues with async interval
 	// maybe use interval.counter outside of callback function
