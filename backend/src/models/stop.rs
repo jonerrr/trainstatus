@@ -20,6 +20,7 @@ pub struct Stop {
     // probably also make a custom serializer/deserializer
     #[schema(schema_with = point_schema)]
     pub geom: Geom,
+    // TODO: convert transfers to list of structs that includes the source
     /// List of stop IDs that are transfers. Currently only for train stops
     pub transfers: Vec<String>,
     #[sqlx(json)]
@@ -38,6 +39,7 @@ pub struct MtaSubwayData {
     pub north_headsign: String,
     #[schema(example = "Manhattan")]
     pub south_headsign: String,
+    // TODO: maybe remove borough since its not used (and can be determined from geom)
     pub borough: Borough,
 }
 

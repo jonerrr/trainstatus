@@ -135,7 +135,7 @@ impl GtfsSource for MtaSubwayRealtime {
             id: Uuid::now_v7(),
             original_id: mta_id,
             route_id,
-            direction: Some(direction),
+            direction,
             created_at,
             vehicle_id: train_id,
             updated_at: Utc::now(),

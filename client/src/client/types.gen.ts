@@ -169,9 +169,9 @@ export type Trip = {
     data: TripData;
     /**
      * For the MTA subway, 1 is northbound, 3 is southbound.
-     * For the MTA buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
+     * For the MTA buses, the direction is 0 or 1, but it corresponds to which stops the bus serves, not cardinality. You can determine this by looking at the `RouteStop` data for the stops the trip serves.
      */
-    direction?: number | null;
+    direction: number;
     id: string;
     /**
      * Original trip identifier from the data source

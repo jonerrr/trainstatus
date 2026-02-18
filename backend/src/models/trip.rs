@@ -19,8 +19,8 @@ pub struct Trip {
     #[schema(example = "1")]
     pub route_id: String,
     /// For the MTA subway, 1 is northbound, 3 is southbound.
-    /// For the MTA buses, the direction is also 0 or 1, but it corresponds to the stops in the route.
-    pub direction: Option<i16>,
+    /// For the MTA buses, the direction is 0 or 1, but it corresponds to which stops the bus serves, not cardinality. You can determine this by looking at the `RouteStop` data for the stops the trip serves.
+    pub direction: i16,
     /// For the MTA subway, this is the start time of the trip.
     /// For the MTA buses, this is the start date of the trip + the current time the trip was first seen in the feed.
     pub created_at: DateTime<Utc>,

@@ -94,10 +94,20 @@ impl GtfsSource for MtaBusRealtime {
             None => return (None, vec![]),
         };
 
-        // Parse direction from trip descriptor or infer from stop IDs
+        // Parse direction from trip descriptor
         // For buses, direction is typically 0 or 1
-        let direction = trip_desc.direction_id.map(|dir| dir as i16);
+        let direction = match trip_desc.direction_id {
+            Some(d) => d as i16,
+            None => {
+                // TODO: remove warning after confirming that all bus trips have direction_id populated
+                warn!(
+                    "Missing direction_id in trip descriptor for trip {}",
+                    mta_id
+                );
 
+                return (None, vec![]);
+            }
+        };
         // Parse start date and time
         let start_date_str = match trip_desc.start_date {
             Some(d) => d,

@@ -4,7 +4,7 @@
     vehicle_id VARCHAR NOT NULL,
     route_id VARCHAR NOT NULL,
     source source_enum NOT NULL,
-    direction SMALLINT,
+    direction SMALLINT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     data JSONB NOT NULL,

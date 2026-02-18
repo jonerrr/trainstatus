@@ -112,7 +112,6 @@ macro_rules! impl_discriminated_data {
 
                 match source {
                     $($arms)*
-                    _ => Err(sqlx::Error::Decode("Unknown or unsupported source variant".into())),
                 }
             }
         }

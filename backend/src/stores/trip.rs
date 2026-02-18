@@ -103,7 +103,7 @@ impl TripStore {
         let vehicle_ids: Vec<String> = data.iter().map(|(t, _)| t.vehicle_id.clone()).collect();
         let route_ids: Vec<String> = data.iter().map(|(t, _)| t.route_id.clone()).collect();
         let sources: Vec<Source> = vec![source; data.len()];
-        let directions: Vec<Option<i16>> = data.iter().map(|(t, _)| t.direction).collect();
+        let directions: Vec<i16> = data.iter().map(|(t, _)| t.direction).collect();
         let created_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.created_at).collect();
         let updated_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.updated_at).collect();
         let trip_data: Vec<serde_json::Value> = data
@@ -140,14 +140,14 @@ impl TripStore {
                 inserted_rows.original_id = input_rows.original_id AND
                 inserted_rows.vehicle_id = input_rows.vehicle_id AND
                 inserted_rows.created_at = input_rows.created_at AND
-                inserted_rows.direction IS NOT DISTINCT FROM input_rows.direction
+                inserted_rows.direction = input_rows.direction
             "#,
             &input_ids,
             &original_ids,
             &vehicle_ids,
             &route_ids,
             &sources as &[Source],
-            &directions as &[Option<i16>],
+            &directions as &[i16],
             &created_ats,
             &updated_ats,
             &trip_data
