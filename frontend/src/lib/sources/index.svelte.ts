@@ -25,13 +25,16 @@ export function createMultiSourceContext<T>(name: string): Context<SourceMap<T>>
 export const source_info = {
 	// TODO: increase refresh interval
 	// TODO: use icons to differentiate between agencies
+	// TODO: make it possible to disable refresh_interval for sources
+	// TODO: make it possible to update refresh_interval time dynamically (e.g. if user is offline)
 	mta_bus: {
 		name: 'Bus',
 		icon: BusFront,
 		refresh_interval: {
 			trips: 5000,
 			stop_times: 5000,
-			alerts: 5000
+			alerts: 5000,
+			positions: 5000
 		},
 		// this means that this source requires including specific routes in the query params
 		// maybe find a better name for the param in the future
@@ -43,7 +46,9 @@ export const source_info = {
 		refresh_interval: {
 			trips: 5000,
 			stop_times: 5000,
-			alerts: 5000
+			alerts: 5000,
+			// TODO: maybe don't include subway positions since they don't contain really contain any useful info
+			positions: 5000
 		},
 		monitor_routes: false
 	}

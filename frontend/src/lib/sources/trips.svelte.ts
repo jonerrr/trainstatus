@@ -3,7 +3,6 @@ import { SvelteMap } from 'svelte/reactivity';
 import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
 
 import type { Source, Trip } from '@trainstatus/client';
-import { Context } from 'runed';
 
 export type TripResource = SvelteMap<string, Trip>;
 

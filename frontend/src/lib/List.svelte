@@ -433,6 +433,7 @@
 						</button>
 
 						{#if pins}
+							<!-- maybe do bind:pins -->
 							<Pin
 								{pins}
 								id={data.id}

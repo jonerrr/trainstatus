@@ -77,14 +77,15 @@ impl Trip {
     }
 }
 
-// stored in a hashmap so no need for trip_id
+// TODO: prob move StopTime to its own file
+
 #[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq, ToSchema, FromRow)]
 pub struct StopTime {
-    // pub trip_id: Uuid,
+    pub trip_id: Uuid,
     pub stop_id: String,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
-    #[sqlx(flatten)]
+    #[sqlx(json)]
     pub data: StopTimeData,
 }
 

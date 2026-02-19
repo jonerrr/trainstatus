@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
-
+// TODO: remove duplicate StopTime struct in trips.rs (or remove this one)
 #[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq, FromRow, ToSchema)]
 pub struct StopTime {
     pub trip_id: Uuid,

@@ -34,6 +34,7 @@
 	const VELOCITY_THRESHOLD = 0.4; // px/ms
 	const CLOSE_THRESHOLD = 0.25; // % of height
 	const DRAG_RESISTANCE = 8; // Rubber band strength
+	const DRAG_START_THRESHOLD = 5; // px of movement before we consider it a real drag
 
 	// State for drag physics
 	let is_dragging = $state(false);
@@ -42,6 +43,7 @@
 	let start_time = 0;
 	let modal_height = 0;
 	let is_transitioning = $state(false);
+	let has_captured = false;
 
 	// Derived style for the modal
 	// We disable CSS transitions while dragging so it feels responsive (1:1 movement)
@@ -61,7 +63,7 @@
 		// enable_scroll();
 		pushState('', { modal: null });
 	}
-
+	// TODO: improve physics on desktop (or maybe just disable)
 	const modal: Attachment<HTMLDialogElement> = (node) => {
 		document.body.style.overflow = 'hidden';
 
@@ -95,17 +97,26 @@
 			// if ((e.target as HTMLElement).closest('button')) return;
 
 			is_dragging = true;
+			has_captured = false;
 			is_transitioning = false;
 			start_y = e.screenY;
 			start_time = Date.now();
 			modal_height = node.getBoundingClientRect().height;
 
-			// Capture pointer to ensure we keep receiving events even if mouse leaves the modal
-			node.setPointerCapture(e.pointerId);
+			// Don't call setPointerCapture here — doing so on every pointerdown (including
+			// taps on inner content) causes the browser to redirect the synthesized click
+			// event to the dialog element, which triggers handle_click and closes the modal.
+			// Instead we capture lazily in handle_pointer_move once a real drag begins.
 		}
 
 		function handle_pointer_move(e: PointerEvent) {
 			if (!is_dragging) return;
+
+			// Lazily capture pointer once we know it's a real drag, not a tap
+			if (!has_captured && Math.abs(e.screenY - start_y) > DRAG_START_THRESHOLD) {
+				node.setPointerCapture(e.pointerId);
+				has_captured = true;
+			}
 
 			const delta_y = e.screenY - start_y;
 
@@ -124,7 +135,10 @@
 
 			is_dragging = false;
 			is_transitioning = true; // Re-enable CSS transitions for the snap back/close
-			node.releasePointerCapture(e.pointerId);
+			if (has_captured) {
+				node.releasePointerCapture(e.pointerId);
+				has_captured = false;
+			}
 
 			const end_y = e.screenY;
 			const distance = end_y - start_y;
@@ -407,7 +421,7 @@
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal?.type === 'stop'}
-		<StopModal {show_previous} time_format={time_format.current} stop={page.state.modal.data} />
+		<StopModal {show_previous} time_format={time_format.current} stop={page.state.modal} />
 
 		{@render actions(
 			true,

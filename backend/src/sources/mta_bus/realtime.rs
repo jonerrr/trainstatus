@@ -4,7 +4,7 @@ use crate::integrations::oba;
 use crate::models::source::Source;
 use crate::models::trip::Trip;
 use crate::models::{
-    position::{MtaBusData, PositionData, VehiclePosition},
+    position::{MtaBusPositionData, PositionData, VehiclePosition},
     trip::{StopTime, StopTimeData},
 };
 use crate::mta_oba_api_key;
@@ -172,7 +172,7 @@ impl GtfsSource for MtaBusRealtime {
                 let departure = DateTime::from_timestamp(departure, 0)?;
 
                 Some(StopTime {
-                    // trip_id: trip.id,
+                    trip_id: trip.id,
                     stop_id,
                     arrival,
                     departure,
@@ -204,8 +204,8 @@ impl GtfsSource for MtaBusRealtime {
             trip_id: None, // Will be set during trip linking
             stop_id,
             updated_at,
-            geom: Some(point),
-            data: PositionData::MtaBus(MtaBusData {
+            geom: Some(point.into()),
+            data: PositionData::MtaBus(MtaBusPositionData {
                 bearing: position.bearing.unwrap_or(0.0),
                 // These will be populated by OBA data
                 passengers: None,

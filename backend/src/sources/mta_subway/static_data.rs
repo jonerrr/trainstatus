@@ -12,7 +12,7 @@ use crate::{
         route::{Route, RouteData},
         source::Source,
         stop::{
-            Borough, FAKE_STOP_IDS, MtaSubwayData, RouteStop, RouteStopData, Stop, StopData,
+            Borough, FAKE_STOP_IDS, MtaSubwayStopData, RouteStop, RouteStopData, Stop, StopData,
             StopType,
         },
     },
@@ -331,7 +331,7 @@ impl MtaSubwayStatic {
                     geom: Point::new(station.stop.lon as f64, station.stop.lat as f64).into(),
                     routes: vec![],
                     transfers: vec![],
-                    data: StopData::MtaSubway(MtaSubwayData {
+                    data: StopData::MtaSubway(MtaSubwayStopData {
                         ada: station_data.ada,
                         north_headsign: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
                         south_headsign: south_headsign.unwrap_or_else(|| "Southbound".to_string()),

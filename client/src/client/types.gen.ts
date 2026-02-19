@@ -61,10 +61,31 @@ export type Borough = 'brooklyn' | 'queens' | 'bronx' | 'staten_island' | 'manha
 export type CompassDirection = 's_w' | 's' | 's_e' | 'e' | 'w' | 'n_e' | 'n_w' | 'n' | 'unknown';
 
 export type MtaBusData = {
+    /**
+     * Deviation from the schedule in seconds.
+     * A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
+     */
+    deviation?: number | null;
+};
+
+export type MtaBusPositionData = {
+    bearing: number;
+    capacity?: number | null;
+    passengers?: number | null;
+    phase?: string | null;
+    status?: string | null;
+};
+
+export type MtaBusStopData = {
     direction: CompassDirection;
 };
 
-export type MtaSubwayData = {
+export type MtaSubwayPositionData = {
+    assigned: boolean;
+    status?: string | null;
+};
+
+export type MtaSubwayStopData = {
     ada: boolean;
     borough: Borough;
     north_headsign: string;
@@ -74,6 +95,17 @@ export type MtaSubwayData = {
     notes?: string | null;
     south_headsign: string;
 };
+
+export type MtaSubwayStopTimeData = {
+    actual_track?: string | null;
+    scheduled_track?: string | null;
+};
+
+export type PositionData = (MtaSubwayPositionData & {
+    source: 'mta_subway';
+}) | (MtaBusPositionData & {
+    source: 'mta_bus';
+});
 
 export type Route = {
     color: string;
@@ -127,18 +159,15 @@ export type Stop = {
     id: string;
     name: string;
     routes: Array<RouteStop>;
-    /**
-     * List of stop IDs that are transfers. Currently only for train stops
-     */
-    transfers: Array<string>;
+    transfers: Array<Transfer>;
 };
 
 /**
  * Stop data changes based on the `Source`
  */
-export type StopData = (MtaSubwayData & {
+export type StopData = (MtaSubwayStopData & {
     source: 'mta_subway';
-}) | (MtaBusData & {
+}) | (MtaBusStopData & {
     source: 'mta_bus';
 });
 
@@ -150,15 +179,24 @@ export type StopTime = {
     trip_id: string;
 };
 
-export type StopTimeData = {
-    actual_track?: string | null;
-    scheduled_track?: string | null;
+export type StopTimeData = (MtaSubwayStopTimeData & {
     source: 'mta_subway';
-} | {
+}) | {
     source: 'mta_bus';
 };
 
 export type StopType = 'full_time' | 'part_time' | 'late_night' | 'rush_hour_one_direction' | 'rush_hour' | 'weekday_only' | 'nights_weekends_only' | 'unknown';
+
+export type Transfer = {
+    min_transfer_time?: number | null;
+    to_stop_id: string;
+    to_stop_source: Source;
+    /**
+     * Numbers between 0-5 represent the GTFS-defined transfer types: https://gtfs.org/documentation/schedule/reference/#transferstxt
+     * 6 are transfers that we calculated based on proximity.
+     */
+    transfer_type: number;
+};
 
 export type Trip = {
     /**
@@ -191,6 +229,26 @@ export type TripData = (MtaBusData & {
     source: 'mta_subway';
 };
 
+/**
+ * Current vehicle position (for upsert into vehicle_position table)
+ */
+export type VehiclePosition = {
+    data: PositionData;
+    geom?: {
+        coordinates: {
+            Point: {
+                x: number;
+                y: number;
+            };
+        };
+        type: 'Point';
+    };
+    stop_id?: string | null;
+    trip_id?: string | null;
+    updated_at: Date;
+    vehicle_id: string;
+};
+
 export type AlertsHandlerData = {
     body?: never;
     path: {
@@ -216,6 +274,32 @@ export type AlertsHandlerResponses = {
 };
 
 export type AlertsHandlerResponse = AlertsHandlerResponses[keyof AlertsHandlerResponses];
+
+export type PositionsHandlerData = {
+    body?: never;
+    path: {
+        /**
+         * Data source
+         */
+        source: Source;
+    };
+    query?: {
+        /**
+         * Unix timestamp to use as the current time. If not specified, the current time is used.
+         */
+        at?: bigint;
+    };
+    url: '/v1/positions/{source}';
+};
+
+export type PositionsHandlerResponses = {
+    /**
+     * Vehicle positions for the specified source
+     */
+    200: Array<VehiclePosition>;
+};
+
+export type PositionsHandlerResponse = PositionsHandlerResponses[keyof PositionsHandlerResponses];
 
 export type RoutesHandlerData = {
     body?: never;

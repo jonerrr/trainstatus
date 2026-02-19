@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::api::{AppError, Parameters};
+use crate::api::AppError;
 use crate::models::route::Route;
 use crate::models::source::Source;
 use crate::models::stop::Stop;

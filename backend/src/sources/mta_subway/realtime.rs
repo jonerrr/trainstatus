@@ -3,7 +3,7 @@ use crate::integrations::gtfs_realtime;
 use crate::models::source::Source;
 use crate::models::stop::FAKE_STOP_IDS;
 use crate::models::{
-    position::{MtaSubwayData, PositionData, VehiclePosition},
+    position::{MtaSubwayPositionData, PositionData, VehiclePosition},
     trip::{MtaSubwayStopTimeData, StopTime, StopTimeData, Trip, TripData},
 };
 use crate::sources::RealtimeAdapter;
@@ -175,7 +175,7 @@ impl GtfsSource for MtaSubwayRealtime {
                 };
 
                 Some(StopTime {
-                    // trip_id: trip.id,
+                    trip_id: trip.id,
                     stop_id,
                     arrival,
                     departure,
@@ -223,7 +223,7 @@ impl GtfsSource for MtaSubwayRealtime {
             stop_id: Some(stop_id.to_string()),
             updated_at,
             geom: None,
-            data: PositionData::MtaSubway(MtaSubwayData {
+            data: PositionData::MtaSubway(MtaSubwayPositionData {
                 assigned: nyct_trip.is_assigned.unwrap_or(false),
                 status,
             }),

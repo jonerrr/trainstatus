@@ -6,6 +6,7 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import { searchSchema } from '$lib/params.schema';
 	import { alert_context, createAlertResource } from '$lib/sources/alerts.svelte';
+	import { createPositionResource, positions_context } from '$lib/sources/positions.svelte';
 	import { createStopTimesResource, stop_times_context } from '$lib/sources/stop_times.svelte';
 	import { createTripResource, trip_context } from '$lib/sources/trips.svelte';
 	import { route_info } from '$lib/util.svelte';
@@ -24,7 +25,7 @@
 	// i think i should probably store the current params in the route_info class
 	const params = useSearchParams(searchSchema);
 
-	const { initial_trips, initial_stop_times, initial_alerts } = page.data;
+	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
 
 	trip_context.set(
 		Object.fromEntries(
@@ -41,34 +42,22 @@
 		) as any
 	);
 
+	positions_context.set(
+		Object.fromEntries(
+			initial_positions.map(({ source, data }) => [
+				source,
+				createPositionResource(source, params, data)
+			])
+		) as any
+	);
+
 	alert_context.set(
 		Object.fromEntries(
 			initial_alerts.map(({ source, data }) => [source, createAlertResource(source, params, data)])
 		) as any
 	);
-	// TODO: pass initial value from ssr (or somehow have this run during ssr)
-	// const trips = createTripResource('mta_subway', params);
-	// const stop_times = createStopTimesResource('mta_subway', params);
-	// trip_context.set(trips);
-	// // alert_context.set(alerts);
 
-	// stop_times_context.set(stop_times);
-
-	// TODO: set delay based on if offline or not
-	// let delay = $state(5000);
-
-	// TODO: there might be issues with async interval
-	// maybe use interval.counter outside of callback function
-	// const interval = useInterval(() => delay, {
-	// 	async callback() {
-	// 		console.log('updating data');
-	// 		await trips.refetch();
-	// 		await alerts.refetch();
-	// 		offline = false;
-	// 	}
-	// });
-	// $inspect(alerts.current);
-
+	// TODO: remove old code below once sharing and offline functionality is working
 	// let last_update = $state<Date>(new Date());
 	// let last_st_update = $state<Date>(new Date());
 	// // used to check if bus routes have changed

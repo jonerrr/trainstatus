@@ -1,6 +1,7 @@
 use super::{AppError, AppState, CurrentTime, Parameters, TimeParams, parse_list};
+use crate::models::position::VehiclePosition;
 use crate::models::source::Source;
-use crate::models::stop_time::StopTime;
+use crate::models::trip::StopTime;
 use crate::models::trip::Trip;
 use crate::stores::alert::ApiAlert;
 use axum::Json;
@@ -40,6 +41,7 @@ pub struct StopTimesParameters {
     /// Comma-separated list of route IDs to filter by. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     route_ids: Vec<String>,
+    // TODO: do we still need this param
     /// Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
     #[serde(default)]
     filter_arrival: bool,
@@ -85,6 +87,32 @@ pub async fn stop_times_handler(
         .get_all(source, at, route_ids, params.filter_arrival)
         .await?;
     Ok(Json(stop_times))
+}
+
+#[utoipa::path(
+    get,
+    path = "/positions/{source}",
+    tag = "REALTIME",
+    params(
+        ("source" = Source, Path, description = "Data source"),
+        TimeParams
+    ),
+    responses(
+        (status = 200, description = "Vehicle positions for the specified source", body = [VehiclePosition])
+    )
+)]
+pub async fn positions_handler(
+    State(state): State<AppState>,
+    Path(source): Path<Source>,
+    current_time: CurrentTime,
+) -> Result<Json<Vec<VehiclePosition>>, AppError> {
+    let at = if current_time.user_specified {
+        Some(current_time.time)
+    } else {
+        None
+    };
+    let positions = state.position_store.get_all(source, at).await?;
+    Ok(Json(positions))
 }
 
 #[utoipa::path(

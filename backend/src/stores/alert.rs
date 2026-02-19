@@ -106,6 +106,7 @@ impl AlertStore {
         at: DateTime<Utc>,
     ) -> anyhow::Result<Vec<ApiAlert>> {
         // Get alerts with all related data in a single query using JOINs and aggregation
+        // TODO: use recorded_at to make sure theres no duplicate alerts
         let rows = sqlx::query_as::<_, AlertRow>(
             r#"
             SELECT
@@ -272,6 +273,7 @@ impl AlertStore {
         //         .collect::<Vec<_>>();
         //     dbg!(&test_aes);
         // }
+        // TODO: fix ERROR:  ON CONFLICT DO UPDATE command cannot affect row a second time
 
         // Insert alerts
         let ids = alerts.iter().map(|a| a.id).collect::<Vec<_>>();

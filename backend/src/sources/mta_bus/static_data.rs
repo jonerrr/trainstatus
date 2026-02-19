@@ -12,10 +12,7 @@ use crate::{
     models::{
         route::{MtaBusData as MtaBusRouteData, Route, RouteData},
         source::Source,
-        stop::{
-            CompassDirection, MtaBusData as MtaBusStopData, RouteStop, RouteStopData, Stop,
-            StopData,
-        },
+        stop::{CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     mta_oba_api_key,
     sources::StaticAdapter,

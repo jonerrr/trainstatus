@@ -24,6 +24,7 @@ declare global {
 			// Initial realtime values as SourceMaps
 			initial_trips: RealtimeInitialValue<TripResource>[];
 			initial_stop_times: RealtimeInitialValue<StopTimesResource>[];
+			initial_positions: RealtimeInitialValue<PositionResource>[];
 			initial_alerts: RealtimeInitialValue<AlertResource>[];
 			// Current time param for RT fetches
 			at?: string;

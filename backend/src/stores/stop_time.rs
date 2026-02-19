@@ -1,4 +1,4 @@
-use crate::models::{source::Source, stop_time::StopTime};
+use crate::models::{source::Source, trip::StopTime};
 use crate::stores::read_through;
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};

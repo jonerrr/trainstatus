@@ -43,8 +43,15 @@ impl StopStore {
                         s.name,
                         s.geom,
                         COALESCE(
-                            array_agg(st.to_stop_id) FILTER (WHERE st.to_stop_id IS NOT NULL),
-                            ARRAY[]::VARCHAR[]
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'to_stop_id', st.to_stop_id,
+                                    'to_stop_source', st.to_stop_source,
+                                    'transfer_type', st.transfer_type,
+                                    'min_transfer_time', st.min_transfer_time
+                                )
+                            ) FILTER (WHERE st.to_stop_id IS NOT NULL),
+                            '[]'::jsonb
                         ) AS transfers,
                         s.data,
                         jsonb_agg(rs.*) AS routes
@@ -162,6 +169,11 @@ impl StopStore {
         transfers: HashMap<String, StopTransfer>,
     ) -> anyhow::Result<()> {
         // TODO: refactor so its like the other bulk inserts (using iter)
+        // remove self transfers
+        let transfers: HashMap<String, StopTransfer> = transfers
+            .into_iter()
+            .filter(|(from_id, transfer)| from_id != &transfer.to_stop_id)
+            .collect();
         let mut from_stop_ids: Vec<String> = Vec::with_capacity(transfers.len());
         let mut from_stop_sources: Vec<Source> = Vec::with_capacity(transfers.len());
         let mut to_stop_ids: Vec<String> = Vec::with_capacity(transfers.len());

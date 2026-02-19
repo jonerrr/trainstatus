@@ -5,8 +5,9 @@
 
 	import { type Pins } from './stores.svelte';
 
+	// TODO: maybe just take the persistedState.current instead of the entire persistedState object
 	let {
-		pins,
+		pins = $bindable(),
 		id,
 		source,
 		class: class_name,

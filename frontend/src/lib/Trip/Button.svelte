@@ -80,13 +80,7 @@
 
 <div class="flex flex-col items-center gap-1 text-left">
 	<div class="flex max-w-[95%] items-center gap-1 self-start">
-		<Icon
-			width={36}
-			height={36}
-			route={data.route}
-			link={false}
-			express={is_train_route(data.route, data) && data.data.express}
-		/>
+		<Icon width={36} height={36} route={data.route} link={false} />
 
 		<ArrowBigRight />
 

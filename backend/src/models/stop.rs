@@ -20,17 +20,27 @@ pub struct Stop {
     // probably also make a custom serializer/deserializer
     #[schema(schema_with = point_schema)]
     pub geom: Geom,
-    // TODO: convert transfers to list of structs that includes the source
-    /// List of stop IDs that are transfers. Currently only for train stops
-    pub transfers: Vec<String>,
+    #[sqlx(json)]
+    // TODO: fix api response including the station itself as a transfer
+    pub transfers: Vec<Transfer>,
     #[sqlx(json)]
     pub data: StopData,
     #[sqlx(json)]
     pub routes: Vec<RouteStop>,
 }
 
+#[derive(Serialize, Deserialize, ToSchema, FromRow, Debug)]
+pub struct Transfer {
+    pub to_stop_id: String,
+    pub to_stop_source: Source,
+    /// Numbers between 0-5 represent the GTFS-defined transfer types: https://gtfs.org/documentation/schedule/reference/#transferstxt
+    /// 6 are transfers that we calculated based on proximity.
+    pub transfer_type: i16,
+    pub min_transfer_time: Option<i16>,
+}
+
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
-pub struct MtaSubwayData {
+pub struct MtaSubwayStopData {
     pub ada: bool,
     /// Notes about ADA accessibility at the stop
     #[schema(example = "Uptown only")]
@@ -44,7 +54,7 @@ pub struct MtaSubwayData {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
-pub struct MtaBusData {
+pub struct MtaBusStopData {
     pub direction: CompassDirection,
 }
 
@@ -52,16 +62,16 @@ pub struct MtaBusData {
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopData {
-    MtaSubway(MtaSubwayData),
-    MtaBus(MtaBusData),
+    MtaSubway(MtaSubwayStopData),
+    MtaBus(MtaBusStopData),
 }
 
 impl_discriminated_data!(
     StopData,
     Source,
     {
-        MtaBus => MtaBusData,
-        MtaSubway => MtaSubwayData,
+        MtaBus => MtaBusStopData,
+        MtaSubway => MtaSubwayStopData,
     }
 );
 
@@ -131,84 +141,6 @@ pub enum CompassDirection {
     N,
     Unknown,
 }
-
-// // although it would probably be more performant make a generic and use serde_json, this will be cached anyways and its simpler
-// impl FromRow<'_, PgRow> for Stop {
-//     fn from_row(row: &PgRow) -> sqlx::Result<Self> {
-//         let geom: wkb::Decode<Geometry> = row.try_get("geom")?;
-//         // let point = match geom.geometry.unwrap() {
-//         //     Geometry::Point(point) => point,
-//         //     _ => return Err(sqlx::Error::Decode("Expected Point geometry".into())),
-//         // };
-//         // let geometry = geom
-//         //     .geometry
-//         //     .ok_or_else(|| sqlx::Error::Decode("Geometry field is null or invalid".into()))?;
-
-//         // let route_type = row.try_get::<RouteType, _>("route_type")?;
-//         let data_json = row.try_get::<serde_json::Value, _>("data")?;
-//         let data: StopData = serde_json::from_value(data_json).map_err(|e| {
-//             sqlx::Error::Decode(
-//                 format!(
-//                     "Failed to decode StopData: {}, for stop {}",
-//                     e,
-//                     row.try_get::<i32, _>("id").unwrap()
-//                 )
-//                 .into(),
-//             )
-//         })?;
-
-//         let routes_json = row.try_get::<serde_json::Value, _>("routes")?;
-//         let routes = serde_json::from_value::<Vec<RouteStop>>(routes_json).map_err(|e| {
-//             sqlx::Error::Decode(
-//                 format!(
-//                     "Failed to decode RouteStop: {}, for stop {}",
-//                     e,
-//                     row.try_get::<i32, _>("id").unwrap()
-//                 )
-//                 .into(),
-//             )
-//         })?;
-
-//         Ok(Self {
-//             id: row.try_get("id")?,
-//             name: row.try_get("name")?,
-//             geom: geom
-//                 .geometry
-//                 .ok_or_else(|| sqlx::Error::Decode("Geometry field is null or invalid".into()))?,
-//             // TODO: make transfers empty vec by default
-//             transfers: row.try_get("transfers").map_err(|e| {
-//                 sqlx::Error::Decode(
-//                     format!(
-//                         "Failed to decode transfers: {}, for stop {}",
-//                         e,
-//                         row.try_get::<i32, _>("id").unwrap()
-//                     )
-//                     .into(),
-//                 )
-//             })?,
-//             data,
-//             routes,
-//             // routes: serde_json::from_value::<Vec<StopRoute>>(routes).unwrap(),
-//             // routes: match route_type {
-//             //     RouteType::Train => {
-//             //         let routes: Vec<serde_json::Value> = row.try_get("routes")?;
-//             //         routes
-//             //             .into_iter()
-//             //             .map(|r| serde_json::from_value::<StopRoute>(r).unwrap())
-//             //             .collect()
-//             //     }
-//             //     RouteType::Bus => {
-//             //         let routes: Vec<serde_json::Value> = row.try_get("routes")?;
-//             //         routes
-//             //             .into_iter()
-//             //             .map(|r| serde_json::from_value::<StopRoute>(r).unwrap())
-//             //             .collect()
-//             //     }
-//             // },
-//             // route_type,
-//         })
-//     }
-// }
 
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
 // Thanks MTA for that

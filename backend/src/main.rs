@@ -40,8 +40,8 @@ use crate::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
     },
     stores::{
-        alert::AlertStore, route::RouteStore, stop::StopStore, stop_time::StopTimeStore,
-        trip::TripStore,
+        alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
+        stop_time::StopTimeStore, trip::TripStore,
     },
 };
 
@@ -66,6 +66,7 @@ struct AppState {
     stop_store: StopStore,
     trip_store: TripStore,
     stop_time_store: StopTimeStore,
+    position_store: PositionStore,
     alert_store: AlertStore,
     // pg_pool: sqlx::PgPool,
     // redis_pool: bb8::Pool<RedisConnectionManager>,
@@ -241,6 +242,7 @@ async fn main() {
         stop_store,
         trip_store,
         stop_time_store,
+        position_store,
         alert_store,
     };
 
