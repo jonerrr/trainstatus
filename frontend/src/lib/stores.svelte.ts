@@ -18,3 +18,10 @@ export const route_pins = new PersistedState<Pins>('route_pins', {
 	// lirr: [],
 	// metro_north: []
 });
+
+export const trip_pins = new PersistedState<Pins>('trip_pins', {
+	mta_subway: [],
+	mta_bus: []
+	// lirr: [],
+	// metro_north: []
+});

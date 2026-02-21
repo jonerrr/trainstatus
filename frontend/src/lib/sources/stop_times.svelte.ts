@@ -1,50 +1,52 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
+import {
+	LiveResource,
+	type StopTimeResource,
+	type StopTimeResources,
+	type TypedStopTime,
+	createMultiSourceContext,
+	source_info
+} from '$lib/sources/index.svelte';
 
 import type { Source, StopTime } from '@trainstatus/client';
 
-// rename to resource maybe (which is what trips and alerts rt resource types are called)
-export interface StopTimesResource {
-	by_trip_id: SvelteMap<string, StopTime[]>;
-	by_stop_id: SvelteMap<string, StopTime[]>;
-}
-
-export function index_stop_times(data: StopTime[]): StopTimesResource {
-	const by_trip_id = new SvelteMap<string, StopTime[]>();
-	const by_stop_id = new SvelteMap<string, StopTime[]>();
+export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): StopTimeResource<S> {
+	const by_trip_id = new SvelteMap<string, TypedStopTime<S>[]>();
+	const by_stop_id = new SvelteMap<string, TypedStopTime<S>[]>();
 
 	for (const st of data) {
-		// if (typeof st.arrival === 'string')
-		st.arrival = new Date(st.arrival);
-		// if (typeof st.departure === 'string')
-		st.departure = new Date(st.departure);
+		const typed_st = {
+			...st,
+			arrival: new Date(st.arrival),
+			departure: new Date(st.departure)
+		} as TypedStopTime<S>;
 
 		if (!by_trip_id.has(st.trip_id)) by_trip_id.set(st.trip_id, []);
 		if (!by_stop_id.has(st.stop_id)) by_stop_id.set(st.stop_id, []);
 
-		by_trip_id.get(st.trip_id)!.push(st);
-		by_stop_id.get(st.stop_id)!.push(st);
+		by_trip_id.get(st.trip_id)!.push(typed_st);
+		by_stop_id.get(st.stop_id)!.push(typed_st);
 	}
 
 	return { by_trip_id, by_stop_id };
 }
 
-const EMPTY_INDEX: StopTimesResource = {
+const EMPTY_INDEX: StopTimeResource<Source> = {
 	by_trip_id: new SvelteMap(),
 	by_stop_id: new SvelteMap()
 };
 
-export function createStopTimesResource(
-	source: Source,
+export function createStopTimeResource<S extends Source>(
+	source: S,
 	params: { at?: number } = {},
-	initial_value: StopTimesResource
+	initial_value: StopTimeResource<S>
 ) {
 	// SvelteSet is inherently reactive — the fetcher closes over it and reads
 	// the current snapshot on every invocation, so no $state() wrapper needed.
 	const monitored_routes = new SvelteSet<string>();
 
-	const resource = new LiveResource<StopTimesResource>(
+	const resource = new LiveResource<StopTimeResource<S>>(
 		async (signal) => {
 			console.log('updating stop times');
 			const routes = [...monitored_routes];
@@ -52,7 +54,7 @@ export function createStopTimesResource(
 			// Sources that require explicit routes (e.g. bus) return empty until
 			// at least one route is monitored, avoiding a useless all-routes request.
 			if (source_info[source].monitor_routes && routes.length === 0) {
-				return EMPTY_INDEX;
+				return EMPTY_INDEX as StopTimeResource<S>;
 			}
 
 			const query = new URLSearchParams();
@@ -65,8 +67,8 @@ export function createStopTimesResource(
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error(`Failed to fetch stop times: ${res.status}`);
 
-			const data: StopTime[] = await res.json();
-			return index_stop_times(data);
+			const data: TypedStopTime<S>[] = await res.json();
+			return index_stop_times<S>(data);
 		},
 		{
 			initial_value,
@@ -135,8 +137,7 @@ export function createStopTimesResource(
 	};
 }
 
-export const stop_times_context =
-	createMultiSourceContext<ReturnType<typeof createStopTimesResource>>('stop_times');
+export const stop_time_context = createMultiSourceContext<StopTimeResources>();
 
 // TODO: remove when finished refactoring
 export const monitored_bus_routes = new SvelteSet<string>();

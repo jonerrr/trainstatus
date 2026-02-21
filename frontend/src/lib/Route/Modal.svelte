@@ -19,9 +19,7 @@
 
 	let { route, time_format }: Props = $props();
 
-	const all_alerts = alert_context.get();
-
-	const alerts = $derived(all_alerts[route.data.source]);
+	const alerts = $derived(alert_context.getSource(route.data.source));
 
 	const route_alerts = $derived(
 		alerts.value?.alerts_by_route

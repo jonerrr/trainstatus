@@ -10,11 +10,11 @@
 	import SettingsModal from '$lib/Settings/Modal.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
-	import { type Pins, route_pins, stop_pins } from '$lib/stores.svelte';
+	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/stores.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
-	import type { Source, Stop, Trip, TripData } from '@trainstatus/client';
+	import type { Source } from '@trainstatus/client';
 	import { PersistedState } from 'runed';
 
 	// import { type Trip, type TripData, is_bus_route } from './trips.svelte';
@@ -443,15 +443,16 @@
 			route_pins
 		)}
 	{:else if page.state.modal?.type === 'trip'}
-		<!-- <TripModal trip={page.state.modal.data} {show_previous} time_format={time_format.current} /> -->
+		<TripModal trip={page.state.modal} {show_previous} time_format={time_format.current} />
 		<!-- TODO: trips -->
-		<!-- {@render actions(
+		{@render actions(
 			true,
 			't',
-			page.state.modal.data.id,
-			`${page.state.modal.data.route_id} Trip`,
+			page.state.modal.id,
+			`${page.state.modal.route_id} Trip`,
+			page.state.modal.data.source,
 			trip_pins
-		)} -->
+		)}
 	{:else if page.state.modal?.type === 'settings'}
 		<SettingsModal />
 	{/if}

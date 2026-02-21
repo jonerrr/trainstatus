@@ -6,8 +6,8 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import { searchSchema } from '$lib/params.schema';
 	import { alert_context, createAlertResource } from '$lib/sources/alerts.svelte';
-	import { createPositionResource, positions_context } from '$lib/sources/positions.svelte';
-	import { createStopTimesResource, stop_times_context } from '$lib/sources/stop_times.svelte';
+	import { createPositionResource, position_context } from '$lib/sources/positions.svelte';
+	import { createStopTimeResource, stop_time_context } from '$lib/sources/stop_times.svelte';
 	import { createTripResource, trip_context } from '$lib/sources/trips.svelte';
 	import { route_info } from '$lib/util.svelte';
 
@@ -33,16 +33,16 @@
 		) as any
 	);
 
-	stop_times_context.set(
+	stop_time_context.set(
 		Object.fromEntries(
 			initial_stop_times.map(({ source, data }) => [
 				source,
-				createStopTimesResource(source, params, data)
+				createStopTimeResource(source, params, data)
 			])
 		) as any
 	);
 
-	positions_context.set(
+	position_context.set(
 		Object.fromEntries(
 			initial_positions.map(({ source, data }) => [
 				source,

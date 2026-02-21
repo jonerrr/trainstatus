@@ -1,14 +1,6 @@
-import type { RouteStop, Stop, StopData } from '@trainstatus/client';
+import type { RouteStop, Stop } from '@trainstatus/client';
 
-// Type guards for source-specific data
-// export const is_mta_bus = (data: StopData): data is StopData & { source: 'mta_bus' } => {
-// 	return data.source === 'mta_bus';
-// };
-
-// export const is_mta_subway = (data: StopData): data is StopData & { source: 'mta_subway' } => {
-// 	return data.source === 'mta_subway';
-// };
-
+// TODO: double check this still works and is necessary after refactor to separate source-specific data into separate types
 // Get main routes for a stop (for subway, filter to main lines only)
 export const main_stop_routes = (stop: Stop): RouteStop[] => {
 	if (stop.data.source === 'mta_subway') {

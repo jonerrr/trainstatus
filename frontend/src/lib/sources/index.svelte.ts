@@ -1,26 +1,154 @@
+import { createContext } from 'svelte';
+
+import type { SvelteMap } from 'svelte/reactivity';
+
 import { BusFront, TrainFront } from '@lucide/svelte';
-import type { Source } from '@trainstatus/client';
-import { Context } from 'runed';
+import type {
+	ApiAlert,
+	MtaBusPositionData,
+	MtaSubwayPositionData,
+	Source,
+	StopTime,
+	StopTimeData,
+	Trip,
+	TripData,
+	VehiclePosition
+} from '@trainstatus/client';
+
+// =============================================================================
+// SOURCE-SPECIFIC DATA MAPS
+// Define the discriminated union mapping for each entity type
+// =============================================================================
+
+/** Position data discriminated by source */
+export type SourcePositionDataMap = {
+	mta_bus: MtaBusPositionData & { source: 'mta_bus' };
+	mta_subway: MtaSubwayPositionData & { source: 'mta_subway' };
+};
+
+/** Trip data discriminated by source */
+export type SourceTripDataMap = {
+	mta_bus: Extract<TripData, { source: 'mta_bus' }>;
+	mta_subway: Extract<TripData, { source: 'mta_subway' }>;
+};
+
+/** StopTime data discriminated by source */
+export type SourceStopTimeDataMap = {
+	mta_bus: Extract<StopTimeData, { source: 'mta_bus' }>;
+	mta_subway: Extract<StopTimeData, { source: 'mta_subway' }>;
+};
+
+// =============================================================================
+// TYPED ENTITY HELPERS
+// Creates a version of an entity with narrowed `data` field based on source
+// =============================================================================
 
 /**
- * Maps a Source to its corresponding resource instance.
- * Use this to build multi-source context types.
- *
- * @example
- * type MultiSourceTrips = SourceMap<TripResource>;
- * // Equivalent to: Record<Source, TripResource>
+ * Narrows an entity type's `data` field based on source.
+ * @template Entity - The base entity type (e.g., VehiclePosition, Trip)
+ * @template DataMap - The source-to-data mapping (e.g., SourcePositionDataMap)
+ * @template S - The specific source
  */
+export type TypedEntity<
+	Entity extends { data: unknown },
+	DataMap extends Record<Source, unknown>,
+	S extends Source
+> = Omit<Entity, 'data'> & { data: DataMap[S] };
+
+// Convenience types for each entity
+export type TypedVehiclePosition<S extends Source> = TypedEntity<
+	VehiclePosition,
+	SourcePositionDataMap,
+	S
+>;
+export type TypedTrip<S extends Source> = TypedEntity<Trip, SourceTripDataMap, S>;
+export type TypedStopTime<S extends Source> = TypedEntity<StopTime, SourceStopTimeDataMap, S>;
+
+// =============================================================================
+// RESOURCE TYPES
+// =============================================================================
+
+/** A SvelteMap of entities keyed by ID */
+export type EntityResource<T> = SvelteMap<string, T>;
+
+/** Maps each source to its typed LiveResource */
+export type SourceResources<T extends Record<Source, unknown>> = {
+	[S in Source]: LiveResource<T[S]>;
+};
+
+// Convenience types for resource maps
+export type PositionResource<S extends Source> = EntityResource<TypedVehiclePosition<S>>;
+export type TripResource<S extends Source> = EntityResource<TypedTrip<S>>;
+
+// StopTimes are indexed by both trip_id and stop_id
+export interface StopTimeResource<S extends Source> {
+	by_trip_id: SvelteMap<string, TypedStopTime<S>[]>;
+	by_stop_id: SvelteMap<string, TypedStopTime<S>[]>;
+}
+
+export type PositionResources = SourceResources<{ [S in Source]: PositionResource<S> }>;
+export type TripResources = SourceResources<{ [S in Source]: TripResource<S> }>;
+export type StopTimeResources = SourceResources<{ [S in Source]: StopTimeResource<S> }>;
+// Alerts don't have source-specific data, simpler type
+// TODO: if we add source-specific fields to alerts in the future, we can switch to a typed version like the others
+export type AlertResources = SourceResources<{ [S in Source]: EntityResource<ApiAlert> }>;
+
+// =============================================================================
+// MULTI-SOURCE CONTEXT
+// =============================================================================
+
 export type SourceMap<T> = Record<Source, T>;
 
 /**
- * Helper to create a multi-source context with proper typing.
- *
- * @example
- * export const trip_context = createMultiSourceContext<TripResource>('trips');
+ * Creates a typed multi-source context with a `getSource` helper
+ * that properly narrows types based on the source parameter.
  */
-export function createMultiSourceContext<T>(name: string): Context<SourceMap<T>> {
-	return new Context<SourceMap<T>>(name);
+export function createMultiSourceContext<ResourceMap extends SourceMap<unknown>>() {
+	const [get, set] = createContext<ResourceMap>();
+
+	function getSource<S extends Source>(source: S): ResourceMap[S] {
+		const all = get();
+		return all[source];
+	}
+
+	return { get, set, getSource };
 }
+
+// not used since each source has different requirements. but maybe in the future we could use the autogenerated transformers from @trainstatus/client/transformers.gen
+// // =============================================================================
+// // INDEX HELPERS
+// // =============================================================================
+
+// /**
+//  * Generic indexer that creates a SvelteMap from an array of entities.
+//  * @param data - Array of entities to index
+//  * @param getKey - Function to extract the key from each entity
+//  * @param transform - Optional transform function applied to each entity
+//  */
+// export function indexEntities<T, K extends string = string>(
+// 	data: T[],
+// 	getKey: (item: T) => K,
+// 	transform?: (item: T) => T
+// ): SvelteMap<K, T> {
+// 	return new SvelteMap(data.map((item) => [getKey(item), transform ? transform(item) : item]));
+// }
+
+// /**
+//  * Index entities by a specific field, with date parsing for common fields.
+//  */
+// export function indexById<T extends { updated_at: Date | string }>(
+// 	data: T[],
+// 	idField: keyof T
+// ): SvelteMap<string, T> {
+// 	return indexEntities(
+// 		data,
+// 		(item) => String(item[idField]),
+// 		(item) => ({
+// 			...item,
+// 			updated_at: new Date(item.updated_at)
+// 		})
+// 	);
+// }
 
 export const source_info = {
 	// TODO: increase refresh interval
@@ -66,7 +194,7 @@ interface LiveResourceOptions<T> {
 	// TODO: maybe make this required
 	initial_value?: T;
 }
-// TODO: probably take a default value for SSR
+
 export class LiveResource<T> {
 	// State
 	value = $state<T | undefined>(undefined);

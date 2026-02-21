@@ -11,11 +11,8 @@
 
 	let { data }: Props = $props();
 
-	const all_alerts = alert_context.get();
+	const alerts = $derived(alert_context.getSource(data.data.source));
 
-	const alerts = $derived(all_alerts[data.data.source]);
-
-	// TODO: alert stuff
 	const route_alerts = $derived(
 		alerts.value?.alerts_by_route
 			.get(data.id)

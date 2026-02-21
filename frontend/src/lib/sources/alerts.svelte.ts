@@ -4,7 +4,6 @@ import icons from '$lib/icons';
 import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
-import { Context } from 'runed';
 
 export interface AlertResource {
 	alerts: ApiAlert[];
@@ -44,11 +43,6 @@ export function createAlertResource(
 	params: { at?: number },
 	initial_value: AlertResource
 ) {
-	// const sourceDeps = () =>
-	// 	({
-	// 		at: params.at
-	// 	}) satisfies { at?: number };
-
 	const resource = new LiveResource<AlertResource>(
 		async (signal) => {
 			console.log('updating alerts');
@@ -102,27 +96,7 @@ export function createAlertResource(
 }
 
 export const alert_context =
-	createMultiSourceContext<ReturnType<typeof createAlertResource>>('alerts');
-
-// export const alert_context = new Context<ReturnType<typeof createAlertResource>>('alerts');
-
-export interface Alert {
-	id: string;
-	alert_type: string;
-	header_html: string;
-	description_html?: string;
-	start_time: Date;
-	end_time?: Date;
-	updated_at: Date;
-	created_at: Date;
-	entities: Entity[];
-}
-
-export interface Entity {
-	route_id: string;
-	sort_order: number;
-	stop_id?: number;
-}
+	createMultiSourceContext<Record<Source, LiveResource<AlertResource>>>();
 
 // TODO: maybe move parsing to backend and standardize icon format (which will be important if we have other sources)
 const train_regex = /(\[(.+?)\])/gm;

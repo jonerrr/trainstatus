@@ -4,22 +4,22 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { type TripData, is_bus_route, is_train_route } from '$lib/sources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';
+	import type { Trip } from '@trainstatus/client';
 
 	interface Props {
-		data: Trip<TripData, Route>;
+		data: Trip;
 	}
 	let { data }: Props = $props();
 
 	// TODO: maybe move this to List.svelte
-	onMount(() => {
-		if (is_bus_route(data.route, data)) {
-			monitored_bus_routes.add(data.route_id);
-		}
-	});
+	// onMount(() => {
+	// 	if (is_bus_route(data.route, data)) {
+	// 		monitored_bus_routes.add(data.route_id);
+	// 	}
+	// });
 
 	const stop_times = $derived(
 		(rt_stop_times.by_trip_id[data.id] || []).filter((st) => st.arrival.getTime() > current_time.ms)

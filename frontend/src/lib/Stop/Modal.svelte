@@ -2,15 +2,15 @@
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import BusCapacity from '$lib/BusCapacity.svelte';
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
 	import { alert_context } from '$lib/sources/alerts.svelte';
-	import type { SourceMap } from '$lib/sources/index.svelte';
-	import { positions_context } from '$lib/sources/positions.svelte';
-	import { stop_times_context } from '$lib/sources/stop_times.svelte';
+	import type { SourceMap, TypedVehiclePosition } from '$lib/sources/index.svelte';
+	import { position_context } from '$lib/sources/positions.svelte';
+	import { stop_time_context } from '$lib/sources/stop_times.svelte';
 	import { trip_context } from '$lib/sources/trips.svelte';
 	import { main_stop_routes } from '$lib/static';
 	import { current_time } from '$lib/util.svelte';
@@ -32,22 +32,17 @@
 
 	let { stop, show_previous, time_format }: Props = $props();
 
-	const all_trips = trip_context.get();
-	const all_stop_times = stop_times_context.get();
-	const all_positions = positions_context.get();
-	const all_alerts = alert_context.get();
-
-	const trips = $derived(all_trips[stop.data.source]);
-	const stop_times = $derived(all_stop_times[stop.data.source]);
-	const positions = $derived(all_positions[stop.data.source]);
-	const alerts = $derived(all_alerts[stop.data.source]);
+	const trips = $derived(trip_context.getSource(stop.data.source));
+	const stop_times = $derived(stop_time_context.getSource(stop.data.source));
+	const positions = $derived(position_context.getSource(stop.data.source));
+	const alerts = $derived(alert_context.getSource(stop.data.source));
 	const routes = $derived(page.data.routes_by_id[stop.data.source]);
 
 	const { stop_times_with_trip, active_routes } = $derived.by(() => {
 		const now = current_time.ms;
 		const active_routes = new Set<string>();
 
-		const stop_times_with_trip = (stop_times.by_stop_id.get(stop.id) ?? []).flatMap((st) => {
+		const stop_times_with_trip = (stop_times.value?.by_stop_id.get(stop.id) ?? []).flatMap((st) => {
 			if (!show_previous && st.arrival.getTime() <= now) return [];
 			const trip = trips.value?.get(st.trip_id);
 			if (!trip) return [];
@@ -166,8 +161,11 @@
 			<div class="flex items-center gap-1">
 				<div class="flex flex-col items-center">
 					<!-- TODO: figure out how to fix type safety so we don't need to check the source again -->
-					{#if position?.data.source === 'mta_bus' && position.data.capacity && position.data.passengers}
+					<!-- {#if position?.data.source === 'mta_bus' && position.data.capacity && position.data.passengers}
 						<BusCapacity passengers={position.data.passengers} capacity={position.data.capacity} />
+					{/if} -->
+					{#if st.data.source === 'mta_bus'}
+						<VehicleCapacity position={position as TypedVehiclePosition<'mta_bus'>} />
 					{/if}
 					<!-- {st.trip.vehicle_id} -->
 					<Icon width={20} height={20} link={false} route={routes[st.trip.route_id]} />
@@ -175,7 +173,7 @@
 
 				<div class="text-left" class:text-neutral-400={st.arrival.getTime() < current_time.ms}>
 					{#if stop.data.source === 'mta_subway'}
-						{@const trip_stop_times = stop_times.by_trip_id.get(st.trip_id)}
+						{@const trip_stop_times = stop_times.value?.by_trip_id.get(st.trip_id)}
 						{@const last_stop_time = trip_stop_times?.[trip_stop_times.length - 1]}
 						{#if last_stop_time}
 							{page.data.stops_by_id['mta_subway'][last_stop_time.stop_id]?.name}
@@ -196,14 +194,14 @@
 							{/if} -->
 			</div>
 
-			<!-- TODO: use new class clsx features -->
 			<div
-				class="flex flex-col items-end {st.trip.data.source === 'mta_subway' &&
-				'assigned' in st.trip.data &&
-				!st.trip.data.assigned
-					? 'italic'
-					: ''}"
-				class:text-neutral-400={st.arrival.getTime() < current_time.ms}
+				class={[
+					'flex flex-col items-end',
+					{
+						italic: position?.data.source === 'mta_subway' && !position.data.assigned,
+						'text-neutral-400': st.arrival.getTime() < current_time.ms
+					}
+				]}
 			>
 				<!-- if bus trip and theres a deviation more than 2 min -->
 				<!-- TODO: Fix -->

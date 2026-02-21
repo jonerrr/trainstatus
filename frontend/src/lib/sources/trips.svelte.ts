@@ -1,13 +1,18 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
+import {
+	LiveResource,
+	type TripResource,
+	type TripResources,
+	type TypedTrip,
+	createMultiSourceContext,
+	source_info
+} from '$lib/sources/index.svelte';
 
-import type { Source, Trip } from '@trainstatus/client';
-
-export type TripResource = SvelteMap<string, Trip>;
+import type { Source } from '@trainstatus/client';
 
 //TODO: compare map and for loop performance
-export function index_trips(data: Trip[]): TripResource {
+export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResource<S> {
 	return new SvelteMap(
 		data.map((trip) => [
 			trip.id,
@@ -20,12 +25,12 @@ export function index_trips(data: Trip[]): TripResource {
 	);
 }
 
-export function createTripResource(
-	source: Source,
+export function createTripResource<S extends Source>(
+	source: S,
 	params: { at?: number },
-	initial_value: TripResource
+	initial_value: TripResource<S>
 ) {
-	const resource = new LiveResource<TripResource>(
+	const resource = new LiveResource<TripResource<S>>(
 		async (signal) => {
 			console.log('updating trips');
 			const query = new URLSearchParams();
@@ -36,8 +41,8 @@ export function createTripResource(
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error('Failed to fetch trips');
 
-			const data: Trip[] = await res.json();
-			return index_trips(data);
+			const data: TypedTrip<S>[] = await res.json();
+			return index_trips<S>(data);
 			// return new SvelteMap(
 			// 	data.map((trip) => [
 			// 		trip.id,
@@ -65,7 +70,6 @@ export function createTripResource(
 	return resource;
 }
 
-export const trip_context =
-	createMultiSourceContext<ReturnType<typeof createTripResource>>('trips');
+export const trip_context = createMultiSourceContext<TripResources>();
 
 export const calculate_trip_height = () => 80;

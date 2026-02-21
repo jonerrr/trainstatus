@@ -1,14 +1,19 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
+import {
+	LiveResource,
+	type PositionResource,
+	type PositionResources,
+	type TypedVehiclePosition,
+	createMultiSourceContext,
+	source_info
+} from '$lib/sources/index.svelte';
 
-import type { Source, VehiclePosition } from '@trainstatus/client';
+import type { Source } from '@trainstatus/client';
 
-export type PositionResource = SvelteMap<string, VehiclePosition>;
-
-//TODO: compare map and for loop performance
-export function index_positions(data: VehiclePosition[]): PositionResource {
-	// TODO: maybe index by trip_id instead, since vehicles can be associated with multiple trips
+export function index_positions<S extends Source>(
+	data: TypedVehiclePosition<S>[]
+): PositionResource<S> {
 	return new SvelteMap(
 		data.map((position) => [
 			position.vehicle_id,
@@ -19,13 +24,12 @@ export function index_positions(data: VehiclePosition[]): PositionResource {
 		])
 	);
 }
-
-export function createPositionResource(
-	source: Source,
+export function createPositionResource<S extends Source>(
+	source: S,
 	params: { at?: number },
-	initial_value: PositionResource
+	initial_value: PositionResource<S>
 ) {
-	const resource = new LiveResource<PositionResource>(
+	const resource = new LiveResource<PositionResource<S>>(
 		async (signal) => {
 			console.log('updating vehicle positions');
 			const query = new URLSearchParams();
@@ -36,13 +40,14 @@ export function createPositionResource(
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error('Failed to fetch vehicle positions');
 
-			const data: VehiclePosition[] = await res.json();
-			return index_positions(data);
+			// Cast is safe because we're fetching for a specific source
+			const data = (await res.json()) as TypedVehiclePosition<S>[];
+			return index_positions<S>(data);
 		},
 		{
 			initial_value,
 			interval: source_info[source].refresh_interval.positions,
-			debounce: 500 // TODO: increase time
+			debounce: 500
 		}
 	);
 
@@ -55,7 +60,5 @@ export function createPositionResource(
 	return resource;
 }
 
-export const positions_context =
-	createMultiSourceContext<ReturnType<typeof createPositionResource>>('positions');
-
+export const position_context = createMultiSourceContext<PositionResources>();
 // export const calculate_position_height = () => 80;

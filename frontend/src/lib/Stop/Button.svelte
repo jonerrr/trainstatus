@@ -3,7 +3,7 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
-	import { stop_times_context } from '$lib/sources/stop_times.svelte';
+	import { stop_time_context } from '$lib/sources/stop_times.svelte';
 	import { trip_context } from '$lib/sources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
@@ -20,11 +20,8 @@
 
 	const routes = $derived(page.data.routes_by_id[stop.data.source]);
 
-	const all_trips = trip_context.get();
-	const all_stop_times = stop_times_context.get();
-
-	const trips = $derived(all_trips[stop.data.source]);
-	const stop_times = $derived(all_stop_times[stop.data.source]);
+	const trips = $derived(trip_context.getSource(stop.data.source));
+	const stop_times = $derived(stop_time_context.getSource(stop.data.source));
 
 	const stop_times_by_direction = $derived.by(() => {
 		const stop_times_by_direction: Map<number, StopTimesByRoute> = new Map();
@@ -41,7 +38,7 @@
 			}
 		}
 
-		const current_stop_times = stop_times.by_stop_id.get(stop.id) ?? [];
+		const current_stop_times = stop_times.value?.by_stop_id.get(stop.id) ?? [];
 		// TODO: maybe end loop early if we get 2 trips for each route or something like that
 		for (const st of current_stop_times) {
 			if (st.arrival.getTime() < current_time.ms) continue;
