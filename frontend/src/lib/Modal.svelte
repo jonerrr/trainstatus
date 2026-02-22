@@ -30,6 +30,9 @@
 
 	// let dialog_el = $state<HTMLDialogElement>();
 
+	// TODO: make implement some sort of focus trap and restore using attachments
+	// see https://svelte.dev/tutorial/svelte/attach
+
 	// Physics constants derived from vaul-svelte
 	const VELOCITY_THRESHOLD = 0.4; // px/ms
 	const CLOSE_THRESHOLD = 0.25; // % of height
@@ -294,7 +297,6 @@
 	// 	duration: 300,
 	// 	easing: cubicOut
 	// });
-	// TODO: use debounced from runed here
 	let copied = $state(false);
 	// show stops/trips before current datetime
 	let show_previous = $state(false);
@@ -444,7 +446,7 @@
 		)}
 	{:else if page.state.modal?.type === 'trip'}
 		<TripModal trip={page.state.modal} {show_previous} time_format={time_format.current} />
-		<!-- TODO: trips -->
+
 		{@render actions(
 			true,
 			't',

@@ -30,7 +30,7 @@
 			title="Settings"
 			class="flex items-center justify-center rounded-md border border-neutral-700/50 bg-neutral-800/70 p-2 text-neutral-300 transition-all duration-200 hover:bg-neutral-700 hover:text-blue-400 focus:ring-2 focus:ring-blue-500/30 focus:outline-none active:bg-neutral-600"
 			onclick={() => {
-				pushState('', { modal: 'settings' });
+				pushState('', { modal: { type: 'settings' } });
 			}}
 		>
 			<Settings class="size-5" />

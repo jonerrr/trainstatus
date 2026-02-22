@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
+	import type { Attachment } from 'svelte/attachments';
+
+	import { trap_focus } from '$lib/trap_focus.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import {
@@ -16,20 +19,25 @@
 	} from '@lucide/svelte';
 	import dayjs from 'dayjs';
 
-	let headerRef = $state<HTMLDivElement>();
+	// let headerRef = $state<HTMLDivElement>();
 	// TODO: maybe low-data mode (that doesn't fetch non-visible info)
-	onMount(() => {
-		// Set a tiny timeout to ensure the dialog is fully rendered
-		setTimeout(() => {
-			// Focus the header element instead of any inputs
-			headerRef?.focus();
-		}, 50);
-	});
+	// onMount(() => {
+	// 	// Set a tiny timeout to ensure the dialog is fully rendered
+	// 	setTimeout(() => {
+	// 		// Focus the header element instead of any inputs
+	// 		headerRef?.focus();
+	// 	}, 50);
+	// });
+
+	// const fix_focus: Attachment<HTMLDivElement> = (node) => {
+	// 	node.focus();
+	// };
 </script>
 
+<!-- TODO: test trap focus. also maybe move it to parent modal component so all of them have it -->
 <div
 	class="z-20 flex items-center gap-1 p-3"
-	bind:this={headerRef}
+	{@attach trap_focus}
 	tabindex="-1"
 	style="outline: none;"
 >
@@ -44,10 +52,11 @@
 		<div class="mb-3 flex items-center justify-between">
 			<div class="flex items-center gap-1">
 				<Hourglass class="size-5" />
-				<h2 class="text-lg font-medium">Custom Time</h2>
+				<h2 class="text-lg font-medium">Time Travel</h2>
 				<span class="text-xs text-yellow-300">(Beta)</span>
 			</div>
 		</div>
+		<!-- TODO: improve wording -->
 		<p class="mb-3 pl-6 text-sm text-neutral-400">
 			View train and bus information from a specific time in the past. This allows you to see
 			historical train movements and delays for research or analysis purposes.
@@ -63,7 +72,7 @@
 						current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
 					(v) => (current_time.value = dayjs(v).unix())
 				}
-				class="min-w-[200px] rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
+				class="min-w-50 rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
 			/>
 			{#if current_time.value}
 				<button

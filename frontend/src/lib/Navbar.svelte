@@ -3,14 +3,14 @@
 
 	import { current_time } from '$lib/util.svelte';
 
-	import { CircleAlert, Clock, Home } from '@lucide/svelte';
+	import { CircleAlert, Clock, House } from '@lucide/svelte';
 
 	interface Routes {
-		[key: string]: [Icon: typeof Home | typeof Clock | typeof CircleAlert, href: string];
+		[key: string]: [Icon: typeof House | typeof Clock | typeof CircleAlert, href: string];
 	}
 
 	const routes: Routes = {
-		Home: [Home, '/'],
+		Home: [House, '/'],
 		Alerts: [CircleAlert, '/alerts'],
 		Stops: [Clock, '/stops']
 	} as const;

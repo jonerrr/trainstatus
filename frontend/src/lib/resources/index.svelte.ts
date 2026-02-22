@@ -197,6 +197,7 @@ interface LiveResourceOptions<T> {
 
 export class LiveResource<T> {
 	// State
+	// TODO: rename value to current (which is what runed and LocalStorage call it)
 	value = $state<T | undefined>(undefined);
 	error = $state<Error | null>(null);
 	last_updated = $state<Date | null>(null);
