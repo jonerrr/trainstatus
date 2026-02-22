@@ -148,13 +148,10 @@ export type Source = 'mta_subway' | 'mta_bus';
 export type Stop = {
     data: StopData;
     geom: {
-        coordinates: {
-            Point: {
-                x: number;
-                y: number;
-            };
+        Point: {
+            x: number;
+            y: number;
         };
-        type: 'Point';
     };
     id: string;
     name: string;
@@ -235,13 +232,10 @@ export type TripData = (MtaBusData & {
 export type VehiclePosition = {
     data: PositionData;
     geom?: {
-        coordinates: {
-            Point: {
-                x: number;
-                y: number;
-            };
+        Point: {
+            x: number;
+            y: number;
         };
-        type: 'Point';
     };
     stop_id?: string | null;
     trip_id?: string | null;

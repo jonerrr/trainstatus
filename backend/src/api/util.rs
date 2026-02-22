@@ -21,22 +21,9 @@ pub fn point_schema() -> utoipa::openapi::schema::Object {
         .required("y")
         .build();
 
-    let coordinates = utoipa::openapi::schema::ObjectBuilder::new()
+    utoipa::openapi::schema::ObjectBuilder::new()
         .schema_type(utoipa::openapi::schema::Type::Object)
         .property("Point", point_coords)
         .required("Point")
-        .build();
-
-    utoipa::openapi::schema::ObjectBuilder::new()
-        .schema_type(utoipa::openapi::schema::Type::Object)
-        .property("coordinates", coordinates)
-        .property(
-            "type",
-            utoipa::openapi::schema::ObjectBuilder::new()
-                .schema_type(utoipa::openapi::schema::Type::String)
-                .enum_values(Some(vec!["Point"])),
-        )
-        .required("coordinates")
-        .required("type")
         .build()
 }

@@ -269,30 +269,6 @@
 	}
 
 	// measure item height on mount and watch for resizes
-	// function measureHeight(node: HTMLElement, id: string) {
-	// 	// Take initial measurement and store it immediately
-	// 	const initial_height = node.offsetHeight;
-	// 	const old_height = item_heights.get(id);
-	// 	item_heights.set(id, initial_height);
-
-	// 	// Only signal a reactive update when our measurement differs from the estimate
-	// 	if (old_height === undefined || initial_height !== old_height) {
-	// 		heights_version++;
-	// 	}
-
-	// 	// Register with the shared observer
-	// 	const ro = get_shared_ro();
-	// 	observed_ids.set(node, id);
-	// 	ro.observe(node);
-
-	// 	return {
-	// 		destroy() {
-	// 			ro.unobserve(node);
-	// 			observed_ids.delete(node);
-	// 		}
-	// 	};
-	// }
-
 	function measure_height(id: string): Attachment<HTMLDivElement> {
 		return (node) => {
 			// Take initial measurement and store it immediately
