@@ -7,10 +7,6 @@
 	// TODO: combine express and local
 </script>
 
-<!-- <svelte:head>
-	<title>Alerts | Train Status</title>
-</svelte:head> -->
-
 <List
 	title="Route Alerts"
 	sources={page.data.routes}

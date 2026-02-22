@@ -21,7 +21,8 @@
 	// see: https://github.com/svecosystem/runed/issues/377
 	// const params = useSearchParams(searchSchema);
 	const params = {};
-
+	// TODO: handle offline from new fetching method
+	// TODO: fix refresh on page load (it should use the initial data and wait 1 interval)
 	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
 
 	trip_context.set(

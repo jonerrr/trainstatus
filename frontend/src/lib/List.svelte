@@ -346,6 +346,9 @@
 	<div
 		class="sticky top-0 z-30 flex w-full items-center justify-between bg-neutral-900/95 shadow-lg shadow-black/10 backdrop-blur-xs"
 	>
+		<!-- TODO: remove either this header or the main website header -->
+		<!-- it should be possible to combine the logo, tab selection, and settings button in one "row" -->
+		<!-- plus, it already shows in the navbar what section is active (except home page lists) -->
 		<h1 class="flex items-center gap-2 pl-2 text-xl font-bold">
 			<span>
 				{title}

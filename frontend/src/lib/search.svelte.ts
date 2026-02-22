@@ -16,7 +16,7 @@ export class StopSearch {
 		}
 	}
 
-	search(search_term: string, source: Source) {
+	query(search_term: string, source: Source) {
 		const index = this.indexes[source];
 		const source_stops = this.stops[source] ?? [];
 		if (!index || !search_term.trim()) {

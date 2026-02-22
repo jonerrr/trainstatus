@@ -2,126 +2,99 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
-	import { type Pins, stop_pins } from '$lib/pins.svelte';
+	import { stop_pins } from '$lib/pins.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 	import { calculate_stop_height } from '$lib/static';
 	import { LocalStorage } from '$lib/storage.svelte';
-	import { debounce } from '$lib/util.svelte';
 
 	import { CircleX, Search } from '@lucide/svelte';
 	import { type Source, type Stop } from '@trainstatus/client';
-
-	// interface StopObj {
-	// 	train: Stop<'train'>[];
-	// 	bus: Stop<'bus'>[];
-	// }
-
-	// const stops: StopObj = $state({
-	// 	bus: page.data.bus_stops,
-	// 	train: page.data.train_stops
-	// });
+	import { Throttled } from 'runed';
 
 	// TODO: might need to use $state.snapshot on page.data.stops
 	// TODO: do we need $state here
-	const stops = page.data.stops;
+	// const stops = $state(page.data.stops);
 
-	// TODO: Fix switching sources causing lag
+	// TODO: Fix switching sources causing lag (page like completely freezes)
 	// TODO: determine default source from users preferences or something
-	let selected_source = new LocalStorage<Source>('stops_tab', 'mta_subway');
+	// TODO: why does svelte give a warning when this isn't wrapped in $state()?
+	let selected_source = $state(new LocalStorage<Source>('stops_tab', 'mta_subway'));
 
-	const search = new StopSearch(page.data.stops);
+	const stop_search = new StopSearch(page.data.stops);
 
 	let search_input: string = $state('');
-	function clear_search() {
-		// reset stop ids
-		// stops['bus'] = page.data.bus_stops;
-		// stops['train'] = page.data.train_stops;
-		// TODO: fix
-		// Object.keys(stops).forEach((key) => {
-		// 	// @ts-ignore
-		// 	stops[key] = page.data.stops[key];
-		// });
+	const throttled_search_input = new Throttled(() => search_input, 150);
 
+	const visible_stops = $derived.by(() => {
+		// console.log('searching for', throttled_search_input.current);
+
+		// default to all stops if search input empty
+		if (throttled_search_input.current === '') {
+			return page.data.stops;
+		}
+
+		// check if its a stop / route id
+		// TODO: maybe add back id length check (since stop_id must have like at least 3 chars. but its different for each source, so maybe not worth it)
+		const id_check = throttled_search_input.current.toUpperCase();
+
+		const stop = page.data.stops_by_id[selected_source.current][id_check];
+		if (stop) {
+			// TODO: maybe preserve the other source search results instead of implicitly resetting them
+			return {
+				...page.data.stops,
+				[selected_source.current]: [stop]
+			};
+		}
+
+		const route = page.data.routes_by_id[selected_source.current][id_check];
+		if (route) {
+			const new_stops: Stop[] = [];
+			// store sequences for sorting later
+			const route_stop_sequences: Record<string, number> = {};
+
+			for (const s of page.data.stops[selected_source.current]) {
+				const r = s.routes.find((r) => r.route_id === route.id);
+				// TODO: maybe add back check for  ['full_time', 'part_time', 'rush_hour'] for mta_subway routes
+				if (r) {
+					new_stops.push(s);
+					route_stop_sequences[s.id] = r.stop_sequence;
+				}
+			}
+			// TODO: maybe add sorting by route stop sequence back
+			if (new_stops.length) {
+				return {
+					...page.data.stops,
+					[selected_source.current]: new_stops.sort(
+						(a, b) => route_stop_sequences[a.id] - route_stop_sequences[b.id]
+					)
+				};
+			}
+		}
+
+		return {
+			...page.data.stops,
+			[selected_source.current]: stop_search.query(
+				throttled_search_input.current,
+				selected_source.current
+			)
+		};
+	});
+	// $inspect(visible_stops);
+
+	function clear_search() {
 		search_input = '';
 	}
-
-	interface StopWithRouteSequence extends Stop {
-		route_stop_sequence: number;
-	}
-
-	// $effect(() => {
-	// 	selected_source.current;
-	// 	search_input;
-
-	// 	// TODO: figure out how to safely set the type of stops and remove ts-ignore-error
-	// 	// TODO: use debounce/throttle from runed lib https://runed.dev/docs/utilities/throttled
-	// 	debounce(() => {
-	// 		if (search_input === '') {
-	// 			clear_search();
-	// 		} else {
-	// 			// try searching for a stop id
-	// 			const as_stop_id = parseInt(search_input);
-	// 			// TODO: double check if its safe to assume that route ids are always uppercase
-	// 			const as_route =
-	// 				page.data.routes_by_id[selected_source.current][search_input.toUpperCase()];
-	// 			// shortest stop id is 3 (TODO: Double check this)
-	// 			if (search_input.length > 2 && !isNaN(as_stop_id)) {
-	// 				const stop = page.data.stops_by_id[selected_source.current][as_stop_id];
-	// 				if (stop && stop.route_type === selected_tab.value) {
-	// 					//@ts-expect-error
-	// 					stops[selected_tab.value] = [stop];
-	// 				}
-	// 			} else if (as_route && as_route.route_type === selected_tab.value) {
-	// 				const new_stops: StopWithRouteSequence[] = [];
-	// 				// sort by route stop_sequence
-	// 				switch (selected_tab.value) {
-	// 					case 'bus':
-	// 						for (const s of page.data.bus_stops) {
-	// 							const route = s.routes.find((r) => r.id === as_route.id);
-	// 							if (route) {
-	// 								new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
-	// 							}
-	// 						}
-	// 						break;
-	// 					case 'train':
-	// 						for (const s of page.data.train_stops) {
-	// 							const route = s.routes.find((r) => r.id === as_route.id);
-	// 							if (route && ['full_time', 'part_time', 'rush_hour'].includes(route.type ?? '')) {
-	// 								new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
-	// 							}
-	// 						}
-	// 						break;
-	// 				}
-	// 				if (new_stops.length) {
-	// 					//@ts-expect-error
-	// 					stops[selected_tab.value] = new_stops
-	// 						.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
-	// 						.map(({ route_stop_sequence, ...stop }) => stop);
-	// 				}
-	// 			} else {
-	// 				// search for stops
-	// 				const results = search.search(search_input, selected_tab.value);
-	// 				// not sure if its safe to assume that the results are always the same type
-	// 				if (results.length) {
-	// 					//@ts-expect-error
-	// 					stops[selected_tab.value] = results;
-	// 				}
-	// 			}
-	// 		}
-	// 	}, 150)();
-	// });
 </script>
 
-<!-- <svelte:head>
-	<title>Stops | Train Status</title>
-</svelte:head> -->
+<!-- TODO: fix space between navbar and search bar -->
 <!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
 <!-- TODO: maybe show indicator when filtered for specific route / stop -->
+<!-- TODO: maybe integrate the search with the List component (using attachments or something).-->
 <div class="flex h-full flex-col">
 	<List
 		title="Stops"
 		type="stop"
-		sources={stops}
+		sources={visible_stops}
 		pins={stop_pins}
 		auto_scroll
 		class="max-h-[calc(100dvh-13.5rem)] grow"
