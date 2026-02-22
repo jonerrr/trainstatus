@@ -96,15 +96,18 @@ impl PositionStore {
             return Ok(());
         }
 
-        let vehicle_ids: Vec<String> = positions.iter().map(|v| v.vehicle_id.clone()).collect();
-        let trip_ids: Vec<Option<Uuid>> = positions.iter().map(|v| v.trip_id).collect();
-        let stop_ids: Vec<Option<String>> = positions.iter().map(|v| v.stop_id.clone()).collect();
+        let vehicle_ids: Vec<_> = positions.iter().map(|v| v.vehicle_id.clone()).collect();
+        let trip_ids: Vec<_> = positions.iter().map(|v| v.trip_id).collect();
+        let stop_ids: Vec<_> = positions
+            .iter()
+            .map(|v| v.stop_id.as_ref().map(|s| s.to_uppercase()))
+            .collect();
         let updated_ats: Vec<_> = positions.iter().map(|v| v.updated_at).collect();
         let geoms: Vec<_> = positions
             .iter()
             .map(|v| v.geom.clone().map(wkb::Encode))
             .collect();
-        let datas: Vec<serde_json::Value> = positions
+        let datas: Vec<_> = positions
             .iter()
             .map(|v| serde_json::to_value(&v.data).unwrap())
             .collect();

@@ -78,7 +78,7 @@ impl StopStore {
     /// Bulk insert stops (and invalidate cache)
     pub async fn save_all(&self, source: Source, stops: &[Stop]) -> anyhow::Result<()> {
         // TODO: probably pass vec instead of slice so we don't need to clone
-        let ids: Vec<_> = stops.iter().map(|s| s.id.clone()).collect();
+        let ids: Vec<_> = stops.iter().map(|s| s.id.to_uppercase()).collect();
         let names: Vec<_> = stops.iter().map(|s| &s.name).collect();
         let geoms: Vec<_> = stops.iter().map(|r| wkb::Encode(r.geom.clone())).collect();
         let datas = stops
@@ -124,8 +124,14 @@ impl StopStore {
         source: Source,
         route_stops: &[RouteStop],
     ) -> anyhow::Result<()> {
-        let route_ids: Vec<_> = route_stops.iter().map(|rs| rs.route_id.clone()).collect();
-        let stop_ids: Vec<_> = route_stops.iter().map(|rs| rs.stop_id.clone()).collect();
+        let route_ids: Vec<_> = route_stops
+            .iter()
+            .map(|rs| rs.route_id.to_uppercase())
+            .collect();
+        let stop_ids: Vec<_> = route_stops
+            .iter()
+            .map(|rs| rs.stop_id.to_uppercase())
+            .collect();
         let stop_sequences: Vec<i16> = route_stops.iter().map(|rs| rs.stop_sequence).collect();
         let datas: Vec<serde_json::Value> = route_stops
             .iter()
@@ -180,11 +186,10 @@ impl StopStore {
         let mut to_stop_sources: Vec<Source> = Vec::with_capacity(transfers.len());
         let mut transfer_types: Vec<i16> = Vec::with_capacity(transfers.len());
         let mut min_transfer_times: Vec<Option<i16>> = Vec::with_capacity(transfers.len());
-        // TODO: implement possibility of cross-source transfers
         for (from_stop_id, transfer) in transfers.iter() {
-            from_stop_ids.push(from_stop_id.clone());
+            from_stop_ids.push(from_stop_id.to_uppercase());
             from_stop_sources.push(source);
-            to_stop_ids.push(transfer.to_stop_id.clone());
+            to_stop_ids.push(transfer.to_stop_id.to_uppercase());
             to_stop_sources.push(source);
             transfer_types.push(transfer.transfer_type as i16);
             min_transfer_times.push(transfer.min_transfer_time.map(|t| t as i16));

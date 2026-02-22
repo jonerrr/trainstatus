@@ -99,9 +99,13 @@ impl TripStore {
 
         // Prepare vectors for bulk insert
         let input_ids: Vec<Uuid> = data.iter().map(|(t, _)| t.id).collect();
+        // TODO: maybe make original and vehicle id uppercase for consistency
         let original_ids: Vec<String> = data.iter().map(|(t, _)| t.original_id.clone()).collect();
         let vehicle_ids: Vec<String> = data.iter().map(|(t, _)| t.vehicle_id.clone()).collect();
-        let route_ids: Vec<String> = data.iter().map(|(t, _)| t.route_id.clone()).collect();
+        let route_ids: Vec<String> = data
+            .iter()
+            .map(|(t, _)| t.route_id.to_uppercase())
+            .collect();
         let sources: Vec<Source> = vec![source; data.len()];
         let directions: Vec<i16> = data.iter().map(|(t, _)| t.direction).collect();
         let created_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.created_at).collect();
@@ -172,7 +176,7 @@ impl TripStore {
             if let Some(&actual_id) = id_map.get(&trip.id) {
                 for st in sts {
                     st_trip_ids.push(actual_id);
-                    st_stop_ids.push(st.stop_id.clone());
+                    st_stop_ids.push(st.stop_id.to_uppercase());
                     st_arrivals.push(st.arrival);
                     st_departures.push(st.departure);
                     st_data.push(serde_json::to_value(&st.data).unwrap());

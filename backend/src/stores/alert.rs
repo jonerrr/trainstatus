@@ -466,7 +466,7 @@ impl AlertStore {
                 .collect();
             let route_ids = filtered_entities
                 .iter()
-                .map(|ae| ae.route_id.clone())
+                .map(|ae| ae.route_id.as_ref().map(|s| s.to_uppercase()))
                 .collect::<Vec<_>>();
             let sources = filtered_entities
                 .iter()
@@ -474,7 +474,7 @@ impl AlertStore {
                 .collect::<Vec<_>>();
             let stop_ids = filtered_entities
                 .iter()
-                .map(|ae| ae.stop_id.clone())
+                .map(|ae| ae.stop_id.as_ref().map(|s| s.to_uppercase()))
                 .collect::<Vec<_>>();
             let sort_orders = filtered_entities
                 .iter()

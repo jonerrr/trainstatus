@@ -58,7 +58,8 @@ impl RouteStore {
 
     /// Bulk insert routes (and invalidate cache)
     pub async fn save_all(&self, source: Source, routes: &[Route]) -> anyhow::Result<()> {
-        let ids: Vec<_> = routes.iter().map(|r| &r.id).collect();
+        // ensure all ids are uppercase for consistency (and frontend search)
+        let ids: Vec<_> = routes.iter().map(|r| r.id.to_uppercase()).collect();
         let sources: Vec<_> = routes.iter().map(|_| source).collect();
         let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
         let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
