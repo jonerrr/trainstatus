@@ -8,7 +8,7 @@
 	import Pin from '$lib/Pin.svelte';
 	import RouteButton from '$lib/Route/Button.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
-	import { default_sources, source_info } from '$lib/sources/index.svelte';
+	import { default_sources, source_info } from '$lib/resources/index.svelte';
 	import type { Pins } from '$lib/stores.svelte';
 
 	import type { Route, Source, Stop } from '@trainstatus/client';

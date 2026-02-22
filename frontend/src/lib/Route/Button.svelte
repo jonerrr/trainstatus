@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
-	import { alert_context } from '$lib/sources/alerts.svelte';
+	import { alert_context } from '$lib/resources/alerts.svelte';
 
 	import type { Route } from '@trainstatus/client';
 

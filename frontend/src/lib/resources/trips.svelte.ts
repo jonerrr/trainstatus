@@ -7,7 +7,7 @@ import {
 	type TypedTrip,
 	createMultiSourceContext,
 	source_info
-} from '$lib/sources/index.svelte';
+} from '$lib/resources/index.svelte';
 
 import type { Source } from '@trainstatus/client';
 

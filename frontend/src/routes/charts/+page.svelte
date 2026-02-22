@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { monitored_bus_routes, stop_time_context } from '$lib/sources/stop_times.svelte';
+	import { monitored_bus_routes, stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';

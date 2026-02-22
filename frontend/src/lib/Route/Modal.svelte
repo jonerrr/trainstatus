@@ -2,7 +2,7 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
-	import { alert_context } from '$lib/sources/alerts.svelte';
+	import { alert_context } from '$lib/resources/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';

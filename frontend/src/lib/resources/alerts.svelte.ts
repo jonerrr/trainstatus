@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import icons from '$lib/icons';
-import { LiveResource, createMultiSourceContext, source_info } from '$lib/sources/index.svelte';
+import { LiveResource, createMultiSourceContext, source_info } from '$lib/resources/index.svelte';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
 

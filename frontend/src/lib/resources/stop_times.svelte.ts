@@ -7,7 +7,7 @@ import {
 	type TypedStopTime,
 	createMultiSourceContext,
 	source_info
-} from '$lib/sources/index.svelte';
+} from '$lib/resources/index.svelte';
 
 import type { Source, StopTime } from '@trainstatus/client';
 

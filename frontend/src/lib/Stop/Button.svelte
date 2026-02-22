@@ -3,8 +3,8 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
-	import { stop_time_context } from '$lib/sources/stop_times.svelte';
-	import { trip_context } from '$lib/sources/trips.svelte';
+	import { stop_time_context } from '$lib/resources/stop_times.svelte';
+	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import type { Stop, StopTime } from '@trainstatus/client';

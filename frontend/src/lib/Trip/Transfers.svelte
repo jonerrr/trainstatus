@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { trip_context } from '$lib/sources/trips.svelte';
+	import { trip_context } from '$lib/resources/trips.svelte';
 
 	import type { StopTime } from '@trainstatus/client';
 

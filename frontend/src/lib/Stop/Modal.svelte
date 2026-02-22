@@ -7,11 +7,11 @@
 	import ModalList from '$lib/ModalList.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
-	import { alert_context } from '$lib/sources/alerts.svelte';
-	import type { SourceMap, TypedVehiclePosition } from '$lib/sources/index.svelte';
-	import { position_context } from '$lib/sources/positions.svelte';
-	import { stop_time_context } from '$lib/sources/stop_times.svelte';
-	import { trip_context } from '$lib/sources/trips.svelte';
+	import { alert_context } from '$lib/resources/alerts.svelte';
+	import type { SourceMap, TypedVehiclePosition } from '$lib/resources/index.svelte';
+	import { position_context } from '$lib/resources/positions.svelte';
+	import { stop_time_context } from '$lib/resources/stop_times.svelte';
+	import { trip_context } from '$lib/resources/trips.svelte';
 	import { main_stop_routes } from '$lib/static';
 	import { current_time } from '$lib/util.svelte';
 

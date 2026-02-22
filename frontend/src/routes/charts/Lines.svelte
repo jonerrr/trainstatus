@@ -3,7 +3,7 @@
 
 	import { pushState } from '$app/navigation';
 
-	import { type Trip } from '$lib/sources/trips.svelte';
+	import { type Trip } from '$lib/resources/trips.svelte';
 	import { type Route } from '$lib/static';
 
 	import { line } from 'd3-shape';

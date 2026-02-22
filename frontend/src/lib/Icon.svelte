@@ -2,7 +2,7 @@
 	import { pushState } from '$app/navigation';
 
 	import icons from '$lib/icons';
-	import { alert_context } from '$lib/sources/alerts.svelte';
+	import { alert_context } from '$lib/resources/alerts.svelte';
 
 	import { RouteIcon } from '@lucide/svelte';
 	import { type Route } from '@trainstatus/client';

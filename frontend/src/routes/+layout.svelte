@@ -4,15 +4,12 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
-	import { searchSchema } from '$lib/params.schema';
-	import { alert_context, createAlertResource } from '$lib/sources/alerts.svelte';
-	import { createPositionResource, position_context } from '$lib/sources/positions.svelte';
-	import { createStopTimeResource, stop_time_context } from '$lib/sources/stop_times.svelte';
-	import { createTripResource, trip_context } from '$lib/sources/trips.svelte';
-	import { route_info } from '$lib/util.svelte';
+	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
+	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
+	import { createStopTimeResource, stop_time_context } from '$lib/resources/stop_times.svelte';
+	import { createTripResource, trip_context } from '$lib/resources/trips.svelte';
 
 	import '@fontsource/inter';
-	import { useSearchParams } from 'runed/kit';
 
 	import '../app.css';
 
@@ -22,8 +19,8 @@
 
 	// TODO: don't use runed search params since they don't support shallow routing
 	// see: https://github.com/svecosystem/runed/issues/377
-	// i think i should probably store the current params in the route_info class
-	const params = useSearchParams(searchSchema);
+	// const params = useSearchParams(searchSchema);
+	const params = {};
 
 	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
 
@@ -229,10 +226,37 @@
 	// 		}
 	// 	});
 	// });
+
+	const url_mappings = {
+		'/': 'Home',
+		'/stops': 'Stops',
+		'/routes': 'Routes',
+		'/alerts': 'Alerts',
+		'/charts': 'Charts'
+	} as const;
+
+	const title = $derived.by(() => {
+		switch (page.state.modal?.type) {
+			case 'stop':
+				return `Stop: ${page.state.modal.name}`;
+			case 'route':
+				return `Route: ${page.state.modal.short_name}`;
+			case 'trip':
+				return `${page.state.modal.route_id} Trip`;
+			// TODO: settings
+		}
+
+		const title =
+			page.url.pathname in url_mappings
+				? url_mappings[page.url.pathname as keyof typeof url_mappings]
+				: '???'; // shouldn't happen since we don't have any other routes, but just in case
+
+		return `${title} | Train Status`;
+	});
 </script>
 
 <svelte:head>
-	<title>{route_info.title}</title>
+	<title>{title}</title>
 </svelte:head>
 
 <svelte:window ononline={() => (offline = false)} onoffline={() => (offline = true)} />
