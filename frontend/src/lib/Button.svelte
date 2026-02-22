@@ -6,16 +6,15 @@
 	import { pushState } from '$app/navigation';
 
 	import Pin from '$lib/Pin.svelte';
-	import type { Pins } from '$lib/stores.svelte';
-
-	import type { PersistedState } from 'runed';
+	import type { Pins } from '$lib/pins.svelte';
+	import type { LocalStorage } from '$lib/storage.svelte';
 
 	type ModalWithId = Exclude<App.PageState['modal'], null | { type: 'settings' }>;
 
 	interface Props {
 		state: ModalWithId;
 		// id?: string;
-		pins?: PersistedState<Pins>;
+		pins?: LocalStorage<Pins>;
 		children: Snippet;
 	}
 

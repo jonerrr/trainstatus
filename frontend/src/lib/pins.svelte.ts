@@ -1,25 +1,26 @@
+import { LocalStorage } from '$lib/storage.svelte';
+
 import type { Source } from '@trainstatus/client';
-import { PersistedState } from 'runed';
 
 export type Pins = {
 	[K in Source]: string[];
 };
-// TODO: maybe have separate PersistedState for each source
-export const stop_pins = new PersistedState<Pins>('stop_pins', {
+// TODO: maybe have separate LocalStorage for each source
+export const stop_pins = new LocalStorage<Pins>('stop_pins', {
 	mta_subway: ['106'],
 	mta_bus: ['400086']
 	// lirr: [],
 	// metro_north: []
 });
 
-export const route_pins = new PersistedState<Pins>('route_pins', {
+export const route_pins = new LocalStorage<Pins>('route_pins', {
 	mta_subway: ['4'],
 	mta_bus: ['M15']
 	// lirr: [],
 	// metro_north: []
 });
 
-export const trip_pins = new PersistedState<Pins>('trip_pins', {
+export const trip_pins = new LocalStorage<Pins>('trip_pins', {
 	mta_subway: [],
 	mta_bus: []
 	// lirr: [],

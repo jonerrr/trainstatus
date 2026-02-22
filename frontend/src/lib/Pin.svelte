@@ -1,11 +1,11 @@
 <script lang="ts">
+	import type { Pins } from '$lib/pins.svelte';
+	import type { LocalStorage } from '$lib/storage.svelte';
+
 	import { Pin } from '@lucide/svelte';
 	import type { Source } from '@trainstatus/client';
-	import type { PersistedState } from 'runed';
 
-	import { type Pins } from './stores.svelte';
-
-	// TODO: maybe just take the persistedState.current instead of the entire persistedState object
+	// TODO: maybe just take the localstorage.current instead of the entire localstorage object
 	let {
 		pins = $bindable(),
 		id,
@@ -13,7 +13,7 @@
 		class: class_name,
 		size
 	}: {
-		pins: PersistedState<Pins>;
+		pins: LocalStorage<Pins>;
 		id: string;
 		source: Source;
 		class?: string;

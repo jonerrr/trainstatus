@@ -13,11 +13,11 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { main_stop_routes } from '$lib/static';
+	import { LocalStorage } from '$lib/storage.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
 	import type { Stop, StopTime, Trip } from '@trainstatus/client';
-	import { PersistedState } from 'runed';
 
 	interface Props {
 		show_previous: boolean;
@@ -57,7 +57,7 @@
 
 	// $inspect(stop_times);
 	// TODO: generate defaults instead of hardcoding
-	let selected_direction = new PersistedState<SourceMap<number>>('direction', {
+	let selected_direction = new LocalStorage<SourceMap<number>>('direction', {
 		mta_subway: 1,
 		mta_bus: 0
 	});

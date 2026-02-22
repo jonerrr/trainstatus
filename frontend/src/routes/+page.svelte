@@ -3,14 +3,15 @@
 
 	import List from '$lib/List.svelte';
 	import { calculate_stop_height } from '$lib/static';
+	import { LocalStorage } from '$lib/storage.svelte';
 	import { haversine } from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 	import type { Source, Stop } from '@trainstatus/client';
-	import { PersistedState, useGeolocation } from 'runed';
+	import { useGeolocation } from 'runed';
 
 	// Geolocation state
-	const location_status = new PersistedState<'unknown' | 'loading' | 'granted' | 'denied'>(
+	const location_status = new LocalStorage<'unknown' | 'loading' | 'granted' | 'denied'>(
 		'location_status',
 		'unknown'
 	);

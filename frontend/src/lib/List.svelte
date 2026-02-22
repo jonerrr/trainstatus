@@ -8,11 +8,14 @@
 	import Pin from '$lib/Pin.svelte';
 	import RouteButton from '$lib/Route/Button.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
+	import type { Pins } from '$lib/pins.svelte';
 	import { default_sources, source_info } from '$lib/resources/index.svelte';
-	import type { Pins } from '$lib/stores.svelte';
+	import { LocalStorage } from '$lib/storage.svelte';
 
 	import type { Route, Source, Stop } from '@trainstatus/client';
-	import { ElementSize, PersistedState, ScrollState } from 'runed';
+	import { ElementSize, ScrollState } from 'runed';
+
+	// TODO: replace elementsize and scrollstate with my own implementations
 
 	// Estimated heights for virtualization
 	const estimated_heights = {
@@ -32,9 +35,9 @@
 		// data organized by source
 		sources: Record<Source, (Stop | Route)[]>;
 		// persisted state for pinned items
-		pins?: PersistedState<Pins>;
+		pins?: LocalStorage<Pins>;
 		// persisted state for selected source tab
-		selected_source?: PersistedState<Source>;
+		selected_source?: LocalStorage<Source>;
 		// items to show before the user scrolls (for pinned lists)
 		items_before_scroll?: number;
 		class?: string;
@@ -58,7 +61,7 @@
 		pins,
 		header_slot,
 		selected_source = $bindable(
-			new PersistedState<Source>(`${title.toLocaleLowerCase()}_tab`, 'mta_subway')
+			new LocalStorage<Source>(`${title.toLocaleLowerCase()}_tab`, 'mta_subway')
 		),
 		height_calc,
 		class: class_name,

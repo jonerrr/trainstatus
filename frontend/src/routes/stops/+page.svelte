@@ -2,14 +2,14 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
+	import { type Pins, stop_pins } from '$lib/pins.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 	import { calculate_stop_height } from '$lib/static';
-	import { type Pins, stop_pins } from '$lib/stores.svelte';
+	import { LocalStorage } from '$lib/storage.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { CircleX, Search } from '@lucide/svelte';
 	import { type Source, type Stop } from '@trainstatus/client';
-	import { PersistedState } from 'runed';
 
 	// interface StopObj {
 	// 	train: Stop<'train'>[];
@@ -26,9 +26,8 @@
 	const stops = page.data.stops;
 
 	// TODO: Fix switching sources causing lag
-	// let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
 	// TODO: determine default source from users preferences or something
-	let selected_source = new PersistedState<Source>('stops_tab', 'mta_subway');
+	let selected_source = new LocalStorage<Source>('stops_tab', 'mta_subway');
 
 	const search = new StopSearch(page.data.stops);
 

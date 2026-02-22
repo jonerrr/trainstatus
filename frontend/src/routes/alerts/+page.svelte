@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
-	import { route_pins } from '$lib/stores.svelte';
+	import { route_pins } from '$lib/pins.svelte';
 
 	// TODO: combine express and local
 </script>

@@ -1,5 +1,3 @@
-import { browser } from '$app/environment';
-
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 	// distance between latitudes and longitudes
@@ -75,88 +73,6 @@ interface ItemHeights {
 // 		: 124 + init;
 // 	return `max-h-[calc(100dvh-${height}px)]`;
 // }
-
-export interface PersistedRune<T> {
-	value: T;
-	// key: string;
-	reset: () => void;
-}
-
-export function persisted_rune<T>(key: string, init_value: T) {
-	let storedValue: T;
-
-	try {
-		const item = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-		storedValue = item ? JSON.parse(item) : init_value;
-	} catch (e) {
-		// localStorage won't be defined so this will always throw on init load
-		if (browser) console.error(e);
-		storedValue = init_value;
-	}
-
-	let state = $state(storedValue);
-
-	function updateStorage(value: T) {
-		try {
-			localStorage.setItem(key, JSON.stringify(value));
-		} catch (e) {
-			console.error(e);
-		}
-	}
-
-	// listen for changes in other tabs
-	if (browser) {
-		window.addEventListener('storage', (event) => {
-			if (event.key === key && event.storageArea === localStorage) {
-				try {
-					const newValue = event.newValue ? JSON.parse(event.newValue) : init_value;
-					state = newValue;
-				} catch (e) {
-					console.error(e);
-				}
-			}
-		});
-	}
-
-	// this allows it to update without being in a component
-	$effect.root(() => {
-		$effect(() => {
-			updateStorage(state);
-		});
-
-		return () => {};
-	});
-
-	return {
-		get value() {
-			return state;
-		},
-		// get key() {
-		// 	return key;
-		// },
-		set value(newValue: T) {
-			state = newValue;
-		},
-		reset() {
-			state = init_value;
-		}
-	};
-}
-
+// TODO: remove if not used. Was used to store virtual list item heights.
+// need to test if its faster to calculate heights on the fly or store them in a map like this.
 export const item_heights = $state<ItemHeights>({});
-
-// interface PinStorage {
-// 	stops: number[];
-// 	routes: string[];
-// 	trips: string[];
-// }
-
-// export const pins = new LocalStorage<PinStorage>('pins', {
-// 	stops: [106, 400086],
-// 	routes: ['4', 'M15'],
-// 	trips: []
-// });
-// temp, will remove once migrated to runed
-export const stop_pins_rune = { value: [] };
-export const route_pins_rune = { value: [] };
-export const trip_pins_rune = { value: [] };

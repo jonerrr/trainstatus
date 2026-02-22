@@ -10,12 +10,12 @@
 	import SettingsModal from '$lib/Settings/Modal.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
-	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/stores.svelte';
+	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
+	import { LocalStorage } from '$lib/storage.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
 	import type { Source } from '@trainstatus/client';
-	import { PersistedState } from 'runed';
 
 	// import { type Trip, type TripData, is_bus_route } from './trips.svelte';
 
@@ -298,8 +298,8 @@
 	let copied = $state(false);
 	// show stops/trips before current datetime
 	let show_previous = $state(false);
-	// let time_format = persisted_rune<'countdown' | 'time'>('time_format', 'countdown');
-	let time_format = new PersistedState<'countdown' | 'time'>('time_format', 'countdown');
+	// e.g. 3m or 12:45.
+	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
 </script>
 
 <!-- TODO: refactor actions now that we have sources -->
@@ -309,7 +309,7 @@
 	id: string,
 	title: string,
 	source: Source,
-	pins: PersistedState<Pins>
+	pins: LocalStorage<Pins>
 )}
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
