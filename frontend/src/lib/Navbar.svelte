@@ -53,6 +53,6 @@
 	/* Gradient separator at top of nav */
 	nav::before {
 		content: '';
-		@apply absolute top-0 right-0 left-0 h-[1px] bg-linear-to-r from-transparent via-neutral-700 to-transparent;
+		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent;
 	}
 </style>

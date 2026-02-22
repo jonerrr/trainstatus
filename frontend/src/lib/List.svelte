@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Attachment } from 'svelte/attachments';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
 
@@ -13,17 +14,8 @@
 	import { LocalStorage } from '$lib/storage.svelte';
 
 	import type { Route, Source, Stop } from '@trainstatus/client';
-	import { ElementSize, ScrollState } from 'runed';
 
-	// TODO: replace elementsize and scrollstate with my own implementations
-
-	// Estimated heights for virtualization
-	const estimated_heights = {
-		stop: 196,
-		route: 40
-	} as const;
-
-	type ItemType = keyof typeof estimated_heights;
+	type ItemType = 'stop' | 'route';
 
 	interface Props {
 		// title of list
@@ -44,7 +36,6 @@
 		// scroll list into view if there are few items
 		auto_scroll?: boolean;
 		// height calculation function for virtualization
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		height_calc: (item: any) => number;
 		// minimum number of items to render during SSR
 		ssr_min?: number;
@@ -72,29 +63,6 @@
 		style: style_
 	}: Props = $props();
 
-	// Active source management - use provided or create internal state
-	// let internal_source = $state<Source>('mta_subway');
-
-	// TODO: update source when current one is empty (see previous implementation)
-	// Initialize internal_source when sources becomes available
-	// $effect(() => {
-	// 	if (sources[0]?.source && internal_source === 'mta_subway') {
-	// 		internal_source = sources[0].source;
-	// 	}
-	// });
-	// TODO: fix this slop
-	// const active_source = $derived({
-	// 	get current() {
-	// 		return selected_source?.current ?? internal_source;
-	// 	},
-	// 	set current(value: Source) {
-	// 		if (selected_source) {
-	// 			selected_source.current = value;
-	// 		} else {
-	// 			internal_source = value;
-	// 		}
-	// 	}
-	// });
 	// TODO: check here if source is empty and switch to first available (instead of using $effect)
 	const active_source = $derived(selected_source.current);
 
@@ -124,20 +92,13 @@
 		easing: cubicInOut
 	});
 
-	// TODO: actually don't use runed utilities for this stuff
-	// Viewport element and sizing using runed
 	let viewport_el = $state<HTMLDivElement>();
-	const viewport_size = new ElementSize(() => viewport_el);
-
-	// Scroll state using runed ScrollState
-	const scroll = new ScrollState({
-		element: () => viewport_el,
-		idle: 100
-	});
+	let viewport_height = $state(0);
+	let scroll_top = $state(0);
 
 	function reset_scroll() {
 		if (viewport_el) {
-			scroll.scrollTo(0, 0);
+			viewport_el.scrollTo(0, 0);
 		}
 	}
 
@@ -155,36 +116,33 @@
 		reset_scroll();
 	});
 
-	// Plain Map - NOT reactive. The $effect below tracks `items` only.
-	// Using SvelteMap here would cause the $effect to re-run O(n) times on initial render
-	// (once per visible item measured), making the total work O(n²) with thousands of stops.
 	// TODO: move to separate file so lists can share measured heights (for same items across sources)
 	const item_heights = new Map<string, number>();
 
-	// Prefix sum array for O(1) offset lookups
-	let offsets = $state<number[]>([]);
-	let measured_total_height = $state(0);
+	// Single reactive signal. Incrementing this causes one O(N) derived rebuild instead of
+	// N individual $state array mutations (which would each trigger fine-grained reactivity).
+	let heights_version = $state(0);
 
-	// Rebuild offsets array when items or heights change (prefix sum calculation)
-	$effect(() => {
-		let running_offset = 0;
-		offsets = items.map((item) => {
-			const top = running_offset;
-			const height = item_heights.get(item.id) ?? height_calc(item);
-			running_offset += height;
+	// Rebuild prefix sums in one pass whenever items or any measured height changes.
+	// Replaces the $effect + mutable $state<number[]> approach which caused O(N²) overhead.
+	const derived_layout = $derived.by(() => {
+		heights_version; // subscribe to height changes
+		let running = 0;
+		const offs = items.map((item) => {
+			const top = running;
+			running += item_heights.get(item.id) ?? height_calc(item);
 			return top;
 		});
-		measured_total_height = running_offset;
+		return { offsets: offs, total: running };
 	});
 
-	// O(1) lookup instead of O(n) iteration
+	// O(1) lookup
 	function getItemOffset(index: number): number {
-		return offsets[index] ?? 0;
+		return derived_layout.offsets[index] ?? 0;
 	}
 
 	// Binary search for start index - O(log n) instead of O(n)
-	function calculateStartIndex() {
-		const scroll_top = scroll.y;
+	function calculateStartIndex(offs = derived_layout.offsets) {
 		if (items.length === 0 || scroll_top <= 0) return 0;
 
 		let low = 0;
@@ -192,7 +150,7 @@
 
 		while (low <= high) {
 			const mid = Math.floor((low + high) / 2);
-			const top = offsets[mid] ?? 0;
+			const top = offs[mid] ?? 0;
 			const height = item_heights.get(items[mid].id) ?? height_calc(items[mid]);
 
 			if (top + height < scroll_top) {
@@ -207,13 +165,11 @@
 	}
 
 	// Calculate end index based on viewport height
-	function calculateEndIndex(start: number) {
-		const scroll_top = scroll.y;
-		const viewport_height = viewport_size.height;
+	function calculateEndIndex(start: number, offs = derived_layout.offsets) {
 		const max_position = scroll_top + viewport_height;
 
 		for (let i = start; i < items.length; i++) {
-			const top = offsets[i] ?? 0;
+			const top = offs[i] ?? 0;
 			const height = item_heights.get(items[i].id) ?? height_calc(items[i]);
 
 			if (top > max_position + overscan * height) {
@@ -224,9 +180,11 @@
 	}
 
 	// Derive visible items with virtualization
+	// NOTE: derived_layout is read here so visible_items recomputes whenever heights change.
 	const [visible_items, start_index] = $derived.by(() => {
-		const start = calculateStartIndex();
-		const end = calculateEndIndex(start);
+		const { offsets } = derived_layout;
+		const start = calculateStartIndex(offsets);
+		const end = calculateEndIndex(start, offsets);
 
 		const visible = items.slice(start, browser ? end : Math.min(ssr_min, items.length));
 
@@ -234,108 +192,128 @@
 			visible.map((item, idx) => ({
 				id: item.id,
 				data: item,
-				top: getItemOffset(start + idx)
+				top: offsets[start + idx] ?? 0
 			})),
 			start
 		];
 	});
 
 	// Calculate total height for the scroll container
-	function calculate_total_height() {
+	const total_height = $derived.by(() => {
+		const { offsets, total } = derived_layout;
 		const total_items = Math.min(items_before_scroll ?? items.length, items.length);
 
-		// Use measured height if available and all items are included
-		if (
-			measured_total_height > 0 &&
-			(!items_before_scroll || items_before_scroll >= items.length)
-		) {
-			return measured_total_height;
-		}
-
-		// Otherwise calculate from offsets or estimates
 		if (total_items === 0) return 0;
-		if (offsets.length > total_items) {
-			return (
-				offsets[total_items - 1] +
-				(item_heights.get(items[total_items - 1].id) ?? height_calc(items[total_items - 1]))
-			);
+
+		// No items_before_scroll cap — use the fully computed total directly
+		if (!items_before_scroll || items_before_scroll >= items.length) {
+			return total;
 		}
 
-		// Fallback to manual calculation
-		let total = 0;
-		for (let i = 0; i < total_items; i++) {
-			const item = items[i];
-			const height = item_heights.get(item.id) ?? height_calc(item);
-			total += height;
-		}
-		return total;
-	}
+		// Cap to items_before_scroll
+		const last_idx = total_items - 1;
+		return (
+			(offsets[last_idx] ?? 0) +
+			(item_heights.get(items[last_idx].id) ?? height_calc(items[last_idx]))
+		);
+	});
 
-	const total_height = $derived.by(calculate_total_height);
-	// TODO: convert to attachment
-	// Action to measure item height with scroll correction
-	function measureHeight(node: HTMLElement, id: string) {
-		// Find the index of this item
-		const get_index = () => items.findIndex((item) => item.id === id);
+	// Single shared ResizeObserver for all measured items.
+	// One observer fires one callback with all changed entries batched together,
+	// so we increment heights_version exactly once per animation frame
+	let shared_ro: ResizeObserver | undefined;
+	const observed_ids = new Map<Element, string>(); // element → item id
 
-		// Measure immediately and correct the estimated offset
-		const initial_height = node.offsetHeight;
-		const item = items.find((i) => i.id === id);
-		const estimated = item ? height_calc(item) : initial_height;
-		const init_delta = initial_height - estimated;
-		item_heights.set(id, initial_height);
+	function get_shared_ro(): ResizeObserver {
+		if (shared_ro) return shared_ro;
+		shared_ro = new ResizeObserver((entries) => {
+			let scroll_delta = 0;
+			let changed = false;
 
-		// Apply the delta between actual and estimated height incrementally
-		// (avoids a full O(n) offset rebuild for each measured item)
-		if (init_delta !== 0) {
-			const index = get_index();
-			if (index >= 0) {
-				measured_total_height += init_delta;
-				for (let i = index + 1; i < offsets.length; i++) {
-					offsets[i] += init_delta;
-				}
-			}
-		}
+			// calculateStartIndex() uses derived_layout which is already up-to-date
+			const current_start = calculateStartIndex();
 
-		// Re-measure on resize with scroll correction
-		const observer = new ResizeObserver(() => {
-			const new_height = node.offsetHeight;
-			const old_height = item_heights.get(id);
+			for (const entry of entries) {
+				const id = observed_ids.get(entry.target);
+				if (!id) continue;
 
-			if (new_height !== old_height && old_height !== undefined) {
-				const delta = new_height - old_height;
-				const index = get_index();
+				const new_height = (entry.target as HTMLElement).offsetHeight;
+				const old_height = item_heights.get(id);
 
-				// Update the height
+				if (new_height === old_height) continue;
+
 				item_heights.set(id, new_height);
+				changed = true;
 
-				// Update total height
-				measured_total_height += delta;
-
-				// Update all subsequent offsets
-				for (let i = index + 1; i < offsets.length; i++) {
-					offsets[i] += delta;
-				}
-
-				// Scroll correction: if item is above viewport, adjust scrollTop
-				// to prevent visible content from jumping
-				if (viewport_el && index >= 0) {
-					const current_start = calculateStartIndex();
-					if (index < current_start) {
-						viewport_el.scrollTop += delta;
+				if (old_height !== undefined) {
+					const delta = new_height - old_height;
+					const index = items.findIndex((item) => item.id === id);
+					// Accumulate scroll correction for items above the viewport
+					if (index >= 0 && index < current_start) {
+						scroll_delta += delta;
 					}
 				}
-			} else if (old_height === undefined) {
-				// First measurement
-				item_heights.set(id, new_height);
+			}
+
+			if (!changed) return;
+
+			// ONE reactive update triggers ONE $derived.by rebuild
+			heights_version++;
+
+			// Apply scroll correction after the reactive update
+			if (scroll_delta !== 0 && viewport_el) {
+				viewport_el.scrollTop += scroll_delta;
 			}
 		});
-		observer.observe(node);
+		return shared_ro;
+	}
 
-		return {
-			destroy() {
-				observer.disconnect();
+	// measure item height on mount and watch for resizes
+	// function measureHeight(node: HTMLElement, id: string) {
+	// 	// Take initial measurement and store it immediately
+	// 	const initial_height = node.offsetHeight;
+	// 	const old_height = item_heights.get(id);
+	// 	item_heights.set(id, initial_height);
+
+	// 	// Only signal a reactive update when our measurement differs from the estimate
+	// 	if (old_height === undefined || initial_height !== old_height) {
+	// 		heights_version++;
+	// 	}
+
+	// 	// Register with the shared observer
+	// 	const ro = get_shared_ro();
+	// 	observed_ids.set(node, id);
+	// 	ro.observe(node);
+
+	// 	return {
+	// 		destroy() {
+	// 			ro.unobserve(node);
+	// 			observed_ids.delete(node);
+	// 		}
+	// 	};
+	// }
+
+	function measure_height(id: string): Attachment<HTMLDivElement> {
+		return (node) => {
+			// Take initial measurement and store it immediately
+			const initial_height = node.offsetHeight;
+			const old_height = item_heights.get(id);
+			item_heights.set(id, initial_height);
+
+			// Only signal a reactive update when our measurement differs from the estimate
+			if (old_height === undefined || initial_height !== old_height) {
+				heights_version++;
 			}
+
+			// Register with the shared observer
+			const ro = get_shared_ro();
+			observed_ids.set(node, id);
+			ro.observe(node);
+
+			return () => {
+				ro.unobserve(node);
+				observed_ids.delete(node);
+			};
 		};
 	}
 </script>
@@ -367,9 +345,6 @@
 					{#if source_data.length > 0}
 						{@const Icon = source_info[source].icon}
 						<div transition:slide={{ axis: 'x', duration: 250 }}>
-							<!-- 		class="relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200 {active_source.current ===
-									source && 'font-medium text-neutral-100'} {active_source.current !== source &&
-									'text-neutral-400'}" -->
 							<button
 								class={[
 									'relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200',
@@ -410,6 +385,14 @@
 
 	<div
 		bind:this={viewport_el}
+		bind:offsetHeight={viewport_height}
+		onscroll={(e) => {
+			// TODO: why did the previous version have a tick here?
+			// now (i think due to new svelte await handling), currentTarget is null if i do await tick beforehand.
+			// maybe use an attachment that updates it or update it in the resize observer or some other callback
+			// await tick();
+			scroll_top = e.currentTarget.scrollTop;
+		}}
 		style="-webkit-overflow-scrolling: touch; {style_ ?? ''}"
 		class="relative overflow-y-auto text-base {class_name ?? ''}"
 	>
@@ -420,7 +403,7 @@
 			>
 				{#each visible_items as { data, id } (id)}
 					<div
-						use:measureHeight={id}
+						{@attach measure_height(id)}
 						class="relative list-item w-full rounded-md border border-neutral-800/50 bg-neutral-950 will-change-transform"
 					>
 						<button
