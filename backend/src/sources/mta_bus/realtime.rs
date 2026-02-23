@@ -321,10 +321,10 @@ impl RealtimeAdapter for MtaBusRealtime {
                         .and_then(|x| x.as_database_error())
                     {
                         if db_err.code().as_deref() == Some("23503") {
-                            tracing::warn!("Missing static data for bus. Ensuring update...");
+                            tracing::warn!("Missing static data for bus. Forcing update...");
 
                             if let Err(update_err) = static_controller
-                                .ensure_updated(GtfsSource::source(self))
+                                .force_update(GtfsSource::source(self))
                                 .await
                             {
                                 anyhow::bail!("Ensure update failed: {}", update_err);

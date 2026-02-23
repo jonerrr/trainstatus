@@ -16,6 +16,8 @@ type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
 pub enum UpdateRequest {
     /// Ensure data is up to date, returns immediately if no update needed
     EnsureUpdated { respond_to: ResponseSender },
+    /// Force an import regardless of staleness (e.g., after a FK violation)
+    ForceUpdate { respond_to: ResponseSender },
 }
 
 /// The controller injected into your Realtime/API state
@@ -30,24 +32,36 @@ impl StaticController {
     /// or waits for an ongoing/new update to complete if data is stale.
     /// Call this before processing realtime data to avoid FK errors.
     pub async fn ensure_updated(&self, source: Source) -> anyhow::Result<()> {
+        self.send_request(source, |tx| UpdateRequest::EnsureUpdated { respond_to: tx })
+            .await
+    }
+
+    /// Forces a re-import of static data regardless of staleness.
+    /// Use this when a FK violation indicates missing static rows that are within
+    /// the normal refresh window.
+    pub async fn force_update(&self, source: Source) -> anyhow::Result<()> {
+        self.send_request(source, |tx| UpdateRequest::ForceUpdate { respond_to: tx })
+            .await
+    }
+
+    async fn send_request(
+        &self,
+        source: Source,
+        make_req: impl FnOnce(ResponseSender) -> UpdateRequest,
+    ) -> anyhow::Result<()> {
         let sender = self
             .senders
             .get(&source)
             .ok_or_else(|| anyhow::anyhow!("No static adapter found for {:?}", source))?;
 
-        // Create a one-time channel for the reply
         let (tx, rx) = oneshot::channel();
 
-        // Send the request
         sender
-            .send(UpdateRequest::EnsureUpdated { respond_to: tx })
+            .send(make_req(tx))
             .await
             .map_err(|_| anyhow::anyhow!("Static engine receiver dropped"))?;
 
-        // Wait for the response (returns immediately if no update needed)
-        rx.await??;
-
-        Ok(())
+        rx.await?
     }
 }
 
@@ -120,38 +134,14 @@ async fn run_source_handler(
                                 pending_waiters.push(respond_to);
 
                                 // Collect any other pending requests
-                                while let Ok(UpdateRequest::EnsureUpdated { respond_to }) = rx.try_recv() {
-                                    pending_waiters.push(respond_to);
+                                while let Ok(r) = rx.try_recv() {
+                                    pending_waiters.push(match r {
+                                        UpdateRequest::EnsureUpdated { respond_to } => respond_to,
+                                        UpdateRequest::ForceUpdate { respond_to } => respond_to,
+                                    });
                                 }
 
-                                import_in_progress = true;
-
-                                // Spawn import task
-                                let pool_clone = pool.clone();
-                                let route_store_clone = route_store.clone();
-                                let stop_store_clone = stop_store.clone();
-                                let adapter_clone = adapter.clone();
-                                let import_tx_clone = import_tx.clone();
-
-                                tokio::spawn(async move {
-                                    let result = adapter_clone.import(&route_store_clone, &stop_store_clone).await;
-
-                                    // Update DB timestamp on success
-                                    if let Ok(_) = &result {
-                                        info!("Import successful");
-                                        let _ = sqlx::query!(
-                                            "UPDATE source SET updated_at = NOW() WHERE id = $1",
-                                            adapter_clone.source() as Source
-                                        )
-                                        .execute(&pool_clone)
-                                        .await;
-                                    } else if let Err(e) = &result {
-                                        error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
-                                    }
-
-                                    // Send result back to handler
-                                    let _ = import_tx_clone.send(result).await;
-                                });
+                                spawn_import(&pool, &route_store, &stop_store, &adapter, &import_tx, &mut import_in_progress);
                             }
                             Ok(true) if import_in_progress => {
                                 // Update already in progress - queue this waiter
@@ -169,6 +159,25 @@ async fn run_source_handler(
                             _ => unreachable!(),
                         }
                     }
+                    UpdateRequest::ForceUpdate { respond_to } => {
+                        if import_in_progress {
+                            // Piggyback on the in-progress import
+                            pending_waiters.push(respond_to);
+                        } else {
+                            info!("Starting import (forced)");
+                            pending_waiters.push(respond_to);
+
+                            // Drain any other queued requests
+                            while let Ok(r) = rx.try_recv() {
+                                pending_waiters.push(match r {
+                                    UpdateRequest::EnsureUpdated { respond_to } => respond_to,
+                                    UpdateRequest::ForceUpdate { respond_to } => respond_to,
+                                });
+                            }
+
+                            spawn_import(&pool, &route_store, &stop_store, &adapter, &import_tx, &mut import_in_progress);
+                        }
+                    }
                 }
             }
 
@@ -176,6 +185,43 @@ async fn run_source_handler(
             else => break,
         }
     }
+}
+
+fn spawn_import(
+    pool: &PgPool,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
+    adapter: &Arc<dyn StaticAdapter>,
+    import_tx: &mpsc::Sender<anyhow::Result<()>>,
+    import_in_progress: &mut bool,
+) {
+    *import_in_progress = true;
+
+    let pool_clone = pool.clone();
+    let route_store_clone = route_store.clone();
+    let stop_store_clone = stop_store.clone();
+    let adapter_clone = adapter.clone();
+    let import_tx_clone = import_tx.clone();
+
+    tokio::spawn(async move {
+        let result = adapter_clone
+            .import(&route_store_clone, &stop_store_clone)
+            .await;
+
+        if let Ok(_) = &result {
+            info!("Import successful");
+            let _ = sqlx::query!(
+                "UPDATE source SET updated_at = NOW() WHERE id = $1",
+                adapter_clone.source() as Source
+            )
+            .execute(&pool_clone)
+            .await;
+        } else if let Err(e) = &result {
+            error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
+        }
+
+        let _ = import_tx_clone.send(result).await;
+    });
 }
 
 #[instrument(skip_all, fields(source = ?adapter.source()))]
