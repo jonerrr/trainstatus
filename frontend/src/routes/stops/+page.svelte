@@ -54,8 +54,13 @@
 
 			for (const s of page.data.stops[selected_source.current]) {
 				const r = s.routes.find((r) => r.route_id === route.id);
-				// TODO: maybe add back check for  ['full_time', 'part_time', 'rush_hour'] for mta_subway routes
-				if (r) {
+
+				if (
+					r &&
+					r.data.source === 'mta_subway' &&
+					// TODO: maybe include other stop types
+					['full_time', 'part_time', 'rush_hour'].includes(r.data.stop_type)
+				) {
 					new_stops.push(s);
 					route_stop_sequences[s.id] = r.stop_sequence;
 				}
@@ -112,7 +117,7 @@
 				name="search"
 				bind:value={search_input}
 				type="search"
-				placeholder="Search stops"
+				placeholder="Search stops by name, ID, or route..."
 				class="h-12 w-full rounded border
 			   border-neutral-800/50
 			   bg-neutral-900
