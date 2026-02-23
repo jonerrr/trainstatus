@@ -3,13 +3,12 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import {
 	LiveResource,
 	type StopTimeResource,
-	type StopTimeResources,
 	type TypedStopTime,
 	createMultiSourceContext,
 	source_info
 } from '$lib/resources/index.svelte';
 
-import type { Source, StopTime } from '@trainstatus/client';
+import type { Source } from '@trainstatus/client';
 
 export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): StopTimeResource<S> {
 	const by_trip_id = new SvelteMap<string, TypedStopTime<S>[]>();
@@ -42,13 +41,12 @@ export function createStopTimeResource<S extends Source>(
 	params: { at?: number } = {},
 	initial_value: StopTimeResource<S>
 ) {
-	// SvelteSet is inherently reactive — the fetcher closes over it and reads
-	// the current snapshot on every invocation, so no $state() wrapper needed.
 	const monitored_routes = new SvelteSet<string>();
 
 	const resource = new LiveResource<StopTimeResource<S>>(
 		async (signal) => {
-			console.log('updating stop times');
+			console.log(`updating ${source} stop times`);
+
 			const routes = [...monitored_routes];
 
 			// Sources that require explicit routes (e.g. bus) return empty until
@@ -57,12 +55,17 @@ export function createStopTimeResource<S extends Source>(
 				return EMPTY_INDEX as StopTimeResource<S>;
 			}
 
-			const query = new URLSearchParams();
-			if (params.at) query.set('at', params.at.toString());
+			const query_params = new URLSearchParams();
+			if (params.at) query_params.set('at', params.at.toString());
 			// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
-			if (routes.length) query.set('route_ids', routes.join(','));
+			if (routes.length) query_params.set('route_ids', routes.join(','));
 
-			const res = await fetch(`/api/v1/stop_times/${source}?${query}`, { signal });
+			const params_str = query_params.toString();
+			const url = params_str
+				? `/api/v1/stop_times/${source}?${params_str}`
+				: `/api/v1/stop_times/${source}`;
+
+			const res = await fetch(url, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error(`Failed to fetch stop times: ${res.status}`);
@@ -137,7 +140,7 @@ export function createStopTimeResource<S extends Source>(
 	};
 }
 
-export const stop_time_context = createMultiSourceContext<StopTimeResources>();
+export type StopTimeStore<S extends Source> = ReturnType<typeof createStopTimeResource<S>>;
+export type StopTimeResources = { [S in Source]: StopTimeStore<S> };
 
-// TODO: remove when finished refactoring
-export const monitored_bus_routes = new SvelteSet<string>();
+export const stop_time_context = createMultiSourceContext<StopTimeResources>();

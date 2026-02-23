@@ -22,9 +22,13 @@
 		aria-label={label}
 		title={label}
 		href="{href}{current_time.value ? `?at=${current_time.value}` : ''}"
-		class="nav-button"
-		class:nav-button-active={href === page.url.pathname}
-		class:text-neutral-400={href !== page.url.pathname}
+		class={[
+			'nav-button',
+			{
+				'bg-neutral-800 font-medium text-neutral-100': href === page.url.pathname,
+				'text-neutral-400': href !== page.url.pathname
+			}
+		]}
 	>
 		<Icon class="nav-icon" />
 		<span>{label}</span>
@@ -44,10 +48,6 @@
 
 	.nav-button {
 		@apply flex flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
-	}
-
-	.nav-button-active {
-		@apply bg-neutral-800 font-medium text-neutral-100;
 	}
 
 	/* Gradient separator at top of nav */

@@ -31,11 +31,10 @@ export function createPositionResource<S extends Source>(
 ) {
 	const resource = new LiveResource<PositionResource<S>>(
 		async (signal) => {
-			console.log('updating vehicle positions');
-			const query = new URLSearchParams();
-			if (params.at) query.set('at', params.at.toString());
+			console.log(`updating ${source} positions`);
 
-			const res = await fetch(`/api/v1/positions/${source}?${query}`, { signal });
+			const query_params = params.at ? `?at=${params.at}` : '';
+			const res = await fetch(`/api/v1/positions/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error('Failed to fetch vehicle positions');

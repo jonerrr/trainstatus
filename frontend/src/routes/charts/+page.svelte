@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { monitored_bus_routes, stop_time_context } from '$lib/resources/stop_times.svelte';
+	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
@@ -15,6 +15,8 @@
 	import AxisX from './AxisX.svelte';
 	import AxisY from './AxisY.svelte';
 	import Lines from './Lines.svelte';
+
+	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
 	let routes = $state<Route[]>([page.data.routes['3']]);
 	let direction = $state<TripDirection>(TripDirection.North);

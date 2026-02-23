@@ -3,22 +3,44 @@
 
 	import List from '$lib/List.svelte';
 	import { route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
+	import { default_sources } from '$lib/resources/index.svelte';
+	import { calculate_trip_height, trip_context } from '$lib/resources/trips.svelte';
 	import { calculate_route_height, calculate_stop_height } from '$lib/static';
 	import { haversine } from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
-	import type { Route, Source, Stop } from '@trainstatus/client';
+	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
 
-	// TODO: add check that trip still exists
-	// const pinned_trips = $derived(
-	// 	Object.fromEntries(
-	// 		Object.entries(trip_pins.current).map(([source, pins]) => [
-	// 			source,
-	// 			pins.map((pin) => page.data.trips_by_id[source as Source][pin])
-	// 		])
-	// 	) as Record<Source, Route[]>
-	// );
+	const all_trips = trip_context.get();
+
+	$effect(() => {
+		for (const [source, resource] of Object.entries(all_trips)) {
+			const map = resource.value;
+			if (!map) continue;
+			const src = source as Source;
+			const current = trip_pins.current[src];
+			const valid = current.filter((id) => map.has(id));
+			if (valid.length !== current.length) {
+				console.log(
+					`Removing invalid pins for source ${src}:`,
+					current.filter((id) => !map.has(id))
+				);
+				trip_pins.current[src] = valid;
+			}
+		}
+	});
+
+	const pinned_trips = $derived.by(() => {
+		const sources = Object.fromEntries(
+			Object.entries(trip_pins.current).map(([source, pins]) => [
+				source,
+				pins
+					.map((pin) => all_trips[source as Source].value?.get(pin))
+					.filter((t) => t !== undefined)
+			])
+		) as Record<Source, Trip[]>;
+		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
+	});
 
 	const pinned_stops = $derived.by(() => {
 		const sources = Object.fromEntries(
@@ -39,13 +61,6 @@
 		) as Record<Source, Route[]>;
 		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
 	});
-
-	// TODO: maybe don't bother with saving status myself. the user can just refresh or permanently block location access in their browser settings.
-	// Geolocation state
-	// const location_status = new LocalStorage<'unknown' | 'granted' | 'denied'>(
-	// 	'location_status',
-	// 	'unknown'
-	// );
 
 	let watch_id: number;
 	// TODO: types
@@ -97,47 +112,12 @@
 		distance: number;
 	}
 
-	const source_order: Source[] = ['mta_subway', 'mta_bus'];
-
-	// Compute nearby stops sorted by distance for each source
-	// : Record<Source, StopWithDistance[]>
-	// async function get_nearby_stops() {
-	// 	console.log('Getting nearby stops...');
-	// 	const result = {} as Record<Source, StopWithDistance[]>;
-
-	// 	try {
-	// 		// TODO: maybe watch events instead of getting position on demand
-	// 		const position = await get_position();
-	// 		location_status.current = 'granted';
-
-	// 		for (const source of source_order) {
-	// 			const data = page.data.stops[source] ?? [];
-
-	// 			result[source] = data
-	// 				.map((stop: Stop) => {
-	// 					const distance = haversine(
-	// 						position.coords.latitude,
-	// 						position.coords.longitude,
-	// 						stop.geom.Point.y,
-	// 						stop.geom.Point.x
-	// 					);
-	// 					return { ...stop, distance };
-	// 				})
-	// 				.sort((a, b) => a.distance - b.distance);
-	// 		}
-	// 	} catch (error) {
-	// 		console.error('Error getting nearby stops:', error);
-	// 		location_status.current = 'denied';
-	// 	}
-	// 	return result;
-	// }
-
 	const nearby_stops = $derived.by(() => {
 		const result = {} as Record<Source, StopWithDistance[]>;
 
 		if (!position) return result;
 
-		for (const source of source_order) {
+		for (const source of default_sources) {
 			const data = page.data.stops[source] ?? [];
 			result[source] = data
 				.map((stop) => {
@@ -155,15 +135,14 @@
 		return result;
 	});
 
-	// Height calculation TODO: Fix
+	// Height calculation TODO: improve
 	let list_height = $state(0);
 	let pin_list_height = $state(0);
-	// const nearby_list_height = $derived(list_height - pin_list_height);
-	const nearby_list_height = $state(800);
+	const nearby_list_height = $derived(list_height - pin_list_height);
 </script>
 
 {#snippet locate_button()}
-	<!-- TODO: fix onclick -->
+	<!-- TODO: double check the location states are all working and onclick is working -->
 	<button
 		onclick={() => resume()}
 		class={[
@@ -193,18 +172,17 @@
 	<!-- Pinned items section - no scroll -->
 	<div class="flex-none overflow-hidden" bind:offsetHeight={pin_list_height}>
 		<!-- TODO: add back trip list -->
-		<!-- {#if trip_pins.current.length}
+		{#if pinned_trips.exists}
 			<List
 				title="Pinned Trips"
-				bus_data={pinned_bus_trips}
-				train_data={pinned_train_trips}
+				sources={pinned_trips.sources}
 				type="trip"
-				pin_rune={trip_pins_rune}
+				pins={trip_pins}
 				height_calc={calculate_trip_height}
 				items_before_scroll={2}
 				class="max-h-[25dvh]"
 			/>
-		{/if} -->
+		{/if}
 
 		{#if pinned_routes.exists}
 			<List
@@ -234,9 +212,12 @@
 	</div>
 
 	<div>
+		<!-- TODO: either hide or show error message when nearby_stops is empty and location perms were denied -->
+		<!-- maybe put it inside of List, since we should also start showing an error message when the stop search returns empty -->
 		<!-- {#if nearby_stops} -->
+		<!-- TODO: fix title text being too long for mobile -->
 		<List
-			title="Nearby Stops"
+			title="Nearby"
 			type="stop"
 			style="max-height: {nearby_list_height}px"
 			sources={nearby_stops}

@@ -9,13 +9,14 @@
 	import Pin from '$lib/Pin.svelte';
 	import RouteButton from '$lib/Route/Button.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
+	import TripButton from '$lib/Trip/Button.svelte';
 	import type { Pins } from '$lib/pins.svelte';
 	import { default_sources, source_info } from '$lib/resources/index.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 
-	import type { Route, Source, Stop } from '@trainstatus/client';
+	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
 
-	type ItemType = 'stop' | 'route';
+	type ItemType = 'stop' | 'route' | 'trip';
 
 	interface Props {
 		// title of list
@@ -25,7 +26,7 @@
 		// item type for rendering and modal
 		type: ItemType;
 		// data organized by source
-		sources: Record<Source, (Stop | Route)[]>;
+		sources: Record<Source, (Stop | Route | Trip)[]>;
 		// persisted state for pinned items
 		pins?: LocalStorage<Pins>;
 		// persisted state for selected source tab
@@ -394,6 +395,8 @@
 								<StopButton data={data as Stop} />
 							{:else if type === 'route'}
 								<RouteButton data={data as Route} />
+							{:else if type === 'trip'}
+								<TripButton data={data as Trip} />
 							{/if}
 						</button>
 

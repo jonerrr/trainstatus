@@ -3,6 +3,7 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import { source_info } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/util.svelte';
@@ -23,8 +24,18 @@
 	const trips = $derived(trip_context.getSource(stop.data.source));
 	const stop_times = $derived(stop_time_context.getSource(stop.data.source));
 
+	// TODO: improve this
+	$effect(() => {
+		if (source_info[stop.data.source].monitor_routes) {
+			for (const r of stop.routes) {
+				stop_times.add_route(r.route_id);
+			}
+		}
+	});
+	// stop_times.add_route()
+
 	const stop_times_by_direction = $derived.by(() => {
-		const stop_times_by_direction: Map<number, StopTimesByRoute> = new Map();
+		const stop_times_by_direction = new Map<number, StopTimesByRoute>();
 
 		// Pre-populate both directions with all routes from stop data
 		if (stop.data.source === 'mta_subway') {
@@ -161,9 +172,9 @@
 		<div class="flex flex-col">
 			{#each stop.routes as route_stop (route_stop.route_id)}
 				{@const route = routes[route_stop.route_id]}
-				<!-- {@const route_stop_times = stop_times.filter((st) => st.route_id === stop_route.id)} -->
-				{@const route_stop_times = []}
-
+				{@const route_stop_times = [...stop_times_by_direction.values()].flatMap(
+					(m) => m.get(route_stop.route_id) ?? []
+				)}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">
@@ -172,20 +183,13 @@
 							{route_stop.data.source === 'mta_bus' && route_stop.data.headsign}
 						</div>
 						<div class="flex gap-2 pr-1">
-							<!-- TODO: improve loading (maybe using svelte's new await stuff) -->
-							<!-- {#if rt_stop_times.updating_routes.has(route.id)}
-								<div class="flex items-center gap-1 py-1">
-									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
-									<div class="h-[1em] w-6 animate-pulse bg-neutral-700"></div>
-								</div>
-							{:else if route_stop_times.length}
+							{#if route_stop_times.length}
 								{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 									{@render eta(stop_time.eta)}
 								{/each}
 							{:else}
 								<div class="text-neutral-400">No trips</div>
-							{/if} -->
-							<div class="text-neutral-400">No trips</div>
+							{/if}
 						</div>
 					</div>
 				</div>

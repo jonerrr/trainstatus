@@ -11,6 +11,7 @@ export interface AlertResource {
 }
 
 export function index_alerts(data: ApiAlert[]): AlertResource {
+	// TODO: maybe combine express alerts here (i dont think there should ever be alerts specifically for express mta_subway tho)
 	const alerts: ApiAlert[] = [];
 	const alerts_by_route: SvelteMap<string, ApiAlert[]> = new SvelteMap();
 
@@ -45,11 +46,10 @@ export function createAlertResource(
 ) {
 	const resource = new LiveResource<AlertResource>(
 		async (signal) => {
-			console.log('updating alerts');
-			const query = new URLSearchParams();
-			if (params.at) query.set('at', params.at.toString());
+			console.log(`updating ${source} alerts`);
 
-			const res = await fetch(`/api/v1/alerts/${source}?${query}`, { signal });
+			const query_params = params.at ? `?at=${params.at}` : '';
+			const res = await fetch(`/api/v1/alerts/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error('Failed to fetch alerts');
@@ -57,32 +57,6 @@ export function createAlertResource(
 			const data: ApiAlert[] = await res.json();
 
 			return index_alerts(data);
-
-			// const alerts = data.map((alert) => ({
-			// 	...alert,
-			// 	header_html: parse_html(alert.header_html),
-			// 	description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
-			// 	start_time: new Date(alert.start_time),
-			// 	end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-			// 	updated_at: new Date(alert.updated_at),
-			// 	created_at: new Date(alert.created_at)
-			// }));
-
-			// const alerts_by_route: SvelteMap<string, ApiAlert[]> = new SvelteMap();
-
-			// for (const alert of alerts) {
-			// 	for (const entity of alert.entities) {
-			// 		if (!alerts_by_route.has(entity.route_id)) {
-			// 			alerts_by_route.set(entity.route_id, []);
-			// 		}
-			// 		alerts_by_route.get(entity.route_id)!.push(alert);
-			// 	}
-			// }
-
-			// return {
-			// 	alerts,
-			// 	alerts_by_route
-			// };
 		},
 		{ initial_value, interval: source_info[source].refresh_interval.alerts, debounce: 500 }
 	);

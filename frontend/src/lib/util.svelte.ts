@@ -28,11 +28,11 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 	};
 }
 
-export function get_position(): Promise<GeolocationPosition> {
-	return new Promise<GeolocationPosition>((res, rej) => {
-		navigator.geolocation.getCurrentPosition(res, rej);
-	});
-}
+// export function get_position(): Promise<GeolocationPosition> {
+// 	return new Promise<GeolocationPosition>((res, rej) => {
+// 		navigator.geolocation.getCurrentPosition(res, rej);
+// 	});
+// }
 
 // if user specified unix timestamp, it is stored here.
 function currentTime() {
@@ -75,4 +75,4 @@ interface ItemHeights {
 // }
 // TODO: remove if not used. Was used to store virtual list item heights.
 // need to test if its faster to calculate heights on the fly or store them in a map like this.
-export const item_heights = $state<ItemHeights>({});
+// export const item_heights = $state<ItemHeights>({});

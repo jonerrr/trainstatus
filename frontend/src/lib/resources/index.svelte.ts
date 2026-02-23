@@ -88,7 +88,6 @@ export interface StopTimeResource<S extends Source> {
 
 export type PositionResources = SourceResources<{ [S in Source]: PositionResource<S> }>;
 export type TripResources = SourceResources<{ [S in Source]: TripResource<S> }>;
-export type StopTimeResources = SourceResources<{ [S in Source]: StopTimeResource<S> }>;
 // Alerts don't have source-specific data, simpler type
 // TODO: if we add source-specific fields to alerts in the future, we can switch to a typed version like the others
 export type AlertResources = SourceResources<{ [S in Source]: EntityResource<ApiAlert> }>;
@@ -159,10 +158,10 @@ export const source_info = {
 		name: 'Bus',
 		icon: BusFront,
 		refresh_interval: {
-			trips: 5000,
-			stop_times: 5000,
-			alerts: 5000,
-			positions: 5000
+			trips: 30_000,
+			stop_times: 30_000,
+			positions: 30_000,
+			alerts: 45_000
 		},
 		// this means that this source requires including specific routes in the query params
 		// maybe find a better name for the param in the future
@@ -172,17 +171,17 @@ export const source_info = {
 		name: 'Subway',
 		icon: TrainFront,
 		refresh_interval: {
-			trips: 5000,
-			stop_times: 5000,
-			alerts: 5000,
+			trips: 30_000,
+			stop_times: 30_000,
+			positions: 30_000,
+			alerts: 45_000
 			// TODO: maybe don't include subway positions since they don't contain really contain any useful info
-			positions: 5000
 		},
 		monitor_routes: false
 	}
 } as const;
 
-export const default_sources: Source[] = ['mta_bus', 'mta_subway'] as const;
+export const default_sources: Source[] = ['mta_subway', 'mta_bus'] as const;
 // TODO: allow changing sources
 
 type Fetcher<T> = (signal: AbortSignal) => Promise<T>;
@@ -191,14 +190,13 @@ interface LiveResourceOptions<T> {
 	interval?: number;
 	enabled?: boolean;
 	debounce?: number;
-	// TODO: maybe make this required
-	initial_value?: T;
+	initial_value: T;
 }
 
 export class LiveResource<T> {
 	// State
 	// TODO: rename value to current (which is what runed and LocalStorage call it)
-	value = $state<T | undefined>(undefined);
+	value: T = $state() as T;
 	error = $state<Error | null>(null);
 	last_updated = $state<Date | null>(null);
 	offline = $state(false);
@@ -217,16 +215,16 @@ export class LiveResource<T> {
 	// Pending resolvers waiting for next successful fetch
 	#pending_resolvers: Array<() => void> = [];
 
-	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions<T> = {}) {
+	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions<T>) {
 		this.#fetcher = fetcher;
+		this.value = options.initial_value;
 		if (options.interval) this.#interval_ms = options.interval;
 		if (options.enabled !== undefined) this.#enabled = options.enabled;
 		if (options.debounce) this.#debounce_ms = options.debounce;
-		if (options.initial_value !== undefined) this.value = options.initial_value;
+		// if (options.initial_value !== undefined) this.value = options.initial_value;
 
 		$effect(() => {
 			if (this.#enabled) {
-				this.refresh();
 				this.#startInterval();
 			} else {
 				this.#stopInterval();

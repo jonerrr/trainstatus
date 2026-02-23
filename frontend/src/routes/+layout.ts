@@ -11,6 +11,8 @@ import type { LayoutLoad } from './$types';
 export const load: LayoutLoad = async ({ fetch, url }) => {
 	const at = url.searchParams.get('at') ?? undefined;
 
+	const rt_params = at ? `?at=${at}` : '';
+
 	// Fetch stops and routes for all sources in parallel
 	const [
 		stop_results,
@@ -20,6 +22,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 		initial_positions,
 		initial_alerts
 	] = await Promise.all([
+		///// static sources
 		Promise.all(
 			default_sources.map(async (source) => ({
 				source,
@@ -32,30 +35,32 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 				data: (await (await fetch(`/api/v1/routes/${source}`)).json()) as Route[]
 			}))
 		),
+		///// realtime sources
 		// TODO: check if monitored route needs to be added from query param
-		// TODO: include ?at in rt fetches
 		Promise.all(
 			default_sources.map(async (source) => ({
 				source,
-				data: index_trips(await (await fetch(`/api/v1/trips/${source}`)).json())
+				data: index_trips(await (await fetch(`/api/v1/trips/${source}${rt_params}`)).json())
 			}))
 		),
 		Promise.all(
 			default_sources.map(async (source) => ({
 				source,
-				data: index_stop_times(await (await fetch(`/api/v1/stop_times/${source}`)).json())
+				data: index_stop_times(
+					await (await fetch(`/api/v1/stop_times/${source}${rt_params}`)).json()
+				)
 			}))
 		),
 		Promise.all(
 			default_sources.map(async (source) => ({
 				source,
-				data: index_positions(await (await fetch(`/api/v1/positions/${source}`)).json())
+				data: index_positions(await (await fetch(`/api/v1/positions/${source}${rt_params}`)).json())
 			}))
 		),
 		Promise.all(
 			default_sources.map(async (source) => ({
 				source,
-				data: index_alerts(await (await fetch(`/api/v1/alerts/${source}`)).json())
+				data: index_alerts(await (await fetch(`/api/v1/alerts/${source}${rt_params}`)).json())
 			}))
 		)
 	]);
