@@ -173,6 +173,7 @@ impl AlertStore {
             FROM realtime.alert a
             WHERE
                 a.source = $1
+                AND a.recorded_at >= $2 - INTERVAL '2 minutes'
                 AND EXISTS (
                     SELECT 1 FROM realtime.active_period ap
                     WHERE ap.alert_id = a.id
@@ -183,6 +184,7 @@ impl AlertStore {
             "#,
         )
         .bind(source)
+        // TODO: double check that recorded_at > 2 min works for when passing a specific time.
         .bind(at)
         .fetch_all(&self.pg_pool)
         .await?;
@@ -354,11 +356,31 @@ impl AlertStore {
 
         // Insert translations
         if !translations.is_empty() {
-            let alert_ids = translations
+            // Deduplicate translations by (alert_id, section, format, language) - last one wins
+            let mut seen_translation_keys = std::collections::HashSet::new();
+            let deduped_translations: Vec<_> = translations
+                .iter()
+                .filter(|t| {
+                    let actual_id = id_mapping.get(&t.alert_id).copied();
+                    if let Some(id) = actual_id {
+                        let key = (id, t.section, t.format, t.language.clone());
+                        if !seen_translation_keys.insert(key) {
+                            tracing::warn!(
+                                "Duplicate translation key (alert_id={}, section={:?}, format={:?}, language={}) - skipping",
+                                id, t.section, t.format, t.language
+                            );
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .collect();
+
+            let alert_ids = deduped_translations
                 .iter()
                 .filter_map(|t| id_mapping.get(&t.alert_id).copied())
                 .collect::<Vec<_>>();
-            let filtered_translations: Vec<_> = translations
+            let filtered_translations: Vec<_> = deduped_translations
                 .iter()
                 .filter(|t| id_mapping.contains_key(&t.alert_id))
                 .collect();
@@ -412,11 +434,31 @@ impl AlertStore {
 
         // Insert active periods
         if !active_periods.is_empty() {
-            let alert_ids = active_periods
+            // Deduplicate active periods by (alert_id, start_time) - last one wins
+            let mut seen_period_keys = std::collections::HashSet::new();
+            let deduped_periods: Vec<_> = active_periods
+                .iter()
+                .filter(|ap| {
+                    let actual_id = id_mapping.get(&ap.alert_id).copied();
+                    if let Some(id) = actual_id {
+                        let key = (id, ap.start_time);
+                        if !seen_period_keys.insert(key) {
+                            tracing::warn!(
+                                "Duplicate active period key (alert_id={}, start_time={}) - skipping",
+                                id, ap.start_time
+                            );
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .collect();
+
+            let alert_ids = deduped_periods
                 .iter()
                 .filter_map(|ap| id_mapping.get(&ap.alert_id).copied())
                 .collect::<Vec<_>>();
-            let filtered_periods: Vec<_> = active_periods
+            let filtered_periods: Vec<_> = deduped_periods
                 .iter()
                 .filter(|ap| id_mapping.contains_key(&ap.alert_id))
                 .collect();
@@ -456,11 +498,37 @@ impl AlertStore {
 
         // Insert affected entities
         if !affected_entities.is_empty() {
-            let alert_ids = affected_entities
+            // Deduplicate affected entities by (alert_id, route_id, source, stop_id) - last one wins
+            // This is needed because stop ID stripping (e.g. A01N/A01S -> A01) can produce duplicates
+            let mut seen_entity_keys = std::collections::HashSet::new();
+            let deduped_entities: Vec<_> = affected_entities
+                .iter()
+                .filter(|ae| {
+                    let actual_id = id_mapping.get(&ae.alert_id).copied();
+                    if let Some(id) = actual_id {
+                        let key = (
+                            id,
+                            ae.route_id.as_ref().map(|s| s.to_uppercase()),
+                            ae.source,
+                            ae.stop_id.as_ref().map(|s| s.to_uppercase()),
+                        );
+                        if !seen_entity_keys.insert(key) {
+                            tracing::warn!(
+                                "Duplicate affected entity key (alert_id={}, route_id={:?}, source={:?}, stop_id={:?}) - skipping",
+                                id, ae.route_id, ae.source, ae.stop_id
+                            );
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .collect();
+
+            let alert_ids = deduped_entities
                 .iter()
                 .filter_map(|ae| id_mapping.get(&ae.alert_id).copied())
                 .collect::<Vec<_>>();
-            let filtered_entities: Vec<_> = affected_entities
+            let filtered_entities: Vec<_> = deduped_entities
                 .iter()
                 .filter(|ae| id_mapping.contains_key(&ae.alert_id))
                 .collect();

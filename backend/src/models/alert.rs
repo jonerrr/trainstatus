@@ -16,14 +16,14 @@ pub struct Alert {
     pub data: AlertData,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(type_name = "alert_section", rename_all = "snake_case")]
 pub enum AlertSection {
     Header,
     Description,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
 #[sqlx(type_name = "alert_format", rename_all = "snake_case")]
 pub enum AlertFormat {
     Plain,

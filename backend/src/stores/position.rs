@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 use geozero::wkb;
 use redis::AsyncCommands;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct PositionStore {

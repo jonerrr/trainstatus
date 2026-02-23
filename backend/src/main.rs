@@ -172,7 +172,7 @@ async fn main() {
     .await;
 
     let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
-        Arc::new(sources::mta_bus::alert::MtaBusAlerts),
+        Arc::new(sources::mta_bus::alerts::MtaBusAlerts),
         Arc::new(sources::mta_subway::alerts::MtaSubwayAlerts),
         // Arc::new(njt::rail_alerts::NjtRailAlerts),
     ];
