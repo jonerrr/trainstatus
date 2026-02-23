@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 
-	import { pushState } from '$app/navigation';
+	import { open_modal } from '$lib/url_params.svelte';
 
-	import { type Trip } from '$lib/resources/trips.svelte';
-	import { type Route } from '$lib/static';
-
+	import type { Route, Trip } from '@trainstatus/client';
 	import { line } from 'd3-shape';
 
 	const { xGet, yGet, data } = getContext('LayerCake');
@@ -20,7 +18,8 @@
 	const path = $derived(line().x($xGet).y($yGet));
 
 	function open_trip(trip: Trip) {
-		pushState('', { modal: 'trip', data: trip });
+		// pushState('', { modal: { ...trip, type: 'trip' } });
+		open_modal({ ...trip, type: 'trip' });
 	}
 </script>
 
