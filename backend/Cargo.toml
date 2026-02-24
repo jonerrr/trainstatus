@@ -60,7 +60,6 @@ utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
-zip = "6.0.0"
 
 [build-dependencies]
 prost-build = "0.14.1"
