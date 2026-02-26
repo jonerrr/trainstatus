@@ -1,13 +1,18 @@
 <script lang="ts">
+	import { onMount, tick, untrack } from 'svelte';
+
+	import { replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
+	import { default_sources } from '$lib/resources/index.svelte';
 	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
 	import { createStopTimeResource, stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { createTripResource, trip_context } from '$lib/resources/trips.svelte';
+	import { current_time } from '$lib/util.svelte';
 
 	import '@fontsource/inter';
 
@@ -17,212 +22,90 @@
 
 	let offline = $state(false);
 
-	const params = {};
+	// Initialize current_time from URL param on page load
+	// If we don't initialize here, the syncing $effect will error out when running replaceState on page load (since router isn't initialized)
+	if (page.data.at) current_time.value = parseInt(page.data.at);
+	// TODO: fix clearing time not working
+
 	// TODO: handle offline from new fetching method
 	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
-
 	trip_context.set(
 		Object.fromEntries(
-			initial_trips.map(({ source, data }) => [source, createTripResource(source, params, data)])
+			initial_trips.map(({ source, data }) => [source, createTripResource(source, data)])
 		) as any
 	);
 
 	stop_time_context.set(
 		Object.fromEntries(
-			initial_stop_times.map(({ source, data }) => [
-				source,
-				createStopTimeResource(source, params, data)
-			])
+			initial_stop_times.map(({ source, data }) => [source, createStopTimeResource(source, data)])
 		) as any
 	);
 
 	position_context.set(
 		Object.fromEntries(
-			initial_positions.map(({ source, data }) => [
-				source,
-				createPositionResource(source, params, data)
-			])
+			initial_positions.map(({ source, data }) => [source, createPositionResource(source, data)])
 		) as any
 	);
 
 	alert_context.set(
 		Object.fromEntries(
-			initial_alerts.map(({ source, data }) => [source, createAlertResource(source, params, data)])
+			initial_alerts.map(({ source, data }) => [source, createAlertResource(source, data)])
 		) as any
 	);
 
-	// TODO: remove old code below once sharing and offline functionality is working
-	// let last_update = $state<Date>(new Date());
-	// let last_st_update = $state<Date>(new Date());
-	// // used to check if bus routes have changed
-	// let last_monitored_routes = $state(new SvelteSet<string>());
-	// // used to show offline icon in header
-	// // used to prevent multiple updates at the same time
-	// let is_updating = $state(false);
+	// Initialize modal from URL params on page load
+	onMount(() => {
+		const url = page.url;
+		// TODO: maybe include the source in the URL params so we don't have to loop over all of them to check
+		const stop_id = url.searchParams.get('s');
+		const route_id = url.searchParams.get('r');
+		const trip_id = url.searchParams.get('t');
 
-	// let last_at = data.at ? parseInt(data.at) : undefined;
+		if (stop_id) {
+			for (const source of default_sources) {
+				const stop = page.data.stops_by_id[source]?.[stop_id];
+				if (stop) {
+					tick().then(() => replaceState('', { modal: { ...stop, type: 'stop' } }));
+					break;
+				}
+			}
+		} else if (route_id) {
+			for (const source of default_sources) {
+				const route = page.data.routes_by_id[source]?.[route_id];
+				if (route) {
+					tick().then(() => replaceState('', { modal: { ...route, type: 'route' } }));
+					break;
+				}
+			}
+		} else if (trip_id) {
+			const all_trips = trip_context.get();
+			if (all_trips) {
+				for (const source of default_sources) {
+					const trip = all_trips[source]?.value?.get(trip_id);
+					if (trip) {
+						tick().then(() => replaceState('', { modal: { ...trip, type: 'trip' } }));
+						break;
+					}
+				}
+			}
+		}
+	});
 
-	// onMount(() => {
-	// 	if (last_at) {
-	// 		current_time.value = last_at;
-	// 	}
-	// 	const id =
-	// 		// stop
-	// 		page.url.searchParams.get('s') ||
-	// 		// route
-	// 		page.url.searchParams.get('r') ||
-	// 		// trip
-	// 		page.url.searchParams.get('t');
+	// Sync current_time.value → ?at URL param whenever it changes.
+	// Reads page.url inside untrack so this effect only re-runs when current_time changes.
+	$effect(() => {
+		const val = current_time.value;
+		untrack(() => {
+			const current_at = page.url.searchParams.get('at');
+			const new_at = val !== undefined ? val.toString() : null;
+			if (current_at === new_at) return; // no change needed
 
-	// 	tick().then(() => {
-	// 		if (id) {
-	// 			// check what type of id it is
-	// 			// TODO: should we use replace or push state
-	// 			if (id in page.data.routes) {
-	// 				replaceState('', {
-	// 					modal: 'route',
-	// 					data: page.data.routes[id]
-	// 				});
-	// 			} else if (id in page.data.stops) {
-	// 				replaceState('', {
-	// 					modal: 'stop',
-	// 					data: page.data.stops[parseInt(id)]
-	// 				});
-	// 			} else if (trips.trips.has(id)) {
-	// 				replaceState('', {
-	// 					modal: 'trip',
-	// 					data: trips.trips.get(id)
-	// 				});
-	// 			}
-	// 		}
-	// 	});
-
-	// const finished = $derived(page.url.pathname.startsWith('/charts'));
-
-	// $inspect(last_monitored_routes);
-
-	// 	const interval = setInterval(async () => {
-	// 		// prevent multiple updates at the same time
-	// 		if (is_updating) return;
-
-	// 		try {
-	// 			is_updating = true;
-	// 			const now = new Date().getTime();
-
-	// 			const current_time_changed = last_at !== current_time.value;
-	// 			// should update if current time is not set or if it's more than 4 hours old
-	// 			const should_update = !current_time.value || current_time.ms >= now - 14400000;
-	// 			// update alerts and trips every 15 seconds or when current time changes
-	// 			if (current_time_changed || (should_update && now - last_update.getTime() > 1000 * 15)) {
-	// 				// console.log('Updating rt data');
-
-	// 				await Promise.all([
-	// 					trips.update(fetch, current_time.value?.toString()),
-	// 					alerts.update(fetch, current_time.value?.toString())
-	// 				]);
-
-	// 				offline = false;
-	// 				last_update = new Date();
-	// 			}
-
-	// 			if (monitored_bus_routes.size > 30) {
-	// 				// remove until there are 30 left
-	// 				const to_remove = Array.from(monitored_bus_routes).slice(0, -30);
-	// 				// console.log('removing', to_remove);
-	// 				to_remove.forEach((r) => {
-	// 					monitored_bus_routes.delete(r);
-	// 					last_monitored_routes.delete(r);
-	// 				});
-	// 			}
-
-	// 			const routes_changed =
-	// 				monitored_bus_routes.size !== last_monitored_routes.size ||
-	// 				!monitored_bus_routes.isSubsetOf(last_monitored_routes);
-	// 			const should_update_st = now - last_st_update.getTime() > 1000 * 15;
-	// 			if (routes_changed && !should_update_st) {
-	// 				// console.log('Updating st bc routes changed');
-
-	// 				// TODO: improve storing bus route so I can update only the new ones
-	// 				// Find only the new routes that weren't in last_monitored_routes
-	// 				// const new_routes = [...monitored_bus_routes].filter(
-	// 				// 	(route) => !last_monitored_routes.has(route)
-	// 				// );
-	// 				// const new_routes = monitored_bus_routes.difference(last_monitored_routes);
-
-	// 				// if (new_routes.size) {
-	// 				// 	// Only update with the new routes
-	// 				// 	await stop_times.update(fetch, [...new_routes], true, current_time.value?.toString());
-
-	// 				// 	// const updated_routes = new SvelteSet([...last_monitored_routes]);
-	// 				// 	// for (const route of new_routes) {
-	// 				// 	// 	updated_routes.add(route);
-	// 				// 	// }
-	// 				// 	// last_monitored_routes = updated_routes;
-	// 				// 	last_monitored_routes = new SvelteSet(last_monitored_routes.union(new_routes));
-	// 				// 	offline = false;
-	// 				// }
-	// 				await stop_times.update(
-	// 					fetch,
-	// 					[...monitored_bus_routes],
-	// 					true,
-	// 					current_time.value?.toString()
-	// 				);
-	// 				last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
-	// 				offline = false;
-	// 			}
-	// 			// update stop times every 15 seconds
-	// 			if (current_time_changed || (should_update && should_update_st)) {
-	// 				// console.log('Updating st');
-
-	// 				await stop_times.update(
-	// 					fetch,
-	// 					[...monitored_bus_routes],
-	// 					false,
-	// 					current_time.value?.toString()
-	// 				);
-	// 				last_st_update = new Date();
-	// 				last_monitored_routes = new SvelteSet([...monitored_bus_routes]);
-	// 				offline = false;
-	// 			}
-	// 		} catch (e) {
-	// 			console.error(e);
-	// 			offline = true;
-
-	// 			// update in 3 seconds if offline
-	// 			last_update = new Date(new Date().getTime() - 1000 * 7);
-	// 			last_st_update = new Date(new Date().getTime() - 1000 * 7);
-	// 		} finally {
-	// 			is_updating = false;
-	// 			last_at = current_time.value;
-	// 		}
-	// 	}, 200);
-
-	// 	// $inspect(monitored_bus_routes);
-
-	// 	return () => clearInterval(interval);
-	// });
-
-	// $effect(() => {
-	// 	current_time.value;
-	// 	tick().then(() => {
-	// 		const url = new URL(window.location.href);
-
-	// 		// use existing url because we don't want to lose other query params
-	// 		if (current_time.value) {
-	// 			url.searchParams.set('at', current_time.value.toString());
-	// 		} else {
-	// 			url.searchParams.delete('at');
-	// 		}
-
-	// 		// only update url if it has changed
-	// 		const new_url = url.toString();
-	// 		if (new_url !== window.location.href) {
-	// 			replaceState(new_url, {
-	// 				modal: 'settings'
-	// 			});
-	// 		}
-	// 	});
-	// });
+			const url = new URL(page.url);
+			if (val !== undefined) url.searchParams.set('at', val.toString());
+			else url.searchParams.delete('at');
+			replaceState(url.pathname + url.search, page.state);
+		});
+	});
 
 	const url_mappings = {
 		'/': 'Home',

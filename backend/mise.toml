@@ -1,5 +1,5 @@
 [tools]
-# rust = "latest"
+rust = "latest"
 # installing with mise caused the rust vscode extension not to work
 # protoc = "latest"
 
@@ -11,8 +11,11 @@ run = "cargo sqlx prepare"
 
 # TODO: fix weird linker error when using mise dev monorepo task
 [tasks.dev]
+# i get a linker error without specifying shell
+# TODO: figure out why control C no longer shuts down the backend (exec didn't work)
+shell = "nu -c"
 depends = ["start-containers"]
-run = "cargo run"
+run = "exec cargo run"
 
 [env]
 # RUST_LOG = "backend=debug"

@@ -19,6 +19,8 @@
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
+	// TODO: improve y axis ordering (if theres trains with weird trip patterns, it causes the stops y axis to be in a weird order and lines to look weird)
+
 	const all_trips = trip_context.get();
 	const all_stop_times = stop_time_context.get();
 
@@ -462,6 +464,7 @@
 		</div>
 
 		<!-- Direction Option -->
+		<!-- TODO: change direction text depending on source -->
 		<div class="flex min-w-24 flex-col gap-2">
 			<div class="font-bold">Direction</div>
 			<div class="flex flex-col gap-2 text-neutral-300">

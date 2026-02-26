@@ -7,6 +7,7 @@ import {
 	createMultiSourceContext,
 	source_info
 } from '$lib/resources/index.svelte';
+import { current_time } from '$lib/util.svelte';
 
 import type { Source } from '@trainstatus/client';
 
@@ -38,7 +39,6 @@ const EMPTY_INDEX: StopTimeResource<Source> = {
 
 export function createStopTimeResource<S extends Source>(
 	source: S,
-	params: { at?: number } = {},
 	initial_value: StopTimeResource<S>
 ) {
 	const monitored_routes = new SvelteSet<string>();
@@ -56,7 +56,8 @@ export function createStopTimeResource<S extends Source>(
 			}
 
 			const query_params = new URLSearchParams();
-			if (params.at) query_params.set('at', params.at.toString());
+			const at = current_time.value;
+			if (at) query_params.set('at', at.toString());
 			// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
 			if (routes.length) query_params.set('route_ids', routes.join(','));
 
@@ -79,6 +80,15 @@ export function createStopTimeResource<S extends Source>(
 			debounce: 500
 		}
 	);
+
+	let prev_time = current_time.value;
+	$effect(() => {
+		const val = current_time.value;
+		if (val !== prev_time) {
+			prev_time = val;
+			resource.refresh();
+		}
+	});
 
 	return {
 		get value() {

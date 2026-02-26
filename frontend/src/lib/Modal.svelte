@@ -2,7 +2,6 @@
 	import type { Attachment } from 'svelte/attachments';
 	import { on } from 'svelte/events';
 
-	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 
 	import Pin from '$lib/Pin.svelte';
@@ -12,7 +11,7 @@
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { close_modal } from '$lib/url_params.svelte';
 
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
 	import type { Source } from '@trainstatus/client';
@@ -63,8 +62,7 @@
 	}
 
 	function close() {
-		// enable_scroll();
-		pushState('', { modal: null });
+		close_modal();
 	}
 	// TODO: improve physics on desktop (or maybe just disable)
 	const modal: Attachment<HTMLDialogElement> = (node) => {
@@ -298,7 +296,7 @@
 	// 	easing: cubicOut
 	// });
 	let copied = $state(false);
-	// show stops/trips before current datetime
+	// show stops/trips before current datetime TODO: maybe persist this preference in local storage
 	let show_previous = $state(false);
 	// e.g. 3m or 12:45.
 	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
@@ -387,7 +385,8 @@
 					aria-label="Share"
 					title="Share"
 					onclick={() => {
-						const url = `${window.location.origin}/?${param_name}=${id}${current_time.value ? `&at=${current_time.value}` : ''}`;
+						// URL already includes ?s/?r/?t and ?at params via shallow routing
+						const url = window.location.href;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
@@ -423,7 +422,7 @@
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal?.type === 'stop'}
-		<StopModal {show_previous} time_format={time_format.current} stop={page.state.modal} />
+		<StopModal stop={page.state.modal} {show_previous} time_format={time_format.current} />
 
 		{@render actions(
 			true,

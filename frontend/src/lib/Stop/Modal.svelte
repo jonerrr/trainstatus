@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 
 	import Button from '$lib/Button.svelte';
@@ -14,6 +13,7 @@
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { main_stop_routes } from '$lib/static';
 	import { LocalStorage } from '$lib/storage.svelte';
+	import { open_modal } from '$lib/url_params.svelte';
 	import { current_time } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
@@ -134,7 +134,8 @@
 				<button
 					class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 					onclick={() =>
-						pushState('', { modal: { type: 'stop', ...$state.snapshot(transfer_stop) } })}
+						// pushState('', { modal: { type: 'stop', ...$state.snapshot(transfer_stop) } })}
+						open_modal({ type: 'stop', ...$state.snapshot(transfer_stop) })}
 				>
 					{#each main_stop_routes(transfer_stop) as route_stop}
 						<Icon

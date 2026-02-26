@@ -8,6 +8,7 @@ import {
 	createMultiSourceContext,
 	source_info
 } from '$lib/resources/index.svelte';
+import { current_time } from '$lib/util.svelte';
 
 import type { Source } from '@trainstatus/client';
 
@@ -26,14 +27,14 @@ export function index_positions<S extends Source>(
 }
 export function createPositionResource<S extends Source>(
 	source: S,
-	params: { at?: number },
 	initial_value: PositionResource<S>
 ) {
 	const resource = new LiveResource<PositionResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} positions`);
 
-			const query_params = params.at ? `?at=${params.at}` : '';
+			const at = current_time.value;
+			const query_params = at ? `?at=${at}` : '';
 			const res = await fetch(`/api/v1/positions/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
@@ -50,8 +51,11 @@ export function createPositionResource<S extends Source>(
 		}
 	);
 
+	let prev_time = current_time.value;
 	$effect(() => {
-		if (params.at !== undefined) {
+		const val = current_time.value;
+		if (val !== prev_time) {
+			prev_time = val;
 			resource.refresh();
 		}
 	});

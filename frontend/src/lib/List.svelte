@@ -4,7 +4,6 @@
 	import { crossfade, slide } from 'svelte/transition';
 
 	import { browser } from '$app/environment';
-	import { pushState } from '$app/navigation';
 
 	import Pin from '$lib/Pin.svelte';
 	import RouteButton from '$lib/Route/Button.svelte';
@@ -13,6 +12,7 @@
 	import type { Pins } from '$lib/pins.svelte';
 	import { default_sources, source_info } from '$lib/resources/index.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
+	import { open_modal } from '$lib/url_params.svelte';
 
 	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
 
@@ -386,9 +386,10 @@
 						<button
 							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
 							onclick={() => {
-								pushState('', {
-									modal: { type, ...$state.snapshot(data) } as any
-								});
+								open_modal({ type, ...data } as any);
+								// pushState('', {
+								// 	modal: { type, ...$state.snapshot(data) } as any
+								// });
 							}}
 						>
 							{#if type === 'stop'}

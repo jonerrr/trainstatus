@@ -3,13 +3,11 @@
 
 	// import { slide } from 'svelte/transition';
 	// import { quintOut } from 'svelte/easing';
-	import { pushState } from '$app/navigation';
 
 	import Pin from '$lib/Pin.svelte';
 	import type { Pins } from '$lib/pins.svelte';
 	import type { LocalStorage } from '$lib/storage.svelte';
-
-	type ModalWithId = Exclude<App.PageState['modal'], null | { type: 'settings' }>;
+	import { type ModalWithId, open_modal } from '$lib/url_params.svelte';
 
 	interface Props {
 		state: ModalWithId;
@@ -33,8 +31,7 @@
 	<button
 		class="flex w-full items-center justify-between border-b border-neutral-800 p-1 text-white transition-colors duration-200 last:border-b-0 hover:bg-neutral-900 active:bg-neutral-900"
 		onclick={() => {
-			// TODO: maybe use ... to spread object
-			pushState('', { modal: $state.snapshot(pState) });
+			open_modal(pState);
 		}}
 	>
 		{@render children()}

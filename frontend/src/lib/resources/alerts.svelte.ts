@@ -2,6 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import icons from '$lib/icons';
 import { LiveResource, createMultiSourceContext, source_info } from '$lib/resources/index.svelte';
+import { current_time } from '$lib/util.svelte';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
 
@@ -39,16 +40,13 @@ export function index_alerts(data: ApiAlert[]): AlertResource {
 	return { alerts, alerts_by_route };
 }
 
-export function createAlertResource(
-	source: Source,
-	params: { at?: number },
-	initial_value: AlertResource
-) {
+export function createAlertResource(source: Source, initial_value: AlertResource) {
 	const resource = new LiveResource<AlertResource>(
 		async (signal) => {
 			console.log(`updating ${source} alerts`);
 
-			const query_params = params.at ? `?at=${params.at}` : '';
+			const at = current_time.value;
+			const query_params = at ? `?at=${at}` : '';
 			const res = await fetch(`/api/v1/alerts/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
@@ -61,8 +59,11 @@ export function createAlertResource(
 		{ initial_value, interval: source_info[source].refresh_interval.alerts, debounce: 500 }
 	);
 
+	let prev_time = current_time.value;
 	$effect(() => {
-		if (params.at !== undefined) {
+		const val = current_time.value;
+		if (val !== prev_time) {
+			prev_time = val;
 			resource.refresh();
 		}
 	});

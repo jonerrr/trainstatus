@@ -112,7 +112,7 @@
 			<Search
 				class="absolute top-1/2 left-3 z-20 h-5 w-5 -translate-y-1/2 text-neutral-400 transition-colors duration-200 group-focus-within:text-neutral-200"
 			/>
-
+			<!-- TODO: maybe add autocomplete="off" -->
 			<input
 				name="search"
 				bind:value={search_input}

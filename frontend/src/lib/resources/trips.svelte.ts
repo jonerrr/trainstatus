@@ -8,6 +8,7 @@ import {
 	createMultiSourceContext,
 	source_info
 } from '$lib/resources/index.svelte';
+import { current_time } from '$lib/util.svelte';
 
 import type { Source } from '@trainstatus/client';
 
@@ -25,16 +26,13 @@ export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResourc
 	);
 }
 
-export function createTripResource<S extends Source>(
-	source: S,
-	params: { at?: number },
-	initial_value: TripResource<S>
-) {
+export function createTripResource<S extends Source>(source: S, initial_value: TripResource<S>) {
 	const resource = new LiveResource<TripResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} trips`);
 
-			const query_params = params.at ? `?at=${params.at}` : '';
+			const at = current_time.value;
+			const query_params = at ? `?at=${at}` : '';
 			const res = await fetch(`/api/v1/trips/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
@@ -42,16 +40,6 @@ export function createTripResource<S extends Source>(
 
 			const data: TypedTrip<S>[] = await res.json();
 			return index_trips<S>(data);
-			// return new SvelteMap(
-			// 	data.map((trip) => [
-			// 		trip.id,
-			// 		{
-			// 			...trip,
-			// 			created_at: new Date(trip.created_at),
-			// 			updated_at: new Date(trip.updated_at)
-			// 		}
-			// 	])
-			// );
 		},
 		{
 			initial_value,
@@ -60,8 +48,11 @@ export function createTripResource<S extends Source>(
 		}
 	);
 
+	let prev_time = current_time.value;
 	$effect(() => {
-		if (params.at !== undefined) {
+		const val = current_time.value;
+		if (val !== prev_time) {
+			prev_time = val;
 			resource.refresh();
 		}
 	});

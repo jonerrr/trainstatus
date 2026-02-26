@@ -1,8 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	import type { Attachment } from 'svelte/attachments';
-
 	import { trap_focus } from '$lib/trap_focus.svelte';
 	import { current_time } from '$lib/util.svelte';
 
@@ -19,19 +15,16 @@
 	} from '@lucide/svelte';
 	import dayjs from 'dayjs';
 
-	// let headerRef = $state<HTMLDivElement>();
-	// TODO: maybe low-data mode (that doesn't fetch non-visible info)
-	// onMount(() => {
-	// 	// Set a tiny timeout to ensure the dialog is fully rendered
-	// 	setTimeout(() => {
-	// 		// Focus the header element instead of any inputs
-	// 		headerRef?.focus();
-	// 	}, 50);
-	// });
-
-	// const fix_focus: Attachment<HTMLDivElement> = (node) => {
-	// 	node.focus();
-	// };
+	// See https://github.com/sveltejs/kit/issues/13746 for more info on reactive search params
+	// TODO: figure out why this isn't reactive when the search params change. For now I'm just
+	// The ?at param is kept in sync with current_time.value by the layout's $effect.
+	// Reading page.url here ensures the charts link always reflects the latest URL state.
+	// const searchParams = $derived(page.url.searchParams);
+	// const current_at = $derived(searchParams.get('at'));
+	// const charts_href = $derived(
+	// 	'/charts' + (searchParams.get('at') ? `?at=${searchParams.get('at')}` : '')
+	// );
+	const charts_href = $derived(current_time.value ? `/charts?at=${current_time.value}` : '/charts');
 </script>
 
 <!-- TODO: test trap focus. also maybe move it to parent modal component so all of them have it -->
@@ -104,7 +97,7 @@
 
 		<div class="flex flex-col gap-4">
 			<a
-				href="/charts{current_time.value ? `?at=${current_time.value}` : ''}"
+				href={charts_href}
 				class="active:scale-98 flex items-center gap-2 rounded-md p-2 pl-6 transition-all duration-200 hover:bg-neutral-800/50 hover:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 active:bg-neutral-800"
 			>
 				<div>

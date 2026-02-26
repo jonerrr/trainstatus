@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { pushState } from '$app/navigation';
-
 	import icons from '$lib/icons';
 	import { alert_context } from '$lib/resources/alerts.svelte';
+	import { open_modal } from '$lib/url_params.svelte';
 
-	import { RouteIcon } from '@lucide/svelte';
 	import { type Route } from '@trainstatus/client';
 
 	// TODO: combine w and h into size
@@ -51,7 +49,8 @@
 			show_alert_icon && 'ring-3 ring-red-800'
 		]}
 		onclick={() => {
-			if (link) pushState('', { modal: { type: 'route', ...route } });
+			// if (link) pushState('', { modal: { type: 'route', ...route } });
+			if (link) open_modal({ type: 'route', ...route });
 		}}
 	>
 		{route.short_name}
@@ -66,7 +65,7 @@
 		aria-label={link ? route.short_name : undefined}
 		class={['relative appearance-none', show_alert_icon && 'ring-3 rounded-full ring-red-800']}
 		onclick={() => {
-			if (link) pushState('', { modal: { type: 'route', ...route } });
+			if (link) open_modal({ type: 'route', ...route });
 		}}
 	>
 		<svg class={class_name} {width} {height} viewBox="0 0 90 90">
