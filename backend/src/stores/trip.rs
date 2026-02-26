@@ -172,16 +172,30 @@ impl TripStore {
         let mut st_departures = Vec::new();
         let mut st_data = Vec::new();
 
+        let mut seen_stop_times = std::collections::HashSet::new();
+        let mut duplicate_count = 0usize;
+
         for (trip, sts) in data {
             if let Some(&actual_id) = id_map.get(&trip.id) {
                 for st in sts {
+                    let stop_id = st.stop_id.to_uppercase();
+                    let key = (actual_id, stop_id.clone());
+                    if !seen_stop_times.insert(key) {
+                        duplicate_count += 1;
+                        continue;
+                    }
                     st_trip_ids.push(actual_id);
-                    st_stop_ids.push(st.stop_id.to_uppercase());
+                    st_stop_ids.push(stop_id);
                     st_arrivals.push(st.arrival);
                     st_departures.push(st.departure);
                     st_data.push(serde_json::to_value(&st.data).unwrap());
                 }
             }
+        }
+
+        // TODO: figure out why there are dupes once in a while??!!!!
+        if duplicate_count > 0 {
+            tracing::warn!(duplicate_count, "Deduplicated stop times before insert");
         }
         // im inserting the stop times in the same functions as trips since the stop time struct doesn't have a trip_id field
         // might want to return the mapping or put this in a separate function later (so it can cache and invalidate that cache)
