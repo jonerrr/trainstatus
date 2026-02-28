@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import { timeMinute } from 'd3-time';
 	import dayjs from 'dayjs';

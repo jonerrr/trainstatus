@@ -2,6 +2,86 @@
 
 @plugin '@tailwindcss/forms';
 
+/* ── Modal View Transitions ─────────────────────────────────────────────────
+   Triggered by [data-modal-direction] set on <html> in url_params.svelte.ts.
+   We suppress the default root crossfade so only the named modal element
+   animates.
+────────────────────────────────────────────────────────────────────────── */
+
+@keyframes modal-slide-in-right {
+	from {
+		opacity: 0;
+		transform: translateX(40px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes modal-slide-out-left {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(-40px);
+	}
+}
+
+@keyframes modal-slide-in-left {
+	from {
+		opacity: 0;
+		transform: translateX(-40px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes modal-slide-out-right {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(40px);
+	}
+}
+
+/* Suppress the full-page root crossfade for all modal transitions */
+:root[data-modal-direction]::view-transition-old(root),
+:root[data-modal-direction]::view-transition-new(root) {
+	animation: none;
+}
+
+/* Forward (open / navigate deeper): new slides in from right, old slides out left */
+:root[data-modal-direction='forward']::view-transition-new(modal) {
+	animation: modal-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+:root[data-modal-direction='forward']::view-transition-old(modal) {
+	animation: modal-slide-out-left 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Backward (close / back button): old slides out to right, new slides in from left */
+:root[data-modal-direction='backward']::view-transition-old(modal) {
+	animation: modal-slide-out-right 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+:root[data-modal-direction='backward']::view-transition-new(modal) {
+	animation: modal-slide-in-left 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+	:root[data-modal-direction]::view-transition-old(modal),
+	:root[data-modal-direction]::view-transition-new(modal) {
+		animation: none;
+	}
+}
+
 @theme {
 	--font-*: initial;
 	--font-sans: Inter, sans-serif;

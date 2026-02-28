@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { trap_focus } from '$lib/trap_focus.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import {
 		BookText,

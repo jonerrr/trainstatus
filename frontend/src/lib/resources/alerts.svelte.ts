@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import icons from '$lib/icons';
 import { LiveResource, createMultiSourceContext, source_info } from '$lib/resources/index.svelte';
-import { current_time } from '$lib/util.svelte';
+import { current_time } from '$lib/url_params.svelte';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
 

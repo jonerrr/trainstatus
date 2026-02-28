@@ -34,32 +34,9 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 // 	});
 // }
 
-// if user specified unix timestamp, it is stored here.
-function currentTime() {
-	let time = $state<number | undefined>();
-
-	return {
-		// returns undefined here bc some components need to know if it was user specified
-		get value(): number | undefined {
-			return time;
-		},
-
-		get ms(): number {
-			return time ? time * 1000 : new Date().getTime();
-		},
-
-		set value(newValue: number | undefined) {
-			// js time is in milliseconds
-			time = newValue;
-		}
-	};
-}
-
-export const current_time = currentTime();
-
-interface ItemHeights {
-	[key: string]: number;
-}
+// interface ItemHeights {
+// 	[key: string]: number;
+// }
 
 // export function list_max_height(init: number = 0) {
 // 	const height = browser

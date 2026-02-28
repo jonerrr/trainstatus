@@ -1,7 +1,51 @@
+import { tick } from 'svelte';
+
 import { pushState, replaceState } from '$app/navigation';
 import { page } from '$app/state';
 
-import { current_time } from '$lib/util.svelte';
+// if user specified unix timestamp, it is stored here.
+function currentTime() {
+	let time = $state<number | undefined>();
+
+	return {
+		// returns undefined here bc some components need to know if it was user specified
+		get value(): number | undefined {
+			return time;
+		},
+
+		get ms(): number {
+			return time ? time * 1000 : new Date().getTime();
+		},
+
+		set value(newValue: number | undefined) {
+			// js time is in milliseconds
+			time = newValue;
+		}
+	};
+}
+
+export const current_time = currentTime();
+
+/**
+ * Wrap a shallow-routing state change in a View Transition.
+ * `direction` is stored on `<html data-modal-direction>` so CSS
+ * can pick the right slide animation.
+ * Falls back to plain fn() when the API is unavailable (SSR / older browsers).
+ */
+function with_view_transition(direction: 'forward' | 'backward', fn: () => void) {
+	if (typeof document === 'undefined' || !document.startViewTransition) {
+		fn();
+		return;
+	}
+	document.documentElement.dataset.modalDirection = direction;
+	const transition = document.startViewTransition(async () => {
+		fn();
+		await tick();
+	});
+	transition.finished.finally(() => {
+		delete document.documentElement.dataset.modalDirection;
+	});
+}
 
 export type ModalWithId = Exclude<App.PageState['modal'], null | { type: 'settings' }>;
 
@@ -27,7 +71,10 @@ export function open_modal(state: ModalWithId) {
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
 	url.searchParams.set(key, state.id);
 
-	pushState(url.pathname + url.search, { modal: $state.snapshot(state) });
+	const snapshot = $state.snapshot(state);
+	with_view_transition('forward', () => {
+		pushState(url.pathname + url.search, { modal: snapshot });
+	});
 }
 
 /**

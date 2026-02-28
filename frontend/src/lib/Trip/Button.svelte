@@ -4,7 +4,7 @@
 	import Icon from '$lib/Icon.svelte';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';
 	import type { Trip } from '@trainstatus/client';

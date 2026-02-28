@@ -6,7 +6,7 @@
 	import { source_info } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import type { Stop, StopTime } from '@trainstatus/client';
 

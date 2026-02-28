@@ -14,7 +14,7 @@
 	import { main_stop_routes } from '$lib/static';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
 	import type { Stop, StopTime, Trip } from '@trainstatus/client';

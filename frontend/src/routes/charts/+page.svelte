@@ -10,7 +10,7 @@
 	import { type SourceMap, default_sources } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import type { Route, Source } from '@trainstatus/client';

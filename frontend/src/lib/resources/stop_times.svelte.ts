@@ -7,7 +7,7 @@ import {
 	createMultiSourceContext,
 	source_info
 } from '$lib/resources/index.svelte';
-import { current_time } from '$lib/util.svelte';
+import { current_time } from '$lib/url_params.svelte';
 
 import type { Source } from '@trainstatus/client';
 

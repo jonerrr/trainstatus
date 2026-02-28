@@ -473,51 +473,12 @@
 		animation: spin 0.5s linear;
 	}
 </style> -->
-<!-- TODO: disable animations using @media (prefers-reduced-motion: no-preference) { } -->
-<!-- TODO: fix animations not working -->
 <style>
-	/* 1. Base State (Closed/Exiting) */
-	dialog {
-		opacity: 0;
-		transform: translateY(100%);
-		/* allow-discrete ensures 'display' waits for the transition to finish before switching to 'none' */
-		transition:
-			opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1),
-			transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
-			overlay 0.3s cubic-bezier(0.32, 0.72, 0, 1) allow-discrete,
-			display 0.3s cubic-bezier(0.32, 0.72, 0, 1) allow-discrete;
-	}
-
-	/* 2. Open State */
 	dialog[open] {
-		opacity: 1;
-		transform: translateY(0);
+		view-transition-name: modal;
 	}
 
-	/* 3. Entry Animation (Starting Style) */
-	@starting-style {
-		dialog[open] {
-			opacity: 0;
-			transform: translateY(100%);
-		}
-	}
-
-	/* 4. Backdrop Animation */
 	dialog::backdrop {
-		background-color: transparent;
-		transition:
-			display 0.3s allow-discrete,
-			overlay 0.3s allow-discrete,
-			background-color 0.3s;
-	}
-
-	dialog[open]::backdrop {
 		background-color: rgb(0 0 0 / 50%);
-	}
-
-	@starting-style {
-		dialog[open]::backdrop {
-			background-color: transparent;
-		}
 	}
 </style>
