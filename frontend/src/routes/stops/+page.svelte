@@ -4,8 +4,8 @@
 	import List from '$lib/List.svelte';
 	import { stop_pins } from '$lib/pins.svelte';
 	import { StopSearch } from '$lib/search.svelte';
-	import { calculate_stop_height } from '$lib/static';
 	import { LocalStorage } from '$lib/storage.svelte';
+	import { calculate_stop_height } from '$lib/util.svelte';
 
 	import { CircleX, Search } from '@lucide/svelte';
 	import { type Source, type Stop } from '@trainstatus/client';

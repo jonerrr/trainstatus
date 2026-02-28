@@ -1,3 +1,5 @@
+import type { Stop } from '@trainstatus/client';
+
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 	// distance between latitudes and longitudes
@@ -17,6 +19,7 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
+// TODO: remove since not used i think
 export function debounce<T extends (...args: never[]) => void>(func: T, wait: number = 75) {
 	let timeout: ReturnType<typeof setTimeout> | null;
 	return function (...args: Parameters<T>) {
@@ -26,6 +29,24 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 			func(...args);
 		}, wait);
 	};
+}
+
+export const calculate_route_height = () => 54;
+
+export function calculate_stop_height(item: Stop) {
+	let height = 44; // stop name height (28px) + 16px padding
+
+	if (item.data.source === 'mta_bus') {
+		height += item.routes.length * 56;
+	} else if (item.data.source === 'mta_subway') {
+		// headsign height
+		height += 24;
+		// route arrivals height
+		height += item.routes.length * 24;
+	}
+	// TODO: handle other sources
+
+	return height;
 }
 
 // export function get_position(): Promise<GeolocationPosition> {

@@ -17,21 +17,3 @@ export const main_stop_routes = (stop: Stop): RouteStop[] => {
 	}
 	return stop.routes;
 };
-
-export const calculate_route_height = () => 52;
-
-export function calculate_stop_height(item: Stop) {
-	let height = 44; // stop name height (28px) + 16px padding
-
-	if (item.data.source === 'mta_bus') {
-		height += item.routes.length * 56;
-	} else if (item.data.source === 'mta_subway') {
-		// headsign height
-		height += 24;
-		// route arrivals height
-		height += item.routes.length * 24;
-	}
-	// TODO: handle other sources
-
-	return height;
-}

@@ -72,10 +72,10 @@
 	);
 
 	// Only show routes that stop at this stop and sort by id length
-	const main_rs = $derived(main_stop_routes(stop));
+	// const main_rs = $derived(main_stop_routes(stop));
 	const route_stops = $derived.by(() => {
-		if (main_rs.length < 6) return main_rs;
-		return [...main_rs].sort((a, b) => {
+		if (stop.routes.length < 6) return stop.routes;
+		return [...stop.routes].sort((a, b) => {
 			const a_active = active_routes.has(a.route_id);
 			const b_active = active_routes.has(b.route_id);
 			if (a_active && !b_active) return -1;
@@ -100,7 +100,7 @@
 				<Icon width={36} height={36} link={true} route={routes[route_stop.route_id]} show_alerts />
 			{/each}
 			<!-- {#if route_stops.length > 5} -->
-			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{main_rs.length - 5}</div>
+			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{stop.routes.length - 5}</div>
 			<!-- {/if} -->
 		{:else}
 			{#each route_stops as route_stop}
@@ -128,7 +128,8 @@
 {#if stop.data.source === 'mta_subway' && stop.transfers.length}
 	<div class="flex items-center gap-1 pb-1 pl-1">
 		<div>Transfers:</div>
-		{#each stop.transfers as transfer}
+		<!-- TODO fix duplicate transfers -->
+		{#each stop.transfers as transfer (transfer.to_stop_id)}
 			{@const transfer_stop = page.data.stops_by_id[transfer.to_stop_source][transfer.to_stop_id]}
 			{#if transfer_stop}
 				<button

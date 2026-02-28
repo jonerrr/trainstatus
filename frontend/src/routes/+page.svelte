@@ -5,7 +5,7 @@
 	import { route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
 	import { default_sources } from '$lib/resources/index.svelte';
 	import { calculate_trip_height, trip_context } from '$lib/resources/trips.svelte';
-	import { calculate_route_height, calculate_stop_height } from '$lib/static';
+	import { calculate_route_height, calculate_stop_height } from '$lib/util.svelte';
 	import { haversine } from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';

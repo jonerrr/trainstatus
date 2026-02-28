@@ -3,6 +3,7 @@
 
 	import List from '$lib/List.svelte';
 	import { route_pins } from '$lib/pins.svelte';
+	import { calculate_route_height } from '$lib/util.svelte';
 
 	// remove special express mta_subway routes (FX, 6X, 7X, etc) since they won't have any alerts
 	const sources = $derived({
@@ -17,6 +18,6 @@
 	type="route"
 	pins={route_pins}
 	class="max-h-[calc(100dvh-10.5rem)]"
-	height_calc={() => 45}
+	height_calc={calculate_route_height}
 	ssr_min={20}
 />
