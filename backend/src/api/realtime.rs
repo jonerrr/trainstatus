@@ -41,10 +41,6 @@ pub struct StopTimesParameters {
     /// Comma-separated list of route IDs to filter by. Be sure to URL encode this.
     #[serde(deserialize_with = "parse_list", default)]
     route_ids: Vec<String>,
-    // TODO: do we still need this param
-    /// Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
-    #[serde(default)]
-    filter_arrival: bool,
 }
 
 #[utoipa::path(
@@ -82,10 +78,7 @@ pub async fn stop_times_handler(
     } else {
         Some(params.route_ids.as_slice())
     };
-    let stop_times = state
-        .stop_time_store
-        .get_all(source, at, route_ids, params.filter_arrival)
-        .await?;
+    let stop_times = state.stop_time_store.get_all(source, at, route_ids).await?;
     Ok(Json(stop_times))
 }
 

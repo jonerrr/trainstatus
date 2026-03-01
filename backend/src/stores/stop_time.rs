@@ -27,24 +27,17 @@ impl StopTimeStore {
         source: Source,
         at: Option<DateTime<Utc>>,
         route_ids: Option<&[String]>,
-        filter_arrival: bool,
     ) -> anyhow::Result<Vec<StopTime>> {
         // If user specified time or route filter, don't cache
         if at.is_some() || route_ids.is_some() {
             return self
-                .query_all_stop_times(
-                    source,
-                    at.unwrap_or_else(Utc::now),
-                    route_ids,
-                    filter_arrival,
-                )
+                .query_all_stop_times(source, at.unwrap_or_else(Utc::now), route_ids)
                 .await;
         }
 
         let key = format!("stop_times:{}", source.as_str());
         read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
-            self.query_all_stop_times(source, Utc::now(), None, filter_arrival)
-                .await
+            self.query_all_stop_times(source, Utc::now(), None).await
         })
         .await
     }
@@ -55,7 +48,6 @@ impl StopTimeStore {
         source: Source,
         at: DateTime<Utc>,
         route_ids: Option<&[String]>,
-        filter_arrival: bool,
     ) -> anyhow::Result<Vec<StopTime>> {
         let route_ids_vec: Vec<String> = route_ids.map(|r| r.to_vec()).unwrap_or_default();
         let has_route_filter = !route_ids_vec.is_empty();
@@ -72,17 +64,15 @@ impl StopTimeStore {
             INNER JOIN realtime.trip t ON t.id = st.trip_id
             WHERE
                 st.source = $1
-                AND t.updated_at >= (($2)::timestamp with time zone - INTERVAL '5 minutes')
-                AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
-                AND ($4 = false OR st.arrival > $2)
-                AND ($5 = false OR t.route_id = ANY($3))
+                AND t.updated_at BETWEEN (($2)::timestamp with time zone - INTERVAL '5 minutes')
+                AND (($2)::timestamp with time zone + INTERVAL '4 hours')
+                AND ($4 = false OR t.route_id = ANY($3))
             ORDER BY st.arrival ASC
             "#,
         )
         .bind(source)
         .bind(at)
         .bind(&route_ids_vec)
-        .bind(filter_arrival)
         .bind(has_route_filter)
         .fetch_all(&self.pg_pool)
         .await?)
