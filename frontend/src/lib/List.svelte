@@ -33,7 +33,8 @@
 		selected_source?: LocalStorage<Source>;
 		// items to show before the user scrolls (for pinned lists)
 		items_before_scroll?: number;
-		class?: string;
+		list_class?: string;
+		container_class?: string;
 		// scroll list into view if there are few items
 		auto_scroll?: boolean;
 		// height calculation function for virtualization
@@ -42,8 +43,6 @@
 		ssr_min?: number;
 		// extra items to render before and after visible items
 		overscan?: number;
-		// css style for list
-		style?: string;
 	}
 
 	let {
@@ -56,12 +55,12 @@
 			new LocalStorage<Source>(`${title.toLocaleLowerCase()}_tab`, 'mta_subway')
 		),
 		height_calc,
-		class: class_name,
+		container_class,
+		list_class,
 		auto_scroll = false,
 		items_before_scroll,
 		ssr_min = 10,
-		overscan = 5,
-		style: style_
+		overscan = 5
 	}: Props = $props();
 
 	// TODO: check here if source is empty and switch to first available (instead of using $effect)
@@ -297,7 +296,7 @@
 
 <!-- TODO: back to top button in header -->
 <!-- TODO: fix scroll warnings in console -->
-<div class="relative z-30 flex w-full flex-col text-neutral-200">
+<div class="relative z-30 flex w-full flex-col text-neutral-200 {container_class ?? ''}">
 	<div
 		class="sticky top-0 z-30 flex w-full items-center justify-between bg-neutral-900/95 shadow-lg shadow-black/10 backdrop-blur-xs"
 	>
@@ -368,8 +367,8 @@
 			// await tick();
 			scroll_top = e.currentTarget.scrollTop;
 		}}
-		style="-webkit-overflow-scrolling: touch; {style_ ?? ''}"
-		class="relative overflow-y-auto text-base {class_name ?? ''}"
+		style="-webkit-overflow-scrolling: touch;"
+		class="relative flex-1 min-h-0 overflow-y-auto text-base {list_class ?? ''}"
 	>
 		<div style:height="{total_height}px" class="relative">
 			<div

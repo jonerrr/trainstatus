@@ -134,13 +134,16 @@
 	onpopstate={handle_popstate}
 />
 
-<Header {offline} />
-<!--  h-[calc(100dvh-7.5rem)] -->
-<main class="relative m-auto text-white">
-	<Modal />
+<!-- Navbar is fixed-position; this wrapper reserves space for it.
+     Mobile: pb-16 (bottom bar). Desktop lg+: pl-20 (left sidebar). -->
+<div class="flex h-dvh flex-col pb-16 lg:pb-0 lg:pl-20">
+	<Header {offline} />
+	<main class="relative flex-1 overflow-hidden text-white">
+		<Modal />
 
-	{@render children()}
-</main>
+		{@render children()}
+	</main>
+</div>
 <Navbar />
 
 <style>

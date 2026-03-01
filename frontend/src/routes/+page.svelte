@@ -134,11 +134,6 @@
 		}
 		return result;
 	});
-
-	// Height calculation TODO: improve
-	let list_height = $state(0);
-	let pin_list_height = $state(0);
-	const nearby_list_height = $derived(list_height - pin_list_height);
 </script>
 
 {#snippet locate_button()}
@@ -167,11 +162,9 @@
 	</button>
 {/snippet}
 
-<!--  overflow-hidden -->
-<div class="flex max-h-[calc(100dvh-10.5rem)] flex-col" bind:offsetHeight={list_height}>
+<div class="flex h-full flex-col overflow-hidden">
 	<!-- Pinned items section - no scroll -->
-	<div class="flex-none overflow-hidden" bind:offsetHeight={pin_list_height}>
-		<!-- TODO: add back trip list -->
+	<div class="flex-none overflow-hidden">
 		{#if pinned_trips.exists}
 			<List
 				title="Pinned Trips"
@@ -180,7 +173,7 @@
 				pins={trip_pins}
 				height_calc={calculate_trip_height}
 				items_before_scroll={2}
-				class="max-h-[25dvh]"
+				list_class="max-h-[25dvh]"
 			/>
 		{/if}
 
@@ -192,7 +185,7 @@
 				type="route"
 				height_calc={calculate_route_height}
 				items_before_scroll={2}
-				class="max-h-[25dvh]"
+				list_class="max-h-[25dvh]"
 			/>
 		{/if}
 
@@ -206,20 +199,19 @@
 				height_calc={calculate_stop_height}
 				items_before_scroll={2}
 				ssr_min={0}
-				class="max-h-[25dvh]"
+				list_class="max-h-[25dvh]"
 			/>
 		{/if}
 	</div>
 
-	<div>
+	<div class="flex-1 min-h-0">
 		<!-- TODO: either hide or show error message when nearby_stops is empty and location perms were denied -->
 		<!-- maybe put it inside of List, since we should also start showing an error message when the stop search returns empty -->
 		<!-- {#if nearby_stops} -->
-		<!-- TODO: fix title text being too long for mobile -->
 		<List
-			title="Nearby"
+			title="Nearby Stops"
 			type="stop"
-			style="max-height: {nearby_list_height}px"
+			container_class="h-full"
 			sources={nearby_stops}
 			pins={stop_pins}
 			header_slot={locate_button}

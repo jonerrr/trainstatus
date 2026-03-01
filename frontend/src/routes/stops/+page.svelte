@@ -102,7 +102,7 @@
 		sources={visible_stops}
 		pins={stop_pins}
 		auto_scroll
-		class="max-h-[calc(100dvh-13.5rem)] grow"
+		container_class="flex-1 min-h-0"
 		bind:selected_source
 		height_calc={calculate_stop_height}
 	/>

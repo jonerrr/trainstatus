@@ -17,7 +17,7 @@
 	{sources}
 	type="route"
 	pins={route_pins}
-	class="max-h-[calc(100dvh-10.5rem)]"
+	container_class="h-full"
 	height_calc={calculate_route_height}
 	ssr_min={20}
 />

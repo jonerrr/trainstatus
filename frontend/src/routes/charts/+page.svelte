@@ -344,7 +344,7 @@
 	<title>Charts | Train Status</title>
 </svelte:head> -->
 
-<div class="flex h-[calc(100dvh-8rem)] min-h-75 flex-col">
+<div class="flex h-full min-h-75 flex-col">
 	<div class="pl-3 text-xl font-bold">Charts</div>
 	<div
 		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"

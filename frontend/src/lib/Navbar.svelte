@@ -3,16 +3,20 @@
 
 	import { current_time } from '$lib/url_params.svelte';
 
-	import { CircleAlert, Clock, House } from '@lucide/svelte';
+	import { ChartLine, CircleAlert, Clock, House } from '@lucide/svelte';
 
 	interface Routes {
-		[key: string]: [Icon: typeof House | typeof Clock | typeof CircleAlert, href: string];
+		[key: string]: [
+			Icon: typeof House | typeof Clock | typeof CircleAlert | typeof ChartLine,
+			href: string
+		];
 	}
 
 	const routes: Routes = {
 		Home: [House, '/'],
 		Alerts: [CircleAlert, '/alerts'],
-		Stops: [Clock, '/stops']
+		Stops: [Clock, '/stops'],
+		Charts: [ChartLine, '/charts']
 	} as const;
 </script>
 
@@ -35,24 +39,34 @@
 	</a>
 {/snippet}
 
+<!-- Mobile: fixed bottom bar (scrollable row). Desktop lg+: fixed left sidebar (column). -->
 <nav
-	class="fixed bottom-0 z-30 grid h-16 w-full grid-cols-3 items-center bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg"
+	class="fixed bottom-0 z-30 flex h-16 w-full flex-row items-stretch overflow-x-auto bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg lg:top-0 lg:left-0 lg:h-full lg:w-20 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:shadow-none"
 >
 	{@render nav_button('Home')}
 	{@render nav_button('Alerts')}
 	{@render nav_button('Stops')}
+	{@render nav_button('Charts')}
 </nav>
 
 <style>
 	@reference "../app.css";
 
 	.nav-button {
-		@apply flex flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
+		/* Mobile: fixed-width cells so the bar scrolls rather than squishing */
+		@apply flex min-w-20 flex-none flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
 	}
 
-	/* Gradient separator at top of nav */
+	/* Desktop sidebar: buttons fill full width and get taller touch targets */
+	@media (min-width: 1024px) {
+		.nav-button {
+			@apply w-full min-w-0 py-4;
+		}
+	}
+
+	/* Gradient separator — top edge on mobile, right edge on desktop */
 	nav::before {
 		content: '';
-		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent;
+		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent lg:top-0 lg:right-0 lg:bottom-0 lg:left-auto lg:h-full lg:w-px lg:bg-linear-to-b;
 	}
 </style>
