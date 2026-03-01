@@ -2,7 +2,9 @@ import { createContext } from 'svelte';
 
 import type { SvelteMap } from 'svelte/reactivity';
 
-import { BusFront, TrainFront } from '@lucide/svelte';
+import mta_bus_icon from '$lib/assets/mta_bus.webp';
+import mta_subway_icon from '$lib/assets/mta_subway.webp';
+
 import type {
 	ApiAlert,
 	MtaBusPositionData,
@@ -14,6 +16,40 @@ import type {
 	TripData,
 	VehiclePosition
 } from '@trainstatus/client';
+
+export const source_info = {
+	// TODO: increase refresh interval
+	// TODO: use icons to differentiate between agencies
+	// TODO: make it possible to disable refresh_interval for sources
+	// TODO: make it possible to update refresh_interval time dynamically (e.g. if user is offline)
+	mta_bus: {
+		name: 'Bus',
+		icon: mta_bus_icon,
+		refresh_interval: {
+			trips: 30_000,
+			stop_times: 30_000,
+			positions: 30_000,
+			alerts: 45_000
+		},
+		// this means that this source requires including specific routes in the query params
+		// maybe find a better name for the param in the future
+		monitor_routes: true
+	},
+	mta_subway: {
+		name: 'Subway',
+		icon: mta_subway_icon,
+		refresh_interval: {
+			trips: 30_000,
+			stop_times: 30_000,
+			positions: 30_000,
+			alerts: 45_000
+			// TODO: maybe don't include subway positions since they don't contain really contain any useful info
+		},
+		monitor_routes: false
+	}
+} as const;
+
+export const default_sources: Source[] = ['mta_subway', 'mta_bus'] as const;
 
 // =============================================================================
 // SOURCE-SPECIFIC DATA MAPS
@@ -149,39 +185,6 @@ export function createMultiSourceContext<ResourceMap extends SourceMap<unknown>>
 // 	);
 // }
 
-export const source_info = {
-	// TODO: increase refresh interval
-	// TODO: use icons to differentiate between agencies
-	// TODO: make it possible to disable refresh_interval for sources
-	// TODO: make it possible to update refresh_interval time dynamically (e.g. if user is offline)
-	mta_bus: {
-		name: 'Bus',
-		icon: BusFront,
-		refresh_interval: {
-			trips: 30_000,
-			stop_times: 30_000,
-			positions: 30_000,
-			alerts: 45_000
-		},
-		// this means that this source requires including specific routes in the query params
-		// maybe find a better name for the param in the future
-		monitor_routes: true
-	},
-	mta_subway: {
-		name: 'Subway',
-		icon: TrainFront,
-		refresh_interval: {
-			trips: 30_000,
-			stop_times: 30_000,
-			positions: 30_000,
-			alerts: 45_000
-			// TODO: maybe don't include subway positions since they don't contain really contain any useful info
-		},
-		monitor_routes: false
-	}
-} as const;
-
-export const default_sources: Source[] = ['mta_subway', 'mta_bus'] as const;
 // TODO: allow changing sources
 
 type Fetcher<T> = (signal: AbortSignal) => Promise<T>;

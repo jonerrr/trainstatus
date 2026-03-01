@@ -316,43 +316,41 @@
 
 		{#if available_sources.length > 1}
 			<div class="rounded-md border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
-				<!-- TODO: doesn't need to be a snippet anymore -->
-				{#snippet source_tab(source: Source)}
-					{@const source_data = sources[source] ?? []}
-					{#if source_data.length > 0}
-						{@const Icon = source_info[source].icon}
-						<div transition:slide={{ axis: 'x', duration: 250 }}>
-							<button
-								class={[
-									'relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200',
-									{
-										'font-medium text-neutral-100': active_source === source,
-										'text-neutral-400': active_source !== source
-									}
-								]}
-								onclick={() => {
-									selected_source.current = source;
-								}}
-								aria-label={`Show ${source_info[source].name} items`}
-							>
-								<Icon class="h-4 w-4" />
-								<span>{source_info[source].name}</span>
-
-								{#if active_source === source}
-									<div
-										in:send={{ key: 'tab' }}
-										out:receive={{ key: 'tab' }}
-										class="absolute inset-0 -z-10 rounded-md bg-neutral-700/50"
-									></div>
-								{/if}
-							</button>
-						</div>
-					{/if}
-				{/snippet}
-
 				<div class="flex gap-1">
 					{#each source_entries as { source } (source)}
-						{@render source_tab(source)}
+						{@const source_data = sources[source] ?? []}
+						{#if source_data.length > 0}
+							<!-- {@const Icon = source_info[source].icon} -->
+							<div transition:slide={{ axis: 'x', duration: 250 }}>
+								<button
+									class={[
+										'relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200',
+										{
+											'font-medium text-neutral-100': active_source === source,
+											'text-neutral-400': active_source !== source
+										}
+									]}
+									onclick={() => {
+										selected_source.current = source;
+									}}
+									aria-label={`Show ${source_info[source].name} items`}
+								>
+									<!-- TODO: improve icons (they are kinda ugly rn) -->
+									<img alt="" src={source_info[source].icon} class="size-6" />
+									<!-- <Icon class="h-4 w-4" /> -->
+									<!-- TODO: only show text if theres enough room -->
+									<!-- <span>{source_info[source].name}</span> -->
+
+									{#if active_source === source}
+										<div
+											in:send={{ key: 'tab' }}
+											out:receive={{ key: 'tab' }}
+											class="absolute inset-0 -z-10 rounded-md bg-neutral-700/50"
+										></div>
+									{/if}
+								</button>
+							</div>
+						{/if}
 					{/each}
 				</div>
 			</div>

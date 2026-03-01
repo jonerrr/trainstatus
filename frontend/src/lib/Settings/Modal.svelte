@@ -27,7 +27,7 @@
 	const charts_href = $derived(current_time.value ? `/charts?at=${current_time.value}` : '/charts');
 </script>
 
-<!-- TODO: test trap focus. also maybe move it to parent modal component so all of them have it -->
+<!-- TODO: test trap focus (on ios). also maybe move it to parent modal component so all of them have it -->
 <div
 	class="z-20 flex items-center gap-1 p-3"
 	{@attach trap_focus}
@@ -68,6 +68,7 @@
 				class="min-w-50 rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
 			/>
 			{#if current_time.value}
+				<!-- TODO: fix ?at param not getting removed until closing the setting modal after clearing -->
 				<button
 					title="Clear time"
 					onclick={(e) => {
