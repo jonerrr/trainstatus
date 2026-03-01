@@ -11,11 +11,6 @@
 	import { type Source, type Stop } from '@trainstatus/client';
 	import { Throttled } from 'runed';
 
-	// TODO: might need to use $state.snapshot on page.data.stops
-	// TODO: do we need $state here
-	// const stops = $state(page.data.stops);
-
-	// TODO: Fix switching sources causing lag (page like completely freezes)
 	// TODO: determine default source from users preferences or something
 	// TODO: why does svelte give a warning when this isn't wrapped in $state()?
 	let selected_source = $state(new LocalStorage<Source>('stops_tab', 'mta_subway'));
@@ -76,12 +71,15 @@
 			}
 		}
 
+		const search_results = stop_search.query(
+			throttled_search_input.current,
+			selected_source.current
+		);
+		// TODO: maybe add some kind of "no results found" state when search_results is empty (and search input isn't empty)
 		return {
 			...page.data.stops,
-			[selected_source.current]: stop_search.query(
-				throttled_search_input.current,
-				selected_source.current
-			)
+			[selected_source.current]:
+				search_results.length > 0 ? search_results : page.data.stops[selected_source.current]
 		};
 	});
 	// $inspect(visible_stops);

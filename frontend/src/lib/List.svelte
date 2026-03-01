@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+
 	import type { Attachment } from 'svelte/attachments';
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
@@ -22,7 +24,7 @@
 		// title of list
 		title: string;
 		// renders extra header content (like geolocate button)
-		header_slot?: import('svelte').Snippet;
+		header_slot?: Snippet;
 		// item type for rendering and modal
 		type: ItemType;
 		// data organized by source
@@ -63,9 +65,6 @@
 		overscan = 5
 	}: Props = $props();
 
-	// TODO: check here if source is empty and switch to first available (instead of using $effect)
-	const active_source = $derived(selected_source.current);
-
 	const source_entries = $derived(
 		default_sources.map((source) => ({
 			source,
@@ -76,13 +75,13 @@
 	// Get available sources (those with data)
 	const available_sources = $derived(source_entries.filter((s) => s.data.length > 0));
 
-	// Auto-switch to first available source if current has no data
-	// $effect(() => {
-	// 	const current_has_data = sources.find((s) => s.source === active_source.current)?.data.length;
-	// 	if (!current_has_data && available_sources.length > 0) {
-	// 		active_source.current = available_sources[0].source;
-	// 	}
-	// });
+	let active_source = $derived.by(() => {
+		// if the selected source has no data, fall back to the first available source
+		if (sources[selected_source.current]?.length > 0) {
+			return selected_source.current;
+		}
+		return available_sources[0]?.source;
+	});
 
 	// Get items for current source
 	const items = $derived(sources[active_source] ?? []);
@@ -303,7 +302,7 @@
 		<!-- TODO: remove either this header or the main website header -->
 		<!-- it should be possible to combine the logo, tab selection, and settings button in one "row" -->
 		<!-- plus, it already shows in the navbar what section is active (except home page lists) -->
-		<h1 class="flex items-center gap-2 pl-2 text-xl font-bold">
+		<h1 class="flex items-center gap-2 pl-2 text-xl font-bold h-10">
 			<span>
 				{title}
 			</span>
@@ -335,7 +334,7 @@
 									aria-label={`Show ${source_info[source].name} items`}
 								>
 									<!-- TODO: improve icons (they are kinda ugly rn) -->
-									<img alt="" src={source_info[source].icon} class="size-6" />
+									<img alt="" src={source_info[source].icon} class="size-5" />
 									<!-- <Icon class="h-4 w-4" /> -->
 									<!-- TODO: only show text if theres enough room -->
 									<!-- <span>{source_info[source].name}</span> -->
