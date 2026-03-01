@@ -7,6 +7,7 @@
 	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
+	import SEO from '$lib/SEO.svelte';
 	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
 	import { default_sources } from '$lib/resources/index.svelte';
 	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
@@ -123,38 +124,9 @@
 			replaceState(url.pathname + url.search, page.state);
 		});
 	});
-
-	const url_mappings = {
-		'/': 'Home',
-		'/stops': 'Stops',
-		'/routes': 'Routes',
-		'/alerts': 'Alerts',
-		'/charts': 'Charts'
-	} as const;
-
-	const title = $derived.by(() => {
-		switch (page.state.modal?.type) {
-			case 'stop':
-				return `Stop: ${page.state.modal.name}`;
-			case 'route':
-				return `Route: ${page.state.modal.short_name}`;
-			case 'trip':
-				return `${page.state.modal.route_id} Trip`;
-			// TODO: settings
-		}
-
-		const title =
-			page.url.pathname in url_mappings
-				? url_mappings[page.url.pathname as keyof typeof url_mappings]
-				: '???'; // shouldn't happen since we don't have any other routes, but just in case
-
-		return `${title} | Train Status`;
-	});
 </script>
 
-<svelte:head>
-	<title>{title}</title>
-</svelte:head>
+<SEO />
 
 <svelte:window
 	ononline={() => (offline = false)}

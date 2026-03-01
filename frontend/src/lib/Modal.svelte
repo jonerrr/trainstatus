@@ -93,6 +93,7 @@
 		//     // ... rest of the function
 		//     element.setPointerCapture(e.pointerId);
 		// }
+
 		function handle_pointer_down(e: PointerEvent) {
 			// Ignore if clicking a button or specific non-draggable areas if needed
 			// if ((e.target as HTMLElement).closest('button')) return;
