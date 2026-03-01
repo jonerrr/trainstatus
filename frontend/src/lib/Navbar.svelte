@@ -23,6 +23,8 @@
 
 {#snippet nav_button(label: string)}
 	{@const [Icon, href] = routes[label]}
+	<!-- use state.eager to ensure visual feedback is instant -->
+	{@const is_active = href === $state.eager(page.url.pathname)}
 	<a
 		aria-label={label}
 		title={label}
@@ -30,8 +32,8 @@
 		class={[
 			'nav-button',
 			{
-				'bg-neutral-800 font-medium text-neutral-100': href === page.url.pathname,
-				'text-neutral-400': href !== page.url.pathname
+				'bg-neutral-800 font-medium text-neutral-100': is_active,
+				'text-neutral-400': !is_active
 			}
 		]}
 	>

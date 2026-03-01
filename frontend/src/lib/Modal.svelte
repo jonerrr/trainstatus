@@ -93,98 +93,98 @@
 		//     element.setPointerCapture(e.pointerId);
 		// }
 
-		function handle_pointer_down(e: PointerEvent) {
-			// Ignore if clicking a button or specific non-draggable areas if needed
-			// if ((e.target as HTMLElement).closest('button')) return;
+		// function handle_pointer_down(e: PointerEvent) {
+		// 	// Ignore if clicking a button or specific non-draggable areas if needed
+		// 	// if ((e.target as HTMLElement).closest('button')) return;
 
-			is_dragging = true;
-			has_captured = false;
-			is_transitioning = false;
-			start_y = e.screenY;
-			start_time = Date.now();
-			modal_height = node.getBoundingClientRect().height;
+		// 	is_dragging = true;
+		// 	has_captured = false;
+		// 	is_transitioning = false;
+		// 	start_y = e.screenY;
+		// 	start_time = Date.now();
+		// 	modal_height = node.getBoundingClientRect().height;
 
-			// Don't call setPointerCapture here — doing so on every pointerdown (including
-			// taps on inner content) causes the browser to redirect the synthesized click
-			// event to the dialog element, which triggers handle_click and closes the modal.
-			// Instead we capture lazily in handle_pointer_move once a real drag begins.
-		}
+		// 	// Don't call setPointerCapture here — doing so on every pointerdown (including
+		// 	// taps on inner content) causes the browser to redirect the synthesized click
+		// 	// event to the dialog element, which triggers handle_click and closes the modal.
+		// 	// Instead we capture lazily in handle_pointer_move once a real drag begins.
+		// }
 
-		function handle_pointer_move(e: PointerEvent) {
-			if (!is_dragging) return;
+		// function handle_pointer_move(e: PointerEvent) {
+		// 	if (!is_dragging) return;
 
-			// Lazily capture pointer once we know it's a real drag, not a tap
-			if (!has_captured && Math.abs(e.screenY - start_y) > DRAG_START_THRESHOLD) {
-				node.setPointerCapture(e.pointerId);
-				has_captured = true;
-			}
+		// 	// Lazily capture pointer once we know it's a real drag, not a tap
+		// 	if (!has_captured && Math.abs(e.screenY - start_y) > DRAG_START_THRESHOLD) {
+		// 		node.setPointerCapture(e.pointerId);
+		// 		has_captured = true;
+		// 	}
 
-			const delta_y = e.screenY - start_y;
+		// 	const delta_y = e.screenY - start_y;
 
-			// If dragging down (positive delta), move 1:1
-			if (delta_y > 0) {
-				translate_y = delta_y;
-			}
-			// If dragging up (negative delta), apply resistance (dampening)
-			else {
-				translate_y = dampen_value(Math.abs(delta_y)) * -1;
-			}
-		}
+		// 	// If dragging down (positive delta), move 1:1
+		// 	if (delta_y > 0) {
+		// 		translate_y = delta_y;
+		// 	}
+		// 	// If dragging up (negative delta), apply resistance (dampening)
+		// 	else {
+		// 		translate_y = dampen_value(Math.abs(delta_y)) * -1;
+		// 	}
+		// }
 
-		function handle_pointer_up(e: PointerEvent) {
-			if (!is_dragging) return;
+		// function handle_pointer_up(e: PointerEvent) {
+		// 	if (!is_dragging) return;
 
-			is_dragging = false;
-			is_transitioning = true; // Re-enable CSS transitions for the snap back/close
-			if (has_captured) {
-				node.releasePointerCapture(e.pointerId);
-				has_captured = false;
-			}
+		// 	is_dragging = false;
+		// 	is_transitioning = true; // Re-enable CSS transitions for the snap back/close
+		// 	if (has_captured) {
+		// 		node.releasePointerCapture(e.pointerId);
+		// 		has_captured = false;
+		// 	}
 
-			const end_y = e.screenY;
-			const distance = end_y - start_y;
-			const time_taken = Date.now() - start_time;
-			const velocity = Math.abs(distance) / time_taken;
+		// 	const end_y = e.screenY;
+		// 	const distance = end_y - start_y;
+		// 	const time_taken = Date.now() - start_time;
+		// 	const velocity = Math.abs(distance) / time_taken;
 
-			// 1. Velocity Check (Flick)
-			// Only close on flick if moving downwards
-			if (distance > 0 && velocity > VELOCITY_THRESHOLD) {
-				close_animate();
-				return;
-			}
+		// 	// 1. Velocity Check (Flick)
+		// 	// Only close on flick if moving downwards
+		// 	if (distance > 0 && velocity > VELOCITY_THRESHOLD) {
+		// 		close_animate();
+		// 		return;
+		// 	}
 
-			// 2. Threshold Check (Drag distance)
-			// Close if dragged down more than 25% of height
-			if (distance > 0 && distance > modal_height * CLOSE_THRESHOLD) {
-				close_animate();
-				return;
-			}
+		// 	// 2. Threshold Check (Drag distance)
+		// 	// Close if dragged down more than 25% of height
+		// 	if (distance > 0 && distance > modal_height * CLOSE_THRESHOLD) {
+		// 		close_animate();
+		// 		return;
+		// 	}
 
-			// 3. Reset (Snap back)
-			// If neither condition met, bounce back to 0
-			translate_y = 0;
-		}
+		// 	// 3. Reset (Snap back)
+		// 	// If neither condition met, bounce back to 0
+		// 	translate_y = 0;
+		// }
 
-		function close_animate() {
-			// Animate off screen
-			translate_y = modal_height; // Slide completely out of view
+		// function close_animate() {
+		// 	// Animate off screen
+		// 	translate_y = modal_height; // Slide completely out of view
 
-			// Wait for animation to finish before actually closing state
-			setTimeout(() => {
-				close();
-				// Reset position for next open (though component usually remounts)
-				translate_y = 0;
-			}, 300);
-		}
+		// 	// Wait for animation to finish before actually closing state
+		// 	setTimeout(() => {
+		// 		close();
+		// 		// Reset position for next open (though component usually remounts)
+		// 		translate_y = 0;
+		// 	}, 300);
+		// }
 
-		// watch for clicks outside the dialog to close it
+		// // watch for clicks outside the dialog to close it
 		function handle_click(event: MouseEvent) {
 			if (event.target === node) {
 				close();
 			}
 		}
 
-		// Add keyboard handler for Escape key
+		// // Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
@@ -225,10 +225,10 @@
 		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
 
 		// physics events
-		listeners_to_remove.push(on(node, 'pointerdown', handle_pointer_down));
-		listeners_to_remove.push(on(node, 'pointermove', handle_pointer_move));
-		listeners_to_remove.push(on(node, 'pointerup', handle_pointer_up));
-		listeners_to_remove.push(on(node, 'pointercancel', handle_pointer_up)); // Handle cases where the pointer is canceled (e.g., system interrupts)
+		// listeners_to_remove.push(on(node, 'pointerdown', handle_pointer_down));
+		// listeners_to_remove.push(on(node, 'pointermove', handle_pointer_move));
+		// listeners_to_remove.push(on(node, 'pointerup', handle_pointer_up));
+		// listeners_to_remove.push(on(node, 'pointercancel', handle_pointer_up)); // Handle cases where the pointer is canceled (e.g., system interrupts)
 
 		return () => {
 			document.body.style.overflow = '';
@@ -236,67 +236,13 @@
 		};
 	};
 
-	// TODO: use runed url search param management
-	// manage title changes, dialog el, and monitored bus routes
-	// $effect(() => {
-	// 	// console.log('modal effect');
-	// 	switch (page.state.modal) {
-	// 		case 'route':
-	// 			dialog_el?.showModal();
-	// 			document.title = `${page.state.data?.id} Alerts | Train Status`;
-	// 			break;
-	// 		case 'stop':
-	// 			dialog_el?.showModal();
-	// 			document.title = `${(page.state.data as Stop)?.name} | Train Status`;
-
-	// 			const stop: Stop = page.state.data;
-	// 			// TODO: add back
-	// 			// if (is_bus(stop)) {
-	// 			// 	// console.log('monitoring modal bus routes');
-	// 			// 	stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
-	// 			// }
-	// 			break;
-	// 		case 'trip':
-	// 			dialog_el?.showModal();
-	// 			document.title = `${page.state.data?.route_id} Trip | Train Status`;
-
-	// 			const trip: Trip = page.state.data;
-	// 			const bus_route = page.data.routes[trip.route_id];
-	// 			// if (is_bus_route(bus_route, trip)) {
-	// 			// 	// console.log('monitoring modal bus routes');
-	// 			// 	monitored_bus_routes.add(trip.route_id);
-	// 			// }
-
-	// 			break;
-	// 		case 'settings':
-	// 			dialog_el?.showModal();
-	// 			document.title = 'Settings | Train Status';
-	// 			break;
-	// 		default:
-	// 			dialog_el?.close();
-	// 			switch (page.route.id) {
-	// 				case '/stops':
-	// 					document.title = 'Stops | Train Status';
-	// 					break;
-	// 				case '/alerts':
-	// 					document.title = 'Alerts | Train Status';
-	// 					break;
-	// 				case '/charts':
-	// 					document.title = 'Charts | Train Status';
-	// 					break;
-	// 				default:
-	// 					document.title = 'Home | Train Status';
-	// 					break;
-	// 			}
-	// 			break;
-	// 	}
-	// });
 	// const rotation = new Tween(0, {
 	// 	duration: 300,
 	// 	easing: cubicOut
 	// });
 	let copied = $state(false);
 	// show stops/trips before current datetime TODO: maybe persist this preference in local storage
+	// TODO: fix show_previous not working
 	let show_previous = $state(false);
 	// e.g. 3m or 12:45.
 	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
@@ -418,7 +364,6 @@
 <!-- fixed bottom-0 left-0 right-0 -->
 <dialog
 	{@attach modal}
-	style={modal_style}
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
 	{#if page.state.modal?.type === 'stop'}
