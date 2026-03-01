@@ -7,6 +7,7 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
+	import { main_route_stops } from '$lib/util.svelte';
 
 	import type { Stop, StopTime } from '@trainstatus/client';
 
@@ -24,15 +25,18 @@
 	const trips = $derived(trip_context.getSource(stop.data.source));
 	const stop_times = $derived(stop_time_context.getSource(stop.data.source));
 
-	// TODO: improve this
+	// TODO: improve this (and handle removing route when unmounted)
 	$effect(() => {
 		if (source_info[stop.data.source].monitor_routes) {
+			// TODO: maybe only add main_rs
 			for (const r of stop.routes) {
 				stop_times.add_route(r.route_id);
 			}
 		}
 	});
 	// stop_times.add_route()
+
+	const main_rs = $derived(main_route_stops(stop.routes));
 
 	const stop_times_by_direction = $derived.by(() => {
 		const stop_times_by_direction = new Map<number, StopTimesByRoute>();
@@ -42,7 +46,7 @@
 			// TODO: find some way to not hardcode the directions (maybe have this info in the source data or something)
 			for (const direction of [1, 3]) {
 				const route_map: StopTimesByRoute = new Map();
-				for (const route of stop.routes) {
+				for (const route of main_rs) {
 					route_map.set(route.route_id, []);
 				}
 				stop_times_by_direction.set(direction, route_map);
@@ -77,7 +81,7 @@
 
 	// $inspect(stop_times_by_direction);
 
-	const default_stop_routes = $derived(stop.routes.map((r) => routes[r.route_id]));
+	const default_stop_routes = $derived(main_rs.map((r) => routes[r.route_id]));
 </script>
 
 <!-- eta used by bus and train -->

@@ -1,4 +1,4 @@
-import type { Stop } from '@trainstatus/client';
+import type { RouteStop, Stop } from '@trainstatus/client';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -30,6 +30,15 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 		}, wait);
 	};
 }
+
+// Get main routes for a stop (for for mta_subway currently, filter to main lines only)
+export const main_route_stops = (route_stops: RouteStop[]): RouteStop[] => {
+	return route_stops.filter(
+		(route) =>
+			route.data.source !== 'mta_subway' ||
+			['full_time', 'part_time'].includes(route.data.stop_type)
+	);
+};
 
 export const calculate_route_height = () => 54;
 

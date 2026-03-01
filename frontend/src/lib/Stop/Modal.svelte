@@ -11,10 +11,10 @@
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
-	import { main_stop_routes } from '$lib/static';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
 	import { current_time } from '$lib/url_params.svelte';
+	import { main_route_stops } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
 	import type { Stop, StopTime, Trip } from '@trainstatus/client';
@@ -71,11 +71,12 @@
 			: stop_times_with_trip
 	);
 
-	// Only show routes that stop at this stop and sort by id length
-	// const main_rs = $derived(main_stop_routes(stop));
+	// if there are more than 6 routes, show the main ones first and sort the rest by active vs inactive and then id length
+	// test lots of routes with http://localhost:5173/stops?s=400354
 	const route_stops = $derived.by(() => {
-		if (stop.routes.length < 6) return stop.routes;
-		return [...stop.routes].sort((a, b) => {
+		const main_rs = main_route_stops(stop.routes);
+		if (stop.routes.length < 6) return main_rs;
+		return main_rs.sort((a, b) => {
 			const a_active = active_routes.has(a.route_id);
 			const b_active = active_routes.has(b.route_id);
 			if (a_active && !b_active) return -1;
@@ -138,7 +139,7 @@
 						// pushState('', { modal: { type: 'stop', ...$state.snapshot(transfer_stop) } })}
 						open_modal({ type: 'stop', ...$state.snapshot(transfer_stop) })}
 				>
-					{#each main_stop_routes(transfer_stop) as route_stop}
+					{#each main_route_stops(transfer_stop.routes) as route_stop}
 						<Icon
 							width={24}
 							height={24}
@@ -181,10 +182,9 @@
 							{page.data.stops_by_id['mta_subway'][last_stop_time.stop_id]?.name}
 						{/if}
 					{:else if stop.data.source === 'mta_bus'}
-						{@const route_stop = stop.routes.find(
-							(r) => r.route_id === st.trip.route_id && r.data.source === 'mta_bus'
-						)}
+						{@const route_stop = stop.routes.find((r) => r.route_id === st.trip.route_id)}
 						<!-- TODO: fix type inference. it should always be mta_bus -->
+						<!-- @ts-ignore -->
 						{route_stop?.data.headsign}
 					{/if}
 				</div>

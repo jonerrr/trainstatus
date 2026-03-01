@@ -116,15 +116,16 @@
 		const result = {} as Record<Source, StopWithDistance[]>;
 
 		if (!position) return result;
+		// reassign to local var to prevent undefined error in map callback.
+		const current_coords = position.coords;
 
 		for (const source of default_sources) {
 			const data = page.data.stops[source] ?? [];
 			result[source] = data
 				.map((stop) => {
-					// TODO: why can position be undefined here?
 					const distance = haversine(
-						position.coords.latitude,
-						position.coords.longitude,
+						current_coords.latitude,
+						current_coords.longitude,
 						stop.geom.Point.y,
 						stop.geom.Point.x
 					);
