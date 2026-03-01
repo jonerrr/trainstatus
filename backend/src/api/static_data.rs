@@ -3,17 +3,19 @@ use crate::api::AppError;
 use crate::models::route::Route;
 use crate::models::source::Source;
 use crate::models::stop::Stop;
-use axum::Json;
 use axum::extract::{Path, State};
-use http::HeaderMap;
+use axum::response::{IntoResponse, Response};
+use http::{HeaderMap, StatusCode};
 
-// TODO: implement etag again
-#[allow(dead_code)]
-fn cache_headers(hash: String) -> HeaderMap {
+fn cache_headers(etag_hash: &str) -> HeaderMap {
     use http::header;
     let mut headers = HeaderMap::new();
     headers.insert("content-type", "application/json".parse().unwrap());
-    headers.insert(header::ETAG, hash.parse().unwrap());
+    // ETag must be a quoted string per RFC 7232
+    headers.insert(
+        header::ETAG,
+        format!("\"{}\"", etag_hash).parse().unwrap(),
+    );
     headers.insert(
         header::CACHE_CONTROL,
         "public, max-age=3600, stale-while-revalidate=86400"
@@ -21,6 +23,17 @@ fn cache_headers(hash: String) -> HeaderMap {
             .unwrap(),
     );
     headers
+}
+
+/// Returns `true` if the client's `If-None-Match` header matches the stored etag.
+fn etag_matches(request_headers: &HeaderMap, etag_hash: &str) -> bool {
+    if let Some(inm) = request_headers.get(http::header::IF_NONE_MATCH) {
+        if let Ok(inm_str) = inm.to_str() {
+            let quoted = format!("\"{}\"", etag_hash);
+            return inm_str == quoted || inm_str == "*";
+        }
+    }
+    false
 }
 
 #[utoipa::path(
@@ -38,25 +51,26 @@ fn cache_headers(hash: String) -> HeaderMap {
 pub async fn routes_handler(
     State(state): State<AppState>,
     Path(source): Path<Source>,
-    _headers: HeaderMap, // TODO: etag
-) -> Result<Json<Vec<Route>>, AppError> {
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    // Check ETag before fetching full data
+    if let Some(etag) = state.route_store.get_etag(source).await? {
+        if etag_matches(&headers, &etag) {
+            return Ok(StatusCode::NOT_MODIFIED.into_response());
+        }
+    }
+
     let routes = state.route_store.get_all(source).await?;
-    Ok(Json(routes))
-    // Ok((StatusCode::OK, json_headers().clone(), routes))
-    // let (routes, routes_hash): (String, String) =
-    //     conn.mget(&["routes", "routes_hash"]).await?;
-    // let (routes, routes_hash) = state.mget_from_cache(&["routes", "routes_hash"]).await?;
 
-    // if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-    //     let etag = routes_hash.parse::<ETag>().unwrap();
+    // Compute/retrieve etag for response header (re-use cached value if present)
+    let etag = state
+        .route_store
+        .get_etag(source)
+        .await?
+        .unwrap_or_default();
 
-    //     // if the etag matches the request, return 304
-    //     if !if_none_match.precondition_passes(&etag) {
-    //         return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
-    //     }
-    // }
-
-    // Ok((StatusCode::OK, cache_headers(routes_hash), routes))
+    let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
+    Ok((cache_headers(&etag), json).into_response())
 }
 
 #[utoipa::path(
@@ -74,8 +88,23 @@ pub async fn routes_handler(
 pub async fn stops_handler(
     State(state): State<AppState>,
     Path(source): Path<Source>,
-    _headers: HeaderMap,
-) -> Result<Json<Vec<Stop>>, AppError> {
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    // Check ETag before fetching full data
+    if let Some(etag) = state.stop_store.get_etag(source).await? {
+        if etag_matches(&headers, &etag) {
+            return Ok(StatusCode::NOT_MODIFIED.into_response());
+        }
+    }
+
     let stops = state.stop_store.get_all(source).await?;
-    Ok(Json(stops))
+
+    let etag = state
+        .stop_store
+        .get_etag(source)
+        .await?
+        .unwrap_or_default();
+
+    let json = serde_json::to_string(&stops).map_err(anyhow::Error::from)?;
+    Ok((cache_headers(&etag), json).into_response())
 }

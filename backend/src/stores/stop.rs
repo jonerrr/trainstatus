@@ -3,7 +3,7 @@ use crate::{
         source::Source,
         stop::{RouteStop, Stop},
     },
-    stores::read_through,
+    stores::{cache_get, cache_set_with_etag},
 };
 use bb8_redis::RedisConnectionManager;
 use geozero::wkb;
@@ -11,6 +11,8 @@ use gtfs_structures::StopTransfer;
 use redis::AsyncCommands;
 use sqlx::PgPool;
 use std::{collections::HashMap, time::Duration};
+
+const TTL: Duration = Duration::from_secs(86400);
 
 #[derive(Clone)]
 pub struct StopStore {
@@ -26,55 +28,73 @@ impl StopStore {
         }
     }
 
-    /// Gets all stops for a specific source (Cached!)
-    pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Stop>> {
-        let key = format!("stops:{}", source.as_str()); // e.g., "stops:mta_subway"
+    fn cache_key(source: Source) -> String {
+        format!("stops:{}", source.as_str())
+    }
 
-        read_through(
-            &self.redis_pool,
-            &key,
-            Duration::from_secs(86400), // Cache for 24 hours
-            || async {
-                // This closure only runs if cache is missing
-                let stops = sqlx::query_as::<_, Stop>(
-                    r#"SELECT
-                        s.id,
-                        s.source,
-                        s.name,
-                        s.geom,
-                        COALESCE(
-                            (
-                                SELECT jsonb_agg(
-                                    jsonb_build_object(
-                                        'to_stop_id', st.to_stop_id,
-                                        'to_stop_source', st.to_stop_source,
-                                        'transfer_type', st.transfer_type,
-                                        'min_transfer_time', st.min_transfer_time
-                                    )
-                                )
-                                FROM static.stop_transfer st
-                                WHERE st.from_stop_id = s.id
-                            ),
-                            '[]'::jsonb
-                        ) AS transfers,
-                        s.data,
-                        (
-                            SELECT jsonb_agg(rs.*)
-                            FROM static.route_stop rs
-                            WHERE rs.stop_id = s.id
-                        ) AS routes
-                    FROM
-                        static.stop s
-                    WHERE
-                        s.data->>'source' = $1"#,
-                )
-                .bind(source.as_str())
-                .fetch_all(&self.pg_pool)
-                .await?;
-                Ok(stops)
-            },
+    /// Fetch stops from DB, populate the Redis cache (JSON + ETag), and return the hash.
+    pub async fn populate_cache(&self, source: Source) -> anyhow::Result<String> {
+        let stops = self.query_all(source).await?;
+        let key = Self::cache_key(source);
+        cache_set_with_etag(&self.redis_pool, &key, &stops, TTL).await
+    }
+
+    /// Raw DB query for all stops of a source (with embedded transfers and route associations).
+    async fn query_all(&self, source: Source) -> anyhow::Result<Vec<Stop>> {
+        Ok(sqlx::query_as::<_, Stop>(
+            r#"SELECT
+                s.id,
+                s.source,
+                s.name,
+                s.geom,
+                COALESCE(
+                    (
+                        SELECT jsonb_agg(
+                            jsonb_build_object(
+                                'to_stop_id', st.to_stop_id,
+                                'to_stop_source', st.to_stop_source,
+                                'transfer_type', st.transfer_type,
+                                'min_transfer_time', st.min_transfer_time
+                            )
+                        )
+                        FROM static.stop_transfer st
+                        WHERE st.from_stop_id = s.id
+                    ),
+                    '[]'::jsonb
+                ) AS transfers,
+                s.data,
+                COALESCE(
+                    (
+                        SELECT jsonb_agg(rs.*)
+                        FROM static.route_stop rs
+                        WHERE rs.stop_id = s.id
+                    ),
+                    '[]'::jsonb
+                ) AS routes
+            FROM
+                static.stop s
+            WHERE
+                s.data->>'source' = $1"#,
         )
-        .await
+        .bind(source.as_str())
+        .fetch_all(&self.pg_pool)
+        .await?)
+    }
+
+    /// Gets all stops for a source. Tries Redis first; falls back to DB on miss.
+    pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Stop>> {
+        let key = Self::cache_key(source);
+        if let Some(cached) = cache_get::<Vec<Stop>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all(source).await
+    }
+
+    /// Returns the stored ETag (blake3 hex) for a source's stops cache, if present.
+    pub async fn get_etag(&self, source: Source) -> anyhow::Result<Option<String>> {
+        let key = format!("{}:etag", Self::cache_key(source));
+        let mut conn = self.redis_pool.get().await?;
+        Ok(conn.get::<_, Option<String>>(&key).await?)
     }
 
     /// Bulk insert stops (and invalidate cache)
@@ -112,15 +132,15 @@ impl StopStore {
         )
         .execute(&self.pg_pool)
         .await?;
-        // Invalidate Cache so the next `get_all` fetches fresh data
-        let key = format!("stops:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await?;
+
+        // Re-query and repopulate cache (write-through) — the stop response embeds
+        // transfers and route associations, so we always re-query the full shape.
+        self.populate_cache(source).await?;
 
         Ok(())
     }
 
-    /// Bulk insert route_stops (and invalidate cache)
+    /// Bulk insert route_stops and repopulate the stops cache.
     pub async fn save_all_route_stops(
         &self,
         source: Source,
@@ -163,10 +183,8 @@ impl StopStore {
         .execute(&self.pg_pool)
         .await?;
 
-        // Invalidate cache
-        let key = format!("route_stops:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await?;
+        // Route associations are embedded in the stop response, so repopulate the stops cache.
+        self.populate_cache(source).await?;
 
         Ok(())
     }
@@ -221,6 +239,9 @@ impl StopStore {
         )
         .execute(&self.pg_pool)
         .await?;
+
+        // Transfers are embedded in the stop response, so repopulate the stops cache.
+        self.populate_cache(source).await?;
 
         Ok(())
     }

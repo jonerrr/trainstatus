@@ -2,13 +2,14 @@ use std::time::Duration;
 
 use crate::{
     models::{position::VehiclePosition, source::Source},
-    stores::read_through,
+    stores::{cache_get, cache_set},
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use geozero::wkb;
-use redis::AsyncCommands;
 use sqlx::PgPool;
+
+const TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct PositionStore {
@@ -25,7 +26,7 @@ impl PositionStore {
     }
 
     /// Gets all positions for a specific source, optionally filtered by a specific time.
-    /// If a time is specified, positions are not cached
+    /// If a time is specified, positions are not cached.
     pub async fn get_all(
         &self,
         source: Source,
@@ -36,10 +37,17 @@ impl PositionStore {
         }
 
         let key = format!("positions:{}", source.as_str());
-        read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
-            self.query_all_positions(source, Utc::now()).await
-        })
-        .await
+        if let Some(cached) = cache_get::<Vec<VehiclePosition>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all_positions(source, Utc::now()).await
+    }
+
+    /// Populate the positions Redis cache by re-querying from DB.
+    async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
+        let key = format!("positions:{}", source.as_str());
+        let positions = self.query_all_positions(source, Utc::now()).await?;
+        cache_set(&self.redis_pool, &key, &positions, TTL).await
     }
 
     /// Internal helper function to query positions without caching
@@ -150,10 +158,8 @@ impl PositionStore {
 
         tracing::debug!("Upserted {} vehicle positions", positions.len());
 
-        // Invalidate Cache
-        let key = format!("positions:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await;
+        // Populate cache (write-through)
+        self.populate_cache(source).await?;
 
         Ok(())
     }

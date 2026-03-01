@@ -1,9 +1,11 @@
 use crate::models::{source::Source, trip::StopTime};
-use crate::stores::read_through;
+use crate::stores::{cache_get, cache_set};
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::time::Duration;
+
+const TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct StopTimeStore {
@@ -28,7 +30,7 @@ impl StopTimeStore {
         at: Option<DateTime<Utc>>,
         route_ids: Option<&[String]>,
     ) -> anyhow::Result<Vec<StopTime>> {
-        // If user specified time or route filter, don't cache
+        // If user specified time or route filter, bypass cache
         if at.is_some() || route_ids.is_some() {
             return self
                 .query_all_stop_times(source, at.unwrap_or_else(Utc::now), route_ids)
@@ -36,10 +38,18 @@ impl StopTimeStore {
         }
 
         let key = format!("stop_times:{}", source.as_str());
-        read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
-            self.query_all_stop_times(source, Utc::now(), None).await
-        })
-        .await
+        if let Some(cached) = cache_get::<Vec<StopTime>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all_stop_times(source, Utc::now(), None).await
+    }
+
+    /// Populate the stop times Redis cache by re-querying from DB.
+    /// Called by the realtime engine after trips are written.
+    pub async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
+        let key = format!("stop_times:{}", source.as_str());
+        let stop_times = self.query_all_stop_times(source, Utc::now(), None).await?;
+        cache_set(&self.redis_pool, &key, &stop_times, TTL).await
     }
 
     /// Internal helper function to query stop times without caching

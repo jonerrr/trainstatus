@@ -3,15 +3,16 @@ use crate::{
         source::Source,
         trip::{StopTime, Trip},
     },
-    stores::read_through,
+    stores::{cache_get, cache_set},
 };
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
-use redis::AsyncCommands;
 use sqlx::PgPool;
 use std::time::Instant;
 use std::{collections::HashMap, time::Duration};
 use uuid::Uuid;
+
+const TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct TripStore {
@@ -28,7 +29,7 @@ impl TripStore {
     }
 
     /// Gets all trips for a specific source, optionally filtered by a specific time.
-    /// If a time is specified, trips are not cached
+    /// If a time is specified, trips are not cached.
     pub async fn get_all(
         &self,
         source: Source,
@@ -39,10 +40,17 @@ impl TripStore {
         }
 
         let key = format!("trips:{}", source.as_str());
-        read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
-            self.query_all_trips(source, Utc::now()).await
-        })
-        .await
+        if let Some(cached) = cache_get::<Vec<Trip>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all_trips(source, Utc::now()).await
+    }
+
+    /// Populate the trips Redis cache by re-querying from DB.
+    async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
+        let key = format!("trips:{}", source.as_str());
+        let trips = self.query_all_trips(source, Utc::now()).await?;
+        cache_set(&self.redis_pool, &key, &trips, TTL).await
     }
 
     /// Internal helper function to query trips without caching
@@ -230,10 +238,9 @@ impl TripStore {
             elapsed.as_secs_f64()
         );
 
-        // Invalidate Cache so the next `get_all` fetches fresh data
-        let key = format!("trips:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await;
+        // Populate trips cache (write-through)
+        self.populate_cache(source).await?;
+
         // might want to insert positions from here instead of returning the map
         Ok(id_map)
     }

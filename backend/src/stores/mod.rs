@@ -10,36 +10,57 @@ pub mod stop;
 pub mod stop_time;
 pub mod trip;
 
-/// Tries to get value from Redis. If missing, runs the `fetch` closure,
-/// caches the result, and returns it.
-pub async fn read_through<T, F, Fut>(
+/// Try to get a cached value from Redis. Returns `None` on miss or error.
+pub async fn cache_get<T>(redis_pool: &bb8::Pool<RedisConnectionManager>, key: &str) -> Option<T>
+where
+    T: DeserializeOwned,
+{
+    let mut conn = redis_pool.get().await.ok()?;
+    let json: String = conn.get(key).await.ok()?;
+    if json.is_empty() {
+        return None;
+    }
+    serde_json::from_str(&json).ok()
+}
+
+/// Serialize `data` to JSON and store it in Redis with the given TTL.
+pub async fn cache_set<T>(
     redis_pool: &bb8::Pool<RedisConnectionManager>,
     key: &str,
+    data: &T,
     ttl: Duration,
-    fetch: F,
-) -> anyhow::Result<T>
+) -> anyhow::Result<()>
 where
-    T: Serialize + DeserializeOwned + Send + Sync,
-    F: FnOnce() -> Fut + Send,
-    Fut: std::future::Future<Output = anyhow::Result<T>> + Send,
+    T: Serialize,
 {
+    let json = serde_json::to_string(data)?;
     let mut conn = redis_pool.get().await?;
+    let _: () = conn.set_ex(key, json, ttl.as_secs()).await?;
+    Ok(())
+}
 
-    // 1. Try Cache
-    if let Ok(cached_json) = conn.get::<_, String>(key).await {
-        if !cached_json.is_empty() {
-            if let Ok(data) = serde_json::from_str(&cached_json) {
-                return Ok(data);
-            }
-        }
-    }
+/// Serialize `data`, compute a blake3 hash, store both the JSON (`key`) and
+/// the hex hash (`key:etag`) in Redis with the given TTL.
+/// Returns the hex hash string (without quotes).
+pub async fn cache_set_with_etag<T>(
+    redis_pool: &bb8::Pool<RedisConnectionManager>,
+    key: &str,
+    data: &T,
+    ttl: Duration,
+) -> anyhow::Result<String>
+where
+    T: Serialize,
+{
+    let json = serde_json::to_string(data)?;
+    let hash = blake3::hash(json.as_bytes()).to_hex().to_string();
+    let etag_key = format!("{}:etag", key);
 
-    // 2. Cache Miss: Fetch from DB
-    let data = fetch().await?;
+    let mut conn = redis_pool.get().await?;
+    let _: () = redis::pipe()
+        .set_ex(key, &json, ttl.as_secs())
+        .set_ex(&etag_key, &hash, ttl.as_secs())
+        .query_async(&mut *conn)
+        .await?;
 
-    // 3. Set Cache (Background task or await depending on safety needs)
-    let json = serde_json::to_string(&data)?;
-    let _: () = conn.set_ex(key, json, ttl.as_secs() as u64).await?;
-
-    Ok(data)
+    Ok(hash)
 }

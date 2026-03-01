@@ -1,4 +1,3 @@
-// use api::websocket::{Clients, Update};
 use axum::{
     Json, ServiceExt,
     body::Body,
@@ -8,10 +7,7 @@ use axum::{
     routing::get,
 };
 use bb8_redis::RedisConnectionManager;
-// use crossbeam::channel::unbounded;
-// use crossbeam::channel::{Receiver, Sender};
 use http::{HeaderValue, Method, StatusCode, request::Parts};
-// use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
@@ -68,13 +64,6 @@ struct AppState {
     stop_time_store: StopTimeStore,
     position_store: PositionStore,
     alert_store: AlertStore,
-    // pg_pool: sqlx::PgPool,
-    // redis_pool: bb8::Pool<RedisConnectionManager>,
-    // rx: crossbeam::channel::Receiver<Vec<Update>>,
-    // clients: Clients,
-    // tx: Sender<serde_json::Value>,
-    // shutdown_tx: Sender<()>,
-    // initial_data: Arc<RwLock<serde_json::Value>>,
 }
 
 // https://stackoverflow.com/a/77249700
@@ -140,8 +129,8 @@ async fn main() {
     let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());
     let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
     let trip_store = stores::trip::TripStore::new(pg_pool.clone(), redis_pool.clone());
-    // let stop_time_store =
-    //     stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
+    let stop_time_store =
+        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
     let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
 
@@ -162,9 +151,8 @@ async fn main() {
     ];
 
     engines::realtime::run(
-        // &pg_pool,
         &trip_store,
-        // &stop_time_store,
+        &stop_time_store,
         &position_store,
         realtime_adapters,
         static_controller.clone(),
@@ -232,10 +220,6 @@ async fn main() {
     components(schemas(models::source::Source))
     )]
     struct ApiDoc;
-
-    let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
-    let stop_time_store =
-        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
 
     let state = AppState {
         route_store,

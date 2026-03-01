@@ -1,12 +1,14 @@
 use crate::{
     models::{route::Route, source::Source},
-    stores::read_through,
+    stores::{cache_get, cache_set_with_etag},
 };
 use bb8_redis::RedisConnectionManager;
 use geozero::wkb;
 use redis::AsyncCommands;
 use sqlx::PgPool;
 use std::time::Duration;
+
+const TTL: Duration = Duration::from_secs(86400);
 
 #[derive(Clone)]
 pub struct RouteStore {
@@ -22,38 +24,53 @@ impl RouteStore {
         }
     }
 
-    /// Gets all routes for a specific source (Cached!)
-    pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Route>> {
-        let key = format!("routes:{}", source.as_str());
+    fn cache_key(source: Source) -> String {
+        format!("routes:{}", source.as_str())
+    }
 
-        read_through(
-            &self.redis_pool,
-            &key,
-            Duration::from_secs(86400), // Cache for 24 hours
-            || async {
-                // This closure only runs if cache is missing
-                let routes = sqlx::query_as::<_, Route>(
-                    r#"SELECT
-                        id,
-                        source,
-                        long_name,
-                        short_name,
-                        color,
-                        data,
-                        geom
-                    FROM
-                        static.route
-                    WHERE
-                        source = $1
-                    ORDER BY short_name"#,
-                )
-                .bind(source)
-                .fetch_all(&self.pg_pool)
-                .await?;
-                Ok(routes)
-            },
+    /// Fetch routes from DB, populate the Redis cache (JSON + ETag), and return the hash.
+    pub async fn populate_cache(&self, source: Source) -> anyhow::Result<String> {
+        let routes = self.query_all(source).await?;
+        let key = Self::cache_key(source);
+        cache_set_with_etag(&self.redis_pool, &key, &routes, TTL).await
+    }
+
+    /// Raw DB query for all routes of a source.
+    async fn query_all(&self, source: Source) -> anyhow::Result<Vec<Route>> {
+        Ok(sqlx::query_as::<_, Route>(
+            r#"SELECT
+                id,
+                source,
+                long_name,
+                short_name,
+                color,
+                data,
+                geom
+            FROM
+                static.route
+            WHERE
+                source = $1
+            ORDER BY short_name"#,
         )
-        .await
+        .bind(source)
+        .fetch_all(&self.pg_pool)
+        .await?)
+    }
+
+    /// Gets all routes for a source. Tries Redis first; falls back to DB on miss.
+    pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Route>> {
+        let key = Self::cache_key(source);
+        if let Some(cached) = cache_get::<Vec<Route>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all(source).await
+    }
+
+    /// Returns the stored ETag (blake3 hex) for a source's routes cache, if present.
+    pub async fn get_etag(&self, source: Source) -> anyhow::Result<Option<String>> {
+        let key = format!("{}:etag", Self::cache_key(source));
+        let mut conn = self.redis_pool.get().await?;
+        Ok(conn.get::<_, Option<String>>(&key).await?)
     }
 
     /// Bulk insert routes (and invalidate cache)
@@ -111,10 +128,8 @@ impl RouteStore {
         )
         .execute(&self.pg_pool)
         .await?;
-        // Invalidate Cache so the next `get_all` fetches fresh data
-        let key = format!("routes:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await?;
+
+        self.populate_cache(source).await?;
 
         Ok(())
     }

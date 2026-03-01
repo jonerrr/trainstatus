@@ -2,15 +2,16 @@ use crate::models::{
     alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation},
     source::Source,
 };
-use crate::stores::read_through;
+use crate::stores::{cache_get, cache_set};
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
-use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::time::Duration;
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+const TTL: Duration = Duration::from_secs(30);
 
 /// API response for alerts - flattened with all related data
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -82,7 +83,6 @@ impl AlertStore {
 
     /// Gets all alerts for a specific source, optionally filtered by a specific time.
     /// If a time is specified, alerts are not cached.
-    /// Returns alerts formatted for the API with flattened translations and entities.
     pub async fn get_all(
         &self,
         source: Source,
@@ -93,10 +93,17 @@ impl AlertStore {
         }
 
         let key = format!("alerts:{}", source.as_str());
-        read_through(&self.redis_pool, &key, Duration::from_secs(30), || async {
-            self.query_all_alerts(source, Utc::now()).await
-        })
-        .await
+        if let Some(cached) = cache_get::<Vec<ApiAlert>>(&self.redis_pool, &key).await {
+            return Ok(cached);
+        }
+        self.query_all_alerts(source, Utc::now()).await
+    }
+
+    /// Populate the alerts Redis cache by re-querying from DB.
+    async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
+        let key = format!("alerts:{}", source.as_str());
+        let alerts = self.query_all_alerts(source, Utc::now()).await?;
+        cache_set(&self.redis_pool, &key, &alerts, TTL).await
     }
 
     /// Internal helper function to query alerts without caching
@@ -597,10 +604,8 @@ impl AlertStore {
 
         // TODO: probably set end time for non-active alerts here
 
-        // Invalidate Cache
-        let key = format!("alerts:{}", source.as_str());
-        let mut conn = self.redis_pool.get().await?;
-        let _: redis::RedisResult<()> = conn.del(&key).await;
+        // Populate cache (write-through)
+        self.populate_cache(source).await?;
 
         Ok(())
     }
