@@ -7,10 +7,10 @@
 	import Pin from '$lib/Pin.svelte';
 	import type { Pins } from '$lib/pins.svelte';
 	import type { LocalStorage } from '$lib/storage.svelte';
-	import { type ModalWithId, open_modal } from '$lib/url_params.svelte';
+	import { type ModalData, open_modal } from '$lib/url_params.svelte';
 
 	interface Props {
-		state: ModalWithId;
+		state: ModalData;
 		// id?: string;
 		pins?: LocalStorage<Pins>;
 		children: Snippet;

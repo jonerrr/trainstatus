@@ -42,8 +42,7 @@ declare global {
 				| null
 				| (Stop & { type: 'stop' })
 				| (Trip & { type: 'trip' })
-				| (Route & { type: 'route' })
-				| { type: 'settings' };
+				| (Route & { type: 'route' });
 			// TODO: require that if modal isn't null, data must be provided
 			// modal: 'stop' | 'trip' | 'route' | 'settings' | null;
 			// data?: Stop | Trip | Route;

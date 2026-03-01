@@ -4,7 +4,6 @@
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import Header from '$lib/Header.svelte';
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import SEO from '$lib/SEO.svelte';
@@ -42,10 +41,11 @@
 
 	// Initialize current_time from URL param on page load
 	// If we don't initialize here, the syncing $effect will error out when running replaceState on page load (since router isn't initialized)
+	// TODO: maybe add error handling for invalid at param. for example if its a huge number and becomes NaN, the sync $effect runs and errors out
 	if (page.data.at) current_time.value = parseInt(page.data.at);
 	// TODO: fix clearing time not working
 
-	// TODO: handle offline from new fetching method
+	// TODO: handle offline from new fetching method (and find a new way to display it since header is removed)
 	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
 	trip_context.set(
 		Object.fromEntries(
@@ -109,18 +109,23 @@
 		}
 	});
 
-	// Sync current_time.value → ?at URL param whenever it changes.
+	// Sync current_time.value with ?at URL param whenever it changes.
 	// Reads page.url inside untrack so this effect only re-runs when current_time changes.
 	$effect(() => {
+		$inspect.trace('Syncing current_time with URL param');
 		const val = current_time.value;
 		untrack(() => {
 			const current_at = page.url.searchParams.get('at');
 			const new_at = val !== undefined ? val.toString() : null;
+			console.log(
+				`current_time changed: ${current_time.value} (URL param at=${current_at}), syncing to ${new_at}`
+			);
 			if (current_at === new_at) return; // no change needed
 
 			const url = new URL(page.url);
 			if (val !== undefined) url.searchParams.set('at', val.toString());
 			else url.searchParams.delete('at');
+			console.log(`Updating URL search param at=${new_at} (was ${current_at})`);
 			replaceState(url.pathname + url.search, page.state);
 		});
 	});
@@ -137,7 +142,7 @@
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Desktop lg+: pl-20 (left sidebar). -->
 <div class="flex h-dvh flex-col pb-16 lg:pb-0 lg:pl-20">
-	<Header {offline} />
+	<!-- <Header {offline} /> -->
 	<main class="relative flex-1 overflow-hidden text-white">
 		<Modal />
 

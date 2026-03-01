@@ -6,7 +6,6 @@
 
 	import Pin from '$lib/Pin.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
-	import SettingsModal from '$lib/Settings/Modal.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
 	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
@@ -455,8 +454,6 @@
 			page.state.modal.data.source,
 			trip_pins
 		)}
-	{:else if page.state.modal?.type === 'settings'}
-		<SettingsModal />
 	{/if}
 </dialog>
 

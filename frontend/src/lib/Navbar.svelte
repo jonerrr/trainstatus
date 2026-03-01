@@ -3,11 +3,11 @@
 
 	import { current_time } from '$lib/url_params.svelte';
 
-	import { ChartLine, CircleAlert, Clock, House } from '@lucide/svelte';
+	import { ChartLine, CircleAlert, Clock, House, Settings } from '@lucide/svelte';
 
 	interface Routes {
 		[key: string]: [
-			Icon: typeof House | typeof Clock | typeof CircleAlert | typeof ChartLine,
+			Icon: typeof House | typeof Clock | typeof CircleAlert | typeof ChartLine | typeof Settings,
 			href: string
 		];
 	}
@@ -16,7 +16,8 @@
 		Home: [House, '/'],
 		Alerts: [CircleAlert, '/alerts'],
 		Stops: [Clock, '/stops'],
-		Charts: [ChartLine, '/charts']
+		Charts: [ChartLine, '/charts'],
+		Settings: [Settings, '/settings']
 	} as const;
 </script>
 
@@ -47,6 +48,9 @@
 	{@render nav_button('Alerts')}
 	{@render nav_button('Stops')}
 	{@render nav_button('Charts')}
+	<div class="lg:mt-auto">
+		{@render nav_button('Settings')}
+	</div>
 </nav>
 
 <style>

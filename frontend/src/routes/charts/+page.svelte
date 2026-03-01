@@ -350,6 +350,8 @@
 		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"
 	>
 		<!-- Routes Option -->
+		<!-- TODO: improve ui for mobile -->
+		<!-- TODO: add tooltips for options (use attachments) -->
 		<div class="flex min-w-60 flex-col gap-2">
 			<div class="font-semibold">Routes</div>
 			<div class="relative w-full" bind:this={comboboxRef}>

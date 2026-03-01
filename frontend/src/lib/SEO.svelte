@@ -6,7 +6,8 @@
 		'/stops': 'Stops',
 		'/routes': 'Routes',
 		'/alerts': 'Alerts',
-		'/charts': 'Charts'
+		'/charts': 'Charts',
+		'/settings': 'Settings'
 	} as const;
 
 	const title = $derived.by(() => {

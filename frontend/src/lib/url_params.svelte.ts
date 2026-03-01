@@ -47,7 +47,7 @@ function with_view_transition(direction: 'forward' | 'backward', fn: () => void)
 	});
 }
 
-export type ModalWithId = Exclude<App.PageState['modal'], null | { type: 'settings' }>;
+export type ModalData = Exclude<App.PageState['modal'], null>;
 
 /** URL search param keys for each modal type */
 export const MODAL_PARAM = {
@@ -63,7 +63,7 @@ export type ModalParamKey = (typeof MODAL_PARAM)[keyof typeof MODAL_PARAM];
  * Uses pushState so the back button closes the modal.
  * Preserves existing URL params (e.g. ?at=).
  */
-export function open_modal(state: ModalWithId) {
+export function open_modal(state: ModalData) {
 	const key = MODAL_PARAM[state.type];
 	const url = new URL(page.url);
 
