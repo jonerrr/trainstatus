@@ -43,28 +43,30 @@ impl StopStore {
                         s.name,
                         s.geom,
                         COALESCE(
-                            jsonb_agg(
-                                jsonb_build_object(
-                                    'to_stop_id', st.to_stop_id,
-                                    'to_stop_source', st.to_stop_source,
-                                    'transfer_type', st.transfer_type,
-                                    'min_transfer_time', st.min_transfer_time
+                            (
+                                SELECT jsonb_agg(
+                                    jsonb_build_object(
+                                        'to_stop_id', st.to_stop_id,
+                                        'to_stop_source', st.to_stop_source,
+                                        'transfer_type', st.transfer_type,
+                                        'min_transfer_time', st.min_transfer_time
+                                    )
                                 )
-                            ) FILTER (WHERE st.to_stop_id IS NOT NULL),
+                                FROM static.stop_transfer st
+                                WHERE st.from_stop_id = s.id
+                            ),
                             '[]'::jsonb
                         ) AS transfers,
                         s.data,
-                        jsonb_agg(rs.*) AS routes
+                        (
+                            SELECT jsonb_agg(rs.*)
+                            FROM static.route_stop rs
+                            WHERE rs.stop_id = s.id
+                        ) AS routes
                     FROM
                         static.stop s
-                    LEFT JOIN static.stop_transfer st ON
-                        s.id = st.from_stop_id
-                    LEFT JOIN static.route_stop rs ON
-                        s.id = rs.stop_id
                     WHERE
-                        s.data->>'source' = $1
-                    GROUP BY
-                        s.id, s.name, s.geom, s.data, s.source"#,
+                        s.data->>'source' = $1"#,
                 )
                 .bind(source.as_str())
                 .fetch_all(&self.pg_pool)
