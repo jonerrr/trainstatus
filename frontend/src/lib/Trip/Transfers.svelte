@@ -3,7 +3,7 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
+	import { current_time, open_modal } from '$lib/url_params.svelte';
 
 	import type { StopTime } from '@trainstatus/client';
 
@@ -31,7 +31,7 @@
 				{#if time_format === 'time'}
 					{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
 				{:else}
-					{((st.arrival.getTime() - new Date().getTime()) / 1000 / 60).toFixed(0)}m
+					{((st.arrival.getTime() - current_time.ms) / 1000 / 60).toFixed(0)}m
 				{/if}
 			</button>
 		{/each}
