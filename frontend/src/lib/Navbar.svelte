@@ -42,15 +42,15 @@
 	</a>
 {/snippet}
 
-<!-- Mobile: fixed bottom bar (scrollable row). Desktop lg+: fixed left sidebar (column). -->
+<!-- Mobile: fixed bottom bar (scrollable row). (larger screens) md+  fixed left sidebar (column). -->
 <nav
-	class="fixed bottom-0 z-30 flex h-16 w-full flex-row items-stretch overflow-x-auto bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg lg:top-0 lg:left-0 lg:h-full lg:w-20 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:shadow-none"
+	class="fixed bottom-0 z-30 flex h-16 w-full flex-row items-stretch overflow-x-auto bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:shadow-none"
 >
 	{@render nav_button('Home')}
 	{@render nav_button('Alerts')}
 	{@render nav_button('Stops')}
 	{@render nav_button('Charts')}
-	<div class="lg:mt-auto">
+	<div class="md:mt-auto">
 		{@render nav_button('Settings')}
 	</div>
 </nav>
@@ -73,6 +73,6 @@
 	/* Gradient separator — top edge on mobile, right edge on desktop */
 	nav::before {
 		content: '';
-		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent lg:top-0 lg:right-0 lg:bottom-0 lg:left-auto lg:h-full lg:w-px lg:bg-linear-to-b;
+		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent md:top-0 md:right-0 md:bottom-0 md:left-auto md:h-full md:w-px md:bg-linear-to-b;
 	}
 </style>

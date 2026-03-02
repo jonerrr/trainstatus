@@ -140,8 +140,8 @@
 />
 
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
-     Mobile: pb-16 (bottom bar). Desktop lg+: pl-20 (left sidebar). -->
-<div class="flex h-dvh flex-col pb-16 lg:pb-0 lg:pl-20">
+     Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->
+<div class="flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
 	<!-- <Header {offline} /> -->
 	<main class="relative flex-1 overflow-hidden text-white">
 		<Modal />
