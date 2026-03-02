@@ -15,50 +15,7 @@
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
 	import type { Source } from '@trainstatus/client';
 
-	// import { type Trip, type TripData, is_bus_route } from './trips.svelte';
-
-	// import { Tween } from 'svelte/motion';
-	// import { cubicOut } from 'svelte/easing';
-
-	// interface Props {
-	// 	current_time?: number;
-	// }
-
-	// const { current_time }: Props = $props();
-
-	// let dialog_el = $state<HTMLDialogElement>();
-
 	// TODO: make implement some sort of focus trap and restore using attachments
-	// see https://svelte.dev/tutorial/svelte/attach
-
-	// Physics constants derived from vaul-svelte
-	const VELOCITY_THRESHOLD = 0.4; // px/ms
-	const CLOSE_THRESHOLD = 0.25; // % of height
-	const DRAG_RESISTANCE = 8; // Rubber band strength
-	const DRAG_START_THRESHOLD = 5; // px of movement before we consider it a real drag
-
-	// State for drag physics
-	let is_dragging = $state(false);
-	let translate_y = $state(0);
-	let start_y = 0;
-	let start_time = 0;
-	let modal_height = 0;
-	let is_transitioning = $state(false);
-	let has_captured = false;
-
-	// Derived style for the modal
-	// We disable CSS transitions while dragging so it feels responsive (1:1 movement)
-	let modal_style = $derived(
-		`transform: translate3d(0, ${translate_y}px, 0); ` +
-			`transition: ${is_transitioning ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none'};` +
-			// Important: prevent browser gestures like "back" or "refresh" while dragging
-			(is_dragging ? 'touch-action: none;' : '')
-	);
-
-	// Logarithmic dampening for "rubber banding" (dragging upwards past 0)
-	function dampen_value(v: number) {
-		return DRAG_RESISTANCE * (Math.log(v + 1) - 2);
-	}
 
 	function close() {
 		close_modal();
@@ -77,106 +34,6 @@
 			}
 		});
 
-		// TODO: maybe need to handle when dialog has long scrollable content
-		// 		function handle_pointer_down(e: PointerEvent) {
-		//     // Check if target is inside a scrollable element that isn't at the top
-		//     let target = e.target as HTMLElement;
-		//     while (target && target !== element) {
-		//         if (target.scrollHeight > target.clientHeight) {
-		//             // It is scrollable. If we are not at the top, don't drag the modal.
-		//             if (target.scrollTop > 0) return;
-		//         }
-		//         target = target.parentElement as HTMLElement;
-		//     }
-
-		//     // ... rest of the function
-		//     element.setPointerCapture(e.pointerId);
-		// }
-
-		// function handle_pointer_down(e: PointerEvent) {
-		// 	// Ignore if clicking a button or specific non-draggable areas if needed
-		// 	// if ((e.target as HTMLElement).closest('button')) return;
-
-		// 	is_dragging = true;
-		// 	has_captured = false;
-		// 	is_transitioning = false;
-		// 	start_y = e.screenY;
-		// 	start_time = Date.now();
-		// 	modal_height = node.getBoundingClientRect().height;
-
-		// 	// Don't call setPointerCapture here — doing so on every pointerdown (including
-		// 	// taps on inner content) causes the browser to redirect the synthesized click
-		// 	// event to the dialog element, which triggers handle_click and closes the modal.
-		// 	// Instead we capture lazily in handle_pointer_move once a real drag begins.
-		// }
-
-		// function handle_pointer_move(e: PointerEvent) {
-		// 	if (!is_dragging) return;
-
-		// 	// Lazily capture pointer once we know it's a real drag, not a tap
-		// 	if (!has_captured && Math.abs(e.screenY - start_y) > DRAG_START_THRESHOLD) {
-		// 		node.setPointerCapture(e.pointerId);
-		// 		has_captured = true;
-		// 	}
-
-		// 	const delta_y = e.screenY - start_y;
-
-		// 	// If dragging down (positive delta), move 1:1
-		// 	if (delta_y > 0) {
-		// 		translate_y = delta_y;
-		// 	}
-		// 	// If dragging up (negative delta), apply resistance (dampening)
-		// 	else {
-		// 		translate_y = dampen_value(Math.abs(delta_y)) * -1;
-		// 	}
-		// }
-
-		// function handle_pointer_up(e: PointerEvent) {
-		// 	if (!is_dragging) return;
-
-		// 	is_dragging = false;
-		// 	is_transitioning = true; // Re-enable CSS transitions for the snap back/close
-		// 	if (has_captured) {
-		// 		node.releasePointerCapture(e.pointerId);
-		// 		has_captured = false;
-		// 	}
-
-		// 	const end_y = e.screenY;
-		// 	const distance = end_y - start_y;
-		// 	const time_taken = Date.now() - start_time;
-		// 	const velocity = Math.abs(distance) / time_taken;
-
-		// 	// 1. Velocity Check (Flick)
-		// 	// Only close on flick if moving downwards
-		// 	if (distance > 0 && velocity > VELOCITY_THRESHOLD) {
-		// 		close_animate();
-		// 		return;
-		// 	}
-
-		// 	// 2. Threshold Check (Drag distance)
-		// 	// Close if dragged down more than 25% of height
-		// 	if (distance > 0 && distance > modal_height * CLOSE_THRESHOLD) {
-		// 		close_animate();
-		// 		return;
-		// 	}
-
-		// 	// 3. Reset (Snap back)
-		// 	// If neither condition met, bounce back to 0
-		// 	translate_y = 0;
-		// }
-
-		// function close_animate() {
-		// 	// Animate off screen
-		// 	translate_y = modal_height; // Slide completely out of view
-
-		// 	// Wait for animation to finish before actually closing state
-		// 	setTimeout(() => {
-		// 		close();
-		// 		// Reset position for next open (though component usually remounts)
-		// 		translate_y = 0;
-		// 	}, 300);
-		// }
-
 		// // watch for clicks outside the dialog to close it
 		function handle_click(event: MouseEvent) {
 			if (event.target === node) {
@@ -184,7 +41,7 @@
 			}
 		}
 
-		// // Add keyboard handler for Escape key
+		// Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
@@ -224,12 +81,6 @@
 		listeners_to_remove.push(on(node, 'mouseup', handle_mouse_up));
 		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
 
-		// physics events
-		// listeners_to_remove.push(on(node, 'pointerdown', handle_pointer_down));
-		// listeners_to_remove.push(on(node, 'pointermove', handle_pointer_move));
-		// listeners_to_remove.push(on(node, 'pointerup', handle_pointer_up));
-		// listeners_to_remove.push(on(node, 'pointercancel', handle_pointer_up)); // Handle cases where the pointer is canceled (e.g., system interrupts)
-
 		return () => {
 			document.body.style.overflow = '';
 			listeners_to_remove.forEach((off) => off());
@@ -242,7 +93,6 @@
 	// });
 	let copied = $state(false);
 	// show stops/trips before current datetime TODO: maybe persist this preference in local storage
-	// TODO: fix show_previous not working
 	let show_previous = $state(false);
 	// e.g. 3m or 12:45.
 	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
