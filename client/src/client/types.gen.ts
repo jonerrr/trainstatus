@@ -140,6 +140,10 @@ export type RouteStopData = {
      */
     direction: number;
     headsign: string;
+    /**
+     * Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
+     */
+    opposite_stop_id?: string | null;
     source: 'mta_bus';
 };
 
@@ -329,10 +333,6 @@ export type StopTimesHandlerData = {
          * Comma-separated list of route IDs to filter by. Be sure to URL encode this.
          */
         route_ids?: Array<string>;
-        /**
-         * Make sure `trip.updated_at` and `stop_time.arrival` are after the current time. By default, this only checks `trip.updated_at`.
-         */
-        filter_arrival?: boolean;
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */

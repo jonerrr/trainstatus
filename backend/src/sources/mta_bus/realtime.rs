@@ -286,6 +286,7 @@ impl RealtimeAdapter for MtaBusRealtime {
                     if let Some(mut position) = self.process_vehicle(vehicle) {
                         // Merge OBA data if available
                         if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
+                            // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
                             if let PositionData::MtaBus(data) = &mut position.data {
                                 data.passengers = oba_data.occupancy_count;
                                 data.capacity = oba_data.occupancy_capacity;

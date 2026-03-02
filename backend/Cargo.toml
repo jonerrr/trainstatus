@@ -12,24 +12,23 @@ bb8-redis = "0.26.0"
 blake3 = "1.8.2"
 chrono = { version = "0.4.42", features = ["serde"] }
 chrono-tz = "0.10.4"
-# crossbeam = "0.8.4"
-# csv = "1.4.0"
 futures = "0.3.31"
 geo = { version = "0.32.0", features = ["use-serde"] }
 geozero = { version = "0.15.1", features = ["with-postgis-sqlx"] }
-gtfs-structures = "0.46.1"
+gtfs-structures = "0.47.0"
 headers = "0.4.1"
 http = "1.2.0"
 indicatif = "0.18.0"
 itertools = "0.14.0"
 polyline = "0.11.0"
+proj4rs = { version = "0.1.9", features = ["crs-definitions", "geo-types"] }
 prost = "0.14.1"
 rayon = "1.11.0"
 redis = "1.0.1"
 regex = "1.12.2"
-reqwest = { version = "0.12.24", default-features = false, features = [
+reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
-  "rustls-tls",
+  "query"
 ] }
 rgb = "0.8.52"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -41,10 +40,7 @@ sqlx = { version = "0.8.6", features = [
   "runtime-tokio-rustls",
   "uuid",
 ] }
-# thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["full"] }
-# tokio-stream = { version = "0.1.16", features = ["sync"] }
-# tokio-tungstenite = "0.24.0"
 tower = { version = "0.5.2", features = ["buffer", "limit"] }
 tower-http = { version = "0.6.6", features = [
   "compression-br",

@@ -45,7 +45,6 @@ pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
                         Ok(msg) => {
                             if let Some(bytes) = bytes_for_debug {
                                 // Extract filename from URL or use index
-                                // TODO: improve default name
                                 let default_name = format!("feed_{}", idx);
                                 let name = url
                                     .split('/')

@@ -16,12 +16,10 @@ pub struct Stop {
     // pub source: Source,
     #[schema(example = "Van Cortlandt Park-242 St")]
     pub name: String,
-    // TODO: generalize schema for all geometry
     // probably also make a custom serializer/deserializer
     #[schema(schema_with = point_schema)]
     pub geom: Geom,
     #[sqlx(json)]
-    // TODO: fix api response including the station itself as a transfer
     pub transfers: Vec<Transfer>,
     #[sqlx(json)]
     pub data: StopData,
@@ -95,11 +93,12 @@ pub enum RouteStopData {
         headsign: String,
         /// Direction of bus trips that serve this stop
         direction: i16,
+        /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
+        opposite_stop_id: Option<String>,
     },
 }
 
 #[derive(sqlx::Type, Clone, ToSchema, Deserialize, Serialize, Debug)]
-// #[sqlx(type_name = "static.stop_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum StopType {
     FullTime,

@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::{LineString, MultiLineString, Point};
+use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
 use indicatif::{ProgressBar, ProgressStyle};
+use proj4rs::{Proj, transform::transform};
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
@@ -18,6 +19,9 @@ use crate::{
     sources::StaticAdapter,
     stores::{route::RouteStore, stop::StopStore},
 };
+
+/// Maximum distance (in meters) allowed when pairing opposite-direction stops.
+const MAX_OPPOSITE_DIST: f64 = 500.0;
 
 pub struct MtaBusStatic;
 
@@ -74,6 +78,9 @@ impl MtaBusStatic {
                 .unwrap(),
         );
 
+        let proj_wgs84 = Proj::from_epsg_code(4326).context("Failed to create WGS84 proj")?;
+        let proj_ny = Proj::from_epsg_code(6538).context("Failed to create NY proj")?;
+
         for mut route in all_routes.into_iter() {
             // Get the stops for the route
             let r_stops = match BusRouteStops::get(&route.id).await {
@@ -121,8 +128,39 @@ impl MtaBusStatic {
                 geom: Some(route_geom.into()),
             });
 
+            // --- Opposite-stop matching ---
+            // Build a map from stop code: projected Point (EPSG:6538, meters)
+            // so we can compute accurate planar distances between candidate pairs.
+            let stop_geom_map: HashMap<i32, Point<f64>> = r_stops
+                .references
+                .stops
+                .iter()
+                .filter_map(|s| {
+                    let mut point =
+                        Point::new((s.lon as f64).to_radians(), (s.lat as f64).to_radians());
+                    transform(&proj_wgs84, &proj_ny, &mut point).ok()?;
+                    Some((s.code, point))
+                })
+                .collect();
+
+            // Extract direction-0 and direction-1 stop ID lists for this route.
+            let stop_groups = &r_stops.entry.stop_groupings[0].stop_groups;
+            let dir0_ids: Vec<i32> = stop_groups
+                .iter()
+                .find(|g| g.id == 0)
+                .map(|g| g.stop_ids.clone())
+                .unwrap_or_default();
+            let dir1_ids: Vec<i32> = stop_groups
+                .iter()
+                .find(|g| g.id == 1)
+                .map(|g| g.stop_ids.clone())
+                .unwrap_or_default();
+
+            let opposite_map =
+                compute_opposite_stops(&dir0_ids, &dir1_ids, &stop_geom_map, MAX_OPPOSITE_DIST);
+
             // Add stops
-            let stops_n = r_stops
+            let new_stops = r_stops
                 .references
                 .stops
                 .into_par_iter()
@@ -137,7 +175,8 @@ impl MtaBusStatic {
                     }),
                 })
                 .collect::<Vec<_>>();
-            stops.extend(stops_n);
+
+            stops.extend(new_stops);
 
             // Parse and collect the route stops for each group/direction
             let route_stops_g = r_stops.entry.stop_groupings[0]
@@ -147,15 +186,18 @@ impl MtaBusStatic {
                     let route_id = &route.id;
 
                     rs.stop_ids
-                        .par_iter()
+                        .iter()
                         .enumerate()
-                        .map(move |(sequence, stop_id)| RouteStop {
+                        .map(|(sequence, stop_id)| RouteStop {
                             route_id: route_id.clone(),
                             stop_id: stop_id.to_string(),
                             stop_sequence: sequence as i16,
                             data: RouteStopData::MtaBus {
                                 headsign: rs.name.name.clone(),
                                 direction: rs.id as i16,
+                                opposite_stop_id: opposite_map
+                                    .get(stop_id)
+                                    .map(|id| id.to_string()),
                             },
                         })
                         .collect::<Vec<_>>()
@@ -179,6 +221,59 @@ impl MtaBusStatic {
 
         Ok((routes, stops, route_stops))
     }
+}
+
+// --- Opposite-stop matching ---
+
+/// For each stop in `dir0_ids`, find the nearest stop in `dir1_ids` (and vice-versa) whose
+/// projected distance is within `max_dist` (EPSG:6538 meters).
+/// Returns a map of `stop_id → opposite_stop_id`.
+fn compute_opposite_stops(
+    dir0_ids: &[i32],
+    dir1_ids: &[i32],
+    stop_geom_map: &HashMap<i32, Point<f64>>,
+    max_dist: f64,
+) -> HashMap<i32, i32> {
+    let mut opposite_map: HashMap<i32, i32> = HashMap::new();
+
+    // dir0 → nearest dir1 match
+    for &stop_id in dir0_ids {
+        let Some(p0) = stop_geom_map.get(&stop_id) else {
+            continue;
+        };
+        let best = dir1_ids
+            .iter()
+            .filter_map(|&opp_id| {
+                let p1 = stop_geom_map.get(&opp_id)?;
+                // let dist = p0.euclidean_distance(p1);
+                let dist = Euclidean.distance(p0, p1);
+                (dist <= max_dist).then_some((opp_id, dist))
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        if let Some((opp_id, _)) = best {
+            opposite_map.insert(stop_id, opp_id);
+        }
+    }
+
+    // dir1 → nearest dir0 match
+    for &stop_id in dir1_ids {
+        let Some(p1) = stop_geom_map.get(&stop_id) else {
+            continue;
+        };
+        let best = dir0_ids
+            .iter()
+            .filter_map(|&opp_id| {
+                let p0 = stop_geom_map.get(&opp_id)?;
+                let dist = Euclidean.distance(p1, p0);
+                (dist <= max_dist).then_some((opp_id, dist))
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        if let Some((opp_id, _)) = best {
+            opposite_map.insert(stop_id, opp_id);
+        }
+    }
+
+    opposite_map
 }
 
 // --- Helper types for parsing MTA Bus API responses ---

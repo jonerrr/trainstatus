@@ -1,5 +1,4 @@
 use anyhow::bail;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 // TODO: combine other oba fetchers (like static mta bus data) into a common module
 
@@ -47,8 +46,8 @@ pub struct VehicleStatus {
     // last_location_update_time is always the same as last_update_time
     // #[serde(with = "chrono::serde::ts_milliseconds")]
     // pub last_location_update_time: DateTime<Utc>,
-    #[serde(with = "chrono::serde::ts_milliseconds")]
-    pub last_update_time: DateTime<Utc>,
+    // #[serde(with = "chrono::serde::ts_milliseconds")]
+    // pub last_update_time: DateTime<Utc>,
     // pub location: Location,
     pub occupancy_capacity: Option<i32>,
     pub occupancy_count: Option<i32>,

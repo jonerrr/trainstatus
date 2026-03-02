@@ -20,10 +20,8 @@ pub struct Route {
     pub color: String,
     #[sqlx(flatten)]
     pub data: RouteData,
-    // maybe change to wkt
+    /// Not included in API response. Use martin tile server layer for geometry instead.
     #[serde(skip_serializing_if = "Option::is_none")]
-    // TODO: correct schema
-    // #[schema(schema_with = crate::static_data::stop::point_schema)]
     #[serde(skip_deserializing)]
     pub geom: Option<Geom>,
 }
