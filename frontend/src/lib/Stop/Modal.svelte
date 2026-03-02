@@ -126,7 +126,7 @@
 </div>
 
 {#if stop.transfers.length}
-	<Transfers transfers={stop.transfers} />
+	<Transfers stop_source={stop.data.source} transfers={stop.transfers} />
 {/if}
 
 {#if !selected_stop_times.length}

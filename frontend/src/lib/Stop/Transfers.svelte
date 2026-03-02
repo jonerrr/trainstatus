@@ -6,13 +6,14 @@
 	import { open_modal } from '$lib/url_params.svelte';
 	import { main_route_stops } from '$lib/util.svelte';
 
-	import type { CompassDirection, Transfer } from '@trainstatus/client';
+	import type { CompassDirection, Source, Transfer } from '@trainstatus/client';
 
 	interface Props {
+		stop_source: Source;
 		transfers: Transfer[];
 	}
 
-	const { transfers }: Props = $props();
+	const { transfers, stop_source }: Props = $props();
 
 	const DIRECTION_ORDER: Record<CompassDirection, number> = {
 		n: 0,
@@ -25,7 +26,6 @@
 		n_w: 7,
 		unknown: 8
 	};
-
 	const sorted_transfers = $derived(
 		transfers
 			.map((t) => ({
@@ -34,6 +34,11 @@
 			}))
 			.filter((t) => t.stop != null)
 			.sort((a, b) => {
+				// Prioritize transfers from the same source as the current stop
+				if (a.stop.data.source === stop_source && b.stop.data.source !== stop_source) return -1;
+				if (b.stop.data.source === stop_source && a.stop.data.source !== stop_source) return 1;
+
+				// Then sort by direction
 				const dir_a =
 					a.stop.data.source === 'mta_bus'
 						? DIRECTION_ORDER[a.stop.data.direction]
@@ -43,6 +48,8 @@
 						? DIRECTION_ORDER[b.stop.data.direction]
 						: DIRECTION_ORDER.unknown;
 				if (dir_a !== dir_b) return dir_a - dir_b;
+
+				// Finally sort by route ID
 				return a.stop.routes[0]?.route_id.localeCompare(b.stop.routes[0]?.route_id ?? '') ?? 0;
 			})
 	);
