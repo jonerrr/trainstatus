@@ -88,11 +88,11 @@ pub enum RouteStopData {
     MtaSubway {
         stop_type: StopType,
     },
-    // TODO: determine the opposite bus stop based on direction, headsign, and closest distance
     MtaBus {
         headsign: String,
         /// Direction of bus trips that serve this stop
         direction: i16,
+        // TODO: check if there are any stops where route stops each have a different opposite stop id. If not, we can move this field to the stop level (e.g. in transfers vec)
         /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
         opposite_stop_id: Option<String>,
     },

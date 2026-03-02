@@ -311,7 +311,7 @@
 	}
 
 	// let last_at = current_time.value;
-
+	// TODO: convert this to an attachment
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
 		// set current time to 2 hours ago

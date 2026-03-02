@@ -61,5 +61,3 @@ export function createTripResource<S extends Source>(source: S, initial_value: T
 }
 
 export const trip_context = createMultiSourceContext<TripResources>();
-
-export const calculate_trip_height = () => 80;

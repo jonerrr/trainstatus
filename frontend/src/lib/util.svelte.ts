@@ -42,6 +42,7 @@ export const main_route_stops = (route_stops: RouteStop[]): RouteStop[] => {
 
 export const calculate_route_height = () => 54;
 
+// TODO: verify calculations
 export function calculate_stop_height(item: Stop) {
 	let height = 44; // stop name height (28px) + 16px padding
 
@@ -57,6 +58,8 @@ export function calculate_stop_height(item: Stop) {
 
 	return height;
 }
+
+export const calculate_trip_height = () => 94;
 
 // export function get_position(): Promise<GeolocationPosition> {
 // 	return new Promise<GeolocationPosition>((res, rej) => {

@@ -216,6 +216,13 @@ fn spawn_import(
             )
             .execute(&pool_clone)
             .await;
+
+            // Compute proximity-based transfers across all sources after every successful
+            // import. Runs source-agnostically so cross-source proximity pairs are always
+            // up to date. Errors are non-fatal — import waiters are still notified Ok.
+            if let Err(e) = stop_store_clone.compute_proximity_transfers().await {
+                error!("Failed to compute proximity transfers: {:#}", e);
+            }
         } else if let Err(e) = &result {
             error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
         }

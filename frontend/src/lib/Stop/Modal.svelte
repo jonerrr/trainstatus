@@ -5,6 +5,7 @@
 	import Icon from '$lib/Icon.svelte';
 	import ModalList from '$lib/ModalList.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import Transfers from '$lib/Stop/Transfers.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 	import type { SourceMap, TypedVehiclePosition } from '$lib/resources/index.svelte';
@@ -12,7 +13,6 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 	import { main_route_stops } from '$lib/util.svelte';
 
@@ -125,32 +125,8 @@
 	</div>
 </div>
 
-<!-- TODO: also show transfers for bus if multiple routes at bus stop -->
-{#if stop.data.source === 'mta_subway' && stop.transfers.length}
-	<div class="flex items-center gap-1 pb-1 pl-1">
-		<div>Transfers:</div>
-		<!-- TODO fix duplicate transfers -->
-		{#each stop.transfers as transfer (transfer.to_stop_id)}
-			{@const transfer_stop = page.data.stops_by_id[transfer.to_stop_source][transfer.to_stop_id]}
-			{#if transfer_stop}
-				<button
-					class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
-					onclick={() =>
-						// pushState('', { modal: { type: 'stop', ...$state.snapshot(transfer_stop) } })}
-						open_modal({ type: 'stop', ...$state.snapshot(transfer_stop) })}
-				>
-					{#each main_route_stops(transfer_stop.routes) as route_stop}
-						<Icon
-							width={24}
-							height={24}
-							link={false}
-							route={page.data.routes_by_id[transfer.to_stop_source][route_stop.route_id]}
-						/>
-					{/each}
-				</button>
-			{/if}
-		{/each}
-	</div>
+{#if stop.transfers.length}
+	<Transfers transfers={stop.transfers} />
 {/if}
 
 {#if !selected_stop_times.length}

@@ -133,10 +133,6 @@ impl StopStore {
         .execute(&self.pg_pool)
         .await?;
 
-        // Re-query and repopulate cache (write-through) — the stop response embeds
-        // transfers and route associations, so we always re-query the full shape.
-        self.populate_cache(source).await?;
-
         Ok(())
     }
 
@@ -182,9 +178,6 @@ impl StopStore {
         )
         .execute(&self.pg_pool)
         .await?;
-
-        // Route associations are embedded in the stop response, so repopulate the stops cache.
-        self.populate_cache(source).await?;
 
         Ok(())
     }
@@ -240,8 +233,129 @@ impl StopStore {
         .execute(&self.pg_pool)
         .await?;
 
-        // Transfers are embedded in the stop response, so repopulate the stops cache.
-        self.populate_cache(source).await?;
+        Ok(())
+    }
+
+    /// Compute proximity-based transfers (transfer_type = 6) across all sources.
+    ///
+    /// Stops within 150 m of each other — measured in EPSG:6538 (NY State Plane, meters)
+    /// via ST_Transform — receive a bidirectional proximity transfer entry, unless:
+    ///   - They already have an official (non-proximity) transfer entry, or
+    ///   - They are a designated `opposite_stop_id` bus-stop pair.
+    ///
+    /// For stops that carry a `direction` field (i.e. mta_bus), only the single closest
+    /// candidate sharing the same source and direction is kept per origin stop, preventing
+    /// duplicate transfers to stops on the same side of the street.
+    ///
+    /// All existing type-6 entries are deleted and recomputed atomically so stale
+    /// pairs (e.g. after a stop moves) are always cleaned up.
+    pub async fn compute_proximity_transfers(&self) -> anyhow::Result<()> {
+        let mut tx = self.pg_pool.begin().await?;
+
+        // Remove all stale proximity transfers before recomputing.
+        sqlx::query("DELETE FROM static.stop_transfer WHERE transfer_type = 6")
+            .execute(&mut *tx)
+            .await?;
+
+        // Insert proximity transfers for every stop pair within 150 m.
+        // Both directions (A→B and B→A) are produced by the self-join.
+        //
+        // For stops with a `direction` value (bus stops), only the closest candidate
+        // per (from_stop, to_source, to_direction) group is kept. Stops without a
+        // direction (subway) are not deduplicated and all qualifying pairs are inserted.
+        // TODO: time this (seems to take a while to run)
+        sqlx::query(
+            r#"
+            WITH candidates AS (
+                SELECT
+                    a.id   AS from_id,
+                    a.source AS from_source,
+                    b.id   AS to_id,
+                    b.source AS to_source,
+                    b.data->>'direction' AS to_direction,
+                    ST_Distance(
+                        ST_Transform(a.geom, 6538),
+                        ST_Transform(b.geom, 6538)
+                    ) AS dist
+                FROM static.stop a
+                JOIN static.stop b
+                    ON a.id != b.id
+                    AND ST_DWithin(
+                        ST_Transform(a.geom, 6538),
+                        ST_Transform(b.geom, 6538),
+                        150.0
+                    )
+                WHERE
+                    -- Skip pairs that already have an official (non-proximity) transfer
+                    NOT EXISTS (
+                        SELECT 1 FROM static.stop_transfer st
+                        WHERE st.from_stop_id = a.id
+                          AND st.from_stop_source = a.source
+                          AND st.to_stop_id = b.id
+                          AND st.to_stop_source = b.source
+                    )
+                    -- Skip mta_bus pairs where b is a's designated opposite stop
+                    AND NOT (
+                        a.source = 'mta_bus'
+                        AND EXISTS (
+                            SELECT 1 FROM static.route_stop rs
+                            WHERE rs.stop_id = a.id
+                              AND rs.source = 'mta_bus'
+                              AND rs.data->>'opposite_stop_id' = b.id
+                        )
+                    )
+                    -- Skip mta_bus pairs where a is b's designated opposite stop
+                    AND NOT (
+                        b.source = 'mta_bus'
+                        AND EXISTS (
+                            SELECT 1 FROM static.route_stop rs
+                            WHERE rs.stop_id = b.id
+                              AND rs.source = 'mta_bus'
+                              AND rs.data->>'opposite_stop_id' = a.id
+                        )
+                    )
+            ),
+            -- Stops without a direction (e.g. subway): keep all qualifying pairs.
+            non_directional AS (
+                SELECT from_id, from_source, to_id, to_source
+                FROM candidates
+                WHERE to_direction IS NULL
+            ),
+            -- Stops with a direction (e.g. bus): keep only the closest per
+            -- (from_stop, to_source, to_direction) group.
+            directional AS (
+                SELECT from_id, from_source, to_id, to_source
+                FROM (
+                    SELECT *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY from_id, from_source, to_source, to_direction
+                            ORDER BY dist
+                        ) AS rn
+                    FROM candidates
+                    WHERE to_direction IS NOT NULL
+                ) ranked
+                WHERE rn = 1
+            )
+            INSERT INTO static.stop_transfer
+                (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type)
+            SELECT from_id, from_source, to_id, to_source, 6 FROM non_directional
+            UNION ALL
+            SELECT from_id, from_source, to_id, to_source, 6 FROM directional
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        // Repopulate stop caches for all sources — transfers are embedded in the stop response.
+        // this is the last step so we do populate cache here.
+        // TODO: maybe move this to parent function to make it clearer that cache is repopulated after transfers are computed?
+        // TODO: create a global var for all sources instead of hardcoding here
+        for source in [Source::MtaSubway, Source::MtaBus] {
+            self.populate_cache(source).await?;
+        }
 
         Ok(())
     }
