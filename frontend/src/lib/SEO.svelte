@@ -7,6 +7,7 @@
 		'/routes': 'Routes',
 		'/alerts': 'Alerts',
 		'/charts': 'Charts',
+		'/map': 'Map',
 		'/settings': 'Settings'
 	} as const;
 
