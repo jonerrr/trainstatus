@@ -18,7 +18,6 @@
 	const path = $derived(line().x($xGet).y($yGet));
 
 	function open_trip(trip: Trip) {
-		// pushState('', { modal: { ...trip, type: 'trip' } });
 		open_modal({ ...trip, type: 'trip' });
 	}
 </script>

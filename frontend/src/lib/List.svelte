@@ -383,9 +383,6 @@
 							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
 							onclick={() => {
 								open_modal({ type, ...data } as any);
-								// pushState('', {
-								// 	modal: { type, ...$state.snapshot(data) } as any
-								// });
 							}}
 						>
 							{#if type === 'stop'}

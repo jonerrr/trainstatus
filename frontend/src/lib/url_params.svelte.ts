@@ -1,5 +1,3 @@
-import { tick } from 'svelte';
-
 import { pushState, replaceState } from '$app/navigation';
 import { page } from '$app/state';
 
@@ -23,29 +21,8 @@ function currentTime() {
 		}
 	};
 }
-
+// TODO: ensure this doesn't cause ssr issues
 export const current_time = currentTime();
-
-/**
- * Wrap a shallow-routing state change in a View Transition.
- * `direction` is stored on `<html data-modal-direction>` so CSS
- * can pick the right slide animation.
- * Falls back to plain fn() when the API is unavailable (SSR / older browsers).
- */
-function with_view_transition(direction: 'forward' | 'backward', fn: () => void) {
-	if (typeof document === 'undefined' || !document.startViewTransition) {
-		fn();
-		return;
-	}
-	document.documentElement.dataset.modalDirection = direction;
-	const transition = document.startViewTransition(async () => {
-		fn();
-		await tick();
-	});
-	transition.finished.finally(() => {
-		delete document.documentElement.dataset.modalDirection;
-	});
-}
 
 export type ModalData = Exclude<App.PageState['modal'], null>;
 
@@ -72,9 +49,8 @@ export function open_modal(state: ModalData) {
 	url.searchParams.set(key, state.id);
 
 	const snapshot = $state.snapshot(state);
-	with_view_transition('forward', () => {
-		pushState(url.pathname + url.search, { modal: snapshot });
-	});
+	const current_index = page.state?.index ?? 0;
+	pushState(url.pathname + url.search, { modal: snapshot, index: current_index + 1 });
 }
 
 /**

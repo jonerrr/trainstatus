@@ -43,12 +43,8 @@ declare global {
 				| (Stop & { type: 'stop' })
 				| (Trip & { type: 'trip' })
 				| (Route & { type: 'route' });
-			// TODO: require that if modal isn't null, data must be provided
-			// modal: 'stop' | 'trip' | 'route' | 'settings' | null;
-			// data?: Stop | Trip | Route;
-			// source?: Source; // maybe don't store source in page state
-			// time used for api requests.
-			// at?: number;
+			// used to determine if page.state update was forward or backwards
+			index?: number;
 		}
 		// interface Platform {}
 	}

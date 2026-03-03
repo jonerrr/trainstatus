@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
+
 	import type { Attachment } from 'svelte/attachments';
 	import { on } from 'svelte/events';
 
@@ -17,29 +19,60 @@
 
 	// TODO: make implement some sort of focus trap and restore using attachments
 
+	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
+	// Otherwise, the sliding animation looks like it runs twice.
+	let current_page_state = $state(page.state);
+
+	$effect(() => {
+		// $inspect.trace('modal state transition effect');
+		const next_state = page.state;
+		if (untrack(() => next_state.modal !== current_page_state.modal)) {
+			// Compare the new index against the current index to figure out slide direction
+			const next_index = next_state.index ?? 0;
+			const local_index = untrack(() => current_page_state?.index ?? 0);
+
+			const is_forward = next_index > local_index;
+			document.documentElement.dataset.modalDirection = is_forward ? 'forward' : 'backward';
+
+			// Wrap the DOM update in the View Transition API
+			if (document.startViewTransition) {
+				document.startViewTransition(async () => {
+					current_page_state = next_state;
+					await tick();
+				});
+			} else {
+				current_page_state = next_state;
+			}
+		}
+	});
+
 	function close() {
 		close_modal();
 	}
-	// TODO: improve physics on desktop (or maybe just disable)
+
 	const modal: Attachment<HTMLDialogElement> = (node) => {
 		document.body.style.overflow = 'hidden';
 
 		$effect(() => {
-			// TODO: why does this run twice on close
-			console.log(`modal update`, { state: page.state });
-			if (page.state.modal) {
+			// $inspect.trace('modal effect');
+			// this was running on close twice because of the handle_click and handle_mouse_up events
+			// console.log('modal update', page.state.modal);
+
+			const has_modal = !!current_page_state.modal;
+			// not sure if we need the node.open check, but just to be safe
+			if (has_modal && !node.open) {
 				node.showModal();
-			} else {
+			} else if (!has_modal && node.open) {
 				node.close();
 			}
 		});
 
-		// // watch for clicks outside the dialog to close it
-		function handle_click(event: MouseEvent) {
-			if (event.target === node) {
-				close();
-			}
-		}
+		// watch for clicks outside the dialog to close it
+		// function handle_click(event: MouseEvent) {
+		// 	if (event.target === node) {
+		// 		close();
+		// 	}
+		// }
 
 		// Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
@@ -76,7 +109,7 @@
 
 		const listeners_to_remove: Array<() => void> = [];
 
-		listeners_to_remove.push(on(node, 'click', handle_click));
+		// listeners_to_remove.push(on(node, 'click', handle_click));
 		listeners_to_remove.push(on(node, 'mousedown', handle_mouse_down));
 		listeners_to_remove.push(on(node, 'mouseup', handle_mouse_up));
 		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
@@ -216,37 +249,37 @@
 	{@attach modal}
 	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
-	{#if page.state.modal?.type === 'stop'}
-		<StopModal stop={page.state.modal} {show_previous} time_format={time_format.current} />
+	{#if current_page_state.modal?.type === 'stop'}
+		<StopModal stop={current_page_state.modal} {show_previous} time_format={time_format.current} />
 
 		{@render actions(
 			true,
 			's',
-			page.state.modal.id,
-			`Arrivals at ${page.state.modal.name}`,
-			page.state.modal.data.source,
+			current_page_state.modal.id,
+			`Arrivals at ${current_page_state.modal.name}`,
+			current_page_state.modal.data.source,
 			stop_pins
 		)}
-	{:else if page.state.modal?.type === 'route'}
-		<RouteModal route={page.state.modal} time_format={time_format.current} />
+	{:else if current_page_state.modal?.type === 'route'}
+		<RouteModal route={current_page_state.modal} time_format={time_format.current} />
 
 		{@render actions(
 			false,
 			'r',
-			page.state.modal.id,
-			`Alerts for ${page.state.modal.short_name}`,
-			page.state.modal.data.source,
+			current_page_state.modal.id,
+			`Alerts for ${current_page_state.modal.short_name}`,
+			current_page_state.modal.data.source,
 			route_pins
 		)}
-	{:else if page.state.modal?.type === 'trip'}
-		<TripModal trip={page.state.modal} {show_previous} time_format={time_format.current} />
+	{:else if current_page_state.modal?.type === 'trip'}
+		<TripModal trip={current_page_state.modal} {show_previous} time_format={time_format.current} />
 
 		{@render actions(
 			true,
 			't',
-			page.state.modal.id,
-			`${page.state.modal.route_id} Trip`,
-			page.state.modal.data.source,
+			current_page_state.modal.id,
+			`${current_page_state.modal.route_id} Trip`,
+			current_page_state.modal.data.source,
 			trip_pins
 		)}
 	{/if}

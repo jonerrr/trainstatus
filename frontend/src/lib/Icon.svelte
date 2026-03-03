@@ -38,7 +38,6 @@
 		<div class="absolute top-0 right-0 size-3 rounded-full bg-orange-400"></div>
 	{/if}
 {/snippet} -->
-<!-- TODO: maybe do $state.snapshot for pushState -->
 {#if route.data.source === 'mta_bus'}
 	<div
 		role={link ? 'button' : undefined}
@@ -49,7 +48,6 @@
 			show_alert_icon && 'ring-3 ring-red-800'
 		]}
 		onclick={() => {
-			// if (link) pushState('', { modal: { type: 'route', ...route } });
 			if (link) open_modal({ type: 'route', ...route });
 		}}
 	>

@@ -4,6 +4,9 @@
 	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Map } from '@lucide/svelte';
 	import { CircleX } from '@lucide/svelte';
 	import dayjs from 'dayjs';
+
+	// TODO: improve ui
+	// TODO: add 'debug' mode that logs data in console and shows extra info about data sources
 </script>
 
 <div class="min-h-screen bg-black text-white">

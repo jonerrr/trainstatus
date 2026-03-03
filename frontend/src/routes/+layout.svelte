@@ -18,23 +18,6 @@
 
 	import '../app.css';
 
-	// Trigger a backward view transition when the browser back button fires a
-	// popstate event (shallow-routing popstate is not caught by onnavigate).
-	// Svelte 5 batches DOM updates in a microtask, so at the point our listener
-	// runs the DOM still shows the old state — startViewTransition captures it
-	// as "old", tick() flushes the pending re-render as "new".
-	// Guard: only animate when the modal dialog is currently open in the DOM so
-	// we don't suppress the root transition for regular back-button page navs.
-	// TODO: fix browser back and forward buttons causing transition to run twice and look bad
-	function handle_popstate() {
-		if (typeof document === 'undefined' || !document.startViewTransition) return;
-		if (!document.querySelector('dialog[open]')) return;
-		document.documentElement.dataset.modalDirection = 'backward';
-		document.startViewTransition(tick).finished.finally(() => {
-			delete document.documentElement.dataset.modalDirection;
-		});
-	}
-
 	let { children } = $props();
 
 	let offline = $state(false);
@@ -133,11 +116,7 @@
 
 <SEO />
 
-<svelte:window
-	ononline={() => (offline = false)}
-	onoffline={() => (offline = true)}
-	onpopstate={handle_popstate}
-/>
+<svelte:window ononline={() => (offline = false)} onoffline={() => (offline = true)} />
 
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->

@@ -8,7 +8,7 @@
 }
 
 /* ── Modal View Transitions ─────────────────────────────────────────────────
-   Triggered by [data-modal-direction] set on <html> in url_params.svelte.ts.
+   Triggered by [data-modal-direction] set on <html> in Modal.svelte.
    We suppress the default root crossfade so only the named modal element
    animates.
 ────────────────────────────────────────────────────────────────────────── */
