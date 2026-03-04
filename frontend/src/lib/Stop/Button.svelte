@@ -28,7 +28,7 @@
 	// TODO: improve this (and handle removing route when unmounted)
 	$effect(() => {
 		if (source_info[stop.data.source].monitor_routes) {
-			// TODO: maybe only add main_rs
+			// TODO: might need to add active_routes that aren't included in the stop.routes array
 			for (const r of stop.routes) {
 				stop_times.add_route(r.route_id);
 			}

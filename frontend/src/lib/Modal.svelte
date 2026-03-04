@@ -46,10 +46,6 @@
 		}
 	});
 
-	function close() {
-		close_modal();
-	}
-
 	const modal: Attachment<HTMLDialogElement> = (node) => {
 		document.body.style.overflow = 'hidden';
 
@@ -70,7 +66,7 @@
 		// watch for clicks outside the dialog to close it
 		// function handle_click(event: MouseEvent) {
 		// 	if (event.target === node) {
-		// 		close();
+		// 		close_modal();
 		// 	}
 		// }
 
@@ -78,7 +74,7 @@
 		function handle_keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
-				close();
+				close_modal();
 			}
 		}
 
@@ -103,7 +99,7 @@
 			const diffY = Math.abs(event.pageY - startY);
 
 			if (diffX < delta && diffY < delta) {
-				close();
+				close_modal();
 			}
 		}
 
@@ -143,7 +139,7 @@
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
-				close();
+				close_modal();
 			}}
 			aria-label="Close modal"
 			title="Close modal"

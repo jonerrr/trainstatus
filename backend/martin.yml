@@ -6,8 +6,8 @@ postgres:
     tables:
       from_schemas:
         - static
-      # must be integer i think
-      id_columns: id
+      # must be integer (but we are using string)
+      # id_columns: id
     functions:
       from_schemas:
         - realtime
