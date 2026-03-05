@@ -12,6 +12,7 @@ use tokio::time::Duration;
 
 pub mod mta_bus;
 pub mod mta_subway;
+pub mod njt_bus;
 
 // need for Dyn traits
 #[async_trait]

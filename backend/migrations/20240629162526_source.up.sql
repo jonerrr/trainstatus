@@ -1,7 +1,7 @@
 CREATE SCHEMA IF NOT EXISTS static;
 CREATE SCHEMA IF NOT EXISTS realtime;
 
-CREATE TYPE source_enum AS ENUM ('mta_subway', 'mta_bus', 'njt_rail', 'lirr', 'mnr');
+CREATE TYPE source_enum AS ENUM ('mta_subway', 'mta_bus', 'njt_rail', 'njt_bus', 'lirr', 'mnr');
 
 CREATE TABLE IF NOT EXISTS source (
     id source_enum PRIMARY KEY,

@@ -7,6 +7,7 @@ use utoipa::ToSchema;
 pub enum Source {
     MtaSubway,
     MtaBus,
+    NjtBus,
     // below not implemented yet
     // Lirr,
     // Mnr,
@@ -18,6 +19,7 @@ impl Source {
         match self {
             Source::MtaSubway => "mta_subway",
             Source::MtaBus => "mta_bus",
+            Source::NjtBus => "njt_bus",
             // Source::Lirr => "lirr",
             // Source::Mnr => "mnr",
             // Source::NjtRail => "njt_rail",

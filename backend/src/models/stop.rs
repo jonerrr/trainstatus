@@ -56,12 +56,19 @@ pub struct MtaBusStopData {
     pub direction: CompassDirection,
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Debug)]
+pub struct NjtBusStopData {
+    /// Public-facing 5-digit stop code (e.g. "10001"), shown on signs and NJT apps
+    pub stop_code: String,
+}
+
 /// Stop data changes based on the `Source`
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopData {
     MtaSubway(MtaSubwayStopData),
     MtaBus(MtaBusStopData),
+    NjtBus(NjtBusStopData),
 }
 
 impl_discriminated_data!(
@@ -70,6 +77,7 @@ impl_discriminated_data!(
     {
         MtaBus => MtaBusStopData,
         MtaSubway => MtaSubwayStopData,
+        NjtBus => NjtBusStopData,
     }
 );
 
@@ -95,6 +103,11 @@ pub enum RouteStopData {
         // TODO: check if there are any stops where route stops each have a different opposite stop id. If not, we can move this field to the stop level (e.g. in transfers vec)
         /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
         opposite_stop_id: Option<String>,
+    },
+    NjtBus {
+        headsign: String,
+        /// 0 or 1 from GTFS direction_id
+        direction: i16,
     },
 }
 

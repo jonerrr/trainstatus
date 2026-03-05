@@ -14,6 +14,7 @@ chrono = { version = "0.4.42", features = ["serde"] }
 chrono-tz = "0.10.4"
 futures = "0.3.31"
 geo = { version = "0.32.0", features = ["use-serde"] }
+geojson = "0.24.2"
 geozero = { version = "0.15.1", features = ["with-postgis-sqlx"] }
 gtfs-structures = "0.47.0"
 headers = "0.4.1"
@@ -28,6 +29,7 @@ redis = "1.0.1"
 regex = "1.12.2"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "json",
+  "multipart",
   "query"
 ] }
 rgb = "0.8.52"

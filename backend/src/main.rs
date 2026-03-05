@@ -138,11 +138,18 @@ async fn main() {
     let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
         Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
         Arc::new(sources::mta_bus::static_data::MtaBusStatic),
+        Arc::new(sources::njt_bus::static_data::NjtBusStatic),
         // Arc::new(njt::rail_static::NjtRailStatic),
     ];
 
     let static_controller =
         engines::static_data::run(&pg_pool, &route_store, &stop_store, static_adapters).await;
+
+    // // test njt bus
+    // static_controller
+    //     .ensure_updated(static_adapters.clone()[2].source())
+    //     .await
+    //     .unwrap();
 
     let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
         Arc::new(MtaSubwayRealtime),

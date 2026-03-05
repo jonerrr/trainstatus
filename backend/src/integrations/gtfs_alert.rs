@@ -91,6 +91,7 @@ pub async fn run_pipeline<T: GtfsAlertSource>(
             let clone_id = match &parsed_alert.data {
                 crate::models::alert::AlertData::MtaSubway(data)
                 | crate::models::alert::AlertData::MtaBus(data) => data.clone_id.clone(),
+                _ => None,
             };
             if let Some(clone_id) = clone_id {
                 processed.cloned_mta_ids.push(clone_id);

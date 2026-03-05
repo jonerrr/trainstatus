@@ -7,15 +7,13 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use http::{HeaderMap, StatusCode};
 
+// TODO: refactor etag logic so if there is no etag, it doesnt just return a blank string as the etag
 fn cache_headers(etag_hash: &str) -> HeaderMap {
     use http::header;
     let mut headers = HeaderMap::new();
     headers.insert("content-type", "application/json".parse().unwrap());
     // ETag must be a quoted string per RFC 7232
-    headers.insert(
-        header::ETAG,
-        format!("\"{}\"", etag_hash).parse().unwrap(),
-    );
+    headers.insert(header::ETAG, format!("\"{}\"", etag_hash).parse().unwrap());
     headers.insert(
         header::CACHE_CONTROL,
         "public, max-age=3600, stale-while-revalidate=86400"
@@ -63,11 +61,7 @@ pub async fn routes_handler(
     let routes = state.route_store.get_all(source).await?;
 
     // Compute/retrieve etag for response header (re-use cached value if present)
-    let etag = state
-        .route_store
-        .get_etag(source)
-        .await?
-        .unwrap_or_default();
+    let etag = state.route_store.get_etag(source).await?.unwrap();
 
     let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())
@@ -99,11 +93,7 @@ pub async fn stops_handler(
 
     let stops = state.stop_store.get_all(source).await?;
 
-    let etag = state
-        .stop_store
-        .get_etag(source)
-        .await?
-        .unwrap_or_default();
+    let etag = state.stop_store.get_etag(source).await?.unwrap();
 
     let json = serde_json::to_string(&stops).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())

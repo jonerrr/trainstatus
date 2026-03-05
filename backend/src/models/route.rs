@@ -37,6 +37,7 @@ pub struct MtaBusData {
 pub enum RouteData {
     MtaBus(MtaBusData),
     MtaSubway,
+    NjtBus,
 }
 
 impl_discriminated_data!(
@@ -45,5 +46,6 @@ impl_discriminated_data!(
     {
         MtaBus => MtaBusData,
         MtaSubway,
+        NjtBus,
     }
 );
