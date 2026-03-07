@@ -99,8 +99,6 @@ pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<Feed
         .collect()
 }
 
-/// The main pipeline: Fetch -> Process -> Save (w/ FK Retry)
-/// Trip geometries are automatically updated by a database trigger when vehicle positions are saved
 #[instrument(skip(adapter, static_controller, trip_store, position_store), fields(source = ?adapter.source()))]
 pub async fn run_pipeline<T: GtfsSource>(
     adapter: &T,

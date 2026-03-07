@@ -137,14 +137,14 @@ message FeedEntity {
 
   // Data about the entity itself. Exactly one of the following fields must be
   // present (unless the entity is being deleted).
-  optional TripUpdate trip_update = 3;
-  optional VehiclePosition vehicle = 4;
-  optional Alert alert = 5;
+  optional TripUpdate      trip_update = 3;
+  optional VehiclePosition vehicle     = 4;
+  optional Alert           alert       = 5;
 
   // NOTE: This field is still experimental, and subject to change. It may be
   // formally adopted in the future.
-  optional Shape shape = 6;
-  optional Stop stop = 7;
+  optional Shape             shape              = 6;
+  optional Stop              stop               = 7;
   optional TripModifications trip_modifications = 8;
 
   // The extensions namespace allows 3rd-party developers to extend the
@@ -273,6 +273,12 @@ message TripUpdate {
     optional string actual_track = 2;
   }
 
+  // MTA railroad custom extensions
+  message MtaRailroadStopTimeUpdate {
+    optional string track = 1;
+    optional string trainStatus = 2;
+  }
+
   // Realtime update for arrival and/or departure events for a given stop on a
   // trip. Updates can be supplied for both past and future events.
   // The producer is allowed, although not required, to drop past events.
@@ -286,7 +292,7 @@ message TripUpdate {
     // Must be the same as in stops.txt in the corresponding GTFS feed.
     optional string stop_id = 4;
 
-    optional StopTimeEvent arrival = 2;
+    optional StopTimeEvent arrival   = 2;
     optional StopTimeEvent departure = 3;
 
     // Expected occupancy after departure from the given stop.
@@ -329,7 +335,7 @@ message TripUpdate {
       UNSCHEDULED = 3;
     }
     optional ScheduleRelationship schedule_relationship = 5
-        [ default = SCHEDULED ];
+    [ default = SCHEDULED ];
 
     // Provides the updated values for the stop time.
     // NOTE: This message is still experimental, and subject to change. It may
@@ -373,10 +379,12 @@ message TripUpdate {
 
     optional NyctStopTimeUpdate nyct_stop_time_update = 1001;
 
+    optional MtaRailroadStopTimeUpdate mta_railroad_stop_time_update = 1005;
+
     // The extensions namespace allows 3rd-party developers to extend the
     // GTFS Realtime Specification in order to add and evaluate new features
     // and modifications to the spec.
-    extensions 1002 to 1999;
+    extensions 1006 to 1999;
 
     // The following extension IDs are reserved for private use by any
     // organization.
@@ -551,10 +559,10 @@ message VehiclePosition {
   // Congestion level that is affecting this vehicle.
   enum CongestionLevel {
     UNKNOWN_CONGESTION_LEVEL = 0;
-    RUNNING_SMOOTHLY = 1;
-    STOP_AND_GO = 2;
-    CONGESTION = 3;
-    SEVERE_CONGESTION = 4; // People leaving their cars.
+    RUNNING_SMOOTHLY         = 1;
+    STOP_AND_GO              = 2;
+    CONGESTION               = 3;
+    SEVERE_CONGESTION        = 4; // People leaving their cars.
   }
   optional CongestionLevel congestion_level = 6;
 
@@ -646,7 +654,7 @@ message VehiclePosition {
     // This message/field is still experimental, and subject to change. It may
     // be formally adopted in the future.
     optional OccupancyStatus occupancy_status = 3
-        [ default = NO_DATA_AVAILABLE ];
+    [ default = NO_DATA_AVAILABLE ];
 
     // Occupancy percentage for this given carriage, in this vehicle.
     // Follows the same rules as "VehiclePosition.occupancy_percentage"
@@ -670,10 +678,12 @@ message VehiclePosition {
     // subject to change. It may be formally adopted in the future.
     optional uint32 carriage_sequence = 5;
 
+    optional MtaRailroadCarriageDetails mta_railroad_carriage_details = 1005;
+
     // The extensions namespace allows 3rd-party developers to extend the
     // GTFS Realtime Specification in order to add and evaluate new features and
     // modifications to the spec.
-    extensions 1000 to 1999;
+    extensions 1006 to 1999;
 
     // The following extension IDs are reserved for private use by any
     // organization.
@@ -703,8 +713,8 @@ message VehiclePosition {
 }
 
 message MercuryStationAlternative {
-  required EntitySelector affected_entity = 1;
-  required TranslatedString notes = 2;
+  required EntitySelector   affected_entity = 1;
+  required TranslatedString notes           = 2;
 }
 
 // Mercury extensions for the Feed Alert
@@ -715,7 +725,7 @@ message MercuryAlert {
 
   repeated MercuryStationAlternative station_alternative = 4;
 
-  repeated string service_plan_number = 5;
+  repeated string service_plan_number  = 5;
   repeated string general_order_number = 6;
 
   // A time interval, in seconds, indicating how long before each active period
@@ -729,7 +739,7 @@ message MercuryAlert {
   // i.e. "Sundays in May from 10:45pm to midnight"
   optional TranslatedString human_readable_active_period = 8;
 
-  optional uint64 directionality = 9;
+  optional uint64         directionality    = 9;
   repeated EntitySelector affected_stations = 10;
 
   optional TranslatedString screens_summary = 11;
@@ -738,6 +748,47 @@ message MercuryAlert {
 
   // The ids of the planned work cloned from
   optional string clone_id = 13;
+}
+
+message MtaRailroadCarriageDetails {
+    //Indicates the number of bikes permitted per carriage.
+    //0=bikes prohibited, -1=No limit.
+  optional int32 bicycles_allowed = 1 [default = 0];
+
+    //A description of the carriage type/model.
+  optional string carriage_class = 2;
+
+    // Whether the carriage has toilet facilities onboard.
+  enum QuietCarriage {
+
+      // It is unknown if the carriage is designated as a quiet carriage.
+      //  This is the default case.
+    UNKNOWN_QUIET_CARRIAGE = 0;
+
+      // The carriage is designated a quiet carriage.
+    QUIET_CARRIAGE = 1;
+
+      // The carriage is not designated as a quiet carriage.
+    NOT_QUIET_CARRIAGE = 2;
+  }
+
+  optional QuietCarriage quiet_carriage = 3 [default = UNKNOWN_QUIET_CARRIAGE];
+
+    // Whether the carriage has toilet facilities onboard.
+  enum ToiletFacilities {
+
+      // It is unknown if the carriage has toilet facilities. This is the
+      // default case.
+    UNKNOWN_TOILET_FACILITIES = 0;
+
+      // The carriage has toilet facilities onboard.
+    TOILET_ONBOARD = 1;
+
+      // The carriage does not have toilet facilities onboard.
+    NO_TOILET_ONBOARD = 2;
+  }
+
+  optional ToiletFacilities toilet_facilities = 4 [default = UNKNOWN_TOILET_FACILITIES];
 }
 
 // An alert, indicating some sort of incident in the public transit network.
@@ -753,17 +804,17 @@ message Alert {
   // Cause of this alert. If cause_detail is included, then Cause must also be
   // included.
   enum Cause {
-    UNKNOWN_CAUSE = 1;
-    OTHER_CAUSE = 2; // Not machine-representable.
+    UNKNOWN_CAUSE     = 1;
+    OTHER_CAUSE       = 2; // Not machine-representable.
     TECHNICAL_PROBLEM = 3;
-    STRIKE = 4;        // Public transit agency employees stopped working.
-    DEMONSTRATION = 5; // People are blocking the streets.
-    ACCIDENT = 6;
-    HOLIDAY = 7;
-    WEATHER = 8;
-    MAINTENANCE = 9;
-    CONSTRUCTION = 10;
-    POLICE_ACTIVITY = 11;
+    STRIKE            = 4; // Public transit agency employees stopped working.
+    DEMONSTRATION     = 5; // People are blocking the streets.
+    ACCIDENT          = 6;
+    HOLIDAY           = 7;
+    WEATHER           = 8;
+    MAINTENANCE       = 9;
+    CONSTRUCTION      = 10;
+    POLICE_ACTIVITY   = 11;
     MEDICAL_EMERGENCY = 12;
   }
   optional Cause cause = 6 [ default = UNKNOWN_CAUSE ];
@@ -771,7 +822,7 @@ message Alert {
   // What is the effect of this problem on the affected entity. If effect_detail
   // is included, then Effect must also be included.
   enum Effect {
-    NO_SERVICE = 1;
+    NO_SERVICE      = 1;
     REDUCED_SERVICE = 2;
 
     // We don't care about INsignificant delays: they are hard to detect, have
@@ -779,13 +830,13 @@ message Alert {
     // frequent.
     SIGNIFICANT_DELAYS = 3;
 
-    DETOUR = 4;
-    ADDITIONAL_SERVICE = 5;
-    MODIFIED_SERVICE = 6;
-    OTHER_EFFECT = 7;
-    UNKNOWN_EFFECT = 8;
-    STOP_MOVED = 9;
-    NO_EFFECT = 10;
+    DETOUR              = 4;
+    ADDITIONAL_SERVICE  = 5;
+    MODIFIED_SERVICE    = 6;
+    OTHER_EFFECT        = 7;
+    UNKNOWN_EFFECT      = 8;
+    STOP_MOVED          = 9;
+    NO_EFFECT           = 10;
     ACCESSIBILITY_ISSUE = 11;
   }
   optional Effect effect = 7 [ default = UNKNOWN_EFFECT ];
@@ -812,9 +863,9 @@ message Alert {
   // Severity of this alert.
   enum SeverityLevel {
     UNKNOWN_SEVERITY = 1;
-    INFO = 2;
-    WARNING = 3;
-    SEVERE = 4;
+    INFO             = 2;
+    WARNING          = 3;
+    SEVERE           = 4;
   }
 
   optional SeverityLevel severity_level = 14 [ default = UNKNOWN_SEVERITY ];
@@ -849,6 +900,7 @@ message Alert {
   optional TranslatedString effect_detail = 18;
 
   optional MercuryAlert mercury_alert = 1001;
+
   // The extensions namespace allows 3rd-party developers to extend the
   // GTFS Realtime Specification in order to add and evaluate new features
   // and modifications to the spec.
@@ -959,9 +1011,9 @@ message NyctTripDescriptor {
   // The direction the train is moving.
   enum Direction {
     NORTH = 1;
-    EAST = 2;
+    EAST  = 2;
     SOUTH = 3;
-    WEST = 4;
+    WEST  = 4;
   }
   // Uptown and Bronx-bound trains are moving NORTH.
   // Times Square Shuttle to Grand Central is also northbound.
@@ -1155,7 +1207,7 @@ message VehicleDescriptor {
     WHEELCHAIR_INACCESSIBLE = 3;
   }
   optional WheelchairAccessible wheelchair_accessible = 4
-      [ default = NO_VALUE ];
+  [ default = NO_VALUE ];
 
   // The extensions namespace allows 3rd-party developers to extend the
   // GTFS Realtime Specification in order to add and evaluate new features and
@@ -1174,41 +1226,41 @@ message MercuryEntitySelector {
   // sort_order.
 
   enum Priority {
-    PRIORITY_NO_SCHEDULED_SERVICE = 1;
-    PRIORITY_INFORMATION_OUTAGE = 2;
-    PRIORITY_STATION_NOTICE = 3;
-    PRIORITY_SPECIAL_NOTICE = 4;
-    PRIORITY_WEEKDAY_SCHEDULE = 5;
-    PRIORITY_WEEKEND_SCHEDULE = 6;
-    PRIORITY_SATURDAY_SCHEDULE = 7;
-    PRIORITY_SUNDAY_SCHEDULE = 8;
-    PRIORITY_EXTRA_SERVICE = 9;
-    PRIORITY_BOARDING_CHANGE = 10;
-    PRIORITY_SPECIAL_SCHEDULE = 11;
-    PRIORITY_EXPECT_DELAYS = 12;
-    PRIORITY_REDUCED_SERVICE = 13;
+    PRIORITY_NO_SCHEDULED_SERVICE     = 1;
+    PRIORITY_INFORMATION_OUTAGE       = 2;
+    PRIORITY_STATION_NOTICE           = 3;
+    PRIORITY_SPECIAL_NOTICE           = 4;
+    PRIORITY_WEEKDAY_SCHEDULE         = 5;
+    PRIORITY_WEEKEND_SCHEDULE         = 6;
+    PRIORITY_SATURDAY_SCHEDULE        = 7;
+    PRIORITY_SUNDAY_SCHEDULE          = 8;
+    PRIORITY_EXTRA_SERVICE            = 9;
+    PRIORITY_BOARDING_CHANGE          = 10;
+    PRIORITY_SPECIAL_SCHEDULE         = 11;
+    PRIORITY_EXPECT_DELAYS            = 12;
+    PRIORITY_REDUCED_SERVICE          = 13;
     PRIORITY_PLANNED_EXPRESS_TO_LOCAL = 14;
-    PRIORITY_PLANNED_EXTRA_TRANSFER = 15;
-    PRIORITY_PLANNED_STOPS_SKIPPED = 16;
-    PRIORITY_PLANNED_DETOUR = 17;
-    PRIORITY_PLANNED_REROUTE = 18;
+    PRIORITY_PLANNED_EXTRA_TRANSFER   = 15;
+    PRIORITY_PLANNED_STOPS_SKIPPED    = 16;
+    PRIORITY_PLANNED_DETOUR           = 17;
+    PRIORITY_PLANNED_REROUTE          = 18;
     PRIORITY_PLANNED_SUBSTITUTE_BUSES = 19;
-    PRIORITY_PLANNED_PART_SUSPENDED = 20;
-    PRIORITY_PLANNED_SUSPENDED = 21;
-    PRIORITY_SERVICE_CHANGE = 22;
-    PRIORITY_PLANNED_WORK = 23;
-    PRIORITY_SOME_DELAYS = 24;
-    PRIORITY_EXPRESS_TO_LOCAL = 25;
-    PRIORITY_DELAYS = 26;
-    PRIORITY_CANCELLATIONS = 27;
+    PRIORITY_PLANNED_PART_SUSPENDED   = 20;
+    PRIORITY_PLANNED_SUSPENDED        = 21;
+    PRIORITY_SERVICE_CHANGE           = 22;
+    PRIORITY_PLANNED_WORK             = 23;
+    PRIORITY_SOME_DELAYS              = 24;
+    PRIORITY_EXPRESS_TO_LOCAL         = 25;
+    PRIORITY_DELAYS                   = 26;
+    PRIORITY_CANCELLATIONS            = 27;
     PRIORITY_DELAYS_AND_CANCELLATIONS = 28;
-    PRIORITY_STOPS_SKIPPED = 29;
-    PRIORITY_SEVERE_DELAYS = 30;
-    PRIORITY_DETOUR = 31;
-    PRIORITY_REROUTE = 32;
-    PRIORITY_SUBSTITUTE_BUSES = 33;
-    PRIORITY_PART_SUSPENDED = 34;
-    PRIORITY_SUSPENDED = 35;
+    PRIORITY_STOPS_SKIPPED            = 29;
+    PRIORITY_SEVERE_DELAYS            = 30;
+    PRIORITY_DETOUR                   = 31;
+    PRIORITY_REROUTE                  = 32;
+    PRIORITY_SUBSTITUTE_BUSES         = 33;
+    PRIORITY_PART_SUSPENDED           = 34;
+    PRIORITY_SUSPENDED                = 35;
   }
 
   // Format for sort_order is 'GTFS-ID:Priority', e.g. 'MTASBWY:G:16'
@@ -1222,11 +1274,11 @@ message EntitySelector {
   // At least one specifier must be given. If several are given, then the
   // matching has to apply to all the given specifiers.
   optional string agency_id = 1;
-  optional string route_id = 2;
+  optional string route_id  = 2;
   // corresponds to route_type in GTFS.
-  optional int32 route_type = 3;
-  optional TripDescriptor trip = 4;
-  optional string stop_id = 5;
+  optional int32          route_type = 3;
+  optional TripDescriptor trip       = 4;
+  optional string         stop_id    = 5;
   // Corresponds to trip direction_id in GTFS trips.txt. If provided the
   // route_id must also be provided.
   optional uint32 direction_id = 6;
@@ -1380,25 +1432,25 @@ message Shape {
 // subject to change. It may be formally adopted in the future.
 message Stop {
   enum WheelchairBoarding {
-    UNKNOWN = 0;
-    AVAILABLE = 1;
+    UNKNOWN       = 0;
+    AVAILABLE     = 1;
     NOT_AVAILABLE = 2;
   }
 
-  optional string stop_id = 1;
-  optional TranslatedString stop_code = 2;
-  optional TranslatedString stop_name = 3;
-  optional TranslatedString tts_stop_name = 4;
-  optional TranslatedString stop_desc = 5;
-  optional float stop_lat = 6;
-  optional float stop_lon = 7;
-  optional string zone_id = 8;
-  optional TranslatedString stop_url = 9;
-  optional string parent_station = 11;
-  optional string stop_timezone = 12;
+  optional string             stop_id             = 1;
+  optional TranslatedString   stop_code           = 2;
+  optional TranslatedString   stop_name           = 3;
+  optional TranslatedString   tts_stop_name       = 4;
+  optional TranslatedString   stop_desc           = 5;
+  optional float              stop_lat            = 6;
+  optional float              stop_lon            = 7;
+  optional string             zone_id             = 8;
+  optional TranslatedString   stop_url            = 9;
+  optional string             parent_station      = 11;
+  optional string             stop_timezone       = 12;
   optional WheelchairBoarding wheelchair_boarding = 13 [ default = UNKNOWN ];
-  optional string level_id = 14;
-  optional TranslatedString platform_code = 15;
+  optional string             level_id            = 14;
+  optional TranslatedString   platform_code       = 15;
 
   // The extensions namespace allows 3rd-party developers to extend the
   // GTFS Realtime Specification in order to add and evaluate new features and
@@ -1539,7 +1591,7 @@ message ReplacementStop {
   // a new stop added using a GTFS-RT Stop message, or to an existing stop
   // defined in the GTFS-Static feedâ€™s stops.txt. The stop MUST have
   // location_type=0 (routable stops).
-  optional string stop_id = 2;
+  optional string stop_id       = 2;
 
   // The extensions namespace allows 3rd-party developers to extend the
   // GTFS Realtime Specification in order to add and evaluate new features and
