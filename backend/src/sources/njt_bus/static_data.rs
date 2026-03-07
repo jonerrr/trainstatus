@@ -17,7 +17,6 @@ use crate::{
 };
 
 const NJT_DEFAULT_COLOR: &str = "0033A0";
-const NJT_AUTH_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/authenticateUser";
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
 const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
 
@@ -35,7 +34,9 @@ impl StaticAdapter for NjtBusStatic {
 
     async fn import(&self, route_store: &RouteStore, stop_store: &StopStore) -> anyhow::Result<()> {
         // 1. Authenticate
-        let token = authenticate().await.context("NJT authentication failed")?;
+        let token = super::get_token()
+            .await
+            .context("NJT authentication failed")?;
 
         // 2. Download GTFS zip as raw bytes
         let gtfs_bytes = download_gtfs(&token)
@@ -74,6 +75,26 @@ impl StaticAdapter for NjtBusStatic {
             route_stops.len()
         );
 
+        #[cfg(debug_assertions)]
+        {
+            // additional sanity check: look for duplicates in the raw vector (before storing)
+            let mut seen: HashMap<(String, String), usize> = HashMap::new();
+            for rs in &route_stops {
+                let key = (rs.route_id.clone(), rs.stop_id.clone());
+                *seen.entry(key).or_insert(0) += 1;
+            }
+            for ((rid, sid), count) in seen {
+                if count > 1 {
+                    tracing::warn!(
+                        "raw route_stops vector contains duplicate entries for route_id={} stop_id={} count={}",
+                        rid,
+                        sid,
+                        count
+                    );
+                }
+            }
+        }
+
         // 8. Persist
         route_store
             .save_all(Source::NjtBus, &routes)
@@ -90,34 +111,6 @@ impl StaticAdapter for NjtBusStatic {
 
         Ok(())
     }
-}
-
-// ── Authentication ────────────────────────────────────────────────────────────
-
-#[derive(serde::Deserialize)]
-struct AuthResponse {
-    #[serde(rename = "UserToken")]
-    user_token: String,
-}
-
-async fn authenticate() -> anyhow::Result<String> {
-    let username = std::env::var("NJT_USERNAME").context("NJT_USERNAME env var not set")?;
-    let password = std::env::var("NJT_PASSWORD").context("NJT_PASSWORD env var not set")?;
-
-    let form = reqwest::multipart::Form::new()
-        .text("username", username)
-        .text("password", password);
-
-    let resp: AuthResponse = reqwest::Client::new()
-        .post(NJT_AUTH_URL)
-        .multipart(form)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
-
-    Ok(resp.user_token)
 }
 
 // ── GTFS download ─────────────────────────────────────────────────────────────
@@ -305,7 +298,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
         }
     }
 
-    accum
+    let mut result: Vec<RouteStop> = accum
         .into_iter()
         .map(|((route_id, stop_id, direction), acc)| {
             let headsign = acc
@@ -325,7 +318,69 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 },
             }
         })
-        .collect()
+        .collect();
+    // TODO: remove this after testing route stop directions are working
+    // debug: check for any duplicates once we uppercase keys
+    #[cfg(debug_assertions)]
+    {
+        let mut norm_map: HashMap<(String, String), Vec<&RouteStop>> = HashMap::new();
+        for rs in &result {
+            let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
+            norm_map.entry(key).or_default().push(rs);
+        }
+        for ((rid, sid), list) in norm_map {
+            if list.len() > 1 {
+                let examples: Vec<_> = list
+                    .iter()
+                    .take(5)
+                    .map(|rs| match &rs.data {
+                        RouteStopData::NjtBus {
+                            headsign,
+                            direction,
+                        } => format!(
+                            "(route_id={}, stop_id={}, direction={}, headsign={})",
+                            rs.route_id, rs.stop_id, direction, headsign
+                        ),
+                        other => format!(
+                            "(route_id={}, stop_id={}, data={:?})",
+                            rs.route_id, rs.stop_id, other
+                        ),
+                    })
+                    .collect();
+                tracing::warn!(
+                    "duplicate route_stop after uppercase normalization: route_id={} stop_id={} count={} examples={:?}",
+                    rid,
+                    sid,
+                    list.len(),
+                    examples
+                );
+            }
+        }
+    }
+
+    // The database schema only permits one row per (route_id, stop_id), so we
+    // need to collapse any entries that differ only by `direction`.  When two
+    // directions are present we arbitrarily keep the one with the smaller
+    // `stop_sequence` (matching what `StopStore` will do when deduplicating).
+    //
+    // The debug check above will still warn about duplicates, but this step
+    // prevents the insertion error when running the importer.
+
+    // perform deduplication in-place to avoid large allocations
+    let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
+    for rs in result.into_iter() {
+        let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
+        deduped
+            .entry(key)
+            .and_modify(|existing| {
+                if rs.stop_sequence < existing.stop_sequence {
+                    *existing = rs.clone();
+                }
+            })
+            .or_insert(rs);
+    }
+
+    deduped.into_values().collect()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

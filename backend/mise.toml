@@ -9,19 +9,15 @@ run = "podman compose up -d"
 [tasks.csp]
 run = "cargo sqlx prepare"
 
-# TODO: fix weird linker error when using mise dev monorepo task
 [tasks.dev]
-# i get a linker error without specifying shell
-# TODO: figure out why control C no longer shuts down the backend (exec didn't work)
-shell = "nu -c"
 depends = ["start-containers"]
-run = "exec cargo run"
+run = "cargo run"
 
 [tasks.reset-db]
 confirm = "Are you sure?"
 run = """
 podman compose down
-podman volume rm backend_trainstatus-db
+podman volume rm backend_trainstatus-db || true
 podman compose up -d
 sqlx migrate run
 """

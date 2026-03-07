@@ -1,5 +1,8 @@
-use crate::feed::Alert as GtfsAlert;
-use crate::integrations::gtfs_alert::{self, GtfsAlertSource};
+use crate::feed::{Alert as GtfsAlert, FeedMessage};
+use crate::integrations::{
+    gtfs_alert::{self, GtfsAlertSource},
+    gtfs_realtime,
+};
 use crate::models::alert::{
     ActivePeriod, AffectedEntity, Alert, AlertData, AlertFormat, AlertSection, AlertTranslation,
     MtaData,
@@ -28,13 +31,17 @@ fn parse_mta_language(lang: Option<&str>) -> (AlertFormat, String) {
 
 pub struct MtaSubwayAlerts;
 
+#[async_trait]
 impl GtfsAlertSource for MtaSubwayAlerts {
     fn source(&self) -> Source {
         Source::MtaSubway
     }
 
-    fn feed_urls(&self) -> Vec<String> {
-        vec!["https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts".into()]
+    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
+        gtfs_realtime::fetch_feeds(vec![
+            ("camsys%2Fsubway-alerts".into(), gtfs_realtime::get_bytes("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts")),
+        ])
+        .await
     }
 
     fn parse_route_id(&self, route_id: String) -> Option<String> {

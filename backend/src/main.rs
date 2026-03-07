@@ -34,6 +34,7 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use crate::{
     sources::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
+        njt_bus::realtime::NjtBusRealtime,
     },
     stores::{
         alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
@@ -154,6 +155,7 @@ async fn main() {
     let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
         Arc::new(MtaSubwayRealtime),
         Arc::new(MtaBusRealtime),
+        Arc::new(NjtBusRealtime),
         // Arc::new(njt::rail_realtime::NjtRailRealtime),
     ];
 
@@ -169,6 +171,7 @@ async fn main() {
     let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
         Arc::new(sources::mta_bus::alerts::MtaBusAlerts),
         Arc::new(sources::mta_subway::alerts::MtaSubwayAlerts),
+        Arc::new(sources::njt_bus::alerts::NjtBusAlerts),
         // Arc::new(njt::rail_alerts::NjtRailAlerts),
     ];
 

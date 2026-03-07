@@ -10,7 +10,7 @@ use crate::sources::RealtimeAdapter;
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{
-    feed::{TripUpdate, VehiclePosition as GtfsVehiclePosition},
+    feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
     integrations::gtfs_realtime::GtfsSource,
 };
 use async_trait::async_trait;
@@ -20,22 +20,64 @@ use uuid::Uuid;
 
 pub struct MtaSubwayRealtime;
 
+#[async_trait]
 impl GtfsSource for MtaSubwayRealtime {
     fn source(&self) -> Source {
         Source::MtaSubway
     }
 
-    fn feed_urls(&self) -> Vec<String> {
-        vec![
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l".into(),
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs".into(), // 1234567
-            "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si".into(),
-        ]
+    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
+        gtfs_realtime::fetch_feeds(vec![
+            (
+                "mta_subway-ace".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
+                ),
+            ),
+            (
+                "mta_subway-bdfm".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
+                ),
+            ),
+            (
+                "mta_subway-g".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g",
+                ),
+            ),
+            (
+                "mta_subway-jz".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz",
+                ),
+            ),
+            (
+                "mta_subway-nqrw".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw",
+                ),
+            ),
+            (
+                "mta_subway-l".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l",
+                ),
+            ),
+            (
+                "mta_subway-gtfs-1234567".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
+                ),
+            ), // 1234567
+            (
+                "mta_subway-si".into(),
+                gtfs_realtime::get_bytes(
+                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si",
+                ),
+            ),
+        ])
+        .await
     }
 
     fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {

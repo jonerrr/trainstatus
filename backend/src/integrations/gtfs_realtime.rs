@@ -6,18 +6,36 @@ use crate::models::{
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{debug_rt_data, engines::static_data::StaticController, models::source::Source};
+use async_trait::async_trait;
+use futures::future::BoxFuture;
 use prost::Message;
+use prost::bytes;
 use std::collections::HashMap;
 use tokio::fs::{create_dir, write};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
+/// A future that fetches a GTFS-RT feed and returns the raw protobuf bytes.
+pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
 
+/// Returns a [`FeedFuture`] that issues a simple HTTP GET and returns the response body.
+pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
+    let url = url.into();
+    Box::pin(async move {
+        Ok(reqwest::get(&url)
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?)
+    })
+}
+
+#[async_trait]
 pub trait GtfsSource: Send + Sync {
     /// Friendly name for logging
     fn source(&self) -> Source;
 
-    /// The URLs to fetch
-    fn feed_urls(&self) -> Vec<String>;
+    /// Fetch and decode all GTFS-RT feeds for this source.
+    async fn fetch_feeds(&self) -> Vec<FeedMessage>;
 
     /// Maps a raw TripUpdate to a Trip AND its StopTimes.
     /// We return both because StopTimes usually need the Trip's UUID.
@@ -27,14 +45,15 @@ pub trait GtfsSource: Send + Sync {
     fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<VehiclePositionModel>;
 }
 
-/// Fetches and decodes a list of GTFS-RT URLs concurrently.
+/// Fetches and decodes GTFS-RT feeds from the provided labeled futures.
+/// Each entry is a `(label, future)` pair where the future returns raw protobuf bytes.
 /// If DEBUG_RT_DATA env var is set, saves raw protobuf and decoded data to ./gtfs/ for debugging.
-pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
-    let futures = urls.into_iter().enumerate().map(|(idx, url)| async move {
-        match reqwest::get(&url).await {
-            Ok(resp) => match resp.bytes().await {
+pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<FeedMessage> {
+    let futures: Vec<_> = labeled_futures
+        .into_iter()
+        .map(|(name, fut)| async move {
+            match fut.await {
                 Ok(bytes) => {
-                    // Only clone bytes if debug mode is enabled
                     let bytes_for_debug = if *debug_rt_data() {
                         Some(bytes.clone())
                     } else {
@@ -43,50 +62,35 @@ pub async fn fetch(urls: Vec<String>) -> Vec<FeedMessage> {
 
                     match FeedMessage::decode(bytes) {
                         Ok(msg) => {
-                            if let Some(bytes) = bytes_for_debug {
-                                // Extract filename from URL or use index
-                                let default_name = format!("feed_{}", idx);
-                                let name = url
-                                    .split('/')
-                                    .last()
-                                    .and_then(|s| s.split('?').next())
-                                    .unwrap_or(&default_name);
-
-                                // Create debug directory if it doesn't exist
+                            if let Some(raw) = bytes_for_debug {
                                 create_dir("./gtfs").await.ok();
 
-                                // Save raw protobuf
                                 let pb_path = format!("./gtfs/{}.pb", name);
-                                if let Err(e) = write(&pb_path, &bytes).await {
-                                    error!("Failed to write protobuf to {}: {}", pb_path, e);
+                                if let Err(e) = write(&pb_path, &raw).await {
+                                    error!(pb_path, %e, "Failed to write protobuf");
                                 }
 
-                                // Save decoded debug output
                                 let txt_path = format!("./gtfs/{}.txt", name);
-                                let debug_output = format!("{:#?}", msg);
-                                if let Err(e) = write(&txt_path, debug_output).await {
-                                    error!("Failed to write debug output to {}: {}", txt_path, e);
+                                let debug_str = format!("{:#?}", msg);
+                                if let Err(e) = write(&txt_path, debug_str).await {
+                                    error!(txt_path, %e, "Failed to write debug output");
                                 }
                             }
                             Some(msg)
                         }
                         Err(e) => {
-                            error!("Failed to decode protobuf from {}: {}", url, e);
+                            error!(name, %e, "Failed to decode protobuf");
                             None
                         }
                     }
                 }
                 Err(e) => {
-                    error!("Failed to read bytes from {}: {}", url, e);
+                    error!(name, %e, "Failed to fetch feed");
                     None
                 }
-            },
-            Err(e) => {
-                error!("Failed to fetch {}: {}", url, e);
-                None
             }
-        }
-    });
+        })
+        .collect();
 
     futures::future::join_all(futures)
         .await
@@ -105,9 +109,10 @@ pub async fn run_pipeline<T: GtfsSource>(
     position_store: &PositionStore,
 ) -> anyhow::Result<()> {
     // Ensure static data is loaded before processing realtime data
+    // TODO: maybe this should be in the engines/realtime.rs
     static_controller.ensure_updated(adapter.source()).await?;
 
-    let feeds = fetch(adapter.feed_urls()).await;
+    let feeds = adapter.fetch_feeds().await;
     if feeds.is_empty() {
         return Ok(());
     }

@@ -32,7 +32,6 @@
 				...t,
 				stop: page.data.stops_by_id[t.to_stop_source][t.to_stop_id]
 			}))
-			.filter((t) => t.stop != null)
 			.sort((a, b) => {
 				// Prioritize transfers from the same source as the current stop
 				if (a.stop.data.source === stop_source && b.stop.data.source !== stop_source) return -1;

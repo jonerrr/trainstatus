@@ -142,6 +142,60 @@ impl StopStore {
         source: Source,
         route_stops: &[RouteStop],
     ) -> anyhow::Result<()> {
+        // Before performing the SQL bulk insert, remove any duplicates that share the
+        // same (route_id, stop_id) once the values are uppercased.  The database
+        // enforces a unique constraint on that pair, so duplicates would trigger the
+        // "ON CONFLICT DO UPDATE command cannot affect row a second time" error when
+        // a single query batch contains more than one entry for the same key.
+        //
+        // We choose to keep the entry with the lowest `stop_sequence` (which is
+        // typically the first appearance in GTFS), but any deterministic rule would
+        // suffice.  Doing this in the store makes the behavior source‑agnostic, so
+        // adapters no longer need to dedupe themselves.
+        // TODO: maybe just move this to njt_bus since thats where the issue was.
+        // let mut unique_map: HashMap<(String, String), RouteStop> = HashMap::new();
+        // for rs in route_stops.iter() {
+        //     let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
+        //     unique_map
+        //         .entry(key)
+        //         .and_modify(|existing| {
+        //             if rs.stop_sequence < existing.stop_sequence {
+        //                 *existing = rs.clone();
+        //             }
+        //         })
+        //         .or_insert_with(|| rs.clone());
+        // }
+
+        // if unique_map.len() != route_stops.len() {
+        //     tracing::info!(
+        //         "[store] removed {} duplicate route_stops before insert",
+        //         route_stops.len() - unique_map.len()
+        //     );
+        // }
+
+        // let deduped: Vec<RouteStop> = unique_map.into_values().collect();
+
+        #[cfg(debug_assertions)]
+        {
+            // still warn if there were duplicates in the original slice, to help
+            // debug faulty adapters
+            let mut seen: HashMap<(String, String), usize> = HashMap::new();
+            for rs in route_stops {
+                let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
+                *seen.entry(key).or_insert(0) += 1;
+            }
+            for ((rid, sid), count) in seen {
+                if count > 1 {
+                    tracing::warn!(
+                        "[store] normalized route_stop appears {} times for route_id={} stop_id={}",
+                        count,
+                        rid,
+                        sid
+                    );
+                }
+            }
+        }
+
         let route_ids: Vec<_> = route_stops
             .iter()
             .map(|rs| rs.route_id.to_uppercase())

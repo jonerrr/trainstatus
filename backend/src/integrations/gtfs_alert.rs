@@ -1,14 +1,16 @@
-use crate::feed::Alert as GtfsAlert;
-use crate::integrations::gtfs_realtime::fetch;
+use crate::feed::{Alert as GtfsAlert, FeedMessage};
 use crate::models::alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation};
 use crate::models::source::Source;
 use crate::stores::alert::AlertStore;
+use async_trait::async_trait;
 use tracing::{debug, info, instrument, warn};
 
+#[async_trait]
 pub trait GtfsAlertSource: Send + Sync {
     fn source(&self) -> Source;
 
-    fn feed_urls(&self) -> Vec<String>;
+    /// Fetch and decode all GTFS-RT alert feeds for this source.
+    async fn fetch_feeds(&self) -> Vec<FeedMessage>;
 
     /// Process a GTFS-RT alert into our internal Alert representation.
     /// Returns None if the alert should be skipped (e.g., missing mercury extension).
@@ -54,7 +56,7 @@ pub async fn run_pipeline<T: GtfsAlertSource>(
     adapter: &T,
     alert_store: &AlertStore,
 ) -> anyhow::Result<()> {
-    let feeds = fetch(adapter.feed_urls()).await;
+    let feeds = adapter.fetch_feeds().await;
     if feeds.is_empty() {
         warn!("No alert feeds fetched for {:?}", adapter.source());
         return Ok(());

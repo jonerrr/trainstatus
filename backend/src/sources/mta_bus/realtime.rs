@@ -13,7 +13,7 @@ use crate::sources::mta_subway::realtime::parse_origin_time;
 use crate::stores::position::PositionStore;
 use crate::stores::trip::TripStore;
 use crate::{
-    feed::{TripUpdate, VehiclePosition as GtfsVehiclePosition},
+    feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
     integrations::gtfs_realtime::GtfsSource,
 };
 use async_trait::async_trait;
@@ -58,16 +58,24 @@ impl MtaBusRealtime {
     }
 }
 
+#[async_trait]
 impl GtfsSource for MtaBusRealtime {
     fn source(&self) -> Source {
         Source::MtaBus
     }
 
-    fn feed_urls(&self) -> Vec<String> {
-        vec![
-            "https://gtfsrt.prod.obanyc.com/tripUpdates".into(),
-            "https://gtfsrt.prod.obanyc.com/vehiclePositions".into(),
-        ]
+    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
+        gtfs_realtime::fetch_feeds(vec![
+            (
+                "mta_bus-trips".into(),
+                gtfs_realtime::get_bytes("https://gtfsrt.prod.obanyc.com/tripUpdates"),
+            ),
+            (
+                "mta_bus-positions".into(),
+                gtfs_realtime::get_bytes("https://gtfsrt.prod.obanyc.com/vehiclePositions"),
+            ),
+        ])
+        .await
     }
 
     fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
@@ -239,10 +247,7 @@ impl RealtimeAdapter for MtaBusRealtime {
             .await?;
 
         // 1. Fetch GTFS and OBA data in parallel
-        let (feeds, oba_result) = tokio::join!(
-            gtfs_realtime::fetch(self.feed_urls()),
-            self.fetch_oba_data()
-        );
+        let (feeds, oba_result) = tokio::join!(self.fetch_feeds(), self.fetch_oba_data());
 
         // 2. Process OBA data into lookup map
         let oba_map: HashMap<String, oba::VehicleStatus> = match oba_result {
