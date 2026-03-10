@@ -21,8 +21,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
 use std::collections::HashMap;
-use tracing::debug;
-use tracing::{error, warn};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 const AGENCIES: [&str; 2] = ["MTABC", "MTA NYCT"];
@@ -42,11 +41,11 @@ impl MtaBusRealtime {
 
             match oba::fetch_vehicles(&url, mta_oba_api_key()).await {
                 Ok(vehicles) => {
-                    tracing::debug!("Fetched {} vehicles from {}", vehicles.len(), agency);
+                    debug!("Fetched {} vehicles from {}", vehicles.len(), agency);
                     all_vehicles.extend(vehicles);
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to fetch OBA data from {}: {:?}", agency, e);
+                    warn!("Failed to fetch OBA data from {}: {:?}", agency, e);
                 }
             }
         }
@@ -244,6 +243,7 @@ impl RealtimeAdapter for MtaBusRealtime {
         std::time::Duration::from_secs(30)
     }
 
+    #[instrument(skip_all, fields(source = ?Source::MtaBus))]
     async fn run(
         &self,
         static_controller: &StaticController,
@@ -288,7 +288,8 @@ impl RealtimeAdapter for MtaBusRealtime {
             for entity in feed.entity {
                 // Process trips and stop times
                 if let Some(update) = entity.trip_update {
-                    let (trip_opt, new_stop_times) = self.process_trip(update, static_cache_store).await;
+                    let (trip_opt, new_stop_times) =
+                        self.process_trip(update, static_cache_store).await;
                     if let Some(trip) = trip_opt {
                         // Map vehicle_id to trip_id for position linking
                         vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
@@ -298,7 +299,9 @@ impl RealtimeAdapter for MtaBusRealtime {
 
                 // Process vehicles and merge with OBA data
                 if let Some(vehicle) = entity.vehicle {
-                    if let Some(mut position) = self.process_vehicle(vehicle, static_cache_store).await {
+                    if let Some(mut position) =
+                        self.process_vehicle(vehicle, static_cache_store).await
+                    {
                         // Merge OBA data if available
                         if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
                             // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
@@ -315,7 +318,7 @@ impl RealtimeAdapter for MtaBusRealtime {
             }
         }
 
-        tracing::info!(
+        info!(
             "Saving {} bus trips and {} positions",
             data.len(),
             positions.len()
@@ -337,7 +340,7 @@ impl RealtimeAdapter for MtaBusRealtime {
                         .and_then(|x| x.as_database_error())
                     {
                         if db_err.code().as_deref() == Some("23503") {
-                            tracing::warn!("Missing static data for bus. Forcing update...");
+                            warn!("Missing static data for bus. Forcing update...");
 
                             if let Err(update_err) = static_controller
                                 .force_update(GtfsSource::source(self))

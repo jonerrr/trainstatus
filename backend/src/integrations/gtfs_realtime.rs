@@ -108,7 +108,7 @@ pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<Feed
         .collect()
 }
 
-#[instrument(skip(adapter, static_controller, static_cache_store, trip_store, position_store), fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = ?adapter.source()))]
 pub async fn run_pipeline<T: GtfsSource>(
     adapter: &T,
     static_controller: &StaticController,

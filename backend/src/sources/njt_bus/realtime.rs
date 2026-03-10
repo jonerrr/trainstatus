@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
-use tracing::debug;
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -31,7 +31,7 @@ impl GtfsSource for NjtBusRealtime {
         let token = match get_token().await {
             Ok(t) => t,
             Err(e) => {
-                tracing::error!("NJT auth failed: {:?}", e);
+                error!("NJT auth failed: {:?}", e);
                 return vec![];
             }
         };
@@ -134,12 +134,19 @@ impl GtfsSource for NjtBusRealtime {
             .map(|ct| ct.headsign.clone())
             .unwrap_or_default();
 
-        // Use vehicle ID from the VehicleDescriptor if present, otherwise fall back to trip_id
-        let vehicle_id = update
+        // Use vehicle ID from the VehicleDescriptor if present, otherwise fall back to vehicle.label
+        // It looks like they are always identical, but sometimes it doesn't include the id in the trips feed.
+        let Some(vehicle_id) = update
             .vehicle
             .as_ref()
-            .and_then(|v| v.id.clone())
-            .unwrap_or_else(|| trip_id.clone());
+            .and_then(|v| v.id.clone().or_else(|| v.label.clone()))
+        else {
+            warn!(
+                trip_id,
+                "Missing vehicle ID for NJT trip update and not found in cache"
+            );
+            return (None, vec![]);
+        };
 
         let trip = Trip {
             id: Uuid::now_v7(),

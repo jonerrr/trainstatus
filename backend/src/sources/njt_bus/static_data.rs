@@ -7,6 +7,7 @@ use geojson::GeoJson;
 use regex::Regex;
 
 use crate::{
+    engines::static_cache::expand_gtfs,
     models::{
         route::{Route, RouteData},
         source::Source,
@@ -14,7 +15,6 @@ use crate::{
     },
     sources::StaticAdapter,
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
-    engines::static_cache::expand_gtfs,
 };
 
 const NJT_DEFAULT_COLOR: &str = "0033A0";
@@ -320,6 +320,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 .max_by_key(|(_, count)| *count)
                 .map(|(h, _)| h)
                 .unwrap_or_default();
+            // TODO: maybe don't include headsign here since its included in rt trip data
 
             RouteStop {
                 route_id,
