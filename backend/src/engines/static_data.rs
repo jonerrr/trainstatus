@@ -8,6 +8,7 @@ use tracing::{error, info, instrument};
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
 use crate::stores::route::RouteStore;
+use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::stop::StopStore;
 
 type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
@@ -69,6 +70,7 @@ pub async fn run(
     pool: &PgPool,
     route_store: &RouteStore,
     stop_store: &StopStore,
+    static_cache_store: &StaticCacheStore,
     adapters: Vec<Arc<dyn StaticAdapter>>,
 ) -> StaticController {
     let mut senders = HashMap::new();
@@ -81,10 +83,11 @@ pub async fn run(
         let pool = pool.clone();
         let route_store = route_store.clone();
         let stop_store = stop_store.clone();
+        let static_cache_store = static_cache_store.clone();
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
-            run_source_handler(pool, route_store, stop_store, adapter, rx).await;
+            run_source_handler(pool, route_store, stop_store, static_cache_store, adapter, rx).await;
         }));
     }
 
@@ -98,6 +101,7 @@ async fn run_source_handler(
     pool: PgPool,
     route_store: RouteStore,
     stop_store: StopStore,
+    static_cache_store: StaticCacheStore,
     adapter: Arc<dyn StaticAdapter>,
     mut rx: mpsc::Receiver<UpdateRequest>,
 ) {
@@ -141,7 +145,7 @@ async fn run_source_handler(
                                     });
                                 }
 
-                                spawn_import(&pool, &route_store, &stop_store, &adapter, &import_tx, &mut import_in_progress);
+                                spawn_import(&pool, &route_store, &stop_store, &static_cache_store, &adapter, &import_tx, &mut import_in_progress);
                             }
                             Ok(true) if import_in_progress => {
                                 // Update already in progress - queue this waiter
@@ -175,7 +179,7 @@ async fn run_source_handler(
                                 });
                             }
 
-                            spawn_import(&pool, &route_store, &stop_store, &adapter, &import_tx, &mut import_in_progress);
+                            spawn_import(&pool, &route_store, &stop_store, &static_cache_store, &adapter, &import_tx, &mut import_in_progress);
                         }
                     }
                 }
@@ -191,6 +195,7 @@ fn spawn_import(
     pool: &PgPool,
     route_store: &RouteStore,
     stop_store: &StopStore,
+    static_cache_store: &StaticCacheStore,
     adapter: &Arc<dyn StaticAdapter>,
     import_tx: &mpsc::Sender<anyhow::Result<()>>,
     import_in_progress: &mut bool,
@@ -200,12 +205,17 @@ fn spawn_import(
     let pool_clone = pool.clone();
     let route_store_clone = route_store.clone();
     let stop_store_clone = stop_store.clone();
+    let static_cache_store_clone = static_cache_store.clone();
     let adapter_clone = adapter.clone();
     let import_tx_clone = import_tx.clone();
 
     tokio::spawn(async move {
         let result = adapter_clone
-            .import(&route_store_clone, &stop_store_clone)
+            .import(
+                &route_store_clone,
+                &stop_store_clone,
+                &static_cache_store_clone,
+            )
             .await;
 
         if let Ok(_) = &result {
@@ -220,7 +230,7 @@ fn spawn_import(
             // Compute proximity-based transfers across all sources after every successful
             // import. Runs source-agnostically so cross-source proximity pairs are always
             // up to date. Errors are non-fatal — import waiters are still notified Ok.
-            if let Err(e) = stop_store_clone.compute_proximity_transfers().await {
+            if let Err(e) = stop_store_clone.compute_proximity_transfers(Some(adapter_clone.source())).await {
                 error!("Failed to compute proximity transfers: {:#}", e);
             }
         } else if let Err(e) = &result {

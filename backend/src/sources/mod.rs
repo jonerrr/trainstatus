@@ -2,8 +2,8 @@ use crate::{
     engines::static_data::StaticController,
     models::source::Source,
     stores::{
-        alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
-        trip::TripStore,
+        alert::AlertStore, position::PositionStore, route::RouteStore,
+        static_cache::StaticCacheStore, stop::StopStore, trip::TripStore,
     },
 };
 use async_trait::async_trait;
@@ -26,6 +26,7 @@ pub trait RealtimeAdapter: Send + Sync {
         // TODO: prob remove pool since stores have it
         // pool: &PgPool,
         static_controller: &StaticController,
+        static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,
         // stop_time_store: &StopTimeStore,
         position_store: &PositionStore,
@@ -50,5 +51,10 @@ pub trait StaticAdapter: Send + Sync {
 
     fn refresh_interval(&self) -> Duration;
 
-    async fn import(&self, route_store: &RouteStore, stop_store: &StopStore) -> anyhow::Result<()>;
+    async fn import(
+        &self,
+        route_store: &RouteStore,
+        stop_store: &StopStore,
+        static_cache_store: &StaticCacheStore,
+    ) -> anyhow::Result<()>;
 }

@@ -8,6 +8,7 @@ pub mod position;
 pub mod route;
 pub mod stop;
 pub mod stop_time;
+pub mod static_cache;
 pub mod trip;
 
 /// Try to get a cached value from Redis. Returns `None` on miss or error.

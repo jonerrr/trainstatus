@@ -303,13 +303,24 @@ impl StopStore {
     ///
     /// All existing type-6 entries are deleted and recomputed atomically so stale
     /// pairs (e.g. after a stop moves) are always cleaned up.
-    pub async fn compute_proximity_transfers(&self) -> anyhow::Result<()> {
+    pub async fn compute_proximity_transfers(&self, source: Option<Source>) -> anyhow::Result<()> {
         let mut tx = self.pg_pool.begin().await?;
 
-        // Remove all stale proximity transfers before recomputing.
-        sqlx::query("DELETE FROM static.stop_transfer WHERE transfer_type = 6")
+        // If a source is provided, only remove and recompute transfers involving that source.
+        // This is much faster than a full recompute of all sources.
+        if let Some(s) = source {
+            sqlx::query(
+                "DELETE FROM static.stop_transfer WHERE transfer_type = 6 AND (from_stop_source = $1 OR to_stop_source = $1)",
+            )
+            .bind(s)
             .execute(&mut *tx)
             .await?;
+        } else {
+            // Remove all stale proximity transfers before recomputing everything.
+            sqlx::query("DELETE FROM static.stop_transfer WHERE transfer_type = 6")
+                .execute(&mut *tx)
+                .await?;
+        }
 
         // Insert proximity transfers for every stop pair within 150 m.
         // Both directions (A→B and B→A) are produced by the self-join.
@@ -317,7 +328,10 @@ impl StopStore {
         // For stops with a `direction` value (bus stops), only the closest candidate
         // per (from_stop, to_source, to_direction) group is kept. Stops without a
         // direction (subway) are not deduplicated and all qualifying pairs are inserted.
-        // TODO: time this (seems to take a while to run)
+        //
+        // OPTIMIZATION: We use `a.geom && ST_Expand(b.geom, 0.002)` to leverage the GIST index
+        // on the 4326 geometry column. 0.002 degrees is approx 220m at NYC latitude,
+        // providing a safe bounding box for our 150m check.
         sqlx::query(
             r#"
             WITH candidates AS (
@@ -334,14 +348,18 @@ impl StopStore {
                 FROM static.stop a
                 JOIN static.stop b
                     ON a.id != b.id
+                    -- Spatial index filter (approx 200m in degrees)
+                    AND a.geom && ST_Expand(b.geom, 0.002)
                     AND ST_DWithin(
                         ST_Transform(a.geom, 6538),
                         ST_Transform(b.geom, 6538),
                         150.0
                     )
                 WHERE
+                    -- If source filter is provided, only look at pairs involving that source
+                    ($1::source_enum IS NULL OR a.source = $1 OR b.source = $1)
                     -- Skip pairs that already have an official (non-proximity) transfer
-                    NOT EXISTS (
+                    AND NOT EXISTS (
                         SELECT 1 FROM static.stop_transfer st
                         WHERE st.from_stop_id = a.id
                           AND st.from_stop_source = a.source
@@ -398,17 +416,26 @@ impl StopStore {
             ON CONFLICT DO NOTHING
             "#,
         )
+        .bind(source)
         .execute(&mut *tx)
         .await?;
 
         tx.commit().await?;
 
-        // Repopulate stop caches for all sources — transfers are embedded in the stop response.
-        // this is the last step so we do populate cache here.
         // TODO: maybe move this to parent function to make it clearer that cache is repopulated after transfers are computed?
-        // TODO: create a global var for all sources instead of hardcoding here
-        for source in [Source::MtaSubway, Source::MtaBus] {
-            self.populate_cache(source).await?;
+        // Repopulate stop caches — transfers are embedded in the stop response.
+        // We iterate through all active sources to ensure all caches are consistent.
+        // Only repopulate if we have a source specified (or all if None).
+        let sources = match source {
+            Some(s) => vec![s],
+            // TODO: create a global var for all sources instead of hardcoding here
+            None => vec![Source::MtaSubway, Source::MtaBus, Source::NjtBus],
+        };
+
+        for s in sources {
+            if let Err(e) = self.populate_cache(s).await {
+                tracing::error!("Failed to repopulate cache for {:?}: {:#}", s, e);
+            }
         }
 
         Ok(())

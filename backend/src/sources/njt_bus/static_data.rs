@@ -13,7 +13,8 @@ use crate::{
         stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     sources::StaticAdapter,
-    stores::{route::RouteStore, stop::StopStore},
+    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
+    engines::static_cache::expand_gtfs,
 };
 
 const NJT_DEFAULT_COLOR: &str = "0033A0";
@@ -32,7 +33,12 @@ impl StaticAdapter for NjtBusStatic {
         Duration::from_secs(60 * 60 * 24) // 24 hours
     }
 
-    async fn import(&self, route_store: &RouteStore, stop_store: &StopStore) -> anyhow::Result<()> {
+    async fn import(
+        &self,
+        route_store: &RouteStore,
+        stop_store: &StopStore,
+        static_cache_store: &StaticCacheStore,
+    ) -> anyhow::Result<()> {
         // 1. Authenticate
         let token = super::get_token()
             .await
@@ -57,6 +63,13 @@ impl StaticAdapter for NjtBusStatic {
             gtfs.stops.len(),
             gtfs.trips.len()
         );
+
+        // Expand and cache trips for 48 hours in Redis
+        let cached_trips = expand_gtfs(Source::NjtBus, &gtfs);
+        static_cache_store
+            .cache_trips(Source::NjtBus, &cached_trips)
+            .await
+            .context("Failed to cache NJT trips in Redis")?;
 
         // 4. Fetch route geometries from NJT ArcGIS REST endpoint
         let route_geom_map = fetch_route_geometries()
@@ -298,7 +311,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
         }
     }
 
-    let mut result: Vec<RouteStop> = accum
+    let result: Vec<RouteStop> = accum
         .into_iter()
         .map(|((route_id, stop_id, direction), acc)| {
             let headsign = acc

@@ -4,6 +4,7 @@ use crate::models::{
     trip::{StopTime, Trip},
 };
 use crate::stores::position::PositionStore;
+use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::trip::TripStore;
 use crate::{debug_rt_data, engines::static_data::StaticController, models::source::Source};
 use async_trait::async_trait;
@@ -39,10 +40,18 @@ pub trait GtfsSource: Send + Sync {
 
     /// Maps a raw TripUpdate to a Trip AND its StopTimes.
     /// We return both because StopTimes usually need the Trip's UUID.
-    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>);
+    async fn process_trip(
+        &self,
+        update: TripUpdate,
+        static_cache_store: &StaticCacheStore,
+    ) -> (Option<Trip>, Vec<StopTime>);
 
     /// Maps a raw VehiclePosition to a VehiclePositionModel.
-    fn process_vehicle(&self, vehicle: VehiclePosition) -> Option<VehiclePositionModel>;
+    async fn process_vehicle(
+        &self,
+        vehicle: VehiclePosition,
+        static_cache_store: &StaticCacheStore,
+    ) -> Option<VehiclePositionModel>;
 }
 
 /// Fetches and decodes GTFS-RT feeds from the provided labeled futures.
@@ -99,10 +108,11 @@ pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<Feed
         .collect()
 }
 
-#[instrument(skip(adapter, static_controller, trip_store, position_store), fields(source = ?adapter.source()))]
+#[instrument(skip(adapter, static_controller, static_cache_store, trip_store, position_store), fields(source = ?adapter.source()))]
 pub async fn run_pipeline<T: GtfsSource>(
     adapter: &T,
     static_controller: &StaticController,
+    static_cache_store: &StaticCacheStore,
     trip_store: &TripStore,
     position_store: &PositionStore,
 ) -> anyhow::Result<()> {
@@ -124,7 +134,8 @@ pub async fn run_pipeline<T: GtfsSource>(
     for feed in feeds {
         for entity in feed.entity {
             if let Some(update) = entity.trip_update {
-                let (trip_opt, new_stop_times) = adapter.process_trip(update);
+                let (trip_opt, new_stop_times) =
+                    adapter.process_trip(update, static_cache_store).await;
                 if let Some(trip) = trip_opt {
                     // Map vehicle_id to trip_id for position linking
                     vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
@@ -133,7 +144,7 @@ pub async fn run_pipeline<T: GtfsSource>(
             }
 
             if let Some(vehicle) = entity.vehicle {
-                if let Some(pos) = adapter.process_vehicle(vehicle) {
+                if let Some(pos) = adapter.process_vehicle(vehicle, static_cache_store).await {
                     positions.push(pos);
                 }
             }

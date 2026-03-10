@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     api::util::point_schema,
+    feed::vehicle_position::OccupancyStatus,
     impl_discriminated_data,
     models::{geom::Geom, source::Source},
 };
@@ -41,11 +42,16 @@ pub struct MtaBusPositionData {
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
+pub struct NjtBusPositionData {
+    pub occupancy_status: OccupancyStatus,
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum PositionData {
     MtaSubway(MtaSubwayPositionData),
     MtaBus(MtaBusPositionData),
-    NjtBus,
+    NjtBus(NjtBusPositionData),
 }
 
 impl_discriminated_data!(
@@ -54,6 +60,6 @@ impl_discriminated_data!(
     {
         MtaBus => MtaBusPositionData,
         MtaSubway => MtaSubwayPositionData,
-        NjtBus,
+        NjtBus => NjtBusPositionData,
     }
 );

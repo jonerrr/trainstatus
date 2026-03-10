@@ -11,6 +11,7 @@ use crate::mta_oba_api_key;
 use crate::sources::RealtimeAdapter;
 use crate::sources::mta_subway::realtime::parse_origin_time;
 use crate::stores::position::PositionStore;
+use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::trip::TripStore;
 use crate::{
     feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
@@ -78,7 +79,11 @@ impl GtfsSource for MtaBusRealtime {
         .await
     }
 
-    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
+    async fn process_trip(
+        &self,
+        update: TripUpdate,
+        _static_cache_store: &StaticCacheStore,
+    ) -> (Option<Trip>, Vec<StopTime>) {
         let trip_desc = update.trip;
 
         // Extract trip ID and route ID
@@ -192,7 +197,11 @@ impl GtfsSource for MtaBusRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
+    async fn process_vehicle(
+        &self,
+        vehicle: GtfsVehiclePosition,
+        _static_cache_store: &StaticCacheStore,
+    ) -> Option<VehiclePosition> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -238,6 +247,7 @@ impl RealtimeAdapter for MtaBusRealtime {
     async fn run(
         &self,
         static_controller: &StaticController,
+        static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,
         position_store: &PositionStore,
     ) -> anyhow::Result<()> {
@@ -278,7 +288,7 @@ impl RealtimeAdapter for MtaBusRealtime {
             for entity in feed.entity {
                 // Process trips and stop times
                 if let Some(update) = entity.trip_update {
-                    let (trip_opt, new_stop_times) = self.process_trip(update);
+                    let (trip_opt, new_stop_times) = self.process_trip(update, static_cache_store).await;
                     if let Some(trip) = trip_opt {
                         // Map vehicle_id to trip_id for position linking
                         vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
@@ -288,7 +298,7 @@ impl RealtimeAdapter for MtaBusRealtime {
 
                 // Process vehicles and merge with OBA data
                 if let Some(vehicle) = entity.vehicle {
-                    if let Some(mut position) = self.process_vehicle(vehicle) {
+                    if let Some(mut position) = self.process_vehicle(vehicle, static_cache_store).await {
                         // Merge OBA data if available
                         if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
                             // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.

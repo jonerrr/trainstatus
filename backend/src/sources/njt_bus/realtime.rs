@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
-use tracing::{debug, warn};
+use tracing::debug;
 use uuid::Uuid;
 
 use crate::{
@@ -9,12 +9,12 @@ use crate::{
     feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
     integrations::gtfs_realtime::{self, GtfsSource},
     models::{
-        position::{PositionData, VehiclePosition},
+        position::{NjtBusPositionData, PositionData, VehiclePosition},
         source::Source,
         trip::{StopTime, StopTimeData, Trip, TripData},
     },
     sources::RealtimeAdapter,
-    stores::{position::PositionStore, trip::TripStore},
+    stores::{position::PositionStore, static_cache::StaticCacheStore, trip::TripStore},
 };
 
 use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
@@ -49,28 +49,54 @@ impl GtfsSource for NjtBusRealtime {
         .await
     }
 
-    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
+    async fn process_trip(
+        &self,
+        update: TripUpdate,
+        static_cache_store: &StaticCacheStore,
+    ) -> (Option<Trip>, Vec<StopTime>) {
         let trip_desc = update.trip;
 
         let trip_id = match trip_desc.trip_id {
             Some(id) => id,
             None => return (None, vec![]),
         };
-        let route_id = match trip_desc.route_id {
-            Some(id) => id,
-            None => return (None, vec![]),
-        };
-        let direction = match trip_desc.direction_id {
-            Some(d) => d as i16,
-            None => {
-                debug!(trip_id, "Missing direction_id for NJT trip");
-                return (None, vec![]);
-            }
-        };
-        let start_date_str = match trip_desc.start_date {
-            Some(d) => d,
-            None => return (None, vec![]),
-        };
+
+        // Try to get from static cache to fill in missing fields
+        // We guess start_date as today if not present
+        // TODO: stop guessing start_date, it will cause issues near midnight.
+        let start_date_str = trip_desc.start_date.clone().unwrap_or_else(|| {
+            Utc::now()
+                .with_timezone(&chrono_tz::America::New_York)
+                .format("%Y%m%d")
+                .to_string()
+        });
+
+        let cached_trip = static_cache_store
+            .get_trip(Source::NjtBus, &trip_id, &start_date_str)
+            .await
+            .unwrap_or(None);
+
+        let route_id = trip_desc
+            .route_id
+            .or_else(|| cached_trip.as_ref().map(|ct| ct.route_id.clone()))
+            .unwrap_or_else(|| {
+                debug!(
+                    trip_id,
+                    "Missing route_id for NJT trip and not found in cache"
+                );
+                "".to_string() // Fallback to empty if really not found
+            });
+
+        if route_id.is_empty() {
+            return (None, vec![]);
+        }
+
+        let direction = trip_desc
+            .direction_id
+            .map(|d| d as i16)
+            .or_else(|| cached_trip.as_ref().map(|ct| ct.direction_id))
+            .unwrap_or(0);
+
         let start_date = match NaiveDate::parse_from_str(&start_date_str, "%Y%m%d") {
             Ok(d) => d,
             Err(_) => return (None, vec![]),
@@ -79,22 +105,34 @@ impl GtfsSource for NjtBusRealtime {
         let start_time = match trip_desc.start_time {
             Some(ref t) => match NaiveTime::parse_from_str(t, "%H:%M:%S") {
                 Ok(time) => time,
-                Err(_) => {
-                    warn!(
-                        trip_id,
-                        start_time = t.as_str(),
-                        "Failed to parse NJT start_time, falling back to midnight"
-                    );
-                    NaiveTime::from_hms_opt(0, 0, 0).unwrap()
-                }
+                Err(_) => cached_trip
+                    .as_ref()
+                    .map(|ct| {
+                        ct.start_time
+                            .with_timezone(&chrono_tz::America::New_York)
+                            .time()
+                    })
+                    .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
             },
-            None => NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+            None => cached_trip
+                .as_ref()
+                .map(|ct| {
+                    ct.start_time
+                        .with_timezone(&chrono_tz::America::New_York)
+                        .time()
+                })
+                .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
         };
 
         let created_at = match Trip::created_at(start_date, start_time) {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
+
+        let headsign = cached_trip
+            .as_ref()
+            .map(|ct| ct.headsign.clone())
+            .unwrap_or_default();
 
         // Use vehicle ID from the VehicleDescriptor if present, otherwise fall back to trip_id
         let vehicle_id = update
@@ -111,7 +149,10 @@ impl GtfsSource for NjtBusRealtime {
             created_at,
             vehicle_id,
             updated_at: Utc::now(),
-            data: TripData::NjtBus,
+            data: TripData::NjtBus(crate::models::trip::NjtBusData {
+                deviation: update.delay,
+                headsign,
+            }),
         };
 
         let stop_times: Vec<StopTime> = update
@@ -145,12 +186,17 @@ impl GtfsSource for NjtBusRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
-        let vehicle_desc = vehicle.vehicle?;
-        let vehicle_id = vehicle_desc.id?;
+    async fn process_vehicle(
+        &self,
+        vehicle: GtfsVehiclePosition,
+        _static_cache_store: &StaticCacheStore,
+    ) -> Option<VehiclePosition> {
+        let vehicle_desc = vehicle.vehicle.as_ref()?;
+        let vehicle_id = vehicle_desc.id.clone()?;
 
         let position = vehicle.position?;
-        let stop_id = vehicle.stop_id;
+        let stop_id = vehicle.stop_id.clone();
+        let occupancy_status = vehicle.occupancy_status();
 
         let updated_at = vehicle
             .timestamp
@@ -166,7 +212,7 @@ impl GtfsSource for NjtBusRealtime {
             stop_id,
             updated_at,
             geom: Some(geom.into()),
-            data: PositionData::NjtBus,
+            data: PositionData::NjtBus(NjtBusPositionData { occupancy_status }),
         })
     }
 }
@@ -184,9 +230,17 @@ impl RealtimeAdapter for NjtBusRealtime {
     async fn run(
         &self,
         static_controller: &StaticController,
+        static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,
         position_store: &PositionStore,
     ) -> anyhow::Result<()> {
-        gtfs_realtime::run_pipeline(self, static_controller, trip_store, position_store).await
+        gtfs_realtime::run_pipeline(
+            self,
+            static_controller,
+            static_cache_store,
+            trip_store,
+            position_store,
+        )
+        .await
     }
 }

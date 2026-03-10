@@ -8,6 +8,7 @@ use crate::models::{
 };
 use crate::sources::RealtimeAdapter;
 use crate::stores::position::PositionStore;
+use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::trip::TripStore;
 use crate::{
     feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
@@ -80,7 +81,11 @@ impl GtfsSource for MtaSubwayRealtime {
         .await
     }
 
-    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
+    async fn process_trip(
+        &self,
+        update: TripUpdate,
+        _static_cache_store: &StaticCacheStore,
+    ) -> (Option<Trip>, Vec<StopTime>) {
         let trip_desc = update.trip;
 
         let mta_id = match trip_desc.trip_id {
@@ -232,7 +237,11 @@ impl GtfsSource for MtaSubwayRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
+    async fn process_vehicle(
+        &self,
+        vehicle: GtfsVehiclePosition,
+        _static_cache_store: &StaticCacheStore,
+    ) -> Option<VehiclePosition> {
         let trip = vehicle.trip?;
         let nyct_trip = trip.nyct_trip_descriptor?;
 
@@ -287,6 +296,7 @@ impl RealtimeAdapter for MtaSubwayRealtime {
         &self,
         // pool: &PgPool,
         static_controller: &StaticController,
+        static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,
         // stop_time_store: &StopTimeStore,
         position_store: &PositionStore,
@@ -294,6 +304,7 @@ impl RealtimeAdapter for MtaSubwayRealtime {
         gtfs_realtime::run_pipeline(
             self,
             static_controller,
+            static_cache_store,
             trip_store,
             // stop_time_store,
             position_store,

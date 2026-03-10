@@ -17,7 +17,7 @@ use crate::{
     },
     mta_oba_api_key,
     sources::StaticAdapter,
-    stores::{route::RouteStore, stop::StopStore},
+    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 
 /// Maximum distance (in meters) allowed when pairing opposite-direction stops.
@@ -35,7 +35,12 @@ impl StaticAdapter for MtaBusStatic {
         Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
-    async fn import(&self, route_store: &RouteStore, stop_store: &StopStore) -> anyhow::Result<()> {
+    async fn import(
+        &self,
+        route_store: &RouteStore,
+        stop_store: &StopStore,
+        _static_cache_store: &StaticCacheStore,
+    ) -> anyhow::Result<()> {
         let (routes, stops, route_stops) = self.import_routes_and_stops().await?;
 
         route_store

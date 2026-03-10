@@ -17,7 +17,7 @@ use crate::{
         },
     },
     sources::StaticAdapter,
-    stores::{route::RouteStore, stop::StopStore},
+    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 
 // Deserialize strings to i16
@@ -152,7 +152,12 @@ impl StaticAdapter for MtaSubwayStatic {
         Duration::from_secs(60 * 60 * 24 * 7) // 7 days
     }
 
-    async fn import(&self, route_store: &RouteStore, stop_store: &StopStore) -> anyhow::Result<()> {
+    async fn import(
+        &self,
+        route_store: &RouteStore,
+        stop_store: &StopStore,
+        _static_cache_store: &StaticCacheStore,
+    ) -> anyhow::Result<()> {
         // TODO: use gtfsReader to only select wanted files
         let gtfs = gtfs_structures::Gtfs::from_url_async(
             "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",

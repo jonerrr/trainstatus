@@ -37,13 +37,22 @@ pub struct MtaBusData {
     pub deviation: Option<i32>,
 }
 
+#[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
+pub struct NjtBusData {
+    /// Deviation from the schedule in seconds.
+    /// A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deviation: Option<i32>,
+    pub headsign: String,
+}
+
 /// Trip data changes based on the `Source`
 #[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum TripData {
     MtaBus(MtaBusData),
     MtaSubway,
-    NjtBus,
+    NjtBus(NjtBusData),
 }
 
 impl_discriminated_data!(
@@ -52,7 +61,7 @@ impl_discriminated_data!(
     {
         MtaBus => MtaBusData,
         MtaSubway,
-        NjtBus,
+        NjtBus => NjtBusData,
     }
 );
 

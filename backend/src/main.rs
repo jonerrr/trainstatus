@@ -134,6 +134,7 @@ async fn main() {
         stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
     let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
+    let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
     // We use Arc so the engine can share ownership of the adapter traits
     let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
@@ -143,8 +144,14 @@ async fn main() {
         // Arc::new(njt::rail_static::NjtRailStatic),
     ];
 
-    let static_controller =
-        engines::static_data::run(&pg_pool, &route_store, &stop_store, static_adapters).await;
+    let static_controller = engines::static_data::run(
+        &pg_pool,
+        &route_store,
+        &stop_store,
+        &static_cache_store,
+        static_adapters,
+    )
+    .await;
 
     // // test njt bus
     // static_controller
@@ -163,6 +170,7 @@ async fn main() {
         &trip_store,
         &stop_time_store,
         &position_store,
+        &static_cache_store,
         realtime_adapters,
         static_controller.clone(),
     )
