@@ -9,6 +9,7 @@ import type {
 	ApiAlert,
 	MtaBusPositionData,
 	MtaSubwayPositionData,
+	NjtBusPositionData,
 	Source,
 	StopTime,
 	StopTimeData,
@@ -46,6 +47,18 @@ export const source_info = {
 			// TODO: maybe don't include subway positions since they don't contain really contain any useful info
 		},
 		monitor_routes: false
+	},
+	njt_bus: {
+		name: 'NJT Bus',
+		// TODO: update icon
+		icon: mta_subway_icon,
+		refresh_interval: {
+			trips: 30_000,
+			stop_times: 30_000,
+			positions: 30_000,
+			alerts: 45_000
+		},
+		monitor_routes: true
 	}
 } as const;
 
@@ -60,18 +73,21 @@ export const default_sources: Source[] = ['mta_subway', 'mta_bus'] as const;
 export type SourcePositionDataMap = {
 	mta_bus: MtaBusPositionData & { source: 'mta_bus' };
 	mta_subway: MtaSubwayPositionData & { source: 'mta_subway' };
+	njt_bus: NjtBusPositionData & { source: 'njt_bus' };
 };
 
 /** Trip data discriminated by source */
 export type SourceTripDataMap = {
 	mta_bus: Extract<TripData, { source: 'mta_bus' }>;
 	mta_subway: Extract<TripData, { source: 'mta_subway' }>;
+	njt_bus: Extract<TripData, { source: 'njt_bus' }>;
 };
 
 /** StopTime data discriminated by source */
 export type SourceStopTimeDataMap = {
 	mta_bus: Extract<StopTimeData, { source: 'mta_bus' }>;
 	mta_subway: Extract<StopTimeData, { source: 'mta_subway' }>;
+	njt_bus: Extract<StopTimeData, { source: 'njt_bus' }>;
 };
 
 // =============================================================================

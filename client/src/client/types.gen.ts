@@ -101,10 +101,45 @@ export type MtaSubwayStopTimeData = {
     scheduled_track?: string | null;
 };
 
+export type NjtBusData = {
+    /**
+     * Deviation from the schedule in seconds.
+     * A negative value means the bus is ahead of schedule and a positive value means the bus is behind schedule.
+     */
+    deviation?: number | null;
+    headsign: string;
+};
+
+export type NjtBusPositionData = {
+    occupancy_status: OccupancyStatus;
+};
+
+export type NjtBusStopData = {
+    /**
+     * Public-facing 5-digit stop code (e.g. "10001"), shown on signs and NJT apps
+     */
+    stop_code: string;
+};
+
+/**
+ * The state of passenger occupancy for the vehicle or carriage.
+ * Individual producers may not publish all OccupancyStatus values. Therefore,
+ * consumers must not assume that the OccupancyStatus values follow a linear
+ * scale. Consumers should represent OccupancyStatus values as the state
+ * indicated and intended by the producer. Likewise, producers must use
+ * OccupancyStatus values that correspond to actual vehicle occupancy states.
+ * For describing passenger occupancy levels on a linear scale, see
+ * `occupancy_percentage`. This field is still experimental, and subject to
+ * change. It may be formally adopted in the future.
+ */
+export type OccupancyStatus = 'Empty' | 'ManySeatsAvailable' | 'FewSeatsAvailable' | 'StandingRoomOnly' | 'CrushedStandingRoomOnly' | 'Full' | 'NotAcceptingPassengers' | 'NoDataAvailable' | 'NotBoardable';
+
 export type PositionData = (MtaSubwayPositionData & {
     source: 'mta_subway';
 }) | (MtaBusPositionData & {
     source: 'mta_bus';
+}) | (NjtBusPositionData & {
+    source: 'njt_bus';
 });
 
 export type Route = {
@@ -122,6 +157,8 @@ export type RouteData = (MtaBusData & {
     source: 'mta_bus';
 }) | {
     source: 'mta_subway';
+} | {
+    source: 'njt_bus';
 };
 
 export type RouteStop = {
@@ -145,9 +182,16 @@ export type RouteStopData = {
      */
     opposite_stop_id?: string | null;
     source: 'mta_bus';
+} | {
+    /**
+     * 0 or 1 from GTFS direction_id
+     */
+    direction: number;
+    headsign: string;
+    source: 'njt_bus';
 };
 
-export type Source = 'mta_subway' | 'mta_bus';
+export type Source = 'mta_subway' | 'mta_bus' | 'njt_bus';
 
 export type Stop = {
     data: StopData;
@@ -170,6 +214,8 @@ export type StopData = (MtaSubwayStopData & {
     source: 'mta_subway';
 }) | (MtaBusStopData & {
     source: 'mta_bus';
+}) | (NjtBusStopData & {
+    source: 'njt_bus';
 });
 
 export type StopTime = {
@@ -184,6 +230,8 @@ export type StopTimeData = (MtaSubwayStopTimeData & {
     source: 'mta_subway';
 }) | {
     source: 'mta_bus';
+} | {
+    source: 'njt_bus';
 };
 
 export type StopType = 'full_time' | 'part_time' | 'late_night' | 'rush_hour_one_direction' | 'rush_hour' | 'weekday_only' | 'nights_weekends_only' | 'unknown';
@@ -228,7 +276,9 @@ export type TripData = (MtaBusData & {
     source: 'mta_bus';
 }) | {
     source: 'mta_subway';
-};
+} | (NjtBusData & {
+    source: 'njt_bus';
+});
 
 /**
  * Current vehicle position (for upsert into vehicle_position table)

@@ -9,6 +9,8 @@ use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
+const REQUIRE_ROUTE_FILTER_SOURCES: [Source; 2] = [Source::MtaBus, Source::NjtBus];
+
 #[utoipa::path(
     get,
     path = "/trips/{source}",
@@ -64,7 +66,7 @@ pub async fn stop_times_handler(
 ) -> Result<Json<Vec<StopTime>>, AppError> {
     // MtaBus has too many stop times to return at once, require route_ids filter
     // TODO: probably should return an error instead of just an empty response
-    if source == Source::MtaBus && params.route_ids.is_empty() {
+    if REQUIRE_ROUTE_FILTER_SOURCES.contains(&source) && params.route_ids.is_empty() {
         return Ok(Json(vec![]));
     }
 

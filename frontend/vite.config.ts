@@ -1,8 +1,9 @@
-import { defineConfig } from 'vitest/config';
-import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
+
 import tailwindcss from '@tailwindcss/vite';
+import { playwright } from '@vitest/browser-playwright';
 import { loadEnv } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd());
@@ -16,8 +17,15 @@ export default defineConfig(({ mode }) => {
 					target: 'http://localhost:3055',
 					changeOrigin: true,
 					rewrite: (path) => path.replace(/^\/api/, '')
+				},
+				// martin server
+				'/m': {
+					target: 'http://localhost:3000',
+					changeOrigin: true,
+					rewrite: (path) => path.replace(/^\/m/, '')
 				}
 			},
+
 			allowedHosts
 
 			// : allowedHosts.length ? allowedHosts : undefined
