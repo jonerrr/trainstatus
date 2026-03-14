@@ -18,6 +18,8 @@ services:
     image: valkey/valkey:alpine
     ports:
       - 6379:6379
+    volumes:
+      - trainstatus-cache:/data
 
   martin:
     container_name: martin
@@ -45,3 +47,4 @@ services:
 
 volumes:
   trainstatus-db:
+  trainstatus-cache:
