@@ -1,5 +1,8 @@
+use crate::debug_rt_data;
 use anyhow::bail;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tokio::fs::{create_dir, write};
+use tracing::error;
 // TODO: combine other oba fetchers (like static mta bus data) into a common module
 
 /// Generic OBA API fetch function that works with any OneBusAway-compatible API
@@ -18,11 +21,21 @@ pub async fn fetch_vehicles(url: &str, api_key: &str) -> anyhow::Result<Vec<Vehi
     if res.data.out_of_range {
         bail!("OBA API request out of range");
     }
+    // TODO: put gtfs and oba data in one common directory (and maybe common format)
+    if *debug_rt_data() {
+        create_dir("./oba").await.ok();
+
+        let json_path = "./oba/vehicles.json";
+        let json_str = serde_json::to_string_pretty(&res)?;
+        if let Err(e) = write(json_path, json_str).await {
+            error!(json_path, %e, "Failed to write OBA debug output");
+        }
+    }
 
     Ok(res.data.list)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Response {
     // pub code: u16,
@@ -32,7 +45,7 @@ pub struct Response {
     pub data: VehicleData,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VehicleData {
     pub limit_exceeded: bool,
@@ -40,7 +53,7 @@ pub struct VehicleData {
     pub list: Vec<VehicleStatus>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VehicleStatus {
     // last_location_update_time is always the same as last_update_time

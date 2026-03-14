@@ -16,8 +16,7 @@ run = "cargo run"
 [tasks.reset-db]
 confirm = "Are you sure?"
 run = """
-podman compose down
-podman volume rm backend_trainstatus-db || true
+podman compose down -v
 podman compose up -d
 sqlx migrate run
 """
