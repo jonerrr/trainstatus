@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
 		plugins: [tailwindcss(), sveltekit()],
 		server: {
 			proxy: {
+				// backend
 				'/api': {
 					target: 'http://localhost:3055',
 					changeOrigin: true,

@@ -1,12 +1,16 @@
-use crate::models::{
-    alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation},
-    source::Source,
+use crate::{
+    models::{
+        alert::{
+            ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, ApiAlertTranslation,
+        },
+        source::Source,
+    },
+    stores::{cache_get, cache_set},
 };
-use crate::stores::{cache_get, cache_set};
 use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, prelude::FromRow};
 use std::time::Duration;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -14,19 +18,14 @@ use uuid::Uuid;
 const TTL: Duration = Duration::from_secs(30);
 
 /// API response for alerts - flattened with all related data
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, FromRow)]
 pub struct ApiAlert {
     pub id: Uuid,
     pub original_id: String,
-    #[schema(example = "Boarding Change")]
-    // TODO: correct examples for different sources
-    /// Alert type, if planned it will start with "Planned"
-    pub alert_type: String,
-    /// Alert header in HTML format
-    pub header_html: String,
-    /// Alert description in HTML format
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description_html: Option<String>,
+    #[sqlx(json)]
+    pub data: AlertData,
+    #[sqlx(json)]
+    pub translations: Vec<ApiAlertTranslation>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     /// Start time of alert (earliest active period)
@@ -35,6 +34,7 @@ pub struct ApiAlert {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<DateTime<Utc>>,
     /// Entities affected by alert
+    #[sqlx(json)]
     pub entities: Vec<ApiAlertEntity>,
 }
 
@@ -48,23 +48,6 @@ pub struct ApiAlertEntity {
     /// Affected stop ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_id: Option<String>,
-}
-
-/// Raw row from alert query for sqlx mapping
-#[derive(sqlx::FromRow)]
-struct AlertRow {
-    id: Uuid,
-    original_id: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    data: serde_json::Value,
-    // Aggregated fields from JOINs
-    header_html: Option<String>,
-    description_html: Option<String>,
-    start_time: Option<DateTime<Utc>>,
-    end_time: Option<DateTime<Utc>>,
-    // JSON aggregated entities
-    entities: serde_json::Value,
 }
 
 #[derive(Clone)]
@@ -114,7 +97,7 @@ impl AlertStore {
     ) -> anyhow::Result<Vec<ApiAlert>> {
         // Get alerts with all related data in a single query using JOINs and aggregation
         // TODO: use recorded_at to make sure theres no duplicate alerts
-        let rows = sqlx::query_as::<_, AlertRow>(
+        let rows = sqlx::query_as::<_, ApiAlert>(
             r#"
             SELECT
                 a.id,
@@ -122,26 +105,8 @@ impl AlertStore {
                 a.created_at,
                 a.updated_at,
                 a.data,
-                -- Get HTML header translation
-                (
-                    SELECT t.text
-                    FROM realtime.alert_translation t
-                    WHERE t.alert_id = a.id
-                        AND t.section = 'header'
-                        AND t.format = 'html'
-                        AND t.language = 'en'
-                    LIMIT 1
-                ) as header_html,
-                -- Get HTML description translation
-                (
-                    SELECT t.text
-                    FROM realtime.alert_translation t
-                    WHERE t.alert_id = a.id
-                        AND t.section = 'description'
-                        AND t.format = 'html'
-                        AND t.language = 'en'
-                    LIMIT 1
-                ) as description_html,
+                -- Get translations, prioritized by format (html first) and language (en first)
+                COALESCE(tr.translations, '[]'::json) as translations,
                 -- Get earliest start time from active periods
                 (
                     SELECT MIN(ap.start_time)
@@ -178,6 +143,17 @@ impl AlertStore {
                     '[]'::json
                 ) as entities
             FROM realtime.alert a
+            LEFT JOIN LATERAL (
+                SELECT json_agg(t) as translations
+                FROM (
+                    SELECT DISTINCT ON (section) section, format, language, text
+                    FROM realtime.alert_translation
+                    WHERE alert_id = a.id
+                    ORDER BY section,
+                             (CASE WHEN format = 'html' THEN 1 ELSE 2 END),
+                             (CASE WHEN language = 'en' THEN 1 ELSE 2 END)
+                ) t
+            ) tr ON true
             WHERE
                 a.source = $1
                 AND a.recorded_at >= $2 - INTERVAL '2 minutes'
@@ -196,44 +172,13 @@ impl AlertStore {
         .fetch_all(&self.pg_pool)
         .await?;
 
-        // Transform rows into API response format
-        let alerts = rows
-            .into_iter()
-            .filter_map(|row| {
-                // Extract alert_type from data JSON
-                let alert_type = row
-                    .data
-                    .get("alert_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown")
-                    .to_string();
-
-                // Parse entities from JSON
-                let entities: Vec<ApiAlertEntity> =
-                    serde_json::from_value(row.entities).unwrap_or_default();
-
-                Some(ApiAlert {
-                    id: row.id,
-                    original_id: row.original_id,
-                    alert_type,
-                    header_html: row.header_html?,
-                    description_html: row.description_html,
-                    created_at: row.created_at,
-                    updated_at: row.updated_at,
-                    start_time: row.start_time?,
-                    end_time: row.end_time,
-                    entities,
-                })
-            })
-            .collect();
-
-        Ok(alerts)
+        Ok(rows)
     }
 
     // TODO: fix affected entities being duplicated. It seems like it creates an affected entity for every active period, even if its the same entity
     /// Bulk insert alerts with their related translations, active periods and affected entities
     /// This should be called with all collections together to maintain consistency
-    #[tracing::instrument(skip(self, alerts, translations, active_periods, affected_entities, cloned_mta_ids), fields(
+    #[tracing::instrument(skip_all, fields(
         source = %source.as_str(),
         alerts_count = alerts.len(),
         translations_count = translations.len(),
@@ -301,7 +246,7 @@ impl AlertStore {
 
         // Use a CTE to get the actual IDs (either inserted or existing due to conflict)
         // This returns the mapping from (created_at, original_id, source) to the actual id
-        let actual_ids = sqlx::query_scalar!(
+        let id_rows = sqlx::query!(
             r#"
             WITH input_data AS (
                 SELECT
@@ -338,7 +283,7 @@ impl AlertStore {
                     data = EXCLUDED.data
                 RETURNING id, created_at, original_id, source
             )
-            SELECT u.id
+            SELECT i.new_id as "new_id!", u.id as "id!"
             FROM input_data i
             JOIN upserted u ON i.created_at = u.created_at
                 AND i.original_id = u.original_id
@@ -357,7 +302,7 @@ impl AlertStore {
 
         // Build a mapping from old (generated) IDs to actual (database) IDs
         let id_mapping: std::collections::HashMap<uuid::Uuid, uuid::Uuid> =
-            ids.into_iter().zip(actual_ids).collect();
+            id_rows.into_iter().map(|r| (r.new_id, r.id)).collect();
 
         tracing::debug!("Inserted {} alerts", alerts.len());
 

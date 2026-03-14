@@ -4,19 +4,24 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | (string & {});
 };
 
+export type AlertData = (MtaAlertData & {
+    source: 'mta_subway';
+}) | (MtaAlertData & {
+    source: 'mta_bus';
+}) | {
+    source: 'njt_bus';
+};
+
+export type AlertFormat = 'plain' | 'html';
+
+export type AlertSection = 'header' | 'description';
+
 /**
  * API response for alerts - flattened with all related data
  */
 export type ApiAlert = {
-    /**
-     * Alert type, if planned it will start with "Planned"
-     */
-    alert_type: string;
     created_at: Date;
-    /**
-     * Alert description in HTML format
-     */
-    description_html?: string | null;
+    data: AlertData;
     /**
      * End time of alert. If null, there is no end time yet.
      */
@@ -25,16 +30,13 @@ export type ApiAlert = {
      * Entities affected by alert
      */
     entities: Array<ApiAlertEntity>;
-    /**
-     * Alert header in HTML format
-     */
-    header_html: string;
     id: string;
     original_id: string;
     /**
      * Start time of alert (earliest active period)
      */
     start_time: Date;
+    translations: Array<ApiAlertTranslation>;
     updated_at: Date;
 };
 
@@ -53,12 +55,31 @@ export type ApiAlertEntity = {
     stop_id?: string | null;
 };
 
+/**
+ * Alert translations for API response (it just doesn't have the alert_id since it's nested under the alert)
+ */
+export type ApiAlertTranslation = {
+    format: AlertFormat;
+    language: string;
+    section: AlertSection;
+    text: string;
+};
+
 export type Borough = 'brooklyn' | 'queens' | 'bronx' | 'staten_island' | 'manhattan';
 
 /**
  * Direction of the stop. Currently only for bus stops
  */
 export type CompassDirection = 's_w' | 's' | 's_e' | 'e' | 'w' | 'n_e' | 'n_w' | 'n' | 'unknown';
+
+export type MtaAlertData = {
+    alert_type: string;
+    /**
+     * The id of the planned work this alert was cloned from
+     */
+    clone_id?: string | null;
+    display_before_active: number;
+};
 
 export type MtaBusData = {
     /**

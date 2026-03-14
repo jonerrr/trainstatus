@@ -1,31 +1,39 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import icons from '$lib/icons';
-import { LiveResource, createMultiSourceContext, source_info } from '$lib/resources/index.svelte';
+import {
+	type AlertResource,
+	type AlertResources,
+	LiveResource,
+	type TypedAlert,
+	createMultiSourceContext,
+	source_info
+} from '$lib/resources/index.svelte';
 import { current_time } from '$lib/url_params.svelte';
 
 import type { ApiAlert, Source } from '@trainstatus/client';
 
-export interface AlertResource {
-	alerts: ApiAlert[];
-	alerts_by_route: SvelteMap<string, ApiAlert[]>;
-}
-
-export function index_alerts(data: ApiAlert[]): AlertResource {
+export function index_alerts<S extends Source>(data: ApiAlert[]): AlertResource<S> {
 	// TODO: maybe combine express alerts here (i dont think there should ever be alerts specifically for express mta_subway tho)
-	const alerts: ApiAlert[] = [];
-	const alerts_by_route: SvelteMap<string, ApiAlert[]> = new SvelteMap();
+	const alerts: TypedAlert<S>[] = [];
+	const alerts_by_route: SvelteMap<string, TypedAlert<S>[]> = new SvelteMap();
 
 	for (const alert of data) {
+		// const header = alert.translations.find((t) => t.section === 'header')?.text ?? '';
+		// const description = alert.translations.find((t) => t.section === 'description')?.text;
+
 		const processed = {
 			...alert,
-			header_html: parse_html(alert.header_html),
-			description_html: alert.description_html ? parse_html(alert.description_html) : undefined,
+			translations: alert.translations.map((t) => ({
+				...t,
+				// TODO: only use this for mta_subway or standardize icons and stuff across sources
+				text: t.format === 'html' ? parse_html(t.text) : t.text
+			})),
 			start_time: new Date(alert.start_time),
 			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
 			updated_at: new Date(alert.updated_at),
 			created_at: new Date(alert.created_at)
-		};
+		} as TypedAlert<S>;
 
 		alerts.push(processed);
 
@@ -40,8 +48,8 @@ export function index_alerts(data: ApiAlert[]): AlertResource {
 	return { alerts, alerts_by_route };
 }
 
-export function createAlertResource(source: Source, initial_value: AlertResource) {
-	const resource = new LiveResource<AlertResource>(
+export function createAlertResource<S extends Source>(source: S, initial_value: AlertResource<S>) {
+	const resource = new LiveResource<AlertResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} alerts`);
 
@@ -54,7 +62,7 @@ export function createAlertResource(source: Source, initial_value: AlertResource
 
 			const data: ApiAlert[] = await res.json();
 
-			return index_alerts(data);
+			return index_alerts<S>(data);
 		},
 		{ initial_value, interval: source_info[source].refresh_interval.alerts, debounce: 500 }
 	);
@@ -70,14 +78,13 @@ export function createAlertResource(source: Source, initial_value: AlertResource
 	return resource;
 }
 
-export const alert_context =
-	createMultiSourceContext<Record<Source, LiveResource<AlertResource>>>();
+export const alert_context = createMultiSourceContext<AlertResources>();
 
 // TODO: maybe move parsing to backend and standardize icon format (which will be important if we have other sources)
-const train_regex = /(\[(.+?)\])/gm;
+const mta_subway_icon_regex = /(\[(.+?)\])/gm;
 
 function parse_html(html: string) {
-	return html.replaceAll(train_regex, (_match, _p1, p2) => {
+	return html.replaceAll(mta_subway_icon_regex, (_match, _p1, p2) => {
 		const icon = icons.find((t) => t.name === p2) ?? icons[icons.length - 1];
 		if (icon.complete_svg) return icon.svg;
 		else

@@ -4,8 +4,11 @@ import type { SvelteMap } from 'svelte/reactivity';
 
 import mta_bus_icon from '$lib/assets/mta_bus.webp';
 import mta_subway_icon from '$lib/assets/mta_subway.webp';
+// TODO: convert to webp
+import njt_bus_icon from '$lib/assets/njt_bus.png';
 
 import type {
+	AlertData,
 	ApiAlert,
 	MtaBusPositionData,
 	MtaSubwayPositionData,
@@ -51,7 +54,7 @@ export const source_info = {
 	njt_bus: {
 		name: 'NJT Bus',
 		// TODO: update icon
-		icon: mta_subway_icon,
+		icon: njt_bus_icon,
 		refresh_interval: {
 			trips: 30_000,
 			stop_times: 30_000,
@@ -61,8 +64,6 @@ export const source_info = {
 		monitor_routes: true
 	}
 } as const;
-
-export const default_sources: Source[] = ['mta_subway', 'mta_bus'] as const;
 
 // =============================================================================
 // SOURCE-SPECIFIC DATA MAPS
@@ -90,6 +91,13 @@ export type SourceStopTimeDataMap = {
 	njt_bus: Extract<StopTimeData, { source: 'njt_bus' }>;
 };
 
+/** Alert data discriminated by source */
+export type SourceAlertDataMap = {
+	mta_bus: Extract<AlertData, { source: 'mta_bus' }>;
+	mta_subway: Extract<AlertData, { source: 'mta_subway' }>;
+	njt_bus: Extract<AlertData, { source: 'njt_bus' }>;
+};
+
 // =============================================================================
 // TYPED ENTITY HELPERS
 // Creates a version of an entity with narrowed `data` field based on source
@@ -115,6 +123,7 @@ export type TypedVehiclePosition<S extends Source> = TypedEntity<
 >;
 export type TypedTrip<S extends Source> = TypedEntity<Trip, SourceTripDataMap, S>;
 export type TypedStopTime<S extends Source> = TypedEntity<StopTime, SourceStopTimeDataMap, S>;
+export type TypedAlert<S extends Source> = TypedEntity<ApiAlert, SourceAlertDataMap, S>;
 
 // =============================================================================
 // RESOURCE TYPES
@@ -123,10 +132,16 @@ export type TypedStopTime<S extends Source> = TypedEntity<StopTime, SourceStopTi
 /** A SvelteMap of entities keyed by ID */
 export type EntityResource<T> = SvelteMap<string, T>;
 
+/** Alert resource with route-indexed alerts */
+export interface AlertResource<S extends Source> {
+	alerts: TypedAlert<S>[];
+	alerts_by_route: SvelteMap<string, TypedAlert<S>[]>;
+}
+
 /** Maps each source to its typed LiveResource */
-export type SourceResources<T extends Record<Source, unknown>> = {
+export type SourceResources<T extends Record<Source, unknown>> = Partial<{
 	[S in Source]: LiveResource<T[S]>;
-};
+}>;
 
 // Convenience types for resource maps
 export type PositionResource<S extends Source> = EntityResource<TypedVehiclePosition<S>>;
@@ -140,15 +155,13 @@ export interface StopTimeResource<S extends Source> {
 
 export type PositionResources = SourceResources<{ [S in Source]: PositionResource<S> }>;
 export type TripResources = SourceResources<{ [S in Source]: TripResource<S> }>;
-// Alerts don't have source-specific data, simpler type
-// TODO: if we add source-specific fields to alerts in the future, we can switch to a typed version like the others
-export type AlertResources = SourceResources<{ [S in Source]: EntityResource<ApiAlert> }>;
+export type AlertResources = SourceResources<{ [S in Source]: AlertResource<S> }>;
 
 // =============================================================================
 // MULTI-SOURCE CONTEXT
 // =============================================================================
 
-export type SourceMap<T> = Record<Source, T>;
+export type SourceMap<T> = Partial<Record<Source, T>>;
 
 /**
  * Creates a typed multi-source context with a `getSource` helper
@@ -219,6 +232,7 @@ export class LiveResource<T> {
 	error = $state<Error | null>(null);
 	last_updated = $state<Date | null>(null);
 	offline = $state(false);
+	// @ts-ignore
 	is_fetching = $state(false);
 
 	// Configuration
@@ -305,8 +319,10 @@ export class LiveResource<T> {
 	}
 
 	async #executeFetch() {
+		// @ts-ignore
 		if (this.is_fetching) return;
 
+		// @ts-ignore
 		this.is_fetching = true;
 		this.#abort_controller = new AbortController();
 
@@ -330,6 +346,7 @@ export class LiveResource<T> {
 			if (e instanceof Error && e.message === 'Offline') this.offline = true;
 			// Don't resolve pending on error - they'll wait for next successful fetch
 		} finally {
+			// @ts-ignore
 			this.is_fetching = false;
 			if (this.#enabled) this.#startInterval();
 		}

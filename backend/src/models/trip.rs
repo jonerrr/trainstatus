@@ -1,6 +1,5 @@
 use crate::{impl_discriminated_data, models::source::Source};
-use chrono::TimeZone;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -25,7 +24,7 @@ pub struct Trip {
     /// For the MTA buses, this is the start date of the trip + the current time the trip was first seen in the feed.
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[sqlx(flatten)]
+    #[sqlx(json)]
     pub data: TripData,
 }
 

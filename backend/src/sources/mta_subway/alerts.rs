@@ -5,7 +5,7 @@ use crate::integrations::{
 };
 use crate::models::alert::{
     ActivePeriod, AffectedEntity, Alert, AlertData, AlertFormat, AlertSection, AlertTranslation,
-    MtaData,
+    MtaAlertData,
 };
 use crate::models::source::Source;
 use crate::sources::AlertsAdapter;
@@ -38,9 +38,12 @@ impl GtfsAlertSource for MtaSubwayAlerts {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        gtfs_realtime::fetch_feeds(vec![
-            ("camsys%2Fsubway-alerts".into(), gtfs_realtime::get_bytes("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts")),
-        ])
+        gtfs_realtime::fetch_feeds(vec![(
+            "mta_subway_alerts".into(),
+            gtfs_realtime::get_bytes(
+                "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
+            ),
+        )])
         .await
     }
 
@@ -88,7 +91,7 @@ impl GtfsAlertSource for MtaSubwayAlerts {
         let alert_id = Uuid::now_v7();
 
         // Build MTA-specific data
-        let mta_data = MtaData {
+        let mta_data = MtaAlertData {
             display_before_active: mercury_alert.display_before_active.unwrap_or(0) as i32,
             alert_type: mercury_alert.alert_type.clone(),
             clone_id: mercury_alert.clone_id.clone(),

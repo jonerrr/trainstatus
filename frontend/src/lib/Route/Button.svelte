@@ -1,9 +1,8 @@
 <script lang="ts">
-	import Button from '$lib/Button.svelte';
 	import Icon from '$lib/Icon.svelte';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 
-	import type { Route } from '@trainstatus/client';
+	import type { Route, Source } from '@trainstatus/client';
 
 	interface Props {
 		data: Route;
@@ -14,7 +13,7 @@
 	const alerts = $derived(alert_context.getSource(data.data.source));
 
 	const route_alerts = $derived(
-		alerts.value?.alerts_by_route
+		alerts?.value?.alerts_by_route
 			.get(data.id)
 			?.sort(
 				(a, b) =>
@@ -30,7 +29,11 @@
 	<Icon height={36} width={36} link={true} route={data} />
 	{#if route_alerts.length}
 		<div class="font-semibold">
-			{route_alerts[0].alert_type}
+			{#if 'alert_type' in route_alerts[0].data}
+				{route_alerts[0].data.alert_type}
+			{:else}
+				Alert
+			{/if}
 		</div>
 		{#if route_alerts.length > 1}
 			<div class="rounded-sm bg-neutral-700 p-1 text-neutral-50">

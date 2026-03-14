@@ -22,7 +22,7 @@
 	const alerts = $derived(alert_context.getSource(route.data.source));
 
 	const route_alerts = $derived(
-		alerts.value?.alerts_by_route
+		alerts?.value?.alerts_by_route
 			.get(route.id)
 			?.sort(
 				(a, b) =>
@@ -80,6 +80,8 @@
 			a.removeAttribute('href');
 		});
 	});
+
+	// $inspect(alerts);
 </script>
 
 <header class="flex items-center gap-1 p-1">
@@ -87,7 +89,12 @@
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if route_alerts.length && idx < route_alerts.length}
-			{route_alerts[idx].alert_type}
+			{#if ['mta_subway', 'mta_bus'].includes(route_alerts[idx].data.source)}
+				<!-- TODO: fix type issue -->
+				{route_alerts[idx].data.alert_type}
+			{:else}
+				Alert
+			{/if}
 		{:else}
 			No alerts
 		{/if}
@@ -112,14 +119,19 @@
 	{@attach manage_scroll}
 >
 	{#each route_alerts as alert}
+		{@const header = alert.translations.find((t) => t.section === 'header')}
+		{@const description = alert.translations.find((t) => t.section === 'description')}
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
 			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-1">
-				{@html alert.header_html}
-
-				{#if alert.description_html}
-					{@html alert.description_html}
+				<!-- although not every translation text is html, its simpler to just use @html for all of them -->
+				{#if header}
+					{@html header.text}
+				{/if}
+				<!-- TODO: maybe add divider between header and description -->
+				{#if description}
+					{@html description.text}
 				{/if}
 			</div>
 
