@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+
+	import { source_info } from '$lib/resources/index.svelte';
+	import { source_preferences, supported_sources } from '$lib/source_preferences.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
-	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Map } from '@lucide/svelte';
+	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers, Map } from '@lucide/svelte';
 	import { CircleX } from '@lucide/svelte';
 	import dayjs from 'dayjs';
 
@@ -14,6 +18,44 @@
 		<h1 class="mb-12 text-4xl font-bold">Settings</h1>
 
 		<div class="flex flex-col divide-y divide-neutral-800 text-base">
+			<div class="p-6">
+				<div class="mb-4 flex items-center justify-between">
+					<div class="flex items-center gap-1">
+						<Layers class="size-5" />
+						<h2 class="text-xl font-semibold">Data Sources</h2>
+					</div>
+				</div>
+				<p class="mb-3 pl-6 text-sm text-neutral-400">
+					Select which transit agencies to load data from. Enabling more sources may increase data
+					usage and load times.
+				</p>
+
+				<div class="flex flex-col gap-3 pl-6">
+					{#each supported_sources as source}
+						{@const info = source_info[source]}
+						<label
+							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"
+						>
+							<input
+								type="checkbox"
+								checked={source_preferences.current.includes(source)}
+								disabled={source_preferences.current.length === 1 &&
+									source_preferences.current.includes(source)}
+								onchange={() => {
+									source_preferences.toggle(source);
+									invalidateAll();
+								}}
+								class="size-5 rounded border-neutral-700 bg-neutral-800 text-emerald-500 focus:ring-emerald-500/30 disabled:opacity-50"
+							/>
+							<div class="flex items-center gap-2">
+								<img src={info.icon} alt="" class="size-6 rounded-sm object-contain" />
+								<span class="font-medium">{info.name}</span>
+							</div>
+						</label>
+					{/each}
+				</div>
+			</div>
+
 			<div class="p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<div class="flex items-center gap-1">
@@ -70,34 +112,6 @@
 				</div>
 
 				<div class="flex flex-col gap-2">
-					<!-- <a
-					href={charts_href}
-					class="active:scale-98 flex items-center gap-2 rounded-md p-2 pl-6 transition-all duration-200 hover:bg-neutral-800/50 hover:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 active:bg-neutral-800"
-				>
-					<div>
-						<div class="flex items-center gap-1">
-							<ChartLine class="size-5" />
-							<span>Charts</span>
-						</div>
-						<div class="text-xs text-neutral-400">Subway and Bus string lines</div>
-					</div>
-				</a> -->
-
-					<a
-						href="https://map.trainstat.us"
-						target="_blank"
-						class="active:scale-98 flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
-					>
-						<div>
-							<div class="flex items-center gap-1">
-								<Map class="size-5" />
-								<span>Bus Map</span>
-								<ExternalLink class="size-4" />
-							</div>
-							<div class="text-sm text-neutral-400">A realtime map of buses in New York City</div>
-						</div>
-					</a>
-
 					<a
 						href="/api/docs"
 						target="_blank"

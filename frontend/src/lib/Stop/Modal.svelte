@@ -17,7 +17,7 @@
 	import { main_route_stops } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
-	import type { Stop, StopTime, Trip } from '@trainstatus/client';
+	import type { ApiAlert, Stop, StopTime, Trip } from '@trainstatus/client';
 
 	interface Props {
 		show_previous: boolean;
@@ -42,14 +42,16 @@
 		const now = current_time.ms;
 		const active_routes = new Set<string>();
 
-		const stop_times_with_trip = (stop_times.value?.by_stop_id.get(stop.id) ?? []).flatMap((st) => {
-			if (!show_previous && st.arrival.getTime() <= now) return [];
-			const trip = trips.value?.get(st.trip_id);
-			if (!trip) return [];
-			const eta = (st.arrival.getTime() - now) / 60000;
-			active_routes.add(trip.route_id);
-			return [{ ...st, eta, trip }] as StopTimeWithTrip[];
-		});
+		const stop_times_with_trip = (stop_times?.value?.by_stop_id.get(stop.id) ?? []).flatMap(
+			(st) => {
+				if (!show_previous && st.arrival.getTime() <= now) return [];
+				const trip = trips?.value?.get(st.trip_id);
+				if (!trip) return [];
+				const eta = (st.arrival.getTime() - now) / 60000;
+				active_routes.add(trip.route_id);
+				return [{ ...st, eta, trip }] as StopTimeWithTrip[];
+			}
+		);
 
 		return { stop_times_with_trip, active_routes };
 	});
@@ -59,7 +61,8 @@
 	// TODO: generate defaults instead of hardcoding
 	let selected_direction = new LocalStorage<SourceMap<number>>('direction', {
 		mta_subway: 1,
-		mta_bus: 0
+		mta_bus: 0,
+		njt_bus: 0
 	});
 	// if its a train, we only want to show stop times for the selected direction
 	// TODO: handle bus stops with opposite_stop_id once implemented
@@ -87,7 +90,7 @@
 
 	// Show indicator if there is an alert at this stop
 	const show_alert_icon = $derived(
-		alerts.value?.alerts.some((alert) => alert.entities.some((e) => e.stop_id === stop.id))
+		alerts?.value?.alerts.some((alert) => alert.entities.some((e) => e.stop_id === stop.id))
 	);
 </script>
 
@@ -98,22 +101,28 @@
 	<div class="flex max-h-36 max-w-40 flex-wrap items-center gap-1 md:max-w-xs">
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route_stop}
-				<Icon width={36} height={36} link={true} route={routes[route_stop.route_id]} show_alerts />
+				{@const route = routes?.[route_stop.route_id]}
+				{#if route}
+					<Icon width={36} height={36} link={true} {route} show_alerts />
+				{/if}
 			{/each}
 			<!-- {#if route_stops.length > 5} -->
 			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{stop.routes.length - 5}</div>
 			<!-- {/if} -->
 		{:else}
 			{#each route_stops as route_stop}
-				<Icon width={36} height={36} link={true} route={routes[route_stop.route_id]} show_alerts />
+				{@const route = routes?.[route_stop.route_id]}
+				{#if route}
+					<Icon width={36} height={36} link={true} {route} show_alerts />
+				{/if}
 			{/each}
 		{/if}
 
 		<!-- </div> -->
 	</div>
 	<div class="flex items-center gap-1 text-xl font-semibold">
-		{#if stop.data.source === 'mta_bus'}
-			<BusArrow direction={stop.data.direction} />
+		{#if (stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus') && 'direction' in stop.data}
+			<BusArrow direction={(stop.data as any).direction} />
 		{/if}
 		{stop.name}
 
@@ -135,7 +144,8 @@
 
 <ModalList>
 	{#each selected_stop_times as st}
-		{@const position = positions.value?.get(st.trip.vehicle_id)}
+		{@const position = positions?.value?.get(st.trip.vehicle_id)}
+		{@const route = routes?.[st.trip.route_id]}
 		<Button state={{ type: 'trip', ...st.trip }}>
 			<div class="flex items-center gap-1">
 				<div class="flex flex-col items-center">
@@ -145,23 +155,27 @@
 					{/if} -->
 					{#if st.data.source === 'mta_bus'}
 						<VehicleCapacity position={position as TypedVehiclePosition<'mta_bus'>} />
+					{:else if st.data.source === 'njt_bus'}
+						<VehicleCapacity position={position as TypedVehiclePosition<'njt_bus'>} />
 					{/if}
-					<!-- {st.trip.vehicle_id} -->
-					<Icon width={20} height={20} link={false} route={routes[st.trip.route_id]} />
+					{#if route}
+						<Icon width={20} height={20} link={false} {route} />
+					{/if}
 				</div>
 
 				<div class="text-left" class:text-neutral-400={st.arrival.getTime() < current_time.ms}>
 					{#if stop.data.source === 'mta_subway'}
-						{@const trip_stop_times = stop_times.value?.by_trip_id.get(st.trip_id)}
+						{@const trip_stop_times = stop_times?.value?.by_trip_id.get(st.trip_id)}
 						{@const last_stop_time = trip_stop_times?.[trip_stop_times.length - 1]}
 						{#if last_stop_time}
-							{page.data.stops_by_id['mta_subway'][last_stop_time.stop_id]?.name}
+							{page.data.stops_by_id['mta_subway']?.[last_stop_time.stop_id]?.name}
 						{/if}
-					{:else if stop.data.source === 'mta_bus'}
+					{:else if stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus'}
 						{@const route_stop = stop.routes.find((r) => r.route_id === st.trip.route_id)}
-						<!-- TODO: fix type inference. it should always be mta_bus -->
-						<!-- @ts-ignore -->
-						{route_stop?.data.headsign}
+						<!-- TODO: fix type inference. it should always be mta_bus or njt_bus -->
+						{#if route_stop?.data && 'headsign' in route_stop.data}
+							{(route_stop.data as any).headsign}
+						{/if}
 					{/if}
 				</div>
 

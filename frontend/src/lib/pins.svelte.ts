@@ -8,21 +8,24 @@ export type Pins = {
 // TODO: maybe have separate LocalStorage for each source
 export const stop_pins = new LocalStorage<Pins>('stop_pins', {
 	mta_subway: ['106'],
-	mta_bus: ['400086']
+	mta_bus: ['400086'],
+	njt_bus: []
 	// lirr: [],
 	// metro_north: []
 });
 
 export const route_pins = new LocalStorage<Pins>('route_pins', {
 	mta_subway: ['4'],
-	mta_bus: ['M15']
+	mta_bus: ['M15'],
+	njt_bus: []
 	// lirr: [],
 	// metro_north: []
 });
 
 export const trip_pins = new LocalStorage<Pins>('trip_pins', {
 	mta_subway: [],
-	mta_bus: []
+	mta_bus: [],
+	njt_bus: []
 	// lirr: [],
 	// metro_north: []
 });

@@ -46,7 +46,12 @@ export function open_modal(state: ModalData) {
 
 	// Remove any existing modal params to avoid stacking them
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
+	url.searchParams.delete('src');
+
 	url.searchParams.set(key, state.id);
+	// if ('data' in state && 'source' in (state.data as any) && (state.data as any).source) {
+	url.searchParams.set('src', state.data.source);
+	// }
 
 	const snapshot = $state.snapshot(state);
 	const current_index = page.state?.index ?? 0;
@@ -61,6 +66,7 @@ export function open_modal(state: ModalData) {
 export function close_modal() {
 	const url = new URL(page.url);
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
+	url.searchParams.delete('src');
 	// Explicitly sync ?at from the source of truth so we don't lose it due to
 	// a race with the layout's $effect.
 	// TODO: maybe just manually add ?at to URL instead of using existing url and deleting other params?

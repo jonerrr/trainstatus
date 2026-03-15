@@ -7,7 +7,7 @@
 	import AxisX from '$lib/charts/AxisX.svelte';
 	import AxisY from '$lib/charts/AxisY.svelte';
 	import Lines from '$lib/charts/Lines.svelte';
-	import { type SourceMap, default_sources } from '$lib/resources/index.svelte';
+	import { type SourceMap } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
@@ -24,21 +24,30 @@
 	const all_trips = trip_context.get();
 	const all_stop_times = stop_time_context.get();
 
-	let routes = $state<SourceMap<Route[]>>({
-		mta_subway: [page.data.routes_by_id['mta_subway']['4']],
-		// mta_bus: [page.data.routes_by_id['mta_bus']['M15']]
-		mta_bus: []
-	});
+	let routes = $state<SourceMap<Route[]>>(
+		Object.fromEntries(
+			page.data.selected_sources.map((source) => [
+				source,
+				source === 'mta_subway' && page.data.routes_by_id[source]?.['4']
+					? [page.data.routes_by_id[source]['4']]
+					: []
+			])
+		) as SourceMap<Route[]>
+	);
 
 	// 0 = first direction (subway northbound / bus dir 0)
 	// 1 = second direction (subway southbound / bus dir 1)
 	let direction_index = $state(0);
 
 	// Per-source direction values: subway uses 1 (north) / 3 (south), bus uses 0 / 1
-	const source_directions = $derived<SourceMap<number>>({
-		mta_subway: direction_index === 0 ? 1 : 3,
-		mta_bus: direction_index
-	});
+	const source_directions = $derived<SourceMap<number>>(
+		Object.fromEntries(
+			page.data.selected_sources.map((source) => [
+				source,
+				source === 'mta_subway' ? (direction_index === 0 ? 1 : 3) : direction_index
+			])
+		) as SourceMap<number>
+	);
 
 	// Flat list of all selected routes (for Lines component, export filename, etc.)
 	const selected_routes_flat = $derived(Object.values(routes).flat());
@@ -51,9 +60,17 @@
 
 	// Monitor bus routes in the stop_times resource
 	$effect(() => {
-		const bus_resource = all_stop_times['mta_bus'];
-		for (const route of routes['mta_bus']) {
-			bus_resource.add_route(route.id);
+		for (const source of page.data.selected_sources) {
+			const info = page.data.routes_by_id[source];
+			if (!info) continue;
+
+			// Check if source is bus-like (monitor_routes = true)
+			const resource = all_stop_times[source];
+			if (!resource || !('add_route' in resource)) continue;
+
+			for (const route of routes[source] ?? []) {
+				(resource as any).add_route(route.id);
+			}
 		}
 	});
 
@@ -65,9 +82,9 @@
 		// Track all stops seen across all sources/routes, keyed by stop.id
 		const stops_seen = new Map<string, { id: string; name: string; sequence: number }>();
 
-		for (const source of default_sources) {
+		for (const source of page.data.selected_sources) {
 			const source_routes = routes[source];
-			if (!source_routes.length) continue;
+			if (!source_routes?.length) continue;
 
 			const trips_map = all_trips?.[source]?.value;
 			if (!trips_map) continue;
@@ -237,8 +254,8 @@
 	// Handle route selection
 	function selectRoute(selectedRoute: Route) {
 		const source = selectedRoute.data.source as Source;
-		if (!routes[source].some((r) => r.id === selectedRoute.id)) {
-			routes[source] = [...routes[source], selectedRoute];
+		if (!routes[source]?.some((r) => r.id === selectedRoute.id)) {
+			routes[source] = [...(routes[source] ?? []), selectedRoute];
 		}
 		isComboboxOpen = false;
 		searchQuery = ''; // Clear search when selection is made
@@ -247,16 +264,16 @@
 	// Remove a route from selection
 	function removeRoute(routeToRemove: Route) {
 		// Don't remove if it's the last route
-		const total = Object.values(routes).reduce((sum, arr) => sum + arr.length, 0);
+		const total = Object.values(routes).reduce((sum, arr) => sum + (arr?.length ?? 0), 0);
 		if (total <= 1) return;
 		const source = routeToRemove.data.source as Source;
-		routes[source] = routes[source].filter((r) => r.id !== routeToRemove.id);
+		routes[source] = routes[source]?.filter((r) => r.id !== routeToRemove.id);
 	}
 
 	// Check if route is already selected
 	function isRouteSelected(route: Route) {
 		const source = route.data.source as Source;
-		return routes[source].some((r) => r.id === route.id);
+		return routes[source]?.some((r) => r.id === route.id) ?? false;
 	}
 
 	// Handle combobox keyboard navigation
@@ -331,7 +348,7 @@
 		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
 		// console.log(xDomain);
 		// Return domain from current time to current time + displayHours
-		return [startTime, endTime];
+		return [startTime, endTime] as any;
 	});
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;

@@ -21,19 +21,23 @@
 	<div class="font-medium">Transfers:</div>
 	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
 		{#each transfer_stop_times as st (st.trip_id)}
-			{@const trip = trips[st.data.source].value?.get(st.trip_id)!}
-			{@const route = page.data.routes_by_id[st.data.source][trip.route_id]}
-			<button
-				onclick={() => open_modal({ type: 'trip', ...trip })}
-				class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
-			>
-				<Icon width={18} height={18} {route} link={false} />
-				{#if time_format === 'time'}
-					{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
-				{:else}
-					{((st.arrival.getTime() - current_time.ms) / 1000 / 60).toFixed(0)}m
+			{@const trip = trips[st.data.source]?.value?.get(st.trip_id)}
+			{#if trip}
+				{@const route = page.data.routes_by_id[st.data.source]?.[trip.route_id]}
+				{#if route}
+					<button
+						onclick={() => open_modal({ type: 'trip', ...trip })}
+						class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
+					>
+						<Icon width={18} height={18} {route} link={false} />
+						{#if time_format === 'time'}
+							{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+						{:else}
+							{((st.arrival.getTime() - current_time.ms) / 1000 / 60).toFixed(0)}m
+						{/if}
+					</button>
 				{/if}
-			</button>
+			{/if}
 		{/each}
 	</div>
 </div>

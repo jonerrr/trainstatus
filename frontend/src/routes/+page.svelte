@@ -3,14 +3,13 @@
 
 	import List from '$lib/List.svelte';
 	import { route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
-	import { default_sources } from '$lib/resources/index.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import {
 		calculate_route_height,
 		calculate_stop_height,
-		calculate_trip_height
+		calculate_trip_height,
+		haversine
 	} from '$lib/util.svelte';
-	import { haversine } from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
@@ -23,6 +22,7 @@
 			if (!map) continue;
 			const src = source as Source;
 			const current = trip_pins.current[src];
+			if (!current) continue;
 			const valid = current.filter((id) => map.has(id));
 			if (valid.length !== current.length) {
 				console.log(
@@ -36,11 +36,11 @@
 
 	const pinned_trips = $derived.by(() => {
 		const sources = Object.fromEntries(
-			Object.entries(trip_pins.current).map(([source, pins]) => [
+			page.data.selected_sources.map((source) => [
 				source,
-				pins
-					.map((pin) => all_trips[source as Source].value?.get(pin))
-					.filter((t) => t !== undefined)
+				trip_pins.current[source]
+					?.map((pin) => all_trips[source]?.value?.get(pin))
+					.filter((t) => t !== undefined) ?? []
 			])
 		) as Record<Source, Trip[]>;
 		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
@@ -48,9 +48,11 @@
 
 	const pinned_stops = $derived.by(() => {
 		const sources = Object.fromEntries(
-			Object.entries(stop_pins.current).map(([source, pins]) => [
+			page.data.selected_sources.map((source) => [
 				source,
-				pins.map((pin) => page.data.stops_by_id[source as Source][pin])
+				stop_pins.current[source]
+					?.map((pin) => page.data.stops_by_id[source]?.[pin])
+					.filter((s) => s !== undefined) ?? []
 			])
 		) as Record<Source, Stop[]>;
 		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
@@ -58,9 +60,11 @@
 
 	const pinned_routes = $derived.by(() => {
 		const sources = Object.fromEntries(
-			Object.entries(route_pins.current).map(([source, pins]) => [
+			page.data.selected_sources.map((source) => [
 				source,
-				pins.map((pin) => page.data.routes_by_id[source as Source][pin])
+				route_pins.current[source]
+					?.map((pin) => page.data.routes_by_id[source]?.[pin])
+					.filter((r) => r !== undefined) ?? []
 			])
 		) as Record<Source, Route[]>;
 		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
@@ -123,7 +127,7 @@
 		// reassign to local var to prevent undefined error in map callback.
 		const current_coords = position.coords;
 
-		for (const source of default_sources) {
+		for (const source of page.data.selected_sources) {
 			const data = page.data.stops[source] ?? [];
 			result[source] = data
 				.map((stop) => {

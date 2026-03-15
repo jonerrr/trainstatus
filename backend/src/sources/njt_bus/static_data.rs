@@ -1,11 +1,5 @@
 use std::{collections::HashMap, io::Cursor, time::Duration};
 
-use anyhow::Context;
-use async_trait::async_trait;
-use geo::{LineString, MultiLineString, Point};
-use geojson::GeoJson;
-use regex::Regex;
-
 use crate::{
     engines::static_cache::expand_gtfs,
     models::{
@@ -13,12 +7,21 @@ use crate::{
         source::Source,
         stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
-    sources::StaticAdapter,
+    sources::{StaticAdapter, normalize_title, normalize_whitespace},
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
+use anyhow::Context;
+use async_trait::async_trait;
+use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
+use geojson::GeoJson;
+use proj4rs::{Proj, transform::transform};
 
-const NJT_DEFAULT_COLOR: &str = "0033A0";
+const NJT_DEFAULT_COLOR: &str = "1A2B57";
+const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
+// TODO: try building route geom by creating a graph of the geom between each stop using the gtfs shapes.txt
+// From my initial testing, each stop point is also somewhere in the shapes.txt, then we can reconstruct using the stop_times.txt sequences.
+// We can also reuse this logic for MTA subway and MTA bus
 const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
 
 pub struct NjtBusStatic;
@@ -39,17 +42,15 @@ impl StaticAdapter for NjtBusStatic {
         stop_store: &StopStore,
         static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
-        // 1. Authenticate
         let token = super::get_token()
             .await
             .context("NJT authentication failed")?;
 
-        // 2. Download GTFS zip as raw bytes
         let gtfs_bytes = download_gtfs(&token)
             .await
             .context("NJT GTFS download failed")?;
 
-        // 3. Parse GTFS in a blocking task (synchronous CPU/IO work)
+        // Parse GTFS in a blocking task
         let gtfs = tokio::task::spawn_blocking(move || {
             gtfs_structures::Gtfs::from_reader(Cursor::new(gtfs_bytes))
         })
@@ -71,12 +72,11 @@ impl StaticAdapter for NjtBusStatic {
             .await
             .context("Failed to cache NJT trips in Redis")?;
 
-        // 4. Fetch route geometries from NJT ArcGIS REST endpoint
         let route_geom_map = fetch_route_geometries()
             .await
             .context("Failed to fetch NJT route geometries")?;
 
-        // 5–7. Build all entities
+        // Build all entities
         let routes = build_routes(&gtfs, &route_geom_map);
         let stops = build_stops(&gtfs);
         let route_stops = build_route_stops(&gtfs);
@@ -108,7 +108,6 @@ impl StaticAdapter for NjtBusStatic {
             }
         }
 
-        // 8. Persist
         route_store
             .save_all(Source::NjtBus, &routes)
             .await
@@ -230,8 +229,16 @@ fn build_routes(
 
             Route {
                 id: r.id.clone(),
-                long_name: r.long_name.clone().unwrap_or_default(),
-                short_name: r.short_name.clone().unwrap_or_default(),
+                long_name: r
+                    .long_name
+                    .as_deref()
+                    .map(normalize_whitespace)
+                    .unwrap_or_default(),
+                short_name: r
+                    .short_name
+                    .as_deref()
+                    .map(normalize_whitespace)
+                    .unwrap_or_default(),
                 color,
                 data: RouteData::NjtBus,
                 geom: geom_map.get(&r.id).cloned().map(Into::into),
@@ -249,11 +256,8 @@ fn build_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<Stop> {
             let lat = s.latitude?;
             let lon = s.longitude?;
             let stop_code = s.code.clone().unwrap_or_else(|| s.id.clone());
-            let name = s
-                .name
-                .as_deref()
-                .map(title_case)
-                .unwrap_or_else(|| s.id.clone());
+            let raw_name = s.name.as_deref().unwrap_or(&s.id);
+            let name = normalize_title(raw_name);
 
             Some(Stop {
                 id: s.id.clone(),
@@ -279,20 +283,53 @@ struct Accumulator {
 }
 
 fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
+    let proj_wgs84 = Proj::from_epsg_code(4326).expect("Failed to create WGS84 proj");
+    let proj_ny = Proj::from_epsg_code(6538).expect("Failed to create NY proj");
+
+    // Build a map of stop_id -> projected Point
+    let stop_geom_map: HashMap<String, Point<f64>> = gtfs
+        .stops
+        .values()
+        .filter_map(|s| {
+            let lat = s.latitude?;
+            let lon = s.longitude?;
+            let mut point = Point::new(lon.to_radians(), lat.to_radians());
+            transform(&proj_wgs84, &proj_ny, &mut point).ok()?;
+            Some((s.id.clone(), point))
+        })
+        .collect();
+
+    // Map: route_id -> (Dir0 stops, Dir1 stops)
+    let mut route_dir_stops: HashMap<String, (Vec<String>, Vec<String>)> = HashMap::new();
     let mut accum: HashMap<RouteStopKey, Accumulator> = HashMap::new();
 
     for trip in gtfs.trips.values() {
         let direction: i16 = trip.direction_id.map(|d| d as i16).unwrap_or(0);
-        let trip_headsign = trip.trip_headsign.as_deref().unwrap_or("").to_owned();
+        let trip_headsign = trip.trip_headsign.as_deref().unwrap_or("");
+
+        let (dir0, dir1) = route_dir_stops
+            .entry(trip.route_id.clone())
+            .or_insert_with(|| (Vec::new(), Vec::new()));
 
         for st in &trip.stop_times {
+            // Collect stops for opposite-stop matching
+            if direction == 0 {
+                if !dir0.contains(&st.stop.id) {
+                    dir0.push(st.stop.id.clone());
+                }
+            } else if direction == 1 {
+                if !dir1.contains(&st.stop.id) {
+                    dir1.push(st.stop.id.clone());
+                }
+            }
+
             // Prefer per-stop headsign, fall back to trip headsign
-            let headsign = st
+            let raw_headsign = st
                 .stop_headsign
                 .as_deref()
-                .filter(|s| !s.is_empty())
-                .unwrap_or(trip_headsign.as_str())
-                .to_owned();
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(trip_headsign);
+            let headsign = normalize_headsign(&trip.route_id, raw_headsign);
 
             let key: RouteStopKey = (trip.route_id.clone(), st.stop.id.clone(), direction);
             let sequence = st.stop_sequence as i16;
@@ -311,6 +348,15 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
         }
     }
 
+    // Map: route_id -> (stop_id -> opposite_stop_id)
+    let opposite_maps: HashMap<String, HashMap<String, String>> = route_dir_stops
+        .into_iter()
+        .map(|(route_id, (dir0, dir1))| {
+            let map = compute_opposite_stops(&dir0, &dir1, &stop_geom_map, MAX_OPPOSITE_DIST);
+            (route_id, map)
+        })
+        .collect();
+
     let result: Vec<RouteStop> = accum
         .into_iter()
         .map(|((route_id, stop_id, direction), acc)| {
@@ -319,8 +365,11 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 .into_iter()
                 .max_by_key(|(_, count)| *count)
                 .map(|(h, _)| h)
-                .unwrap_or_default();
-            // TODO: maybe don't include headsign here since its included in rt trip data
+                .unwrap_or_else(|| "Unknown".into());
+
+            let opposite_stop_id = opposite_maps
+                .get(&route_id)
+                .and_then(|m| m.get(&stop_id).cloned());
 
             RouteStop {
                 route_id,
@@ -329,6 +378,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 data: RouteStopData::NjtBus {
                     headsign,
                     direction,
+                    opposite_stop_id,
                 },
             }
         })
@@ -351,6 +401,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                         RouteStopData::NjtBus {
                             headsign,
                             direction,
+                            ..
                         } => format!(
                             "(route_id={}, stop_id={}, direction={}, headsign={})",
                             rs.route_id, rs.stop_id, direction, headsign
@@ -397,29 +448,89 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
     deduped.into_values().collect()
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// --- Opposite-stop matching ---
+// TODO: combine mta_bus and njt_bus logic into a common module
+/// For each stop in `dir0_ids`, find the nearest stop in `dir1_ids` (and vice-versa) whose
+/// projected distance is within `max_dist` (EPSG:6538 meters).
+/// Returns a map of `stop_id → opposite_stop_id`.
+fn compute_opposite_stops(
+    dir0_ids: &[String],
+    dir1_ids: &[String],
+    stop_geom_map: &HashMap<String, Point<f64>>,
+    max_dist: f64,
+) -> HashMap<String, String> {
+    let mut opposite_map: HashMap<String, String> = HashMap::new();
 
-/// Convert ALL-CAPS strings (common in NJT GTFS) to Title Case.
-/// Capitalises the first letter and any letter following a non-word character.
-fn title_case(s: &str) -> String {
-    let re = Regex::new(r"\W").unwrap();
-    let mut name = s.to_lowercase();
-
-    // Collect indices of the character that follows each non-word character
-    let capitalize_at: Vec<usize> = re.find_iter(&name).map(|m| m.end()).collect();
-
-    for idx in capitalize_at {
-        if let Some(c) = name[idx..].chars().next() {
-            let upper = c.to_uppercase().to_string();
-            let end = idx + c.len_utf8();
-            name.replace_range(idx..end, &upper);
+    // dir0 → nearest dir1 match
+    for stop_id in dir0_ids {
+        let Some(p0) = stop_geom_map.get(stop_id) else {
+            continue;
+        };
+        let best = dir1_ids
+            .iter()
+            .filter_map(|opp_id| {
+                let p1 = stop_geom_map.get(opp_id)?;
+                let dist = Euclidean.distance(p0, p1);
+                (dist <= max_dist).then_some((opp_id, dist))
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        if let Some((opp_id, _)) = best {
+            opposite_map.insert(stop_id.clone(), opp_id.clone());
         }
     }
 
-    // Capitalise the very first character
-    let mut chars = name.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    // dir1 → nearest dir0 match
+    for stop_id in dir1_ids {
+        let Some(p1) = stop_geom_map.get(stop_id) else {
+            continue;
+        };
+        let best = dir0_ids
+            .iter()
+            .filter_map(|opp_id| {
+                let p0 = stop_geom_map.get(opp_id)?;
+                let dist = Euclidean.distance(p1, p0);
+                (dist <= max_dist).then_some((opp_id, dist))
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        if let Some((opp_id, _)) = best {
+            opposite_map.insert(stop_id.clone(), opp_id.clone());
+        }
     }
+
+    opposite_map
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Normalize a destination headsign by removing a repeated route-id prefix and
+/// converting the remaining text to title case.
+fn normalize_headsign(route_id: &str, headsign: &str) -> String {
+    let compact = normalize_whitespace(headsign);
+    let stripped = strip_route_id_prefix(route_id, &compact);
+    normalize_title(stripped)
+}
+
+/// Remove a route-id token from the start of a headsign when present.
+///
+/// Examples:
+/// - "509 ATLANTIC CITY" -> "ATLANTIC CITY"
+/// - "509-ATLANTIC CITY" -> "ATLANTIC CITY"
+fn strip_route_id_prefix<'a>(route_id: &str, headsign: &'a str) -> &'a str {
+    let trimmed = headsign.trim();
+    if route_id.is_empty() || trimmed.is_empty() {
+        return trimmed;
+    }
+
+    let first_token_end = trimmed
+        .find(|c: char| c.is_whitespace() || matches!(c, '-' | ':' | '/' | '.'))
+        .unwrap_or(trimmed.len());
+
+    let first_token = &trimmed[..first_token_end];
+    if !first_token.eq_ignore_ascii_case(route_id) {
+        return trimmed;
+    }
+
+    trimmed[first_token_end..]
+        .trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '-' | ':' | '/' | '.'))
+        .trim()
 }

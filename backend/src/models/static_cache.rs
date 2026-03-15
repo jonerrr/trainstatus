@@ -11,6 +11,7 @@ pub struct CachedStopTime {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedTrip {
+    // TODO: make some fields optional (like headsign)
     pub trip_id: String,
     pub route_id: String,
     pub headsign: String,

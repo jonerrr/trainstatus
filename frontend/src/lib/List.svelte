@@ -6,13 +6,14 @@
 	import { crossfade, slide } from 'svelte/transition';
 
 	import { browser } from '$app/environment';
+	import { page } from '$app/state';
 
 	import Pin from '$lib/Pin.svelte';
 	import RouteButton from '$lib/Route/Button.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 	import TripButton from '$lib/Trip/Button.svelte';
 	import type { Pins } from '$lib/pins.svelte';
-	import { default_sources, source_info } from '$lib/resources/index.svelte';
+	import { source_info } from '$lib/resources/index.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
 
@@ -28,7 +29,7 @@
 		// item type for rendering and modal
 		type: ItemType;
 		// data organized by source
-		sources: Record<Source, (Stop | Route | Trip)[]>;
+		sources: Partial<Record<Source, (Stop | Route | Trip)[]>>;
 		// persisted state for pinned items
 		pins?: LocalStorage<Pins>;
 		// persisted state for selected source tab
@@ -54,7 +55,10 @@
 		pins,
 		header_slot,
 		selected_source = $bindable(
-			new LocalStorage<Source>(`${title.toLocaleLowerCase()}_tab`, 'mta_subway')
+			new LocalStorage<Source>(
+				`${title.toLocaleLowerCase()}_tab`,
+				page.data.selected_sources[0] ?? 'mta_subway'
+			)
 		),
 		height_calc,
 		container_class,
@@ -66,7 +70,7 @@
 	}: Props = $props();
 
 	const source_entries = $derived(
-		default_sources.map((source) => ({
+		page.data.selected_sources.map((source) => ({
 			source,
 			data: sources[source] ?? []
 		}))
@@ -77,7 +81,7 @@
 
 	let active_source = $derived.by(() => {
 		// if the selected source has no data, fall back to the first available source
-		if (sources[selected_source.current]?.length > 0) {
+		if ((sources[selected_source.current]?.length ?? 0) > 0) {
 			return selected_source.current;
 		}
 		return available_sources[0]?.source;

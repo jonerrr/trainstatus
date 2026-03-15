@@ -24,14 +24,16 @@
 	const source_stop_times = $derived(stop_time_context.getSource(data.data.source));
 
 	const stop_times = $derived(
-		(source_stop_times.value.by_trip_id.get(data.id) || []).filter(
+		(source_stop_times?.value?.by_trip_id.get(data.id) ?? []).filter(
 			(st) => st.arrival.getTime() > current_time.ms
 		)
 	);
 
 	const position = $derived(
-		position_context.getSource(data.data.source).value.get(data.vehicle_id)
+		position_context.getSource(data.data.source)?.value?.get(data.vehicle_id)
 	);
+
+	const route = $derived(page.data.routes_by_id?.[data.data.source]?.[data.route_id]);
 
 	// TODO: create a single reusable last_stop function for trip button and modal
 	const last_stop = $derived.by(() => {
@@ -41,13 +43,13 @@
 			case 'mta_bus':
 				// TODO: get actual last stop instead of headsign. I think the issue was that bus trips don't always include all stop times, so the last stop time might not be the actual last stop.
 				// get stop in the direction of trip and get headsign
-				const stop = page.data.stops_by_id[data.data.source][stop_times[0].stop_id];
-				const routeStop = stop.routes.find((r) => r.route_id === data.route_id)!;
+				const stop = page.data.stops_by_id?.[data.data.source]?.[stop_times[0].stop_id];
+				const routeStop = stop?.routes.find((r) => r.route_id === data.route_id);
 				// this shouldn't be necessary since we should only be looking at bus routes, but just in case (and also to satisfy type checker)
-				return routeStop.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
+				return routeStop?.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
 			case 'mta_subway':
 				const last_st = stop_times[stop_times.length - 1];
-				return page.data.stops_by_id[data.data.source][last_st.stop_id].name;
+				return page.data.stops_by_id?.[data.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';
 			default:
 				return 'Unknown';
 		}
@@ -57,7 +59,7 @@
 		// TODO: check that position was updated_at recently (like in the past 5 minutes) to prevent showing wrong stop due to stale position data.
 		const target_stop_id = position?.stop_id || stop_times[0]?.stop_id;
 		if (!stop_times.length) return 'Unknown';
-		return page.data.stops_by_id[data.data.source][target_stop_id].name;
+		return page.data.stops_by_id?.[data.data.source]?.[target_stop_id]?.name ?? 'Unknown';
 	});
 
 	// const { current_status, current_stop } = $derived.by(() => {
@@ -101,12 +103,9 @@
 
 <div class="flex flex-col items-center gap-1 text-left">
 	<div class="flex max-w-[95%] items-center gap-1 self-start">
-		<Icon
-			width={36}
-			height={36}
-			route={page.data.routes_by_id[data.data.source][data.route_id]}
-			link={false}
-		/>
+		{#if route}
+			<Icon width={36} height={36} {route} link={false} />
+		{/if}
 
 		<ArrowBigRight />
 
@@ -115,7 +114,9 @@
 
 	<div class="flex gap-1 self-start">
 		<!-- TODO: map specific status values or just convert to title case -->
-		<span>{position?.data.status}</span>
+		{#if position?.data && 'status' in position.data}
+			<span>{(position.data as any).status}</span>
+		{/if}
 		{current_stop}
 	</div>
 </div>

@@ -25,12 +25,10 @@
 	const alerts = $derived(alert_context.get()[route.data.source]);
 
 	const show_alert_icon = $derived.by(() => {
-		if (!show_alerts) return false;
+		if (!show_alerts || !alerts) return false;
 		// TODO: maybe differentiate between planned alerts, station notices, etc
-		return alerts.value?.alerts_by_route.has(route.id);
+		return alerts.value?.alerts_by_route.has(route.id) ?? false;
 	});
-
-	// const icon_name = $derived(route.route_type === 'bus' || !express ? route.id : route.id + 'X');
 </script>
 
 <!-- {#snippet alert_icon()}
@@ -38,7 +36,7 @@
 		<div class="absolute top-0 right-0 size-3 rounded-full bg-orange-400"></div>
 	{/if}
 {/snippet} -->
-{#if route.data.source === 'mta_bus'}
+{#if ['mta_bus', 'njt_bus'].includes(route.data.source)}
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}

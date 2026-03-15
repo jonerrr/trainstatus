@@ -6,7 +6,6 @@ use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
 use indicatif::{ProgressBar, ProgressStyle};
 use proj4rs::{Proj, transform::transform};
 use rayon::prelude::*;
-use regex::Regex;
 use serde::{Deserialize, Deserializer};
 
 use crate::{
@@ -16,7 +15,7 @@ use crate::{
         stop::{CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     mta_oba_api_key,
-    sources::StaticAdapter,
+    sources::{StaticAdapter, normalize_title},
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 
@@ -250,7 +249,6 @@ fn compute_opposite_stops(
             .iter()
             .filter_map(|&opp_id| {
                 let p1 = stop_geom_map.get(&opp_id)?;
-                // let dist = p0.euclidean_distance(p1);
                 let dist = Euclidean.distance(p0, p1);
                 (dist <= max_dist).then_some((opp_id, dist))
             })
@@ -429,23 +427,8 @@ fn de_stop_name<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let re = Regex::new(r"\W{1}").unwrap();
     let mut name = String::deserialize(deserializer)?;
-    name = name.to_lowercase();
-    let matches = re.find_iter(&name);
-
-    let mut name = name.clone();
-    // Replace the character after each match with the uppercase version
-    for m in matches {
-        let idx = m.end();
-        if let Some(c) = name.chars().nth(idx) {
-            let upper = c.to_uppercase().to_string();
-            name.replace_range(idx..idx + 1, &upper);
-        }
-    }
-    // Capitalize the first letter
-    name = name.chars().next().unwrap().to_uppercase().to_string() + &name[1..];
-
+    name = normalize_title(&name);
     Ok(name)
 }
 

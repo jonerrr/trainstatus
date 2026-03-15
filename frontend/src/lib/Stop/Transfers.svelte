@@ -6,7 +6,7 @@
 	import { open_modal } from '$lib/url_params.svelte';
 	import { main_route_stops } from '$lib/util.svelte';
 
-	import type { CompassDirection, Source, Transfer } from '@trainstatus/client';
+	import type { CompassDirection, Source, Stop, Transfer } from '@trainstatus/client';
 
 	interface Props {
 		stop_source: Source;
@@ -30,8 +30,9 @@
 		transfers
 			.map((t) => ({
 				...t,
-				stop: page.data.stops_by_id[t.to_stop_source][t.to_stop_id]
+				stop: page.data.stops_by_id[t.to_stop_source]?.[t.to_stop_id]
 			}))
+			.filter((t): t is typeof t & { stop: Stop } => t.stop !== undefined)
 			.sort((a, b) => {
 				// Prioritize transfers from the same source as the current stop
 				if (a.stop.data.source === stop_source && b.stop.data.source !== stop_source) return -1;
@@ -66,12 +67,10 @@
 					<BusArrow direction={stop.data.direction} size="1rem" />
 				{/if}
 				{#each main_route_stops(stop.routes) as route_stop}
-					<Icon
-						width={24}
-						height={24}
-						link={false}
-						route={page.data.routes_by_id[to_stop_source][route_stop.route_id]}
-					/>
+					{@const route = page.data.routes_by_id[to_stop_source]?.[route_stop.route_id]}
+					{#if route}
+						<Icon width={24} height={24} link={false} {route} />
+					{/if}
 				{/each}
 			</button>
 		{/each}

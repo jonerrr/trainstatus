@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-// use sqlx::PgPool;
+use titlecase::Titlecase;
 use tokio::time::Duration;
 
 pub mod mta_bus;
@@ -57,4 +57,23 @@ pub trait StaticAdapter: Send + Sync {
         stop_store: &StopStore,
         static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()>;
+}
+
+///// various utilities for parsing and normalizing static data
+
+/// Trim leading/trailing whitespace and collapse internal whitespace runs.
+pub fn normalize_whitespace(value: &str) -> String {
+    let mut normalized = String::with_capacity(value.len());
+    for token in value.split_whitespace() {
+        if !normalized.is_empty() {
+            normalized.push(' ');
+        }
+        normalized.push_str(token);
+    }
+    normalized
+}
+
+/// Normalize whitespace and convert the resulting value to title case.
+pub fn normalize_title(value: &str) -> String {
+    normalize_whitespace(value).titlecase()
 }

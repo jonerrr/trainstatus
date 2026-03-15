@@ -2,11 +2,12 @@ import type { Source, Stop } from '@trainstatus/client';
 import { Index } from 'flexsearch';
 
 export class StopSearch {
-	indexes = $state({} as Record<Source, Index>);
-	stops = $state({} as Record<Source, Stop[]>);
+	indexes = $state({} as Partial<Record<Source, Index>>);
+	stops = $state({} as Partial<Record<Source, Stop[]>>);
 
-	constructor(stops_by_source: Record<Source, Stop[]>) {
+	constructor(stops_by_source: Partial<Record<Source, Stop[]>>) {
 		for (const [source, stops] of Object.entries(stops_by_source) as [Source, Stop[]][]) {
+			if (!stops) continue;
 			const index = new Index({ tokenize: 'forward' });
 			stops.forEach((stop, i) => {
 				index.add(i, stop.name);

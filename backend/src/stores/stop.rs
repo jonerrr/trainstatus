@@ -44,7 +44,6 @@ impl StopStore {
         Ok(sqlx::query_as::<_, Stop>(
             r#"SELECT
                 s.id,
-                s.source,
                 s.name,
                 s.geom,
                 COALESCE(
@@ -59,6 +58,7 @@ impl StopStore {
                         )
                         FROM static.stop_transfer st
                         WHERE st.from_stop_id = s.id
+                          AND st.from_stop_source = s.source
                     ),
                     '[]'::jsonb
                 ) AS transfers,
@@ -68,15 +68,16 @@ impl StopStore {
                         SELECT jsonb_agg(rs.*)
                         FROM static.route_stop rs
                         WHERE rs.stop_id = s.id
+                          AND rs.source = s.source
                     ),
                     '[]'::jsonb
                 ) AS routes
             FROM
                 static.stop s
             WHERE
-                s.data->>'source' = $1"#,
+                s.source = $1"#,
         )
-        .bind(source.as_str())
+        .bind(source)
         .fetch_all(&self.pg_pool)
         .await?)
     }
@@ -322,6 +323,7 @@ impl StopStore {
                 .await?;
         }
 
+        // TODO: figure out why a bunch of nearby stops are missing transfers. (mta_subway has no cross-source transfers which makes no sense)
         // Insert proximity transfers for every stop pair within 150 m.
         // Both directions (A→B and B→A) are produced by the self-join.
         //
@@ -332,20 +334,31 @@ impl StopStore {
         // OPTIMIZATION: We use `a.geom && ST_Expand(b.geom, 0.002)` to leverage the GIST index
         // on the 4326 geometry column. 0.002 degrees is approx 220m at NYC latitude,
         // providing a safe bounding box for our 150m check.
-        sqlx::query(
+        sqlx::query!(
             r#"
-            WITH candidates AS (
+            WITH stop_direction AS (
+                -- Determine the dominant direction (0/1) for each stop from its route associations.
+                -- mode() picks the most frequent value; for bus stops this is usually just one value.
+                SELECT
+                    stop_id,
+                    source,
+                    mode() WITHIN GROUP (ORDER BY (data->>'direction')::integer) as direction
+                FROM static.route_stop
+                GROUP BY stop_id, source
+            ),
+            candidates AS (
                 SELECT
                     a.id   AS from_id,
                     a.source AS from_source,
                     b.id   AS to_id,
                     b.source AS to_source,
-                    b.data->>'direction' AS to_direction,
+                    sd_b.direction AS to_direction,
                     ST_Distance(
                         ST_Transform(a.geom, 6538),
                         ST_Transform(b.geom, 6538)
                     ) AS dist
                 FROM static.stop a
+                LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source
                 JOIN static.stop b
                     ON a.id != b.id
                     -- Spatial index filter (approx 200m in degrees)
@@ -355,6 +368,7 @@ impl StopStore {
                         ST_Transform(b.geom, 6538),
                         150.0
                     )
+                LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source
                 WHERE
                     -- If source filter is provided, only look at pairs involving that source
                     ($1::source_enum IS NULL OR a.source = $1 OR b.source = $1)
@@ -366,57 +380,42 @@ impl StopStore {
                           AND st.to_stop_id = b.id
                           AND st.to_stop_source = b.source
                     )
-                    -- Skip mta_bus pairs where b is a's designated opposite stop
+                    -- Skip pairs of the same bus source that share the same direction
                     AND NOT (
-                        a.source = 'mta_bus'
+                        a.source = b.source
+                        AND a.source IN ('mta_bus', 'njt_bus')
+                        AND sd_a.direction IS NOT NULL
+                        AND sd_b.direction IS NOT NULL
+                        AND sd_a.direction = sd_b.direction
+                    )
+                    -- Skip pairs where b is a's designated opposite stop
+                    AND NOT (
+                        (a.source IN ('mta_bus', 'njt_bus'))
                         AND EXISTS (
                             SELECT 1 FROM static.route_stop rs
                             WHERE rs.stop_id = a.id
-                              AND rs.source = 'mta_bus'
+                              AND rs.source = a.source
                               AND rs.data->>'opposite_stop_id' = b.id
                         )
                     )
-                    -- Skip mta_bus pairs where a is b's designated opposite stop
+                    -- Skip pairs where a is b's designated opposite stop
                     AND NOT (
-                        b.source = 'mta_bus'
+                        (b.source IN ('mta_bus', 'njt_bus'))
                         AND EXISTS (
                             SELECT 1 FROM static.route_stop rs
                             WHERE rs.stop_id = b.id
-                              AND rs.source = 'mta_bus'
+                              AND rs.source = b.source
                               AND rs.data->>'opposite_stop_id' = a.id
                         )
                     )
-            ),
-            -- Stops without a direction (e.g. subway): keep all qualifying pairs.
-            non_directional AS (
-                SELECT from_id, from_source, to_id, to_source
-                FROM candidates
-                WHERE to_direction IS NULL
-            ),
-            -- Stops with a direction (e.g. bus): keep only the closest per
-            -- (from_stop, to_source, to_direction) group.
-            directional AS (
-                SELECT from_id, from_source, to_id, to_source
-                FROM (
-                    SELECT *,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY from_id, from_source, to_source, to_direction
-                            ORDER BY dist
-                        ) AS rn
-                    FROM candidates
-                    WHERE to_direction IS NOT NULL
-                ) ranked
-                WHERE rn = 1
             )
             INSERT INTO static.stop_transfer
                 (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type)
-            SELECT from_id, from_source, to_id, to_source, 6 FROM non_directional
-            UNION ALL
-            SELECT from_id, from_source, to_id, to_source, 6 FROM directional
+            SELECT from_id, from_source, to_id, to_source, 6 FROM candidates
             ON CONFLICT DO NOTHING
             "#,
+            source as _
         )
-        .bind(source)
         .execute(&mut *tx)
         .await?;
 

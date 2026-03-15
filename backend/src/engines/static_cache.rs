@@ -1,4 +1,4 @@
-use chrono::{Datelike, DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use gtfs_structures::Exception;
 
@@ -6,6 +6,7 @@ use crate::models::source::Source;
 use crate::models::static_cache::{CachedStopTime, CachedTrip};
 
 pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedTrip> {
+    // TODO: don't hardcode timezone
     let now = Utc::now().with_timezone(&New_York);
     let today = now.date_naive();
     let tomorrow = today.succ_opt().unwrap();
@@ -16,16 +17,16 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
     for trip in gtfs.trips.values() {
         for &date in &dates {
             if runs_on_date(&trip.service_id, date, gtfs) {
-                let first_stop_time = match trip.stop_times.first() {
-                    Some(st) => st,
-                    None => continue,
+                let Some(first_stop_time) = trip.stop_times.first() else {
+                    continue;
                 };
 
                 // Calculate start_time for this specific day
-                let start_time_seconds = first_stop_time.arrival_time.unwrap_or(0);
-                let start_time = match calculate_datetime(date, start_time_seconds) {
-                    Some(dt) => dt,
-                    None => continue,
+                let Some(start_time_seconds) = first_stop_time.arrival_time else {
+                    continue;
+                };
+                let Some(start_time) = calculate_datetime(date, start_time_seconds) else {
+                    continue;
                 };
 
                 let stop_times = trip
@@ -101,8 +102,7 @@ fn calculate_datetime(date: NaiveDate, seconds_since_midnight: u32) -> Option<Da
 
     // Handle times > 24:00:00 (GTFS allows this)
     let (extra_days, hours) = (hours / 24, hours % 24);
-    let actual_date = date
-        .checked_add_signed(chrono::Duration::days(extra_days as i64))?;
+    let actual_date = date.checked_add_signed(chrono::Duration::days(extra_days as i64))?;
 
     let naive_dt = NaiveDateTime::new(
         actual_date,

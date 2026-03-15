@@ -108,6 +108,8 @@ pub enum RouteStopData {
         headsign: String,
         /// 0 or 1 from GTFS direction_id
         direction: i16,
+        /// Populated by the backend based on proximity and direction. Not guaranteed to be accurate.
+        opposite_stop_id: Option<String>,
     },
 }
 

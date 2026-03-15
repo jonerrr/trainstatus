@@ -8,13 +8,13 @@
 	import Navbar from '$lib/Navbar.svelte';
 	import SEO from '$lib/SEO.svelte';
 	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
-	import { default_sources } from '$lib/resources/index.svelte';
 	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
 	import { createStopTimeResource, stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { createTripResource, trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
 	import '@fontsource/inter';
+	import type { Source } from '@trainstatus/client';
 
 	import '../app.css';
 
@@ -57,13 +57,15 @@
 	// Initialize modal from URL params on page load
 	onMount(() => {
 		const url = page.url;
-		// TODO: maybe include the source in the URL params so we don't have to loop over all of them to check
 		const stop_id = url.searchParams.get('s');
 		const route_id = url.searchParams.get('r');
 		const trip_id = url.searchParams.get('t');
+		const source_id = url.searchParams.get('src') as Source | null;
 
+		const sources: Source[] = source_id ? [source_id] : page.data.selected_sources;
+		// TODO: require source param so we don't need to iterate through sources
 		if (stop_id) {
-			for (const source of default_sources) {
+			for (const source of sources) {
 				const stop = page.data.stops_by_id[source]?.[stop_id];
 				if (stop) {
 					tick().then(() => replaceState('', { modal: { ...stop, type: 'stop' } }));
@@ -71,7 +73,7 @@
 				}
 			}
 		} else if (route_id) {
-			for (const source of default_sources) {
+			for (const source of sources) {
 				const route = page.data.routes_by_id[source]?.[route_id];
 				if (route) {
 					tick().then(() => replaceState('', { modal: { ...route, type: 'route' } }));
@@ -79,10 +81,10 @@
 				}
 			}
 		} else if (trip_id) {
-			const all_trips = trip_context.get();
-			if (all_trips) {
-				for (const source of default_sources) {
-					const trip = all_trips[source]?.value?.get(trip_id);
+			const all_trips_data = trip_context.get();
+			if (all_trips_data) {
+				for (const source of sources) {
+					const trip = all_trips_data[source]?.value?.get(trip_id);
 					if (trip) {
 						tick().then(() => replaceState('', { modal: { ...trip, type: 'trip' } }));
 						break;

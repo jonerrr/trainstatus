@@ -11,9 +11,16 @@
 	import { type Source, type Stop } from '@trainstatus/client';
 	import { Throttled } from 'runed';
 
-	// TODO: determine default source from users preferences or something
-	// TODO: why does svelte give a warning when this isn't wrapped in $state()?
-	let selected_source = $state(new LocalStorage<Source>('stops_tab', 'mta_subway'));
+	let selected_source = $state(
+		new LocalStorage<Source>('stops_tab', page.data.selected_sources[0] ?? 'mta_subway')
+	);
+
+	// Ensure selected source is still enabled
+	$effect(() => {
+		if (!page.data.selected_sources.includes(selected_source.current)) {
+			selected_source.current = page.data.selected_sources[0] ?? 'mta_subway';
+		}
+	});
 
 	const stop_search = new StopSearch(page.data.stops);
 
@@ -32,7 +39,7 @@
 		// TODO: maybe add back id length check (since stop_id must have like at least 3 chars. but its different for each source, so maybe not worth it)
 		const id_check = throttled_search_input.current.toUpperCase();
 
-		const stop = page.data.stops_by_id[selected_source.current][id_check];
+		const stop = page.data.stops_by_id[selected_source.current]?.[id_check];
 		if (stop) {
 			// TODO: maybe preserve the other source search results instead of implicitly resetting them
 			return {
@@ -41,13 +48,13 @@
 			};
 		}
 
-		const route = page.data.routes_by_id[selected_source.current][id_check];
+		const route = page.data.routes_by_id[selected_source.current]?.[id_check];
 		if (route) {
 			const new_stops: Stop[] = [];
 			// store sequences for sorting later
 			const route_stop_sequences: Record<string, number> = {};
 
-			for (const s of page.data.stops[selected_source.current]) {
+			for (const s of page.data.stops[selected_source.current] ?? []) {
 				const r = s.routes.find((r) => r.route_id === route.id);
 
 				if (
@@ -79,9 +86,11 @@
 		return {
 			...page.data.stops,
 			[selected_source.current]:
-				search_results.length > 0 ? search_results : page.data.stops[selected_source.current]
+				search_results.length > 0
+					? search_results
+					: (page.data.stops[selected_source.current] ?? [])
 		};
-	});
+	}) as Partial<Record<Source, Stop[]>>;
 	// $inspect(visible_stops);
 
 	function clear_search() {

@@ -20,17 +20,17 @@
 
 	let { data: stop }: Props = $props();
 
-	const routes = $derived(page.data.routes_by_id[stop.data.source]);
+	const routes = $derived(page.data.routes_by_id?.[stop.data.source] ?? {});
 
 	const trips = $derived(trip_context.getSource(stop.data.source));
 	const stop_times = $derived(stop_time_context.getSource(stop.data.source));
 
 	// TODO: improve this (and handle removing route when unmounted)
 	$effect(() => {
-		if (source_info[stop.data.source].monitor_routes) {
+		if (source_info[stop.data.source]?.monitor_routes) {
 			// TODO: might need to add active_routes that aren't included in the stop.routes array
 			for (const r of stop.routes) {
-				stop_times.add_route(r.route_id);
+				stop_times?.add_route(r.route_id);
 			}
 		}
 	});
@@ -53,11 +53,11 @@
 			}
 		}
 
-		const current_stop_times = stop_times.value?.by_stop_id.get(stop.id) ?? [];
+		const current_stop_times = stop_times?.value?.by_stop_id.get(stop.id) ?? [];
 		// TODO: maybe end loop early if we get 2 trips for each route or something like that
 		for (const st of current_stop_times) {
 			if (st.arrival.getTime() < current_time.ms) continue;
-			const trip = trips.value?.get(st.trip_id);
+			const trip = trips?.value?.get(st.trip_id);
 			if (!trip) continue;
 
 			const route_id = trip.route_id;
@@ -81,7 +81,9 @@
 
 	// $inspect(stop_times_by_direction);
 
-	const default_stop_routes = $derived(main_rs.map((r) => routes[r.route_id]));
+	const default_stop_routes = $derived(
+		main_rs.map((r) => routes[r.route_id]).filter((r) => r !== undefined)
+	);
 </script>
 
 <!-- eta used by bus and train -->
@@ -161,13 +163,15 @@
 			</div>
 		</div>
 	{/snippet} -->
-{:else if stop.data.source === 'mta_bus'}
+{:else if ['mta_bus', 'njt_bus'].includes(stop.data.source)}
 	<!-- TODO: make spacing consistent (use grid maybe idk) -->
 	<div class="flex flex-col text-white">
 		<div class="flex items-center">
-			<div>
-				<BusArrow direction={stop.data.direction} />
-			</div>
+			{#if stop.data.source === 'mta_bus'}
+				<div>
+					<BusArrow direction={stop.data.direction} />
+				</div>
+			{/if}
 			<div class="text-left text-lg font-medium">
 				{stop.name}
 			</div>
@@ -179,12 +183,17 @@
 				{@const route_stop_times = [...stop_times_by_direction.values()].flatMap(
 					(m) => m.get(route_stop.route_id) ?? []
 				)}
+				{#if !route}
+					{@debug stop}
+				{/if}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">
 						<div>
 							<!-- TODO: handle other sources -->
-							{route_stop.data.source === 'mta_bus' && route_stop.data.headsign}
+							{#if 'headsign' in route_stop.data}
+								{route_stop.data.headsign}
+							{/if}
 						</div>
 						<div class="flex gap-2 pr-1">
 							{#if route_stop_times.length}

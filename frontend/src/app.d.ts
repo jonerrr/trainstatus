@@ -1,4 +1,5 @@
 import type { AlertResource } from '$lib/resources/alerts.svelte';
+import type { PositionResource } from '$lib/resources/positions.svelte';
 import type { StopTimesResource } from '$lib/resources/stop_times.svelte';
 import type { TripResource } from '$lib/resources/trips.svelte';
 
@@ -17,10 +18,11 @@ declare global {
 		// interface Locals {}
 		// maybe this should be maps
 		interface PageData {
-			stops: Record<Source, Stop[]>;
-			routes: Record<Source, Route[]>;
-			stops_by_id: Record<Source, Record<string, Stop>>;
-			routes_by_id: Record<Source, Record<string, Route>>;
+			selected_sources: Source[];
+			stops: Partial<Record<Source, Stop[]>>;
+			routes: Partial<Record<Source, Route[]>>;
+			stops_by_id: Partial<Record<Source, Record<string, Stop>>>;
+			routes_by_id: Partial<Record<Source, Record<string, Route>>>;
 			// Initial realtime values as SourceMaps
 			initial_trips: RealtimeInitialValue<TripResource>[];
 			initial_stop_times: RealtimeInitialValue<StopTimesResource>[];
