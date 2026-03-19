@@ -12,7 +12,7 @@ use futures::future::BoxFuture;
 use prost::Message;
 use prost::bytes;
 use std::collections::HashMap;
-use tokio::fs::{create_dir, write};
+use tokio::fs::{create_dir_all, write};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 /// A future that fetches a GTFS-RT feed and returns the raw protobuf bytes.
@@ -72,14 +72,14 @@ pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<Feed
                     match FeedMessage::decode(bytes) {
                         Ok(msg) => {
                             if let Some(raw) = bytes_for_debug {
-                                create_dir("./gtfs").await.ok();
+                                create_dir_all("./debug_data/gtfs").await.ok();
 
-                                let pb_path = format!("./gtfs/{}.pb", name);
+                                let pb_path = format!("./debug_data/gtfs/{}.pb", name);
                                 if let Err(e) = write(&pb_path, &raw).await {
                                     error!(pb_path, %e, "Failed to write protobuf");
                                 }
 
-                                let txt_path = format!("./gtfs/{}.txt", name);
+                                let txt_path = format!("./debug_data/gtfs/{}.txt", name);
                                 let debug_str = format!("{:#?}", msg);
                                 if let Err(e) = write(&txt_path, debug_str).await {
                                     error!(txt_path, %e, "Failed to write debug output");

@@ -51,17 +51,19 @@ pub async fn routes_handler(
     Path(source): Path<Source>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    // If Redis was flushed, lazily repopulate cache so we can always return an ETag.
+    // TODO: figure out why this sometimes happens
+    let etag = match state.route_store.get_etag(source).await? {
+        Some(etag) => etag,
+        None => state.route_store.populate_cache(source).await?,
+    };
+
     // Check ETag before fetching full data
-    if let Some(etag) = state.route_store.get_etag(source).await? {
-        if etag_matches(&headers, &etag) {
-            return Ok(StatusCode::NOT_MODIFIED.into_response());
-        }
+    if etag_matches(&headers, &etag) {
+        return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
 
     let routes = state.route_store.get_all(source).await?;
-
-    // Compute/retrieve etag for response header (re-use cached value if present)
-    let etag = state.route_store.get_etag(source).await?.unwrap();
 
     let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())
@@ -84,16 +86,18 @@ pub async fn stops_handler(
     Path(source): Path<Source>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    // If Redis was flushed, lazily repopulate cache so we can always return an ETag.
+    let etag = match state.stop_store.get_etag(source).await? {
+        Some(etag) => etag,
+        None => state.stop_store.populate_cache(source).await?,
+    };
+
     // Check ETag before fetching full data
-    if let Some(etag) = state.stop_store.get_etag(source).await? {
-        if etag_matches(&headers, &etag) {
-            return Ok(StatusCode::NOT_MODIFIED.into_response());
-        }
+    if etag_matches(&headers, &etag) {
+        return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
 
     let stops = state.stop_store.get_all(source).await?;
-
-    let etag = state.stop_store.get_etag(source).await?.unwrap();
 
     let json = serde_json::to_string(&stops).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())
