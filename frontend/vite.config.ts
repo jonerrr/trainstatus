@@ -20,10 +20,10 @@ export default defineConfig(({ mode }) => {
 					rewrite: (path) => path.replace(/^\/api/, '')
 				},
 				// martin server
-				'/m': {
+				'/martin': {
 					target: 'http://localhost:3000',
 					changeOrigin: true,
-					rewrite: (path) => path.replace(/^\/m/, '')
+					rewrite: (path) => path.replace(/^\/martin/, '')
 				}
 			},
 

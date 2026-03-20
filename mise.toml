@@ -2,6 +2,7 @@ experimental_monorepo_root = true
 
 [tools]
 "github:protomaps/go-pmtiles" = "latest"
+"pipx:pyvalhalla" = { version = "latest", uvx = true }
 
 [monorepo]
 config_roots = ["science", "backend", "frontend"]
@@ -12,8 +13,3 @@ REDIS_URL = "redis://localhost:6379"
 
 [tasks.dev]
 depends = ["//backend:dev", "//frontend:dev"]
-
-[tasks.basemap]
-# TODO: test and improve script (e.g. get latest URL from api)
-dir = "pmtiles"
-run = "pmtiles extract https://build.protomaps.com/20260305.pmtiles ny.pmtiles --bbox=-74.685881,40.231692,-73.30382,41.16561"

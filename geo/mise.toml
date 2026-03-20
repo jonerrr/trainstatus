@@ -1,0 +1,26 @@
+[tasks.basemap]
+# TODO: test and improve script (e.g. get latest URL from api)
+dir = "pmtiles"
+run = "pmtiles extract https://build.protomaps.com/20260305.pmtiles ny.pmtiles --bbox=-74.685881,40.231692,-73.30382,41.16561"
+
+[tasks.generate-osm-pbf]
+dir = "map-updates/osm"
+# TODO: Download these dynamically
+run = """
+osmium merge connecticut-260319.osm.pbf new-jersey-260319.osm.pbf new-york-260319.osm.pbf -o merged.osm.pbf
+
+"""
+
+[tasks.generate-tiles]
+dir = "map-updates/osm"
+run = """
+podman run -it --rm --pull always -e JAVA_TOOL_OPTIONS="-Xmx4g" -v "$($env.pwd):/data" ghcr.io/onthegomap/planetiler:latest
+  --osm-path=/data/merged.osm.pbf
+  --output=/data/basemap.pmtiles
+"""
+# run = """
+# podman run -it --rm --pull always -v $(pwd):/data \
+#   ghcr.io/systemed/tilemaker:master \
+#   /data/merged.osm.pbf \
+#   --output /data/data.pmtiles
+# """
