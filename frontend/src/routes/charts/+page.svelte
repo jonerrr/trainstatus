@@ -361,8 +361,7 @@
 	<title>Charts | Train Status</title>
 </svelte:head> -->
 
-<div class="flex h-full min-h-75 flex-col">
-	<div class="pl-3 text-xl font-bold">Charts</div>
+<div class="flex h-full min-h-75 flex-col py-4">
 	<div
 		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"
 	>
@@ -622,3 +621,11 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	@reference "../../app.css";
+
+	:global(.layercake-layout-svg) {
+		@apply bg-neutral-950;
+	}
+</style>
