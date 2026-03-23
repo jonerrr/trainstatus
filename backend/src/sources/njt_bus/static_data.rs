@@ -1,4 +1,9 @@
-use std::{collections::HashMap, io::Cursor, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Cursor,
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::{
     engines::static_cache::expand_gtfs,
@@ -16,14 +21,22 @@ use async_trait::async_trait;
 use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
 use geojson::GeoJson;
 use proj4rs::{Proj, transform::transform};
+use tracing::{info, warn};
+
+use super::{NJT_BUS_ROUTES_URL, NjtApi};
 
 const NJT_DEFAULT_COLOR: &str = "1A2B57";
 const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
-// TODO: try building route geom by creating a graph of the geom between each stop using the gtfs shapes.txt
-// From my initial testing, each stop point is also somewhere in the shapes.txt, then we can reconstruct using the stop_times.txt sequences.
-// We can also reuse this logic for MTA subway and MTA bus
 const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BusRoute {
+    #[serde(rename = "BusRouteID")]
+    bus_route_id: String,
+    #[serde(rename = "BusRouteDescription")]
+    bus_route_description: String,
+}
 
 pub struct NjtBusStatic {
     valhalla: Arc<ValhallaManager>,
@@ -79,7 +92,7 @@ impl StaticAdapter for NjtBusStatic {
         stop_store: &StopStore,
         static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
-        let token = super::get_token()
+        let token = super::get_token(NjtApi::GtfsG2)
             .await
             .context("NJT authentication failed")?;
 
@@ -109,7 +122,16 @@ impl StaticAdapter for NjtBusStatic {
             .await
             .context("Failed to cache NJT trips in Redis")?;
 
-        let mut route_geom_map = fetch_route_geometries()
+        let bus_routes_token = super::get_token(NjtApi::BusDv2)
+            .await
+            .context("NJT BUSDV2 authentication failed")?;
+
+        let bus_routes = fetch_bus_routes(&bus_routes_token)
+            .await
+            .context("Failed to fetch BUSDV2 route metadata")?;
+
+        // TODO: either fix or remove valhalla route snapping for njt bus
+        let mut route_geom_map = fetch_route_geometries(&bus_routes, &gtfs)
             .await
             .context("Failed to fetch NJT route geometries")?;
 
@@ -125,7 +147,7 @@ impl StaticAdapter for NjtBusStatic {
             }
         };
 
-        self.snap_route_geometries(&mut route_geom_map).await;
+        // self.snap_route_geometries(&mut route_geom_map).await;
 
         // Build all entities
         let routes = build_routes(&gtfs, &route_geom_map);
@@ -193,10 +215,30 @@ async fn download_gtfs(token: &str) -> anyhow::Result<Vec<u8>> {
     Ok(bytes.to_vec())
 }
 
+async fn fetch_bus_routes(token: &str) -> anyhow::Result<Vec<BusRoute>> {
+    let form = reqwest::multipart::Form::new()
+        .text("token", token.to_owned())
+        .text("mode", "ALL");
+
+    let routes = reqwest::Client::new()
+        .post(NJT_BUS_ROUTES_URL)
+        .multipart(form)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<BusRoute>>()
+        .await?;
+
+    Ok(routes)
+}
+
 // ── Route geometry (ArcGIS) ───────────────────────────────────────────────────
 
 /// Fetch GeoJSON from NJT ArcGIS and return a map of route_id → MultiLineString.
-async fn fetch_route_geometries() -> anyhow::Result<HashMap<String, MultiLineString>> {
+async fn fetch_route_geometries(
+    bus_routes: &[BusRoute],
+    gtfs: &gtfs_structures::Gtfs,
+) -> anyhow::Result<HashMap<String, MultiLineString>> {
     let text = reqwest::Client::new()
         .get(NJT_ARCGIS_URL)
         .send()
@@ -215,6 +257,34 @@ async fn fetch_route_geometries() -> anyhow::Result<HashMap<String, MultiLineStr
     // Group line segments by route_id (LINE_STRING property)
     let mut route_lines: HashMap<String, Vec<LineString>> = HashMap::new();
 
+    let bus_route_by_id: HashMap<String, String> = bus_routes
+        .iter()
+        .map(|route| {
+            (
+                route.bus_route_id.clone(),
+                route.bus_route_description.clone(),
+            )
+        })
+        .collect();
+
+    let gtfs_route_ids: HashSet<String> =
+        gtfs.routes.values().map(|route| route.id.clone()).collect();
+
+    let mut gtfs_route_ids_by_long_name: HashMap<String, Vec<String>> = HashMap::new();
+    for route in gtfs.routes.values() {
+        let Some(long_name) = route.long_name.as_deref() else {
+            continue;
+        };
+
+        gtfs_route_ids_by_long_name
+            .entry(route_name_key(long_name))
+            .or_default()
+            .push(route.id.clone());
+    }
+
+    let mut mapped_via_bus_api = 0usize;
+    let mut unresolved_line_string_ids = 0usize;
+
     for feature in fc.features {
         let Some(props) = &feature.properties else {
             continue;
@@ -222,9 +292,29 @@ async fn fetch_route_geometries() -> anyhow::Result<HashMap<String, MultiLineStr
         let Some(val) = props.get("LINE_STRING") else {
             continue;
         };
-        let route_id = match val.as_str() {
-            Some(s) => s.to_owned(),
-            None => val.to_string().trim_matches('"').to_owned(),
+
+        let Some(line_string_id) = val.as_str() else {
+            warn!(value = ?val, "Unexpected non-string LINE_STRING property in ArcGIS feature; skipping");
+            continue;
+        };
+
+        // this seems to get most of the routes (newark light rail, etc). but theres still a couple gtfs routes that don't have matching geometry
+        let route_id = match map_arcgis_route_id_to_gtfs_route_id(
+            &line_string_id,
+            &bus_route_by_id,
+            &gtfs_route_ids_by_long_name,
+            &gtfs_route_ids,
+        ) {
+            Some(gtfs_route_id) => {
+                if gtfs_route_id != line_string_id {
+                    mapped_via_bus_api += 1;
+                }
+                gtfs_route_id
+            }
+            None => {
+                unresolved_line_string_ids += 1;
+                line_string_id.into()
+            }
         };
 
         let Some(ref geom) = feature.geometry else {
@@ -248,10 +338,52 @@ async fn fetch_route_geometries() -> anyhow::Result<HashMap<String, MultiLineStr
         }
     }
 
+    if mapped_via_bus_api > 0 {
+        info!(
+            mapped_via_bus_api,
+            "Mapped ArcGIS LINE_STRING IDs to GTFS route IDs using BUSDV2 route descriptions"
+        );
+    }
+
+    if unresolved_line_string_ids > 0 {
+        warn!(
+            unresolved_line_string_ids,
+            "ArcGIS features could not be mapped via BUSDV2 metadata; keeping original LINE_STRING value"
+        );
+    }
+
     Ok(route_lines
         .into_iter()
         .map(|(id, lines)| (id, MultiLineString::new(lines)))
         .collect())
+}
+
+fn map_arcgis_route_id_to_gtfs_route_id(
+    line_string_id: &str,
+    bus_route_by_id: &HashMap<String, String>,
+    gtfs_route_ids_by_long_name: &HashMap<String, Vec<String>>,
+    gtfs_route_ids: &HashSet<String>,
+) -> Option<String> {
+    if gtfs_route_ids.contains(line_string_id) {
+        return Some(line_string_id.to_owned());
+    }
+
+    let description = bus_route_by_id.get(line_string_id)?;
+    let candidates = gtfs_route_ids_by_long_name.get(&route_name_key(description))?;
+
+    if candidates.len() == 1 {
+        return candidates.first().cloned();
+    }
+
+    candidates
+        .iter()
+        .find(|route_id| route_id.eq_ignore_ascii_case(line_string_id))
+        .cloned()
+        .or_else(|| candidates.first().cloned())
+}
+
+fn route_name_key(value: &str) -> String {
+    normalize_whitespace(value).to_ascii_lowercase()
 }
 
 fn positions_to_linestring(positions: &[geojson::Position]) -> LineString {
@@ -434,8 +566,11 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
             }
         })
         .collect();
+
+    // TODO: figure out what to do about bus stops where the same route id but different direction have the same stop_id
+    // for example route_id=605 stop_id=15142 count=2 examples=["(route_id=605, stop_id=15142, direction=1, headsign=Quaker Br Mall via Griggs Frm)", "(route_id=605, stop_id=15142, direction=0, headsign=Princeton Montgomery Twp via Griggs Frm)"]
+
     // TODO: remove this after testing route stop directions are working
-    // debug: check for any duplicates once we uppercase keys
     #[cfg(debug_assertions)]
     {
         let mut norm_map: HashMap<(String, String), Vec<&RouteStop>> = HashMap::new();

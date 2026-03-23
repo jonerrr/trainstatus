@@ -11,7 +11,6 @@ use tracing::error;
 use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-// pub mod errors;
 // pub mod websocket;
 pub mod realtime;
 pub mod static_data;

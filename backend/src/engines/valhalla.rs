@@ -10,6 +10,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
+// TODO: remove retry logic or make it based on http status code (e.g. dont retry on 400)
 const DEFAULT_VALHALLA_BASE_URL: &str = "http://127.0.0.1:8002";
 const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 60;
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 8;
