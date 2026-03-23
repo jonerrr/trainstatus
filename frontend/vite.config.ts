@@ -24,14 +24,9 @@ export default defineConfig(({ mode }) => {
 					target: 'http://localhost:3000',
 					changeOrigin: true,
 					xfwd: true
-
-					// rewrite: (path) => path.replace(/^\/martin/, '')
 				}
 			},
-
 			allowedHosts
-
-			// : allowedHosts.length ? allowedHosts : undefined
 		},
 		test: {
 			expect: { requireAssertions: true },
