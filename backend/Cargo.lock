@@ -262,7 +262,6 @@ dependencies = [
  "headers",
  "http",
  "indicatif",
- "itertools 0.14.0",
  "polyline",
  "proj4rs",
  "prost",

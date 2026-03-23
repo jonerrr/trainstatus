@@ -20,7 +20,6 @@ gtfs-structures = "0.47.0"
 headers = "0.4.1"
 http = "1.2.0"
 indicatif = "0.18.0"
-itertools = "0.14.0"
 polyline = "0.11.0"
 proj4rs = { version = "0.1.9", features = ["crs-definitions", "geo-types"] }
 prost = "0.14.1"
