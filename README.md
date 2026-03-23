@@ -6,7 +6,7 @@ The best website to check the status of your train (and bus).
 
 ~~If you'd like to try a hosted version of the API, you can find the documentation [here](https://trainstat.us/api/docs)~~. You can also host your own version using the prebuilt container images linked to this repository.
 
-~~A realtime bus map is available at <a href="https://map.trainstat.us" target="_blank">map.trainstat.us</a>.~~
+~~A realtime bus map is available at <a href="https://trainstat.us/map" target="_blank">trainstat.us/map</a>.~~
 
 ## Features
 
@@ -25,6 +25,8 @@ The best website to check the status of your train (and bus).
 - Use the prebuilt container images linked to this repository.
 - Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
 - Requires PostgreSQL and Valkey/Redis.
+- Route snapping for MTA Bus and NJT Bus uses an on-demand `valhalla_service` process managed by the backend (lazy start + idle shutdown).
+- Set `VALHALLA_CONFIG` if your Valhalla config file is not at `/data/valhalla.json`.
 
 ## Development
 

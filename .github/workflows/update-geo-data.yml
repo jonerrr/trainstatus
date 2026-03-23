@@ -1,3 +1,5 @@
+name: Update Geo Data
+
 on:
     workflow_dispatch:
         # TODO: add scheduled refresh
