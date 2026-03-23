@@ -25,7 +25,7 @@ The best website to check the status of your train (and bus).
 - Use the prebuilt container images linked to this repository.
 - Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
 - Requires PostgreSQL with PostGIS and Valkey/Redis.
-- See `compose.test.yml` for example deployment.
+- See `compose.test.yml` for example deployment with traefik. You will need to update the URLs inside of `geo/styles/<style>.json` to match the URL you are hosting it on.
 
 ## Development
 

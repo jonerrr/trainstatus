@@ -22,5 +22,8 @@ REDIS_URL = "redis://localhost:6379"
 run = "podman compose -f compose.dev.yml up -d"
 
 [tasks.dev]
-depends = ["start-containers", "//backend:migrate"]
+depends = ["start-containers"]
 run = { tasks = ["//backend:dev", "//frontend:dev"] }
+
+[tasks.preview]
+run = "podman compose -f compose.test.yml up -d"

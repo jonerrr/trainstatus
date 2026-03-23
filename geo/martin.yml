@@ -10,9 +10,10 @@ postgres:
         - static
       # must be integer (but we are using string)
       # id_columns: id
-    functions:
-      from_schemas:
-        - realtime
+    # TODO: add back functions once they are fixed
+    # functions:
+    #   from_schemas:
+    #     - realtime
 
 sprites:
   paths:
@@ -21,11 +22,7 @@ sprites:
 
 styles:
   paths:
-    # publish all *.json files in this directory
-    # The name of the file will be used as the style name
     - /styles
-    # publish a single file - here `maplibre_style` will be the style name
-    # - /path/to/maplibre_style.json
 
 fonts:
   paths:
@@ -39,7 +36,7 @@ pmtiles:
   sources:
     basemap: /data/basemap.pmtiles
 
+# should be disabled in prod
 web_ui: enable-for-all
 
-# TODO: re-enable after done styling with maputnik
-# cors: false
+cors: false

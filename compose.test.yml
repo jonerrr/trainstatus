@@ -1,4 +1,38 @@
 services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      # port matches the martin style urls
+      - 5173:80
+      - 8080:8080
+    volumes:
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:Z
+
+  ts-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      - ORIGIN=http://traefik
+    depends_on:
+      ts-backend:
+        condition: service_started
+      martin:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=PathPrefix(`/`)
+      - traefik.http.routers.frontend.entrypoints=web
+      - traefik.http.routers.frontend.priority=1
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
+
   # TODO: fix valhalla returning no suitable edges error for all routes
   ts-backend:
     build: backend
@@ -8,18 +42,25 @@ services:
       - ADDRESS=0.0.0.0:3055
     env_file:
       - .env.docker
-    ports:
-      - 3055:3055
     depends_on:
       postgis:
-        condition: service_started
+        condition: service_healthy
       geo-data:
         condition: service_completed_successfully
     volumes:
       - trainstatus-geo-data-test:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=PathPrefix(`/api`)
+      - traefik.http.routers.backend.entrypoints=web
+      - traefik.http.routers.backend.priority=100
+      - traefik.http.routers.backend.middlewares=strip-api-prefix
+      - traefik.http.middlewares.strip-api-prefix.stripprefix.prefixes=/api
+      - traefik.http.services.backend.loadbalancer.server.port=3055
 
   geo-data:
     image: ghcr.io/jonerrr/trainstatus-geo-data:latest
+    pull_policy: always
     restart: "no"
     volumes:
       - trainstatus-geo-data-test:/shared-data
@@ -28,8 +69,6 @@ services:
       - -ec
       - |
         cp -a /data/. /shared-data/
-
-  # TODO: add frontend
 
   postgis:
     container_name: postgis
@@ -61,13 +100,18 @@ services:
   martin:
     container_name: martin
     image: ghcr.io/maplibre/martin:latest
-    ports:
-      - 3000:3000
     environment:
       - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
     depends_on:
-      - postgis
+      postgis:
+        condition: service_healthy
     command: ["--config", "/config/martin.yml"]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.martin.rule=PathPrefix(`/martin`)
+      - traefik.http.routers.martin.entrypoints=web
+      - traefik.http.routers.martin.priority=90
+      - traefik.http.services.martin.loadbalancer.server.port=3000
     volumes:
       - ./geo/martin.yml:/config/martin.yml:Z,ro
       - ./geo/sprites:/sprites:Z,ro

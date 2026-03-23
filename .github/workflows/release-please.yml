@@ -40,9 +40,11 @@ jobs:
                 include:
                     - component: backend
                       context: ./backend
+                      dockerfile: ./backend/Dockerfile
                       image: ghcr.io/${{ github.repository_owner }}/trainstatus-backend
                     - component: frontend
-                      context: ./frontend
+                      context: .
+                      dockerfile: ./frontend/Dockerfile
                       image: ghcr.io/${{ github.repository_owner }}/trainstatus-frontend
 
         permissions:
@@ -72,6 +74,7 @@ jobs:
               uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
+                  file: ${{ matrix.dockerfile }}
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
