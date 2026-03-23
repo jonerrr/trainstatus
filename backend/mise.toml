@@ -8,7 +8,7 @@ run = "cargo sqlx prepare"
 run = "sqlx migrate run"
 
 [tasks.dev]
-# depends = ["start-containers"]
+depends = ["//backend:migrate"]
 run = "cargo run"
 
 [tasks.reset-db]

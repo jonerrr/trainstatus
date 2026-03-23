@@ -4,3 +4,4 @@ queries.sql
 gtfs/
 sprites/
 Dockerfile
+debug_data/
