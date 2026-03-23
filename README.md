@@ -1,12 +1,12 @@
 # Train Status
 
-**Notice**: Websites are currently offline as I complete a large refactor.
+## Notice: Websites are currently offline as I complete a large refactor
 
 The best website to check the status of your train (and bus).
 
-If you'd like to try a hosted version of the API, you can find the documentation [here](https://trainstat.us/api/docs). You can also host your own version using the prebuilt container images linked to this repository.
+~~If you'd like to try a hosted version of the API, you can find the documentation [here](https://trainstat.us/api/docs)~~. You can also host your own version using the prebuilt container images linked to this repository.
 
-A realtime bus map is available at <a href="https://map.trainstat.us" target="_blank">map.trainstat.us</a>.
+~~A realtime bus map is available at <a href="https://map.trainstat.us" target="_blank">map.trainstat.us</a>.~~
 
 ## Features
 

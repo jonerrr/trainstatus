@@ -2,35 +2,24 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
-	import type { Route } from '$lib/static';
-	import { route_pins_rune } from '$lib/util.svelte';
+	import { route_pins } from '$lib/pins.svelte';
+	import { calculate_route_height } from '$lib/util.svelte';
 
-	const { bus_routes, train_routes } = $derived(
-		Object.values(page.data.routes).reduce(
-			(acc: { bus_routes: Route[]; train_routes: Route[] }, route) => {
-				if (route.route_type === 'bus') {
-					acc.bus_routes.push(route);
-				} else {
-					acc.train_routes.push(route);
-				}
-				return acc;
-			},
-			{ bus_routes: [], train_routes: [] }
-		)
-	);
+	import type { Route, Source } from '@trainstatus/client';
+
+	// remove special express mta_subway routes (FX, 6X, 7X, etc) since they won't have any alerts
+	const sources = $derived({
+		...page.data.routes,
+		mta_subway: page.data.routes['mta_subway']?.filter((route) => !route.id.endsWith('X'))
+	});
 </script>
-
-<svelte:head>
-	<title>Alerts | Train Status</title>
-</svelte:head>
 
 <List
 	title="Route Alerts"
-	bus_data={bus_routes}
-	train_data={train_routes}
+	{sources}
 	type="route"
-	pin_rune={route_pins_rune}
-	class="max-h-[calc(100dvh-10.5rem)]"
-	height_calc={() => 45}
+	pins={route_pins}
+	container_class="h-full"
+	height_calc={calculate_route_height}
 	ssr_min={20}
 />

@@ -1,0 +1,77 @@
+name: release-please
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+    packages: write
+
+concurrency:
+    group: release-please
+    cancel-in-progress: false
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        outputs:
+            release_created: ${{ steps.release.outputs.release_created }}
+            version: ${{ steps.release.outputs.version }}
+        steps:
+            - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+              id: release
+              with:
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json
+                  target-branch: main
+
+    build-and-push:
+        needs:
+            - release-please
+        if: ${{ needs.release-please.outputs.release_created }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - component: backend
+                      context: ./backend
+                      image: ghcr.io/${{ github.repository_owner }}/trainstatus-backend
+                    - component: frontend
+                      context: ./frontend
+                      image: ghcr.io/${{ github.repository_owner }}/trainstatus-frontend
+
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.repository_owner }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract metadata (tags, labels) for Docker
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ matrix.image }}
+                  tags: |
+                      latest
+                      ${{ needs.release-please.outputs.version }}
+
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v7
+              with:
+                  context: ${{ matrix.context }}
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}

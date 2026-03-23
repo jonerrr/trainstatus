@@ -1,0 +1,45 @@
+route_prefix: /martin
+
+postgres:
+  # The connection URL will be read from DATABASE_URL env var
+  connection_string: $DATABASE_URL
+
+  auto_publish:
+    tables:
+      from_schemas:
+        - static
+      # must be integer (but we are using string)
+      # id_columns: id
+    functions:
+      from_schemas:
+        - realtime
+
+sprites:
+  paths:
+    - /sprites/dark-matter
+    - /sprites/frontend
+
+styles:
+  paths:
+    # publish all *.json files in this directory
+    # The name of the file will be used as the style name
+    - /styles
+    # publish a single file - here `maplibre_style` will be the style name
+    # - /path/to/maplibre_style.json
+
+fonts:
+  paths:
+    - /fonts
+
+# mbtiles:
+#   sources:
+#     basemap: /data/basemap.mbtiles
+
+pmtiles:
+  sources:
+    basemap: /data/basemap.pmtiles
+
+web_ui: enable-for-all
+
+# TODO: re-enable after done styling with maputnik
+# cors: false

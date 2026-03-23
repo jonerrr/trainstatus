@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { type BusStopDirection } from '$lib/static';
-
 	import {
 		ArrowDown,
 		ArrowDownLeft,
@@ -11,26 +9,27 @@
 		ArrowUpLeft,
 		ArrowUpRight
 	} from '@lucide/svelte';
+	import type { CompassDirection } from '@trainstatus/client';
 
-	const { direction }: { direction: BusStopDirection } = $props();
+	const { direction, size = '1.5rem' }: { direction: CompassDirection; size?: string } = $props();
 </script>
 
 <div>
-	{#if direction === 'sw'}
-		<ArrowDownLeft size="1.5rem" />
+	{#if direction === 's_w'}
+		<ArrowDownLeft {size} />
 	{:else if direction === 's'}
-		<ArrowDown size="1.5rem" />
-	{:else if direction === 'se'}
-		<ArrowDownRight size="1.5rem" />
+		<ArrowDown {size} />
+	{:else if direction === 's_e'}
+		<ArrowDownRight {size} />
 	{:else if direction === 'e'}
-		<ArrowRight size="1.5rem" />
+		<ArrowRight {size} />
 	{:else if direction === 'w'}
-		<ArrowLeft size="1.5rem" />
-	{:else if direction === 'nw'}
-		<ArrowUpLeft size="1.5rem" />
-	{:else if direction === 'ne'}
-		<ArrowUpRight size="1.5rem" />
+		<ArrowLeft {size} />
+	{:else if direction === 'n_w'}
+		<ArrowUpLeft {size} />
+	{:else if direction === 'n_e'}
+		<ArrowUpRight {size} />
 	{:else if direction === 'n'}
-		<ArrowUp size="1.5rem" />
+		<ArrowUp {size} />
 	{/if}
 </div>

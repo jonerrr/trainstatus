@@ -1,14 +1,21 @@
-[tools]
-# rust = "latest"
-# installing with mise caused the rust vscode extension not to work
-# protoc = "latest"
+# [tasks.start-containers]
+# run = "podman compose up -d"
 
-[tasks.start-containers]
-run = "podman compose up -d"
+[tasks.csp]
+run = "cargo sqlx prepare"
 
 [tasks.dev]
-depends = ["start-containers"]
+# depends = ["start-containers"]
 run = "cargo run"
 
+[tasks.reset-db]
+confirm = "Are you sure?"
+run = """
+podman compose -f ../compose.dev.yml down -v
+podman compose -f ../compose.dev.yml up -d
+sqlx migrate run
+"""
+
 [env]
+VALHALLA_CONFIG = "../geo/data/valhalla.json"
 # RUST_LOG = "backend=debug"

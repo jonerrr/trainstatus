@@ -1,4 +1,4 @@
-<script lang="ts" generics="T">
+<script lang="ts">
 	import type { Snippet } from 'svelte';
 
 	// import { crossfade, slide } from 'svelte/transition';

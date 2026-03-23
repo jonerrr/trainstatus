@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.vehicle_position (\n                vehicle_id,\n                source,\n                trip_id,\n                stop_id,\n                geom,\n                data,\n                updated_at\n            )\n            SELECT\n                unnest($1::text[]),\n                unnest($2::source_enum[]),\n                unnest($3::uuid[]),\n                unnest($4::text[]),\n                unnest($5::geometry[]),\n                unnest($6::JSONB[]),\n                unnest($7::timestamptz[])\n            ON CONFLICT (vehicle_id, source) DO UPDATE SET\n                trip_id = EXCLUDED.trip_id,\n                stop_id = EXCLUDED.stop_id,\n                geom = EXCLUDED.geom,\n                data = EXCLUDED.data,\n                updated_at = EXCLUDED.updated_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "njt_bus",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "UuidArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a5e75d1bf2136979a3e0b3a9d0da94839719fdaf428a5cc31ed4abfc501e4632"
+}

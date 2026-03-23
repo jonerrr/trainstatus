@@ -1,13 +1,15 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TYPE static.route_type AS ENUM ('train', 'bus');
-
 CREATE TABLE IF NOT EXISTS static.route (
-    id VARCHAR PRIMARY KEY,
+    id VARCHAR NOT NULL,
+    source source_enum NOT NULL,
     long_name VARCHAR NOT NULL,
     short_name VARCHAR NOT NULL,
     color VARCHAR(7) NOT NULL,
-    shuttle BOOLEAN NOT NULL,
+    data JSONB NOT NULL,
     geom geometry(MULTILINESTRING, 4326),
-    route_type static.route_type NOT NULL
+    -- Need to have source in primary key to avoid conflicts between different sources
+    PRIMARY KEY (id, source)
 );
+
+CREATE INDEX IF NOT EXISTS idx_route_geom ON static.route USING GIST (geom);

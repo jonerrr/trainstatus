@@ -8,7 +8,7 @@ COPY . .
 ARG SQLX_OFFLINE=true
 RUN cargo build --release --target x86_64-unknown-linux-musl
 
-
+# TODO: replace this with valhalla image
 FROM scratch
 
 WORKDIR /app
