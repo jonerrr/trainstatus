@@ -289,12 +289,12 @@ async fn fetch_route_geometries(
         let Some(props) = &feature.properties else {
             continue;
         };
-        let Some(val) = props.get("LINE_STRING") else {
+        let Some(val) = props.get("LINE") else {
             continue;
         };
 
-        let Some(line_string_id) = val.as_str() else {
-            warn!(value = ?val, "Unexpected non-string LINE_STRING property in ArcGIS feature; skipping");
+        let Some(line_string_id) = val.as_u64().map(|v| v.to_string()) else {
+            warn!(value = ?val, "Unexpected non-string LINE property in ArcGIS feature; skipping");
             continue;
         };
 
@@ -365,7 +365,7 @@ fn map_arcgis_route_id_to_gtfs_route_id(
     gtfs_route_ids: &HashSet<String>,
 ) -> Option<String> {
     if gtfs_route_ids.contains(line_string_id) {
-        return Some(line_string_id.to_owned());
+        return Some(line_string_id.into());
     }
 
     let description = bus_route_by_id.get(line_string_id)?;
@@ -375,6 +375,7 @@ fn map_arcgis_route_id_to_gtfs_route_id(
         return candidates.first().cloned();
     }
 
+    // TODO: check if this actually happens
     candidates
         .iter()
         .find(|route_id| route_id.eq_ignore_ascii_case(line_string_id))
