@@ -1,8 +1,8 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc, time::Duration};
 
 use crate::{
-    engines::valhalla::ValhallaManager,
     engines::static_cache::expand_gtfs,
+    engines::valhalla::ValhallaManager,
     models::{
         route::{Route, RouteData},
         source::Source,
@@ -34,10 +34,7 @@ impl NjtBusStatic {
         Self { valhalla }
     }
 
-    async fn snap_route_geometries(
-        &self,
-        route_geometries: &mut HashMap<String, MultiLineString>,
-    ) {
+    async fn snap_route_geometries(&self, route_geometries: &mut HashMap<String, MultiLineString>) {
         for (route_id, geometry) in route_geometries.iter_mut() {
             let mut snapped_lines = Vec::with_capacity(geometry.0.len());
 
@@ -235,13 +232,13 @@ async fn fetch_route_geometries() -> anyhow::Result<HashMap<String, MultiLineStr
         };
 
         match &geom.value {
-            geojson::Value::LineString(positions) => {
+            geojson::GeometryValue::LineString { coordinates } => {
                 route_lines
                     .entry(route_id)
                     .or_default()
-                    .push(positions_to_linestring(positions));
+                    .push(positions_to_linestring(coordinates));
             }
-            geojson::Value::MultiLineString(multi) => {
+            geojson::GeometryValue::MultiLineString { coordinates: multi } => {
                 let lines = route_lines.entry(route_id).or_default();
                 for positions in multi {
                     lines.push(positions_to_linestring(positions));
