@@ -24,24 +24,23 @@ The best website to check the status of your train (and bus).
 
 - Use the prebuilt container images linked to this repository.
 - Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
-- Requires PostgreSQL and Valkey/Redis.
-- Route snapping for MTA Bus and NJT Bus uses an on-demand `valhalla_service` process managed by the backend (lazy start + idle shutdown).
-- Set `VALHALLA_CONFIG` if your Valhalla config file is not at `/data/valhalla.json`.
+- Requires PostgreSQL with PostGIS and Valkey/Redis.
+- See `compose.test.yml` for example deployment.
 
 ## Development
 
 ### Requirements
 
-- Podman/Docker
+- Podman (Docker can be used, but tasks use podman)
 - [Mise](https://mise.jdx.dev/)
 - [BusTime API Key](https://register.developer.obanyc.com/)
+- [NJT Developer Account](https://developer.njtransit.com/registration/register)
 
 ### Setup
 
 1. Clone the repository
 2. Mise should automatically install required dependencies
-3. Set environment variables as listed in `backend/README.md` inside `backend/.env.toml`
-4. Start PostgreSQL and Valkey with `docker compose up -d` or `podman compose up -d`
-5. Install SQLX CLI with `cargo install sqlx-cli --no-default-features --features native-tls,postgres`
-6. Start backend with `cargo r`
-7. Start frontend with `pnpm dev`
+3. Set environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml`
+4. Run `mise //geo:build-data` to build valhalla and basemap tiles
+5. Run `mise //geo:export-generated-data` to export tiles to your machine for local development.
+6. Start dbs, backend, and frontend with `mise dev`

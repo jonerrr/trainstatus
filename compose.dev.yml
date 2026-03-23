@@ -12,6 +12,11 @@ services:
       - trainstatus-db:/var/lib/postgresql
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:Z,ro
     shm_size: 1g
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "trains", "-d", "trains"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   valkey:
     container_name: valkey
@@ -29,7 +34,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
     depends_on:
-      - postgis
+      postgis:
+        condition: service_healthy
     command: ["--config", "/config/martin.yml"]
     volumes:
       - ./geo/martin.yml:/config/martin.yml:Z,ro

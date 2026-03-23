@@ -4,6 +4,9 @@
 [tasks.csp]
 run = "cargo sqlx prepare"
 
+[tasks.migrate]
+run = "sqlx migrate run"
+
 [tasks.dev]
 # depends = ["start-containers"]
 run = "cargo run"
@@ -13,8 +16,8 @@ confirm = "Are you sure?"
 run = """
 podman compose -f ../compose.dev.yml down -v
 podman compose -f ../compose.dev.yml up -d
-sqlx migrate run
 """
+depends_post = ["//backend:migrate"]
 
 [env]
 VALHALLA_CONFIG = "../geo/data/valhalla.json"

@@ -1,15 +1,18 @@
 experimental_monorepo_root = true
 
 [tools]
-"github:protomaps/go-pmtiles" = "latest"
+# "github:protomaps/go-pmtiles" = "latest"
+"aqua:astral-sh/uv" = "latest"
+"core:rust" = "latest"
+"core:node" = "latest"
+"aqua:pnpm/pnpm" = "latest"
 "pipx:pyvalhalla" = { version = "latest", uvx = true }
-rust = "latest"
-uv = "latest"
+"cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres", default-features = false }
 # installing with mise caused the rust vscode extension not to work
 # protoc = "latest"
 
 [monorepo]
-config_roots = ["science", "backend", "frontend"]
+config_roots = ["backend", "frontend", "geo", "science"]
 
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
@@ -19,5 +22,5 @@ REDIS_URL = "redis://localhost:6379"
 run = "podman compose -f compose.dev.yml up -d"
 
 [tasks.dev]
-depends = ["start-containers"]
+depends = ["start-containers", "//backend:migrate"]
 run = { tasks = ["//backend:dev", "//frontend:dev"] }

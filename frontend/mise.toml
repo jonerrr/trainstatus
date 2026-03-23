@@ -1,7 +1,3 @@
-[tools]
-"core:node" = "latest"
-"aqua:pnpm/pnpm" = "latest"
-
 [tasks.dev]
 run = "pnpm dev"
 
