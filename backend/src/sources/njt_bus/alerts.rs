@@ -19,7 +19,7 @@ use crate::{
     stores::alert::AlertStore,
 };
 
-use super::{NJT_ALERTS_URL, get_token, njt_post_future};
+use super::{NJT_ALERTS_URL, NjtApi, get_token, njt_post_future};
 
 pub struct NjtBusAlerts;
 
@@ -30,7 +30,7 @@ impl GtfsAlertSource for NjtBusAlerts {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token().await {
+        let token = match get_token(NjtApi::GtfsG2).await {
             Ok(t) => t,
             Err(e) => {
                 tracing::error!("NJT auth failed for alerts: {:?}", e);

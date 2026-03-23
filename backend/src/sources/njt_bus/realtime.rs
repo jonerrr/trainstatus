@@ -17,7 +17,7 @@ use crate::{
     stores::{position::PositionStore, static_cache::StaticCacheStore, trip::TripStore},
 };
 
-use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
+use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, NjtApi, get_token, njt_post_future};
 
 pub struct NjtBusRealtime;
 
@@ -28,7 +28,7 @@ impl GtfsSource for NjtBusRealtime {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token().await {
+        let token = match get_token(NjtApi::GtfsG2).await {
             Ok(t) => t,
             Err(e) => {
                 error!("NJT auth failed: {:?}", e);

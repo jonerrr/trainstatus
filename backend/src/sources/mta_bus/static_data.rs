@@ -37,6 +37,8 @@ impl MtaBusStatic {
         route_id: &str,
         route_geom: &MultiLineString,
     ) -> MultiLineString {
+        // TODO: fix some routes that end up with broken segments. For example B25 on fulton
+        // maybe try sending the entire linestring but adding the break param
         let mut snapped = Vec::with_capacity(route_geom.0.len());
 
         for (line_index, line) in route_geom.0.iter().enumerate() {
