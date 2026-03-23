@@ -1,0 +1,79 @@
+services:
+  # TODO: fix valhalla returning no suitable edges error for all routes
+  ts-backend:
+    build: backend
+    environment:
+      - DATABASE_URL=postgres://trains:trains@postgis:5432/trains
+      - REDIS_URL=redis://valkey:6379
+      - ADDRESS=0.0.0.0:3055
+    env_file:
+      - .env.docker
+    ports:
+      - 3055:3055
+    depends_on:
+      postgis:
+        condition: service_started
+      geo-data:
+        condition: service_completed_successfully
+    volumes:
+      - trainstatus-geo-data-test:/data
+
+  geo-data:
+    image: ghcr.io/jonerrr/trainstatus-geo-data:latest
+    restart: "no"
+    volumes:
+      - trainstatus-geo-data-test:/shared-data
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        cp -a /data/. /shared-data/
+
+  # TODO: add frontend
+
+  postgis:
+    container_name: postgis
+    image: docker.io/postgis/postgis:18-3.6-alpine
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=trains
+      - POSTGRES_PASSWORD=trains
+      - POSTGRES_DB=trains
+    volumes:
+      - trainstatus-db-test:/var/lib/postgresql
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:Z,ro
+    shm_size: 1g
+
+  valkey:
+    container_name: valkey
+    image: valkey/valkey:alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - trainstatus-cache-test:/data
+
+  martin:
+    container_name: martin
+    image: ghcr.io/maplibre/martin:latest
+    ports:
+      - 3000:3000
+    environment:
+      - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
+    depends_on:
+      - postgis
+    command: ["--config", "/config/martin.yml"]
+    volumes:
+      - ./geo/martin.yml:/config/martin.yml:Z,ro
+      - ./geo/sprites:/sprites:Z,ro
+      - ./geo/styles:/styles:Z,ro
+      - ./geo/fonts:/fonts:Z,ro
+      # TODO: improve file structure
+      # TODO: get basemap from geo-data container for testing
+      # - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
+      - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
+
+volumes:
+  trainstatus-db-test:
+  trainstatus-cache-test:
+  trainstatus-geo-data-test:
