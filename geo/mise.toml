@@ -1,0 +1,40 @@
+# [tasks.basemap]
+# # TODO: test and improve script (e.g. get latest URL from api)
+# dir = "pmtiles"
+# run = "pmtiles extract https://build.protomaps.com/20260305.pmtiles ny.pmtiles --bbox=-74.685881,40.231692,-73.30382,41.16561"
+
+[tasks.build-data]
+run = "podman build -f Dockerfile -t trainstatus-geo-data ."
+# TODO: fix paths inside valhalla.json
+
+[tasks.export-generated-data]
+description = "Copy generated geo artifacts from a container image into ./data"
+run = """
+set -eu
+
+image="${IMAGE:-trainstatus-geo-data}"
+out_dir="${MISE_PROJECT_ROOT:-$PWD}/data"
+container_id="$(podman create "$image")"
+
+cleanup() {
+	podman rm -f "$container_id" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+mkdir -p "$out_dir"
+
+podman cp "$container_id:/data/valhalla.json" "$out_dir/valhalla.json"
+podman cp "$container_id:/data/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
+podman cp "$container_id:/data/basemap.pmtiles" "$out_dir/basemap.pmtiles"
+
+sed -i 's#"tile_extract": "/data/valhalla_tiles.tar"#"tile_extract": "'"$out_dir"'/valhalla_tiles.tar"#' "$out_dir/valhalla.json"
+
+echo "Copied artifacts from $image to $out_dir"
+"""
+
+# run = """
+# podman run -it --rm --pull always -v $(pwd):/data \
+#   ghcr.io/systemed/tilemaker:master \
+#   /data/merged.osm.pbf \
+#   --output /data/data.pmtiles
+# """

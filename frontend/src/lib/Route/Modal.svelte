@@ -1,26 +1,28 @@
 <script lang="ts">
-	import { updated } from '$app/state';
+	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
-	import { alerts as rt_alerts } from '$lib/alerts.svelte';
-	import { type Route } from '$lib/static';
+	import { alert_context } from '$lib/resources/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import type { Route } from '@trainstatus/client';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 
 	dayjs.extend(relativeTime);
 
-	interface ModalProps {
+	interface Props {
 		route: Route;
 		time_format: 'time' | 'countdown';
 	}
 
-	let { route, time_format }: ModalProps = $props();
+	let { route, time_format }: Props = $props();
 
-	const alerts = $derived(
-		rt_alerts.alerts_by_route
+	const alerts = $derived(alert_context.getSource(route.data.source));
+
+	const route_alerts = $derived(
+		alerts?.value?.alerts_by_route
 			.get(route.id)
 			?.sort(
 				(a, b) =>
@@ -33,7 +35,7 @@
 
 	let scroll_area: HTMLDivElement | undefined;
 
-	function manage_scroll(node: HTMLDivElement) {
+	const manage_scroll: Attachment = (node) => {
 		const observer = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
@@ -58,12 +60,8 @@
 		const alert_els = Array.from(node.children) as HTMLDivElement[];
 		alert_els.forEach((el) => observer.observe(el));
 
-		return {
-			destroy() {
-				alert_els.forEach((el) => observer.unobserve(el));
-			}
-		};
-	}
+		return () => alert_els.forEach((el) => observer.unobserve(el));
+	};
 
 	function scroll_to_alert(i: number) {
 		// console.log(i);
@@ -82,14 +80,21 @@
 			a.removeAttribute('href');
 		});
 	});
+
+	// $inspect(alerts);
 </script>
 
 <header class="flex items-center gap-1 p-1">
-	<Icon width={36} height={36} express={false} link={false} {route} />
+	<Icon width={36} height={36} link={false} {route} />
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
-		{#if alerts.length && idx < alerts.length}
-			{alerts[idx].alert_type}
+		{#if route_alerts.length && idx < route_alerts.length}
+			{#if ['mta_subway', 'mta_bus'].includes(route_alerts[idx].data.source)}
+				<!-- TODO: fix type issue -->
+				{route_alerts[idx].data.alert_type}
+			{:else}
+				Alert
+			{/if}
 		{:else}
 			No alerts
 		{/if}
@@ -98,11 +103,11 @@
 
 <!-- handle arrow keys -->
 <svelte:window
-	onkeydown={($event) => {
-		if ($event.key === 'ArrowLeft' && idx > 0) {
+	onkeydown={(event) => {
+		if (event.key === 'ArrowLeft' && idx > 0) {
 			// if we don't debounce, clicking arrow key twice really fast will get the scroll stuck
 			debounce_scroll_to_alert(idx - 1);
-		} else if ($event.key === 'ArrowRight' && idx < alerts.length - 1) {
+		} else if (event.key === 'ArrowRight' && idx < route_alerts.length - 1) {
 			debounce_scroll_to_alert(idx + 1);
 		}
 	}}
@@ -111,17 +116,22 @@
 <div
 	class="scrollbar-hidden flex snap-x snap-mandatory gap-2 overflow-x-scroll bg-neutral-950"
 	bind:this={scroll_area}
-	use:manage_scroll
+	{@attach manage_scroll}
 >
-	{#each alerts as alert}
+	{#each route_alerts as alert}
+		{@const header = alert.translations.find((t) => t.section === 'header')}
+		{@const description = alert.translations.find((t) => t.section === 'description')}
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
 			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-1">
-				{@html alert.header_html}
-
-				{#if alert.description_html}
-					{@html alert.description_html}
+				<!-- although not every translation text is html, its simpler to just use @html for all of them -->
+				{#if header}
+					{@html header.text}
+				{/if}
+				<!-- TODO: maybe add divider between header and description -->
+				{#if description}
+					{@html description.text}
 				{/if}
 			</div>
 
@@ -151,7 +161,7 @@
 		</article>
 	{/each}
 
-	{#if alerts.length > 1}
+	{#if route_alerts.length > 1}
 		<div class="absolute bottom-0 flex w-full -translate-y-16 items-center justify-center gap-2">
 			<!-- <div class="flex  w-fit"> -->
 
@@ -163,17 +173,17 @@
 			>
 				<ChevronLeft />
 			</button>
-			{#each alerts as _alert, i}
+			{#each route_alerts as _alert, i}
 				<button
-					class="size-3 rounded-full bg-neutral-300 {i !== idx && 'bg-neutral-500'}"
+					class={['size-3 rounded-full bg-neutral-300', { 'bg-neutral-500': i === idx }]}
 					aria-label="Scroll to alert"
 					onclick={() => scroll_to_alert(i)}
 				>
 				</button>
 			{/each}
 			<button
-				disabled={idx === alerts.length - 1}
-				class:text-neutral-500={idx === alerts.length - 1}
+				disabled={idx === route_alerts.length - 1}
+				class={{ 'text-neutral-500': idx === route_alerts.length - 1 }}
 				aria-label="Next alert"
 				onclick={() => scroll_to_alert(idx + 1)}
 			>

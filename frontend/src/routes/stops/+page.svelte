@@ -2,114 +2,115 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
+	import { stop_pins } from '$lib/pins.svelte';
 	import { StopSearch } from '$lib/search.svelte';
-	import { type Stop, calculate_stop_height } from '$lib/static';
-	import { debounce, persisted_rune, stop_pins_rune } from '$lib/util.svelte';
+	import { LocalStorage } from '$lib/storage.svelte';
+	import { calculate_stop_height } from '$lib/util.svelte';
 
 	import { CircleX, Search } from '@lucide/svelte';
+	import { type Source, type Stop } from '@trainstatus/client';
+	import { Throttled } from 'runed';
 
-	interface StopObj {
-		train: Stop<'train'>[];
-		bus: Stop<'bus'>[];
-	}
+	let selected_source = $state(
+		new LocalStorage<Source>('stops_tab', page.data.selected_sources[0] ?? 'mta_subway')
+	);
 
-	const stops: StopObj = $state({
-		bus: page.data.bus_stops,
-		train: page.data.train_stops
+	// Ensure selected source is still enabled
+	$effect(() => {
+		if (!page.data.selected_sources.includes(selected_source.current)) {
+			selected_source.current = page.data.selected_sources[0] ?? 'mta_subway';
+		}
 	});
 
-	let selected_tab = $state(persisted_rune<'train' | 'bus'>('stops_tab', 'train'));
-
-	const search = new StopSearch(page.data.bus_stops, page.data.train_stops);
+	const stop_search = new StopSearch(page.data.stops);
 
 	let search_input: string = $state('');
-	function clear_search() {
-		// reset stop ids
-		stops['bus'] = page.data.bus_stops;
-		stops['train'] = page.data.train_stops;
+	const throttled_search_input = new Throttled(() => search_input, 150);
 
-		search_input = '';
-	}
+	const visible_stops = $derived.by(() => {
+		// console.log('searching for', throttled_search_input.current);
 
-	interface StopWithRouteSequence extends Stop<'train' | 'bus'> {
-		route_stop_sequence: number;
-	}
+		// default to all stops if search input empty
+		if (throttled_search_input.current === '') {
+			return page.data.stops;
+		}
 
-	$effect(() => {
-		selected_tab.value;
-		search_input;
+		// check if its a stop / route id
+		// TODO: maybe add back id length check (since stop_id must have like at least 3 chars. but its different for each source, so maybe not worth it)
+		const id_check = throttled_search_input.current.toUpperCase();
 
-		// TODO: figure out how to safely set the type of stops and remove ts-ignore-error
-		debounce(() => {
-			if (search_input === '') {
-				clear_search();
-			} else {
-				// try searching for a stop id
-				const as_stop_id = parseInt(search_input);
-				const as_route = page.data.routes[search_input.toUpperCase()];
-				// shortest stop id is 3
-				if (search_input.length > 2 && !isNaN(as_stop_id)) {
-					const stop = page.data.stops[as_stop_id];
-					if (stop && stop.route_type === selected_tab.value) {
-						//@ts-expect-error
-						stops[selected_tab.value] = [stop];
-					}
-				} else if (as_route && as_route.route_type === selected_tab.value) {
-					const new_stops: StopWithRouteSequence[] = [];
-					// sort by route stop_sequence
-					switch (selected_tab.value) {
-						case 'bus':
-							for (const s of page.data.bus_stops) {
-								const route = s.routes.find((r) => r.id === as_route.id);
-								if (route) {
-									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
-								}
-							}
-							break;
-						case 'train':
-							for (const s of page.data.train_stops) {
-								const route = s.routes.find((r) => r.id === as_route.id);
-								if (route && ['full_time', 'part_time', 'rush_hour'].includes(route.type ?? '')) {
-									new_stops.push({ ...s, route_stop_sequence: route.stop_sequence });
-								}
-							}
-							break;
-					}
-					if (new_stops.length) {
-						//@ts-expect-error
-						stops[selected_tab.value] = new_stops
-							.sort((a, b) => a.route_stop_sequence - b.route_stop_sequence)
-							.map(({ route_stop_sequence, ...stop }) => stop);
-					}
-				} else {
-					// search for stops
-					const results = search.search(search_input, selected_tab.value);
-					// not sure if its safe to assume that the results are always the same type
-					if (results.length) {
-						//@ts-expect-error
-						stops[selected_tab.value] = results;
-					}
+		const stop = page.data.stops_by_id[selected_source.current]?.[id_check];
+		if (stop) {
+			// TODO: maybe preserve the other source search results instead of implicitly resetting them
+			return {
+				...page.data.stops,
+				[selected_source.current]: [stop]
+			};
+		}
+
+		const route = page.data.routes_by_id[selected_source.current]?.[id_check];
+		if (route) {
+			const new_stops: Stop[] = [];
+			// store sequences for sorting later
+			const route_stop_sequences: Record<string, number> = {};
+
+			for (const s of page.data.stops[selected_source.current] ?? []) {
+				const r = s.routes.find((r) => r.route_id === route.id);
+
+				if (
+					r &&
+					r.data.source === 'mta_subway' &&
+					// TODO: maybe include other stop types
+					['full_time', 'part_time', 'rush_hour'].includes(r.data.stop_type)
+				) {
+					new_stops.push(s);
+					route_stop_sequences[s.id] = r.stop_sequence;
 				}
 			}
-		}, 150)();
-	});
+			// TODO: maybe add sorting by route stop sequence back
+			if (new_stops.length) {
+				return {
+					...page.data.stops,
+					[selected_source.current]: new_stops.sort(
+						(a, b) => route_stop_sequences[a.id] - route_stop_sequences[b.id]
+					)
+				};
+			}
+		}
+
+		const search_results = stop_search.query(
+			throttled_search_input.current,
+			selected_source.current
+		);
+		// TODO: maybe add some kind of "no results found" state when search_results is empty (and search input isn't empty)
+		return {
+			...page.data.stops,
+			[selected_source.current]:
+				search_results.length > 0
+					? search_results
+					: (page.data.stops[selected_source.current] ?? [])
+		};
+	}) as Partial<Record<Source, Stop[]>>;
+	// $inspect(visible_stops);
+
+	function clear_search() {
+		search_input = '';
+	}
 </script>
 
-<svelte:head>
-	<title>Stops | Train Status</title>
-</svelte:head>
+<!-- TODO: fix space between navbar and search bar -->
 <!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
 <!-- TODO: maybe show indicator when filtered for specific route / stop -->
+<!-- TODO: maybe integrate the search with the List component (using attachments or something).-->
 <div class="flex h-full flex-col">
 	<List
 		title="Stops"
 		type="stop"
-		bus_data={stops.bus}
-		train_data={stops.train}
-		pin_rune={stop_pins_rune}
+		sources={visible_stops}
+		pins={stop_pins}
 		auto_scroll
-		class="max-h-[calc(100dvh-13.5rem)] grow"
-		bind:selected_tab
+		container_class="flex-1 min-h-0"
+		bind:selected_source
 		height_calc={calculate_stop_height}
 	/>
 
@@ -118,12 +119,12 @@
 			<Search
 				class="absolute top-1/2 left-3 z-20 h-5 w-5 -translate-y-1/2 text-neutral-400 transition-colors duration-200 group-focus-within:text-neutral-200"
 			/>
-
+			<!-- TODO: maybe add autocomplete="off" -->
 			<input
 				name="search"
 				bind:value={search_input}
 				type="search"
-				placeholder="Search stops"
+				placeholder="Search stops by name, ID, or route..."
 				class="h-12 w-full rounded border
 			   border-neutral-800/50
 			   bg-neutral-900

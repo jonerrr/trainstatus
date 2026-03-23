@@ -4,43 +4,9 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-		<!-- <link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-640x1136.png"
-			media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-750x1294.png"
-			media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-1242x2148.png"
-			media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-1125x2436.png"
-			media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-1536x2048.png"
-			media="(min-device-width: 768px) and (max-device-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-1668x2224.png"
-			media="(min-device-width: 834px) and (max-device-width: 834px) and (-webkit-min-device-pixel-ratio: 2) and (orientation: portrait)"
-		/>
-		<link
-			rel="apple-touch-startup-image"
-			href="/splash/icon-2048x2732.png"
-			media="(min-device-width: 1024px) and (max-device-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) and (orientation: portrait)"
-		/> -->
 		<!-- TODO: better splash screen support -->
-		<link rel="apple-touch-startup-image" href="/splash-screen.png" />
+		<!-- TODO: test splash screen still works after adding %sveltekit.assets% -->
+		<link rel="apple-touch-startup-image" href="%sveltekit.assets%/splash-screen.png" />
 
 		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
@@ -50,36 +16,9 @@
 		<meta name="msapplication-TileColor" content="#09090b" />
 		<meta name="theme-color" content="#09090b" />
 
-		<meta
-			name="description"
-			content="The best website to view MTA subway (and bus) times and alerts."
-		/>
-
-		<!-- OGP Tags -->
-		<meta property="og:title" content="Train Status" />
-		<meta property="og:type" content="website" />
-		<meta
-			property="og:description"
-			content="The best website to view MTA subway (and bus) times and alerts."
-		/>
-		<!-- <meta property="og:image" content="https://trainstat.us/logo.png" /> -->
-
-		<!-- Twitter Meta Tags -->
-		<meta name="twitter:card" content="summary_large_image" />
-		<meta property="twitter:domain" content="Train Status" />
-		<meta property="twitter:url" content="https://trainstat.us" />
-		<meta name="twitter:title" content="Train Status" />
-		<meta
-			name="twitter:description"
-			content="The best website to view MTA subway (and bus) times and alerts."
-		/>
-		<!-- <meta name="twitter:image" content="https://trainstat.us/logo.png" /> -->
-
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<title>Train Status</title>
-
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

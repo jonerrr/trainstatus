@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH stop_direction AS (\n                -- Determine the dominant direction (0/1) for each stop from its route associations.\n                -- mode() picks the most frequent value; for bus stops this is usually just one value.\n                SELECT\n                    stop_id,\n                    source,\n                    mode() WITHIN GROUP (ORDER BY (data->>'direction')::integer) as direction\n                FROM static.route_stop\n                GROUP BY stop_id, source\n            ),\n            candidates AS (\n                SELECT\n                    a.id   AS from_id,\n                    a.source AS from_source,\n                    b.id   AS to_id,\n                    b.source AS to_source,\n                    sd_b.direction AS to_direction,\n                    ST_Distance(\n                        ST_Transform(a.geom, 6538),\n                        ST_Transform(b.geom, 6538)\n                    ) AS dist\n                FROM static.stop a\n                LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source\n                JOIN static.stop b\n                    ON a.id != b.id\n                    -- Spatial index filter (approx 200m in degrees)\n                    AND a.geom && ST_Expand(b.geom, 0.002)\n                    AND ST_DWithin(\n                        ST_Transform(a.geom, 6538),\n                        ST_Transform(b.geom, 6538),\n                        150.0\n                    )\n                LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source\n                WHERE\n                    -- If source filter is provided, only look at pairs involving that source\n                    ($1::source_enum IS NULL OR a.source = $1 OR b.source = $1)\n                    -- Skip pairs that already have an official (non-proximity) transfer\n                    AND NOT EXISTS (\n                        SELECT 1 FROM static.stop_transfer st\n                        WHERE st.from_stop_id = a.id\n                          AND st.from_stop_source = a.source\n                          AND st.to_stop_id = b.id\n                          AND st.to_stop_source = b.source\n                    )\n                    -- Skip pairs of the same bus source that share the same direction\n                    AND NOT (\n                        a.source = b.source\n                        AND a.source IN ('mta_bus', 'njt_bus')\n                        AND sd_a.direction IS NOT NULL\n                        AND sd_b.direction IS NOT NULL\n                        AND sd_a.direction = sd_b.direction\n                    )\n                    -- Skip pairs where b is a's designated opposite stop\n                    AND NOT (\n                        (a.source IN ('mta_bus', 'njt_bus'))\n                        AND EXISTS (\n                            SELECT 1 FROM static.route_stop rs\n                            WHERE rs.stop_id = a.id\n                              AND rs.source = a.source\n                              AND rs.data->>'opposite_stop_id' = b.id\n                        )\n                    )\n                    -- Skip pairs where a is b's designated opposite stop\n                    AND NOT (\n                        (b.source IN ('mta_bus', 'njt_bus'))\n                        AND EXISTS (\n                            SELECT 1 FROM static.route_stop rs\n                            WHERE rs.stop_id = b.id\n                              AND rs.source = b.source\n                              AND rs.data->>'opposite_stop_id' = a.id\n                        )\n                    )\n            )\n            INSERT INTO static.stop_transfer\n                (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type)\n            SELECT from_id, from_source, to_id, to_source, 6 FROM candidates\n            ON CONFLICT DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_rail",
+                "njt_bus",
+                "lirr",
+                "mnr"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4c9ddc7ea5c72bf8f04662cdc23295058f309022b02f05a5c9793536d721e139"
+}

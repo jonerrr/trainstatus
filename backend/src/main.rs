@@ -1,4 +1,3 @@
-// use api::websocket::{Clients, Update};
 use axum::{
     Json, ServiceExt,
     body::Body,
@@ -8,10 +7,7 @@ use axum::{
     routing::get,
 };
 use bb8_redis::RedisConnectionManager;
-// use crossbeam::channel::unbounded;
-// use crossbeam::channel::{Receiver, Sender};
 use http::{HeaderValue, Method, StatusCode, request::Parts};
-// use serde_json::json;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     convert::Infallible,
@@ -21,10 +17,7 @@ use std::{
 };
 use tokio::{
     signal,
-    sync::{
-        Notify,
-        broadcast::{self, Sender},
-    },
+    sync::broadcast::{self, Sender},
 };
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
@@ -38,33 +31,61 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
+use crate::{
+    sources::{
+        StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
+        njt_bus::realtime::NjtBusRealtime,
+    },
+    stores::{
+        alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
+        stop_time::StopTimeStore, trip::TripStore,
+    },
+};
+
 mod api;
-mod realtime;
-mod static_data;
+mod engines;
+mod integrations;
+mod macros;
+mod models;
+mod sources;
+mod stores;
 
 #[allow(clippy::all)]
 pub mod feed {
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
 
-// https://stackoverflow.com/a/77249700
-pub fn api_key() -> &'static str {
-    // you need bustime api key to run this
-    static API_KEY: OnceLock<String> = OnceLock::new();
-    API_KEY.get_or_init(|| var("API_KEY").expect("Missing API_KEY "))
-}
-
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone)]
 struct AppState {
-    pg_pool: sqlx::PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
-    // rx: crossbeam::channel::Receiver<Vec<Update>>,
-    // clients: Clients,
-    // tx: Sender<serde_json::Value>,
-    // shutdown_tx: Sender<()>,
-    // initial_data: Arc<RwLock<serde_json::Value>>,
+    route_store: RouteStore,
+    stop_store: StopStore,
+    trip_store: TripStore,
+    stop_time_store: StopTimeStore,
+    position_store: PositionStore,
+    alert_store: AlertStore,
+}
+
+// https://stackoverflow.com/a/77249700
+// TODO: panic or better error msg when not found
+pub fn mta_oba_api_key() -> &'static str {
+    // you need bustime api key to run this
+    static API_KEY: OnceLock<String> = OnceLock::new();
+    API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").unwrap())
+}
+
+/// Path to valhalla config file. Defaults do /data/valhalla.json
+pub fn valhalla_config() -> &'static str {
+    static VALHALLA_CONFIG: OnceLock<String> = OnceLock::new();
+    VALHALLA_CONFIG
+        .get_or_init(|| var("VALHALLA_CONFIG").unwrap_or_else(|_| "/data/valhalla.json".into()))
+}
+
+/// If true, will save fetched GTFS-RT protobufs (and other rt data) and their decoded txt to disk for debugging. Set the `DEBUG_RT_DATA` env var to enable.
+pub fn debug_rt_data() -> &'static bool {
+    static DEBUG_RT_DATA: OnceLock<bool> = OnceLock::new();
+    DEBUG_RT_DATA.get_or_init(|| var("DEBUG_RT_DATA").is_ok())
 }
 
 #[tokio::main]
@@ -77,15 +98,12 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
     tracing::info!("Starting Train Status API v{}", VERSION);
-    let read_only = var("READ_ONLY").is_ok();
-    if read_only {
-        tracing::info!("Running in read-only mode");
-    }
+    // let read_only = var("READ_ONLY").is_ok();
+    // if read_only {
+    //     tracing::info!("Running in read-only mode");
+    // }
 
-    let pg_connect_option: PgConnectOptions = var("DATABASE_URL")
-        .expect("DATABASE_URL env not set")
-        .parse()
-        .unwrap();
+    let pg_connect_option: PgConnectOptions = var("DATABASE_URL").unwrap().parse().unwrap();
     let pg_pool = PgPoolOptions::new()
         .max_connections(100)
         .connect_with(pg_connect_option)
@@ -97,8 +115,7 @@ async fn main() {
         .expect("Failed to run database migrations");
 
     // Connect to redis and create a pool
-    let manager =
-        RedisConnectionManager::new(var("REDIS_URL").expect("REDIS_URL env not set")).unwrap();
+    let manager = RedisConnectionManager::new(var("REDIS_URL").unwrap()).unwrap();
     let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
 
     // Test Redis connection
@@ -114,28 +131,94 @@ async fn main() {
         redis::Value::SimpleString(s) => {
             assert_eq!(s, "PONG");
         }
-        _ => panic!("Failed read redis ping response"),
+        _ => panic!("Failed to read redis ping response"),
     }
 
-    if !read_only {
-        let notify = Arc::new(Notify::new());
-        let notify2 = notify.clone();
+    let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());
+    let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
+    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), redis_pool.clone());
+    let stop_time_store =
+        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
+    let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
+    let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
+    let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
-        static_data::import(
-            pg_pool.clone(),
-            notify,
-            redis_pool.clone(),
-            var("FORCE_UPDATE").is_ok(),
-            false,
-        )
-        .await;
-        // Wait for static data to be loaded
-        notify2.notified().await;
-    }
-    // cache static data. It will also cache after each refresh
-    static_data::cache_all(&pg_pool, &redis_pool)
-        .await
-        .expect("Failed to cache static data");
+    let valhalla_manager = engines::valhalla::ValhallaManager::new(
+        engines::valhalla::ValhallaConfig::from_config_path(valhalla_config().to_owned()),
+    );
+
+    // We use Arc so the engine can share ownership of the adapter traits
+    let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
+        Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
+        Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
+            valhalla_manager.clone(),
+        )),
+        Arc::new(sources::njt_bus::static_data::NjtBusStatic::new(
+            valhalla_manager,
+        )),
+        // Arc::new(njt::rail_static::NjtRailStatic),
+    ];
+
+    let static_controller = engines::static_data::run(
+        &pg_pool,
+        &route_store,
+        &stop_store,
+        &static_cache_store,
+        static_adapters,
+    )
+    .await;
+
+    // // test njt bus
+    // static_controller
+    //     .ensure_updated(static_adapters.clone()[2].source())
+    //     .await
+    //     .unwrap();
+
+    let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
+        Arc::new(MtaSubwayRealtime),
+        Arc::new(MtaBusRealtime),
+        Arc::new(NjtBusRealtime),
+        // Arc::new(njt::rail_realtime::NjtRailRealtime),
+    ];
+
+    engines::realtime::run(
+        &trip_store,
+        &stop_time_store,
+        &position_store,
+        &static_cache_store,
+        realtime_adapters,
+        static_controller.clone(),
+    )
+    .await;
+
+    let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
+        Arc::new(sources::mta_bus::alerts::MtaBusAlerts),
+        Arc::new(sources::mta_subway::alerts::MtaSubwayAlerts),
+        Arc::new(sources::njt_bus::alerts::NjtBusAlerts),
+        // Arc::new(njt::rail_alerts::NjtRailAlerts),
+    ];
+
+    engines::alerts::run(&alert_store, alert_adapters).await;
+
+    // if !read_only {
+    //     let notify = Arc::new(Notify::new());
+    //     let notify2 = notify.clone();
+
+    //     static_data::import(
+    //         pg_pool.clone(),
+    //         notify,
+    //         redis_pool.clone(),
+    //         var("FORCE_UPDATE").is_ok(),
+    //         false,
+    //     )
+    //     .await;
+    //     // Wait for static data to be loaded
+    //     notify2.notified().await;
+    // }
+    // // cache static data. It will also cache after each refresh
+    // static_data::cache_all(&pg_pool, &redis_pool)
+    //     .await
+    //     .expect("Failed to cache static data");
 
     // This will store alerts and trips for initial websocket load
     // null in rust :explode:
@@ -144,7 +227,7 @@ async fn main() {
     // let (tx, rx) = unbounded::<Vec<Update>>();
     // tx, initial_data.clone()
 
-    realtime::import(pg_pool.clone(), redis_pool.clone(), read_only).await;
+    // realtime::import(pg_pool.clone(), redis_pool.clone(), read_only).await;
 
     let cors_layer =
         CorsLayer::new()
@@ -165,19 +248,19 @@ async fn main() {
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
-    )
+    ),
+    // See: https://github.com/juhaku/utoipa/issues/1425
+    components(schemas(models::source::Source))
     )]
     struct ApiDoc;
 
     let state = AppState {
-        pg_pool,
-        redis_pool,
-        // updated_trips,
-        // tx,
-        // rx,
-        // clients: ws_clients,
-        // shutdown_tx: shutdown_tx.clone(),
-        // initial_data,
+        route_store,
+        stop_store,
+        trip_store,
+        stop_time_store,
+        position_store,
+        alert_store,
     };
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())

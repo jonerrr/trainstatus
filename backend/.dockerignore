@@ -1,5 +1,6 @@
-target
-container_postgres-data
-.mise.toml
-.infisical.json
+target/
+mise.toml
 queries.sql
+gtfs/
+sprites/
+Dockerfile

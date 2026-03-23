@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import type { RouteStop, Stop } from '@trainstatus/client';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -19,6 +19,7 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
+// TODO: remove since not used i think
 export function debounce<T extends (...args: never[]) => void>(func: T, wait: number = 75) {
 	let timeout: ReturnType<typeof setTimeout> | null;
 	return function (...args: Parameters<T>) {
@@ -30,105 +31,45 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 	};
 }
 
-export function get_position(): Promise<GeolocationPosition> {
-	return new Promise<GeolocationPosition>((res, rej) => {
-		navigator.geolocation.getCurrentPosition(res, rej);
-	});
-}
+// Get main routes for a stop (for for mta_subway currently, filter to main lines only)
+export const main_route_stops = (route_stops: RouteStop[]): RouteStop[] => {
+	return route_stops.filter(
+		(route) =>
+			route.data.source !== 'mta_subway' ||
+			['full_time', 'part_time'].includes(route.data.stop_type)
+	);
+};
 
-export interface PersistedRune<T> {
-	value: T;
-	// key: string;
-	reset: () => void;
-}
+export const calculate_route_height = () => 54;
 
-export function persisted_rune<T>(key: string, init_value: T) {
-	let storedValue: T;
+// TODO: verify calculations
+export function calculate_stop_height(item: Stop) {
+	let height = 44; // stop name height (28px) + 16px padding
 
-	try {
-		const item = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-		storedValue = item ? JSON.parse(item) : init_value;
-	} catch (e) {
-		// localStorage won't be defined so this will always throw on init load
-		if (browser) console.error(e);
-		storedValue = init_value;
+	if (item.data.source === 'mta_bus') {
+		height += item.routes.length * 56;
+	} else if (item.data.source === 'mta_subway') {
+		// headsign height
+		height += 24;
+		// route arrivals height
+		height += item.routes.length * 24;
 	}
+	// TODO: handle other sources
 
-	let state = $state(storedValue);
-
-	function updateStorage(value: T) {
-		try {
-			localStorage.setItem(key, JSON.stringify(value));
-		} catch (e) {
-			console.error(e);
-		}
-	}
-
-	// listen for changes in other tabs
-	if (browser) {
-		window.addEventListener('storage', (event) => {
-			if (event.key === key && event.storageArea === localStorage) {
-				try {
-					const newValue = event.newValue ? JSON.parse(event.newValue) : init_value;
-					state = newValue;
-				} catch (e) {
-					console.error(e);
-				}
-			}
-		});
-	}
-
-	// this allows it to update without being in a component
-	$effect.root(() => {
-		$effect(() => {
-			updateStorage(state);
-		});
-
-		return () => {};
-	});
-
-	return {
-		get value() {
-			return state;
-		},
-		// get key() {
-		// 	return key;
-		// },
-		set value(newValue: T) {
-			state = newValue;
-		},
-		reset() {
-			state = init_value;
-		}
-	};
+	return height;
 }
 
-// if user specified unix timestamp, it is stored here.
-function currentTime() {
-	let time = $state<number | undefined>();
+export const calculate_trip_height = () => 94;
 
-	return {
-		// returns undefined here bc some components need to know if it was user specified
-		get value(): number | undefined {
-			return time;
-		},
+// export function get_position(): Promise<GeolocationPosition> {
+// 	return new Promise<GeolocationPosition>((res, rej) => {
+// 		navigator.geolocation.getCurrentPosition(res, rej);
+// 	});
+// }
 
-		get ms(): number {
-			return time ? time * 1000 : new Date().getTime();
-		},
-
-		set value(newValue: number | undefined) {
-			// js time is in milliseconds
-			time = newValue;
-		}
-	};
-}
-
-export const current_time = currentTime();
-
-interface ItemHeights {
-	[key: string]: number;
-}
+// interface ItemHeights {
+// 	[key: string]: number;
+// }
 
 // export function list_max_height(init: number = 0) {
 // 	const height = browser
@@ -142,21 +83,6 @@ interface ItemHeights {
 // 		: 124 + init;
 // 	return `max-h-[calc(100dvh-${height}px)]`;
 // }
-
-export const item_heights = $state<ItemHeights>({});
-
-// interface PinStorage {
-// 	stops: number[];
-// 	routes: string[];
-// 	trips: string[];
-// }
-
-// export const pins = new LocalStorage<PinStorage>('pins', {
-// 	stops: [106, 400086],
-// 	routes: ['4', 'M15'],
-// 	trips: []
-// });
-
-export const stop_pins_rune = persisted_rune<number[]>('stop_pins', [106, 400086]);
-export const route_pins_rune = persisted_rune<string[]>('route_pins', ['4', 'M15']);
-export const trip_pins_rune = persisted_rune<string[]>('trip_pins', []);
+// TODO: remove if not used. Was used to store virtual list item heights.
+// need to test if its faster to calculate heights on the fly or store them in a map like this.
+// export const item_heights = $state<ItemHeights>({});
