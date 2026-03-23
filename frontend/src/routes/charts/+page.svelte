@@ -4,127 +4,127 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
-	import { type Route } from '$lib/static';
-	import { monitored_bus_routes, stop_times } from '$lib/stop_times.svelte';
-	import { TripDirection, trips } from '$lib/trips.svelte';
-	import { current_time } from '$lib/util.svelte';
+	import AxisX from '$lib/charts/AxisX.svelte';
+	import AxisY from '$lib/charts/AxisY.svelte';
+	import Lines from '$lib/charts/Lines.svelte';
+	import { type SourceMap } from '$lib/resources/index.svelte';
+	import { stop_time_context } from '$lib/resources/stop_times.svelte';
+	import { trip_context } from '$lib/resources/trips.svelte';
+	import { current_time } from '$lib/url_params.svelte';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
+	import type { Route, Source } from '@trainstatus/client';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { LayerCake, Svg, flatten } from 'layercake';
 
-	import AxisX from './AxisX.svelte';
-	import AxisY from './AxisY.svelte';
-	import Lines from './Lines.svelte';
+	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
-	let routes = $state<Route[]>([page.data.routes['3']]);
-	let direction = $state<TripDirection>(TripDirection.North);
+	// TODO: improve y axis ordering (if theres trains with weird trip patterns, it causes the stops y axis to be in a weird order and lines to look weird)
+
+	const all_trips = trip_context.get();
+	const all_stop_times = stop_time_context.get();
+
+	let routes = $state<SourceMap<Route[]>>(
+		Object.fromEntries(
+			page.data.selected_sources.map((source) => [
+				source,
+				source === 'mta_subway' && page.data.routes_by_id[source]?.['4']
+					? [page.data.routes_by_id[source]['4']]
+					: []
+			])
+		) as SourceMap<Route[]>
+	);
+
+	// 0 = first direction (subway northbound / bus dir 0)
+	// 1 = second direction (subway southbound / bus dir 1)
+	let direction_index = $state(0);
+
+	// Per-source direction values: subway uses 1 (north) / 3 (south), bus uses 0 / 1
+	const source_directions = $derived<SourceMap<number>>(
+		Object.fromEntries(
+			page.data.selected_sources.map((source) => [
+				source,
+				source === 'mta_subway' ? (direction_index === 0 ? 1 : 3) : direction_index
+			])
+		) as SourceMap<number>
+	);
+
+	// Flat list of all selected routes (for Lines component, export filename, etc.)
+	const selected_routes_flat = $derived(Object.values(routes).flat());
+
 	let stop_points = $state<boolean>(false);
 	let current_time_line = $state<boolean>(true);
+	// TODO: fix x axis interval causing page to freeze
 	let xAxisInterval = $state<number>(15);
 	let displayHours = $state<number>(3);
 
+	// Monitor bus routes in the stop_times resource
 	$effect(() => {
-		for (const r of routes) {
-			if (r.route_type === 'bus') {
-				monitored_bus_routes.add(r.id);
+		for (const source of page.data.selected_sources) {
+			const info = page.data.routes_by_id[source];
+			if (!info) continue;
+
+			// Check if source is bus-like (monitor_routes = true)
+			const resource = all_stop_times[source];
+			if (!resource || !('add_route' in resource)) continue;
+
+			for (const route of routes[source] ?? []) {
+				(resource as any).add_route(route.id);
 			}
 		}
 	});
 
-	// interface RouteStopData {
-	// 	stop_id: number;
-	// 	stop_name: string;
-	// 	// sequence of this stop in stop times for each of the trips
-	// 	sequences: number[];
-	// }
-
-	// TODO: add main route stops to y domain no matter what
-	// TODO: add to common stops if theres a transfer to the route
 	const data = $derived.by(() => {
-		const route_trips = [];
-		// Track stops by route ID
-		const stopsByRoute = new Map<string, Set<{ id: number; name: string; sequence: number }>>();
+		const route_trips: Array<{
+			trip: { id: string; route_id: string; direction: number; [key: string]: unknown };
+			points: Array<{ stop_id: string; stop_name: string; time: Date }>;
+		}> = [];
+		// Track all stops seen across all sources/routes, keyed by stop.id
+		const stops_seen = new Map<string, { id: string; name: string; sequence: number }>();
 
-		// Initialize sets for each selected route
-		for (const route of routes) {
-			stopsByRoute.set(route.id, new Set());
-		}
+		for (const source of page.data.selected_sources) {
+			const source_routes = routes[source];
+			if (!source_routes?.length) continue;
 
-		for (const trip of trips.trips.values()) {
-			if (routes.every((r) => r.id !== trip.route_id) || trip.direction !== direction) continue;
-			const trip_st = stop_times.by_trip_id[trip.id];
-			if (!trip_st) continue;
+			const trips_map = all_trips?.[source]?.value;
+			if (!trips_map) continue;
 
-			// Skip trips that aren't fully complete (any departure time > current_time)
-			// if (trip_st.some((st) => st.departure.getTime() <= current_time.ms)) continue;
+			const stop_times_resource = all_stop_times?.[source];
+			const direction = source_directions[source];
 
-			const trip_points = [];
-			for (const st of trip_st) {
-				if (st.arrival.getTime() < current_time.ms) continue;
-				const stop = page.data.stops[st.stop_id];
+			for (const trip of trips_map.values()) {
+				if (!source_routes.some((r) => r.id === trip.route_id)) continue;
+				if (trip.direction !== direction) continue;
 
-				const stop_sequence = stop.routes.find((r) => r.id === trip.route_id)?.stop_sequence;
-				if (!stop_sequence) {
-					console.log(
-						'stop_sequence not found, skipping',
-						stop.name,
-						trip.route_id,
-						stop.routes.map((r) => r.id)
-					);
-					continue;
-				}
+				const trip_st = stop_times_resource?.by_trip_id.get(trip.id);
+				if (!trip_st?.length) continue;
 
-				// Add the stop to its route's set
-				const stopInfo = { id: stop.id, name: stop.name, sequence: stop_sequence };
-				const routeStops = stopsByRoute.get(trip.route_id);
-				if (routeStops) {
-					routeStops.add(stopInfo);
-				}
+				const trip_points: Array<{ stop_id: string; stop_name: string; time: Date }> = [];
+				for (const st of trip_st) {
+					if (st.arrival.getTime() < current_time.ms) continue;
 
-				trip_points.push({
-					stop_id: stop.id,
-					stop_name: stop.name,
-					time: st.arrival
-				});
-			}
+					const stop = page.data.stops_by_id[source]?.[st.stop_id];
+					if (!stop) continue;
 
-			route_trips.push({ trip, points: trip_points });
-		}
+					const route_stop = stop.routes.find((r) => r.route_id === trip.route_id);
+					const sequence = route_stop?.stop_sequence ?? 0;
 
-		// Find stops that are common to all selected routes
-		let commonStops: Array<{ id: number; name: string; sequence: number }> = [];
-
-		if (routes.length > 0) {
-			// Start with all stops from the first route
-			const firstRouteStops = stopsByRoute.get(routes[0].id);
-			if (firstRouteStops && firstRouteStops.size > 0) {
-				commonStops = Array.from(firstRouteStops);
-
-				// Filter to keep only stops that exist in all other routes
-				for (let i = 1; i < routes.length; i++) {
-					const routeStops = stopsByRoute.get(routes[i].id);
-					if (routeStops) {
-						commonStops = commonStops.filter((stop) =>
-							Array.from(routeStops).some((rs) => rs.id === stop.id)
-						);
+					if (!stops_seen.has(stop.id)) {
+						stops_seen.set(stop.id, { id: stop.id, name: stop.name, sequence });
 					}
+
+					trip_points.push({ stop_id: stop.id, stop_name: stop.name, time: st.arrival });
+				}
+
+				if (trip_points.length) {
+					route_trips.push({ trip, points: trip_points });
 				}
 			}
-
-			// remove stops that are not in the main route from trip points
-			route_trips.forEach((trip) => {
-				trip.points = trip.points.filter((point) =>
-					commonStops.some((stop) => stop.id === point.stop_id)
-				);
-			});
 		}
 
-		// Sort stops by sequence number
-		commonStops.sort((a, b) => a.sequence - b.sequence);
-
-		// Create y domain from the sorted common stops
-		const yDomain = commonStops.map((stop) => stop.name);
+		const yDomain = Array.from(stops_seen.values())
+			.sort((a, b) => a.sequence - b.sequence)
+			.map((s) => s.name);
 
 		return { route_trips, yDomain };
 	});
@@ -180,7 +180,7 @@
 		const url = URL.createObjectURL(blob);
 
 		// Create a filename with all route short names
-		const filename = `${routes.map((r) => r.short_name).join('_')}_${direction === TripDirection.North ? 'northbound' : 'southbound'}_chart.svg`;
+		const filename = `${selected_routes_flat.map((r) => r.short_name).join('_')}_${direction_index === 0 ? 'northbound' : 'southbound'}_chart.svg`;
 
 		// Create a download link and click it
 		const downloadLink = document.createElement('a');
@@ -202,12 +202,12 @@
 	let comboboxRef = $state<HTMLDivElement | null>(null);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
 
-	// Sorted routes for the combobox
+	// Sorted flat list of all routes from all sources (subway first, then bus)
 	const sortedRoutes = $derived(
-		Object.values(page.data.routes).sort((a, b) => {
-			// Train routes come first
-			if (a.route_type === 'train' && b.route_type !== 'train') return -1;
-			if (a.route_type !== 'train' && b.route_type === 'train') return 1;
+		(Object.values(page.data.routes) as Route[][]).flat().sort((a, b) => {
+			// Subway routes come first
+			if (a.data.source === 'mta_subway' && b.data.source !== 'mta_subway') return -1;
+			if (a.data.source !== 'mta_subway' && b.data.source === 'mta_subway') return 1;
 			// Then sort by short_name
 			return a.short_name.localeCompare(b.short_name);
 		})
@@ -253,9 +253,9 @@
 
 	// Handle route selection
 	function selectRoute(selectedRoute: Route) {
-		// Check if the route is already selected
-		if (!routes.some((r) => r.id === selectedRoute.id)) {
-			routes.push(selectedRoute);
+		const source = selectedRoute.data.source as Source;
+		if (!routes[source]?.some((r) => r.id === selectedRoute.id)) {
+			routes[source] = [...(routes[source] ?? []), selectedRoute];
 		}
 		isComboboxOpen = false;
 		searchQuery = ''; // Clear search when selection is made
@@ -264,13 +264,16 @@
 	// Remove a route from selection
 	function removeRoute(routeToRemove: Route) {
 		// Don't remove if it's the last route
-		if (routes.length <= 1) return;
-		routes = routes.filter((r) => r.id !== routeToRemove.id);
+		const total = Object.values(routes).reduce((sum, arr) => sum + (arr?.length ?? 0), 0);
+		if (total <= 1) return;
+		const source = routeToRemove.data.source as Source;
+		routes[source] = routes[source]?.filter((r) => r.id !== routeToRemove.id);
 	}
 
 	// Check if route is already selected
-	function isRouteSelected(routeId: string) {
-		return routes.some((r) => r.id === routeId);
+	function isRouteSelected(route: Route) {
+		const source = route.data.source as Source;
+		return routes[source]?.some((r) => r.id === route.id) ?? false;
 	}
 
 	// Handle combobox keyboard navigation
@@ -325,7 +328,7 @@
 	}
 
 	// let last_at = current_time.value;
-
+	// TODO: convert this to an attachment
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
 		// set current time to 2 hours ago
@@ -345,7 +348,7 @@
 		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
 		// console.log(xDomain);
 		// Return domain from current time to current time + displayHours
-		return [startTime, endTime];
+		return [startTime, endTime] as any;
 	});
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;
@@ -354,17 +357,18 @@
 	// $inspect(xDomain);
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
 	<title>Charts | Train Status</title>
-</svelte:head>
+</svelte:head> -->
 
-<div class="flex h-[calc(100dvh-8rem)] min-h-[300px] flex-col">
-	<div class="pl-3 text-xl font-bold">Charts</div>
+<div class="flex h-full min-h-75 flex-col py-4">
 	<div
 		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"
 	>
 		<!-- Routes Option -->
-		<div class="flex min-w-[240px] flex-col gap-2">
+		<!-- TODO: improve ui for mobile -->
+		<!-- TODO: add tooltips for options (use attachments) -->
+		<div class="flex min-w-60 flex-col gap-2">
 			<div class="font-semibold">Routes</div>
 			<div class="relative w-full" bind:this={comboboxRef}>
 				<button
@@ -376,15 +380,15 @@
 					aria-label="Add routes"
 				>
 					<div class="flex flex-1 flex-wrap items-center gap-2">
-						{#if routes.length === 0}
+						{#if selected_routes_flat.length === 0}
 							<span>Select routes</span>
 						{:else}
-							{#each routes as selectedRoute}
+							{#each selected_routes_flat as selectedRoute}
 								<div
 									class="flex items-center rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1"
 								>
-									<Icon height={20} width={20} express={false} route={selectedRoute} link={false} />
-									{#if routes.length > 1}
+									<Icon height={20} width={20} route={selectedRoute} link={false} />
+									{#if selected_routes_flat.length > 1}
 										<div
 											role="button"
 											tabindex="0"
@@ -409,7 +413,7 @@
 							{/each}
 						{/if}
 					</div>
-					<ChevronDown class="h-4 w-4 flex-shrink-0" />
+					<ChevronDown class="h-4 w-4 shrink-0" />
 				</button>
 
 				<!-- Dropdown with search and options -->
@@ -443,9 +447,9 @@
 									<div
 										role="option"
 										tabindex="0"
-										aria-selected={isRouteSelected(routeOption.id)}
+										aria-selected={isRouteSelected(routeOption)}
 										class="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
-											routeOption.id
+											routeOption
 										)
 											? 'bg-neutral-700'
 											: ''}"
@@ -455,18 +459,17 @@
 										<Icon
 											height={32}
 											width={32}
-											express={false}
 											route={routeOption}
 											link={false}
-											class="mr-3 flex-shrink-0"
+											class="mr-3 shrink-0"
 										/>
-										<span class="flex-grow">{routeOption.long_name}</span>
+										<span class="grow">{routeOption.long_name}</span>
 										<!-- <div class="flex flex-col">
 											<span class="text-sm">{getRouteDisplayName(routeOption)}</span>
 											<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
 										</div> -->
-										{#if isRouteSelected(routeOption.id)}
-											<Check class="mt-1 size-4 flex-shrink-0 text-green-500" />
+										{#if isRouteSelected(routeOption)}
+											<Check class="mt-1 size-4 shrink-0 text-green-500" />
 											<!-- <span class="ml-auto text-green-500">✓</span> -->
 										{/if}
 									</div>
@@ -479,28 +482,29 @@
 		</div>
 
 		<!-- Direction Option -->
+		<!-- TODO: change direction text depending on source -->
 		<div class="flex min-w-24 flex-col gap-2">
 			<div class="font-bold">Direction</div>
 			<div class="flex flex-col gap-2 text-neutral-300">
 				<div class="flex items-center justify-between gap-2">
 					<label for="northbound" class="cursor-pointer">Northbound</label>
 					<input
-						bind:group={direction}
+						bind:group={direction_index}
 						type="radio"
 						id="northbound"
 						name="direction"
-						value={TripDirection.North}
+						value={0}
 						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
 				</div>
 				<div class="flex items-center justify-between gap-2">
 					<label for="southbound" class="cursor-pointer">Southbound</label>
 					<input
-						bind:group={direction}
+						bind:group={direction_index}
 						type="radio"
 						id="southbound"
 						name="direction"
-						value={TripDirection.South}
+						value={1}
 						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
 				</div>
@@ -571,7 +575,7 @@
 		</div>
 
 		<!-- Export Button -->
-		<div class="flex min-w-[120px] flex-col justify-center">
+		<div class="flex min-w-30 flex-col justify-center">
 			<button
 				onclick={export_as_svg}
 				class="flex h-fit items-center justify-center gap-2 rounded bg-neutral-900 px-4 py-2 transition-colors hover:bg-neutral-800"
@@ -589,7 +593,8 @@
 			<!-- Scrollable container with both scroll directions -->
 			<div class="absolute inset-0 overflow-auto">
 				<!-- Chart with minimum dimensions but able to shrink -->
-				<div bind:this={svgContainer} class="h-full min-h-[500px] w-full min-w-[1300px]">
+				<div bind:this={svgContainer} class="h-full min-h-125 w-full min-w-325">
+					<!-- TODO: fix lines where the arrival times are identical (because mta is bad) from creating invalid lines (crosses same Y twice) -->
 					<LayerCake
 						debug={false}
 						ssr
@@ -606,7 +611,7 @@
 						<Svg>
 							<AxisX {current_time_line} interval={xAxisInterval} />
 							<AxisY />
-							<Lines {routes} bind:stop_points />
+							<Lines routes={selected_routes_flat} bind:stop_points />
 						</Svg>
 					</LayerCake>
 				</div>
@@ -616,3 +621,11 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	@reference "../../app.css";
+
+	:global(.layercake-layout-svg) {
+		@apply bg-neutral-950;
+	}
+</style>

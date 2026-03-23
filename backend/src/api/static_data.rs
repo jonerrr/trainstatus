@@ -1,28 +1,19 @@
-use super::errors::ServerError;
-use super::json_headers;
 use crate::AppState;
-use crate::static_data::route::{self, Route};
-use crate::static_data::stop::Stop;
-use axum::extract::Query;
-use axum::{extract::State, response::IntoResponse};
-use headers::{ETag, HeaderMapExt, IfNoneMatch};
-use http::{HeaderMap, StatusCode, header};
-use serde::Deserialize;
-use utoipa::IntoParams;
+use crate::api::AppError;
+use crate::models::route::Route;
+use crate::models::source::Source;
+use crate::models::stop::Stop;
+use axum::extract::{Path, State};
+use axum::response::{IntoResponse, Response};
+use http::{HeaderMap, StatusCode};
 
-#[derive(Deserialize, IntoParams)]
-pub struct Parameters {
-    /// Return in GeoJSON format instead of JSON
-    #[serde(default)]
-    geojson: bool,
-    /// Filter by route type. If none provided, all routes are returned.
-    #[serde(default)]
-    route_type: Option<route::RouteType>,
-}
-
-pub fn cache_headers(hash: String) -> HeaderMap {
-    let mut headers = json_headers().clone();
-    headers.insert(header::ETAG, hash.parse().unwrap());
+// TODO: refactor etag logic so if there is no etag, it doesnt just return a blank string as the etag
+fn cache_headers(etag_hash: &str) -> HeaderMap {
+    use http::header;
+    let mut headers = HeaderMap::new();
+    headers.insert("content-type", "application/json".parse().unwrap());
+    // ETag must be a quoted string per RFC 7232
+    headers.insert(header::ETAG, format!("\"{}\"", etag_hash).parse().unwrap());
     headers.insert(
         header::CACHE_CONTROL,
         "public, max-age=3600, stale-while-revalidate=86400"
@@ -32,12 +23,23 @@ pub fn cache_headers(hash: String) -> HeaderMap {
     headers
 }
 
+/// Returns `true` if the client's `If-None-Match` header matches the stored etag.
+fn etag_matches(request_headers: &HeaderMap, etag_hash: &str) -> bool {
+    if let Some(inm) = request_headers.get(http::header::IF_NONE_MATCH) {
+        if let Ok(inm_str) = inm.to_str() {
+            let quoted = format!("\"{}\"", etag_hash);
+            return inm_str == quoted || inm_str == "*";
+        }
+    }
+    false
+}
+
 #[utoipa::path(
     get,
-    path = "/routes",
+    path = "/routes/{source}",
     tag = "STATIC",
     params(
-        Parameters
+        ("source" = Source, Path, description = "Data source")
     ),
     responses(
         (status = 200, description = "Subway and bus routes. WARNING: W train geometry is missing.", body = [Route]),
@@ -46,107 +48,57 @@ pub fn cache_headers(hash: String) -> HeaderMap {
 )]
 pub async fn routes_handler(
     State(state): State<AppState>,
-    params: Query<Parameters>,
+    Path(source): Path<Source>,
     headers: HeaderMap,
-) -> Result<impl IntoResponse, ServerError> {
-    match (params.geojson, &params.route_type) {
-        (true, route_type) => {
-            let geojson: String = match route_type {
-                Some(route_type) => {
-                    state
-                        .get_from_cache(&format!("routes_geojson_{}", route_type))
-                        .await?
-                }
-                None => state.get_from_cache("routes_geojson").await?,
-            };
+) -> Result<Response, AppError> {
+    // If Redis was flushed, lazily repopulate cache so we can always return an ETag.
+    // TODO: figure out why this sometimes happens
+    let etag = match state.route_store.get_etag(source).await? {
+        Some(etag) => etag,
+        None => state.route_store.populate_cache(source).await?,
+    };
 
-            // browsers still assume json with this header so im just gonna use application/json
-            // let mut headers = HeaderMap::new();
-            // headers.insert(
-            //     header::CONTENT_TYPE,
-            //     "application/geo+json".parse().unwrap(),
-            // );
-            // headers.insert(
-            //     header::CONTENT_DISPOSITION,
-            //     "attachment; filename=\"routes.geojson\"".parse().unwrap(),
-            // );
-
-            Ok((StatusCode::OK, json_headers().clone(), geojson))
-        }
-        (false, Some(route_type)) => {
-            // let routes: String = conn.get(format!("routes_{}", route_type)).await?;
-            let routes: String = state
-                .get_from_cache(&format!("routes_{}", route_type))
-                .await?;
-
-            Ok((StatusCode::OK, json_headers().clone(), routes))
-        }
-        _ => {
-            // let (routes, routes_hash): (String, String) =
-            //     conn.mget(&["routes", "routes_hash"]).await?;
-            let (routes, routes_hash) = state.mget_from_cache(&["routes", "routes_hash"]).await?;
-
-            if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-                let etag = routes_hash.parse::<ETag>().unwrap();
-
-                // if the etag matches the request, return 304
-                if !if_none_match.precondition_passes(&etag) {
-                    return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
-                }
-            }
-
-            Ok((StatusCode::OK, cache_headers(routes_hash), routes))
-        }
+    // Check ETag before fetching full data
+    if etag_matches(&headers, &etag) {
+        return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
+
+    let routes = state.route_store.get_all(source).await?;
+
+    let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
+    Ok((cache_headers(&etag), json).into_response())
 }
 
 #[utoipa::path(
     get,
-    path = "/stops",
+    path = "/stops/{source}",
     tag = "STATIC",
     params(
-        Parameters
+        ("source" = Source, Path, description = "Data source")
     ),
     responses(
-        (status = 200, description = "Subway and bus stops", body = [Stop]),
+        (status = 200, description = "Source stops", body = [Stop]),
         (status = 304, description = "If no parameters are provided and the etag matches the request")
     )
 )]
 pub async fn stops_handler(
     State(state): State<AppState>,
-    params: Query<Parameters>,
+    Path(source): Path<Source>,
     headers: HeaderMap,
-) -> Result<impl IntoResponse, ServerError> {
-    match (params.geojson, &params.route_type) {
-        (true, Some(route_type)) => {
-            let geojson = state
-                .get_from_cache(&format!("stops_geojson_{}", route_type))
-                .await?;
+) -> Result<Response, AppError> {
+    // If Redis was flushed, lazily repopulate cache so we can always return an ETag.
+    let etag = match state.stop_store.get_etag(source).await? {
+        Some(etag) => etag,
+        None => state.stop_store.populate_cache(source).await?,
+    };
 
-            Ok((StatusCode::OK, json_headers().clone(), geojson))
-        }
-        (false, Some(route_type)) => {
-            let stops = state
-                .get_from_cache(&format!("stops_{}", route_type))
-                .await?;
-
-            Ok((StatusCode::OK, json_headers().clone(), stops))
-        }
-        _ => {
-            let (stops, stops_hash) = state.mget_from_cache(&["stops", "stops_hash"]).await?;
-
-            if let Some(if_none_match) = headers.typed_get::<IfNoneMatch>() {
-                let etag = stops_hash
-                    .parse::<ETag>()
-                    .map_err(|_| ServerError::BadRequest("Failed to parse ETag".into()))?;
-
-                // if the etag matches the request, return 304
-                if !if_none_match.precondition_passes(&etag) {
-                    return Ok((StatusCode::NOT_MODIFIED, HeaderMap::new(), String::new()));
-                }
-            }
-
-            Ok((StatusCode::OK, cache_headers(stops_hash), stops))
-        }
+    // Check ETag before fetching full data
+    if etag_matches(&headers, &etag) {
+        return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
+
+    let stops = state.stop_store.get_all(source).await?;
+
+    let json = serde_json::to_string(&stops).map_err(anyhow::Error::from)?;
+    Ok((cache_headers(&etag), json).into_response())
 }

@@ -2,97 +2,90 @@
 
 ## Project Overview
 
-Real-time MTA subway and bus tracker with a Rust backend (Axum) and SvelteKit frontend. Consumes MTA GTFS-RT and SIRI feeds, stores data in PostgreSQL with PostGIS, caches in Valkey/Redis.
+Real-time MTA subway and bus tracker. Rust/Axum backend, SvelteKit frontend, PostgreSQL + PostGIS, Valkey/Redis cache. Sources: `mta_subway` (GTFS-RT), `mta_bus` (OBA/SIRI).
 
 ## Architecture
 
-### Backend (`backend/`)
+### Backend (`backend/src/`)
 
-- **Framework**: Axum with utoipa for OpenAPI docs (served at `/api/docs`)
-- **Data flow**: GTFS-RT/SIRI feeds → parse → PostgreSQL → Redis cache → API
-- **Key modules**:
-  - `static_data/` - Routes, stops, shapes (refreshes every 3 days from MTA GTFS)
-  - `realtime/` - Trips, alerts, stop times (updates every ~30 seconds)
-  - `api/` - HTTP handlers with Redis caching for static data
-- **Protobuf**: GTFS-RT protos compiled via `build.rs` into `feed` module
+**Data flow**: MTA feeds → `sources/` adapters → PostgreSQL → Redis read-through cache → `stores/` → Axum API
 
-### Frontend (`frontend/`)
+**Key modules**:
 
-- **Framework**: SvelteKit with Svelte 5 runes, TailwindCSS 4
-- **Pattern**: Trips, routes, and stops each have `Button.svelte` and `Modal.svelte` components in `src/lib/{Route,Stop,Trip}/`
-- **State**: Global reactive stores using Svelte 5's `$state` runes in `*.svelte.ts` files (e.g., `trips.svelte.ts`, `alerts.svelte.ts`)
-- **Types**: API types mirrored in `src/lib/static.ts` with type guards (`is_bus`, `is_train`)
+- `sources/` — Trait-based adapters (`RealtimeAdapter`, `AlertsAdapter`, `StaticAdapter`) with implementations in `mta_subway/` and `mta_bus/`
+- `engines/` — Spawns background tokio tasks: `static_data` (manages static import lifecycle via `StaticController`), `realtime`, `alerts`
+- `stores/` — Typed store structs (`TripStore`, `RouteStore`, etc.) wrapping PgPool + Redis; use `stores::read_through()` for cache-aside reads
+- `api/` — Axum handlers; `AppState` holds all stores; OpenAPI docs at `/api/docs` (via utoipa/scalar)
+- `integrations/` — Shared GTFS-RT/OBA parsing helpers
+- `models/` — DB row types; geometry decoded via `geozero` from WKB
+- `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`
 
-## Development
+**`StaticController`**: Realtime engines call `controller.ensure_updated(source)` before processing to avoid FK errors. `force_update` re-imports if a FK violation occurs.
 
-### Setup
+**API routes** (all under `/api/v1/`):
+
+- Static: `GET /routes/{source}`, `GET /stops/{source}`
+- Realtime: `GET /trips/{source}`, `GET /stop_times/{source}`, `GET /positions/{source}`, `GET /alerts/{source}`
+- All realtime endpoints accept `?at=<unix_timestamp>` for historical queries
+
+### Frontend (`frontend/src/`)
+
+**Type generation**: `client/` package generates TypeScript types from the OpenAPI spec via `@hey-api/openapi-ts`. Run codegen with `pnpm --filter @trainstatus/client openapi-ts` after backend changes.
+
+**Data loading pattern**:
+
+1. `+layout.ts` SSR-fetches all sources in parallel and returns initial indexed data
+2. `+layout.svelte` creates `LiveResource<T>` instances from initial data and sets Svelte contexts
+3. Components consume typed context via `trip_context.getSource(source)`, `stop_time_context.getSource(source)`, etc.
+
+**`LiveResource<T>`** (`src/lib/resources/index.svelte.ts`): Manages periodic polling + AbortController. Data stored as reactive `SvelteMap` keyed by entity ID.
+
+**Source-discriminated types**: Entity `data` fields vary by source. Use `TypedTrip<S>`, `TypedVehiclePosition<S>`, `TypedStopTime<S>` generics. `source_info` config in `index.svelte.ts` defines per-source refresh intervals and UI metadata.
+
+**StopTimes** are double-indexed: `by_trip_id` and `by_stop_id` (`StopTimeResource<S>`).
+
+**Component pattern**: Each entity type has `Button.svelte` + `Modal.svelte` in `src/lib/{Route,Stop,Trip}/`. Modal routing uses shallow URL params (`?s=`, `?r=`, `?t=`). View transitions use `document.startViewTransition`.
+
+**Global state files** use `.svelte.ts` extension (e.g., `util.svelte.ts` for `current_time`, `storage.svelte.ts`, `pins.svelte.ts`).
+
+## Development Setup
 
 ```bash
-# Uses mise for tool management - installs automatically
-# Backend: Rust (system-installed), Frontend: Node/pnpm via mise
-
-# Start PostgreSQL + Valkey (required)
+# Start PostgreSQL + Valkey
 cd backend && podman compose up -d
 
-# Run migrations
-cargo install sqlx-cli --no-default-features --features native-tls,postgres
-sqlx migrate run
-
-# Backend - requires API_KEY env var for BusTime API
-cargo run  # or: mise run dev
+# Backend (requires env vars in backend/.env.toml)
+cd backend && cargo run
 
 # Frontend
 cd frontend && pnpm install && pnpm dev
+
+# Regenerate API client types (after backend OpenAPI changes)
+pnpm --filter @trainstatus/client openapi-ts
 ```
 
-### Environment Variables
+**Backend env vars** (`backend/.env.toml`):
 
-Backend (in `backend/.env.toml`):
-
-- `DATABASE_URL` - PostgreSQL connection string (required)
-- `REDIS_URL` - Valkey/Redis URL (required)
-- `API_KEY` - MTA BusTime API key (required)
-- `FORCE_UPDATE` - Force static data refresh on startup
-- `READ_ONLY` - Skip all data updates (useful for testing API)
-- `DEBUG_GTFS` - Save raw GTFS feeds to `./gtfs/` for debugging
+- `DATABASE_URL`, `REDIS_URL` — required
+- `MTA_OBA_API_KEY` — MTA BusTime API key (required)
+- `DEBUG_RT_DATA` — saves raw feed protobufs to `backend/gtfs/`
 
 ## Conventions
 
 ### Backend
 
-- Use `sqlx::query!` macro for compile-time checked SQL
+- Always use `sqlx::query_as::<_, ModelType>(...)` (not the `query!` macro) — models use custom `FromRow` impls for PostGIS geometry via `geozero`
 - Migrations in `backend/migrations/` with timestamp prefixes
-- Database schema uses `static.` namespace for static data tables
-- Custom `FromRow` implementations for complex types with PostGIS geometry
-- Error handling via `thiserror` with `ServerError` enum in `api/errors.rs`
-- Cache static data in Redis; use `AppState::get_from_cache()` which auto-recaches on miss
+- Add new transit sources by implementing `RealtimeAdapter` + `AlertsAdapter` + `StaticAdapter` traits in a new `sources/<name>/` module, then registering in `main.rs`
+- Error handling: `AppError(anyhow::Error)` in `api/` converts to 500; use `?` freely
 
 ### Frontend
 
-- Components follow `Button.svelte`/`Modal.svelte` pattern for entities
-- Use `.svelte.ts` extension for files with Svelte 5 runes
-- Global stores exported as singletons (e.g., `export const alerts = createAlerts()`)
-- API calls go through SvelteKit's `fetch` for SSR compatibility
-- Type guards distinguish bus vs train data: `is_bus(stop)`, `is_train(stop)`
-
-### API Design
-
-- Endpoints support `?geojson=true` for GeoJSON responses
-- Realtime endpoints accept `?at=timestamp` for historical data
-- Static data cached with ETags for conditional requests
-- Routes: `/api/v1/{routes,stops,trips,stop_times,alerts}`
+- All API types come from `@trainstatus/client` — do not manually define API response types
+- Use `TypedTrip<S>` / `TypedVehiclePosition<S>` etc. when source is known; use base `Trip` / `VehiclePosition` when source is unknown
+- `current_time.value` (from `url_params.svelte.ts`) drives `?at=` queries; updating it auto-refreshes all `LiveResource` instances via `$effect`
 
 ## Database
 
-- PostgreSQL with PostGIS extension
-- Geometry stored as WKB, decoded via `geozero` crate
-- Static data in `static.` schema: `route`, `stop`, `route_stop`, `transfer`, `last_update`
-- Realtime data: `trip`, `stop_time`, `alert`, `alert_entity`
-
-## Testing
-
-Run the backend in read-only mode to test API without MTA feed updates:
-
-```bash
-READ_ONLY=1 cargo run
-```
+- PostgreSQL with PostGIS; geometry as WKB decoded by `geozero`
+- `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`)

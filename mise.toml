@@ -1,1 +1,23 @@
 experimental_monorepo_root = true
+
+[tools]
+"github:protomaps/go-pmtiles" = "latest"
+"pipx:pyvalhalla" = { version = "latest", uvx = true }
+rust = "latest"
+uv = "latest"
+# installing with mise caused the rust vscode extension not to work
+# protoc = "latest"
+
+[monorepo]
+config_roots = ["science", "backend", "frontend"]
+
+[env]
+DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
+REDIS_URL = "redis://localhost:6379"
+
+[tasks.start-containers]
+run = "podman compose -f compose.dev.yml up -d"
+
+[tasks.dev]
+depends = ["start-containers"]
+run = { tasks = ["//backend:dev", "//frontend:dev"] }

@@ -1,5 +1,14 @@
-import type { Route, Stop } from '$lib/static';
-import type { Trip } from '$lib/trips.svelte';
+import type { AlertResource } from '$lib/resources/alerts.svelte';
+import type { PositionResource } from '$lib/resources/positions.svelte';
+import type { StopTimesResource } from '$lib/resources/stop_times.svelte';
+import type { TripResource } from '$lib/resources/trips.svelte';
+
+import type { ApiAlert, Route, Source, Stop, StopTime, Trip } from '@trainstatus/client';
+
+interface RealtimeInitialValue<T> {
+	source: Source;
+	data: T;
+}
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
@@ -9,16 +18,17 @@ declare global {
 		// interface Locals {}
 		// maybe this should be maps
 		interface PageData {
-			routes: {
-				[id: string]: Route;
-			};
-			// stops: Stop<'bus' | 'train'>[];
-			stops: {
-				[id: number]: Stop<'bus' | 'train'>;
-			};
-			bus_stops: Stop<'bus'>[];
-			train_stops: Stop<'train'>[];
-			// initial current_time.value (can't set in layout load bc SSR)
+			selected_sources: Source[];
+			stops: Partial<Record<Source, Stop[]>>;
+			routes: Partial<Record<Source, Route[]>>;
+			stops_by_id: Partial<Record<Source, Record<string, Stop>>>;
+			routes_by_id: Partial<Record<Source, Record<string, Route>>>;
+			// Initial realtime values as SourceMaps
+			initial_trips: RealtimeInitialValue<TripResource>[];
+			initial_stop_times: RealtimeInitialValue<StopTimesResource>[];
+			initial_positions: RealtimeInitialValue<PositionResource>[];
+			initial_alerts: RealtimeInitialValue<AlertResource>[];
+			// Current time param for RT fetches
 			at?: string;
 			// used to keep track of the current monitored
 			// current_monitored_routes: string[];
@@ -29,10 +39,14 @@ declare global {
 			// dialog_open: boolean;
 			// dialog_id: T;
 			// null is not open
-			modal: 'stop' | 'trip' | 'route' | 'settings' | null;
-			data?: Stop | Trip | Route;
-			// time used for api requests.
-			// at?: number;
+			// type: 'stop' | 'trip' | 'route' | 'settings' | null;
+			modal:
+				| null
+				| (Stop & { type: 'stop' })
+				| (Trip & { type: 'trip' })
+				| (Route & { type: 'route' });
+			// used to determine if page.state update was forward or backwards
+			index?: number;
 		}
 		// interface Platform {}
 	}

@@ -1,58 +1,80 @@
 <script lang="ts">
-	import { pushState } from '$app/navigation';
+	import { tick, untrack } from 'svelte';
+
+	import type { Attachment } from 'svelte/attachments';
+	import { on } from 'svelte/events';
+
 	import { page } from '$app/state';
 
+	import Pin from '$lib/Pin.svelte';
 	import RouteModal from '$lib/Route/Modal.svelte';
-	import SettingsModal from '$lib/Settings/Modal.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
-	import {
-		type PersistedRune,
-		current_time,
-		persisted_rune,
-		route_pins_rune,
-		stop_pins_rune,
-		trip_pins_rune
-	} from '$lib/util.svelte';
+	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
+	import { LocalStorage } from '$lib/storage.svelte';
+	import { close_modal } from '$lib/url_params.svelte';
 
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
+	import type { Source } from '@trainstatus/client';
 
-	import Pin from './Pin.svelte';
-	import { type Stop, is_bus } from './static';
-	import { monitored_bus_routes } from './stop_times.svelte';
-	import { type Trip, type TripData, is_bus_route } from './trips.svelte';
+	// TODO: make implement some sort of focus trap and restore using attachments (actually, i think the dialog element does this natively?)
 
-	// import { Tween } from 'svelte/motion';
-	// import { cubicOut } from 'svelte/easing';
+	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
+	// Otherwise, the sliding animation looks like it runs twice.
+	let current_page_state = $state(page.state);
 
-	// interface Props {
-	// 	current_time?: number;
-	// }
+	$effect(() => {
+		// $inspect.trace('modal state transition effect');
+		const next_state = page.state;
+		if (untrack(() => next_state.modal !== current_page_state.modal)) {
+			// Compare the new index against the current index to figure out slide direction
+			const next_index = next_state.index ?? 0;
+			const local_index = untrack(() => current_page_state?.index ?? 0);
 
-	// const { current_time }: Props = $props();
+			const is_forward = next_index > local_index;
+			document.documentElement.dataset.modalDirection = is_forward ? 'forward' : 'backward';
 
-	let dialog_el = $state<HTMLDialogElement>();
-
-	function close() {
-		// enable_scroll();
-		pushState('', { modal: null });
-	}
-
-	function manage_modal(node: HTMLDialogElement) {
-		document.body.style.overflow = 'hidden';
-
-		// watch for clicks outside the dialog to close it
-		function handle_click(event: MouseEvent) {
-			if (event.target === node) {
-				close();
+			// Wrap the DOM update in the View Transition API
+			if (document.startViewTransition) {
+				document.startViewTransition(async () => {
+					current_page_state = next_state;
+					await tick();
+				});
+			} else {
+				current_page_state = next_state;
 			}
 		}
+	});
+
+	const modal: Attachment<HTMLDialogElement> = (node) => {
+		document.body.style.overflow = 'hidden';
+
+		$effect(() => {
+			// $inspect.trace('modal effect');
+			// this was running on close twice because of the handle_click and handle_mouse_up events
+			// console.log('modal update', page.state.modal);
+
+			const has_modal = !!current_page_state.modal;
+			// not sure if we need the node.open check, but just to be safe
+			if (has_modal && !node.open) {
+				node.showModal();
+			} else if (!has_modal && node.open) {
+				node.close();
+			}
+		});
+
+		// watch for clicks outside the dialog to close it
+		// function handle_click(event: MouseEvent) {
+		// 	if (event.target === node) {
+		// 		close_modal();
+		// 	}
+		// }
 
 		// Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
-				close();
+				close_modal();
 			}
 		}
 
@@ -70,108 +92,54 @@
 		}
 
 		function handle_mouse_up(event: MouseEvent) {
-			// Only act if the mouse started and ended directly on the dialog element
+			// Only act if the mouse started and ended directly on the dialog node
 			if (event.target !== node) return;
 
 			const diffX = Math.abs(event.pageX - startX);
 			const diffY = Math.abs(event.pageY - startY);
 
 			if (diffX < delta && diffY < delta) {
-				close();
+				close_modal();
 			}
 		}
 
-		node.addEventListener('click', handle_click);
-		node.addEventListener('mousedown', handle_mouse_down);
-		node.addEventListener('mouseup', handle_mouse_up);
-		document.addEventListener('keydown', handle_keydown);
+		const listeners_to_remove: Array<() => void> = [];
 
-		return {
-			destroy() {
-				document.body.style.overflow = '';
-				node.removeEventListener('mousedown', handle_mouse_down);
-				node.removeEventListener('mouseup', handle_mouse_up);
-				node.removeEventListener('click', handle_click);
-				document.removeEventListener('keydown', handle_keydown);
-			}
+		// listeners_to_remove.push(on(node, 'click', handle_click));
+		listeners_to_remove.push(on(node, 'mousedown', handle_mouse_down));
+		listeners_to_remove.push(on(node, 'mouseup', handle_mouse_up));
+		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
+
+		return () => {
+			document.body.style.overflow = '';
+			listeners_to_remove.forEach((off) => off());
 		};
-	}
+	};
 
-	// manage title changes, dialog el, and monitored bus routes
-	$effect(() => {
-		// console.log('modal effect');
-		switch (page.state.modal) {
-			case 'route':
-				dialog_el?.showModal();
-				document.title = `${page.state.data.id} Alerts | Train Status`;
-				break;
-			case 'stop':
-				dialog_el?.showModal();
-				document.title = `${page.state.data.name} | Train Status`;
-
-				const stop: Stop<'bus' | 'train'> = page.state.data;
-				if (is_bus(stop)) {
-					// console.log('monitoring modal bus routes');
-					stop.routes.forEach((r) => monitored_bus_routes.add(r.id));
-				}
-				break;
-			case 'trip':
-				dialog_el?.showModal();
-				document.title = `${page.state.data.route_id} Trip | Train Status`;
-
-				const trip: Trip<TripData> = page.state.data;
-				const bus_route = page.data.routes[trip.route_id];
-				if (is_bus_route(bus_route, trip)) {
-					// console.log('monitoring modal bus routes');
-					monitored_bus_routes.add(trip.route_id);
-				}
-
-				break;
-			case 'settings':
-				dialog_el?.showModal();
-				document.title = 'Settings | Train Status';
-				break;
-			default:
-				dialog_el?.close();
-				switch (page.route.id) {
-					case '/stops':
-						document.title = 'Stops | Train Status';
-						break;
-					case '/alerts':
-						document.title = 'Alerts | Train Status';
-						break;
-					case '/charts':
-						document.title = 'Charts | Train Status';
-						break;
-					default:
-						document.title = 'Home | Train Status';
-						break;
-				}
-				break;
-		}
-	});
 	// const rotation = new Tween(0, {
 	// 	duration: 300,
 	// 	easing: cubicOut
 	// });
-
 	let copied = $state(false);
-	// show stops/trips before current datetime
+	// show stops/trips before current datetime TODO: maybe persist this preference in local storage
 	let show_previous = $state(false);
-	let time_format = persisted_rune<'countdown' | 'time'>('time_format', 'countdown');
+	// e.g. 3m or 12:45.
+	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
 </script>
 
+<!-- TODO: refactor actions now that we have sources -->
 {#snippet actions(
 	history: boolean,
 	param_name: 'r' | 's' | 't',
-	id: string | number,
+	id: string,
 	title: string,
-	pin_rune: PersistedRune<(string | number)[]>
+	source: Source,
+	pins: LocalStorage<Pins>
 )}
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
-				close();
+				close_modal();
 			}}
 			aria-label="Close modal"
 			title="Close modal"
@@ -226,10 +194,10 @@
 				aria-label="Change time formatting"
 				title="Change time formatting"
 				onclick={() => {
-					time_format.value = time_format.value === 'countdown' ? 'time' : 'countdown';
+					time_format.current = time_format.current === 'countdown' ? 'time' : 'countdown';
 				}}
 			>
-				{#if time_format.value === 'countdown'}
+				{#if time_format.current === 'countdown'}
 					<AlarmClock size="2rem" />
 				{:else}
 					<Timer size="2rem" />
@@ -242,7 +210,8 @@
 					aria-label="Share"
 					title="Share"
 					onclick={() => {
-						const url = `${window.location.origin}/?${param_name}=${id}${current_time.value ? `&at=${current_time.value}` : ''}`;
+						// URL already includes ?s/?r/?t and ?at params via shallow routing
+						const url = window.location.href;
 
 						// Only use share api if on mobile and supported
 						if (!navigator.share || !/Mobi/i.test(window.navigator.userAgent)) {
@@ -267,48 +236,48 @@
 				</button>
 			{/if}
 
-			<Pin {id} {pin_rune} size="2rem" />
+			<Pin {id} {pins} {source} size="2rem" />
 		</div>
 	</div>
 {/snippet}
 <!-- fixed bottom-0 left-0 right-0 -->
 <dialog
-	bind:this={dialog_el}
-	use:manage_modal
-	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-[800px] flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
+	{@attach modal}
+	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 >
-	{#if page.state.modal === 'stop'}
-		<StopModal {show_previous} time_format={time_format.value} stop={page.state.data} />
+	{#if current_page_state.modal?.type === 'stop'}
+		<StopModal stop={current_page_state.modal} {show_previous} time_format={time_format.current} />
 
 		{@render actions(
 			true,
 			's',
-			page.state.data.id,
-			`Arrivals at ${page.state.data.name}`,
-			stop_pins_rune
+			current_page_state.modal.id,
+			`Arrivals at ${current_page_state.modal.name}`,
+			current_page_state.modal.data.source,
+			stop_pins
 		)}
-	{:else if page.state.modal === 'route'}
-		<RouteModal route={page.state.data} time_format={time_format.value} />
+	{:else if current_page_state.modal?.type === 'route'}
+		<RouteModal route={current_page_state.modal} time_format={time_format.current} />
 
 		{@render actions(
 			false,
 			'r',
-			page.state.data.id,
-			`Alerts for ${page.state.data.id}`,
-			route_pins_rune
+			current_page_state.modal.id,
+			`Alerts for ${current_page_state.modal.short_name}`,
+			current_page_state.modal.data.source,
+			route_pins
 		)}
-	{:else if page.state.modal === 'trip'}
-		<TripModal trip={page.state.data} {show_previous} time_format={time_format.value} />
+	{:else if current_page_state.modal?.type === 'trip'}
+		<TripModal trip={current_page_state.modal} {show_previous} time_format={time_format.current} />
 
 		{@render actions(
 			true,
 			't',
-			page.state.data.id,
-			`${page.state.data.route_id} Trip`,
-			trip_pins_rune
+			current_page_state.modal.id,
+			`${current_page_state.modal.route_id} Trip`,
+			current_page_state.modal.data.source,
+			trip_pins
 		)}
-	{:else if page.state.modal === 'settings'}
-		<SettingsModal />
 	{/if}
 </dialog>
 
@@ -326,3 +295,12 @@
 		animation: spin 0.5s linear;
 	}
 </style> -->
+<style>
+	dialog[open] {
+		view-transition-name: modal;
+	}
+
+	dialog::backdrop {
+		background-color: rgb(0 0 0 / 50%);
+	}
+</style>

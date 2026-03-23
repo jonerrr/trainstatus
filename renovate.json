@@ -1,3 +1,37 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json"
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "description": "Group all frontend/client (Node.js/pnpm) dependencies",
+      "matchFileNames": [
+        "frontend/**",
+        "client/**",
+        "package.json",
+        "pnpm-workspace.yaml"
+      ],
+      "groupName": "frontend"
+    },
+    {
+      "description": "Group all backend (Rust/Docker/Postgres) dependencies",
+      "matchFileNames": [
+        "backend/**",
+        "Cargo.toml",
+        "compose.yml",
+        "compose.example.yml",
+        "Dockerfile"
+      ],
+      "groupName": "backend"
+    },
+    {
+      "description": "Group all science (Python/uv) dependencies",
+      "matchFileNames": ["science/**"],
+      "groupName": "science"
+    },
+    {
+      "description": "Group root tools (mise) separately or bundle them into backend",
+      "matchFileNames": ["mise.toml", "mise.local.toml"],
+      "groupName": "tooling"
+    }
+  ]
 }
