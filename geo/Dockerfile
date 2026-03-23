@@ -14,6 +14,7 @@ RUN --mount=type=cache,id=osm-pbf-cache,target=/var/cache/osm-pbfs \
     for url in \
     https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf \
     https://download.geofabrik.de/north-america/us/new-jersey-latest.osm.pbf \
+    https://download.geofabrik.de/north-america/us/pennsylvania-latest.osm.pbf \
     https://download.geofabrik.de/north-america/us/connecticut-latest.osm.pbf; do \
     file="$(basename "${url}")"; \
     if [ ! -s "/var/cache/osm-pbfs/${file}" ]; then \
@@ -23,11 +24,11 @@ RUN --mount=type=cache,id=osm-pbf-cache,target=/var/cache/osm-pbfs \
     osmium merge \
     /var/cache/osm-pbfs/new-york-latest.osm.pbf \
     /var/cache/osm-pbfs/new-jersey-latest.osm.pbf \
+    /var/cache/osm-pbfs/pennsylvania-latest.osm.pbf \
     /var/cache/osm-pbfs/connecticut-latest.osm.pbf \
     -o /build/merged.osm.pbf
 
 # --- STAGE 2: Valhalla Graph Build ---
-# TODO: Check that renovate found this
 FROM ghcr.io/valhalla/valhalla:3.6.3 AS valhalla-builder
 
 WORKDIR /build

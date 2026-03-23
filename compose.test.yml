@@ -44,6 +44,11 @@ services:
       - trainstatus-db-test:/var/lib/postgresql
       - ./postgresql.conf:/etc/postgresql/postgresql.conf:Z,ro
     shm_size: 1g
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "trains", "-d", "trains"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   valkey:
     container_name: valkey

@@ -2,7 +2,8 @@ name: Update Geo Data
 
 on:
     workflow_dispatch:
-        # TODO: add scheduled refresh
+    schedule:
+        - cron: "0 0 * * 0" # Every Sunday at midnight
 
 permissions:
     contents: read

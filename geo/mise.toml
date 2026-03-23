@@ -1,11 +1,5 @@
-# [tasks.basemap]
-# # TODO: test and improve script (e.g. get latest URL from api)
-# dir = "pmtiles"
-# run = "pmtiles extract https://build.protomaps.com/20260305.pmtiles ny.pmtiles --bbox=-74.685881,40.231692,-73.30382,41.16561"
-
 [tasks.build-data]
 run = "podman build -f Dockerfile -t trainstatus-geo-data ."
-# TODO: fix paths inside valhalla.json
 
 [tasks.export-generated-data]
 description = "Copy generated geo artifacts from a container image into ./data"
@@ -13,7 +7,7 @@ run = """
 set -eu
 
 image="${IMAGE:-trainstatus-geo-data}"
-out_dir="${MISE_PROJECT_ROOT:-$PWD}/data"
+out_dir="${MISE_CONFIG_ROOT}/data"
 container_id="$(podman create "$image")"
 
 cleanup() {
