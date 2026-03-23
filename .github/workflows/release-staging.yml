@@ -42,7 +42,7 @@ jobs:
             staging-${{ github.sha }}
 
       - name: Build and Push Docker Image to Staging
-        uses: docker/build-push-action@v5.3.0
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: ${{ matrix.context }}
           push: true
