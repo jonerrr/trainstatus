@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/jonerrr/trainstatus/compare/backend-v1.0.1...backend-v1.0.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* remove backend compose.yml and itertools dep ([e94bc1f](https://github.com/jonerrr/trainstatus/commit/e94bc1f7f164a5bbc3b9b463c0253d18fa267870))
+
 ## [1.0.1](https://github.com/jonerrr/trainstatus/compare/backend-v1.0.0...backend-v1.0.1) (2026-03-23)
 
 
