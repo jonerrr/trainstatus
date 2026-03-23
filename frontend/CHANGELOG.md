@@ -1,0 +1,14 @@
+# Changelog
+
+## 1.0.0 (2026-03-23)
+
+
+### Features
+
+* rewrite ([#222](https://github.com/jonerrr/trainstatus/issues/222)) ([0bf46a7](https://github.com/jonerrr/trainstatus/commit/0bf46a74933432415696d1c57b3c69e1e5ce9363))
+
+
+### Bug Fixes
+
+* frontend docker image and test compose stack ([e0bedff](https://github.com/jonerrr/trainstatus/commit/e0bedff9976cd2535806957b5a49ef6a0203fe3c))
+* frontend docker node version ([bc20df4](https://github.com/jonerrr/trainstatus/commit/bc20df411ff4b87178f2c66ca37e3dcad80a6cbf))
