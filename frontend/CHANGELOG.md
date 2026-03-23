@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.0.0...frontend-v1.0.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* vite config ([3df6324](https://github.com/jonerrr/trainstatus/commit/3df63240e3cd0c9ade889235ec1a757f058230e3))
+
 ## 1.0.0 (2026-03-23)
 
 
