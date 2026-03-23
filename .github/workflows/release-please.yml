@@ -19,8 +19,8 @@ jobs:
     release-please:
         runs-on: ubuntu-latest
         outputs:
-            release_created: ${{ steps.release.outputs.release_created }}
-            version: ${{ steps.release.outputs.version }}
+            release_created: ${{ steps.release.outputs.releases_created }}
+            version: ${{ steps.release.outputs['backend--version'] }} # versions will always be synced
         steps:
             - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
               id: release
@@ -32,7 +32,7 @@ jobs:
     build-and-push:
         needs:
             - release-please
-        if: ${{ needs.release-please.outputs.release_created }}
+        if: ${{ needs.release-please.outputs.release_created == 'true' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
