@@ -1,6 +1,7 @@
-use std::{collections::HashMap, io::Cursor, time::Duration};
+use std::{collections::HashMap, io::Cursor, sync::Arc, time::Duration};
 
 use crate::{
+    engines::valhalla::ValhallaManager,
     engines::static_cache::expand_gtfs,
     models::{
         route::{Route, RouteData},
@@ -24,7 +25,46 @@ const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
 // We can also reuse this logic for MTA subway and MTA bus
 const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
 
-pub struct NjtBusStatic;
+pub struct NjtBusStatic {
+    valhalla: Arc<ValhallaManager>,
+}
+
+impl NjtBusStatic {
+    pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
+        Self { valhalla }
+    }
+
+    async fn snap_route_geometries(
+        &self,
+        route_geometries: &mut HashMap<String, MultiLineString>,
+    ) {
+        for (route_id, geometry) in route_geometries.iter_mut() {
+            let mut snapped_lines = Vec::with_capacity(geometry.0.len());
+
+            for (line_index, line) in geometry.0.iter().enumerate() {
+                if line.0.len() < 2 {
+                    snapped_lines.push(line.clone());
+                    continue;
+                }
+
+                match self.valhalla.trace_route(line).await {
+                    Ok(snapped_line) => snapped_lines.push(snapped_line),
+                    Err(err) => {
+                        tracing::warn!(
+                            route_id,
+                            line_index,
+                            error = %err,
+                            "NJT bus route snapping failed; preserving original linestring"
+                        );
+                        snapped_lines.push(line.clone());
+                    }
+                }
+            }
+
+            *geometry = MultiLineString::new(snapped_lines);
+        }
+    }
+}
 
 #[async_trait]
 impl StaticAdapter for NjtBusStatic {
@@ -72,9 +112,23 @@ impl StaticAdapter for NjtBusStatic {
             .await
             .context("Failed to cache NJT trips in Redis")?;
 
-        let route_geom_map = fetch_route_geometries()
+        let mut route_geom_map = fetch_route_geometries()
             .await
             .context("Failed to fetch NJT route geometries")?;
+
+        // Keep Valhalla warm while this import's snapping pass is active.
+        let _import_snap_usage = match self.valhalla.acquire_usage().await {
+            Ok(lease) => Some(lease),
+            Err(err) => {
+                tracing::warn!(
+                    error = %err,
+                    "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
+                );
+                None
+            }
+        };
+
+        self.snap_route_geometries(&mut route_geom_map).await;
 
         // Build all entities
         let routes = build_routes(&gtfs, &route_geom_map);

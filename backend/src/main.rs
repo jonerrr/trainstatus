@@ -75,6 +75,13 @@ pub fn mta_oba_api_key() -> &'static str {
     API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").unwrap())
 }
 
+/// Path to valhalla config file. Defaults do /data/valhalla.json
+pub fn valhalla_config() -> &'static str {
+    static VALHALLA_CONFIG: OnceLock<String> = OnceLock::new();
+    VALHALLA_CONFIG
+        .get_or_init(|| var("VALHALLA_CONFIG").unwrap_or_else(|_| "/data/valhalla.json".into()))
+}
+
 /// If true, will save fetched GTFS-RT protobufs (and other rt data) and their decoded txt to disk for debugging. Set the `DEBUG_RT_DATA` env var to enable.
 pub fn debug_rt_data() -> &'static bool {
     static DEBUG_RT_DATA: OnceLock<bool> = OnceLock::new();
@@ -136,11 +143,19 @@ async fn main() {
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
     let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
+    let valhalla_manager = engines::valhalla::ValhallaManager::new(
+        engines::valhalla::ValhallaConfig::from_config_path(valhalla_config().to_owned()),
+    );
+
     // We use Arc so the engine can share ownership of the adapter traits
     let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
         Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
-        Arc::new(sources::mta_bus::static_data::MtaBusStatic),
-        Arc::new(sources::njt_bus::static_data::NjtBusStatic),
+        Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
+            valhalla_manager.clone(),
+        )),
+        Arc::new(sources::njt_bus::static_data::NjtBusStatic::new(
+            valhalla_manager,
+        )),
         // Arc::new(njt::rail_static::NjtRailStatic),
     ];
 

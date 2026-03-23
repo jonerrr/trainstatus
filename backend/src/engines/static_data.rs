@@ -87,7 +87,15 @@ pub async fn run(
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
-            run_source_handler(pool, route_store, stop_store, static_cache_store, adapter, rx).await;
+            run_source_handler(
+                pool,
+                route_store,
+                stop_store,
+                static_cache_store,
+                adapter,
+                rx,
+            )
+            .await;
         }));
     }
 
@@ -191,6 +199,7 @@ async fn run_source_handler(
     }
 }
 
+#[instrument(skip_all, fields(source = ?adapter.source()))]
 fn spawn_import(
     pool: &PgPool,
     route_store: &RouteStore,
@@ -230,7 +239,10 @@ fn spawn_import(
             // Compute proximity-based transfers across all sources after every successful
             // import. Runs source-agnostically so cross-source proximity pairs are always
             // up to date. Errors are non-fatal — import waiters are still notified Ok.
-            if let Err(e) = stop_store_clone.compute_proximity_transfers(Some(adapter_clone.source())).await {
+            if let Err(e) = stop_store_clone
+                .compute_proximity_transfers(Some(adapter_clone.source()))
+                .await
+            {
                 error!("Failed to compute proximity transfers: {:#}", e);
             }
         } else if let Err(e) = &result {

@@ -1,3 +1,4 @@
+# NOT USED ANYMORE. USE ../compose.dev.yml
 services:
   postgis:
     container_name: postgis
@@ -21,19 +22,21 @@ services:
     volumes:
       - trainstatus-cache:/data
 
-  martin:
-    container_name: martin
-    image: ghcr.io/maplibre/martin:latest
-    ports:
-      - 3000:3000
-    environment:
-      - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
-    depends_on:
-      - postgis
-    command: ["--config", "/config/martin.yml"]
-    volumes:
-      - ./martin.yml:/config/martin.yml:Z,ro
-      - ./sprites:/sprites:Z,ro
+  # martin:
+  #   container_name: martin
+  #   image: ghcr.io/maplibre/martin:latest
+  #   ports:
+  #     - 3000:3000
+  #   environment:
+  #     - DATABASE_URL=postgresql://trains:trains@postgis:5432/trains
+  #   depends_on:
+  #     - postgis
+  #   command: ["--config", "/config/martin.yml"]
+  #   volumes:
+  #     - ./martin.yml:/config/martin.yml:Z,ro
+  #     - ./sprites:/sprites:Z,ro
+  #     # TODO: improve file structure
+  #     - ../geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
 
   # ts-backend:
   #   environment:

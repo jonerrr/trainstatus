@@ -27,13 +27,13 @@
 		"@types/d3-time": "catalog:",
 		"@types/eslint": "catalog:",
 		"@types/node": "catalog:",
-		"@vitest/browser-playwright": "^4.1.0",
+		"@vitest/browser-playwright": "catalog:",
 		"eslint": "catalog:",
 		"eslint-config-prettier": "catalog:",
 		"eslint-plugin-svelte": "catalog:",
 		"globals": "catalog:",
 		"maplibre-gl": "catalog:",
-		"playwright": "^1.58.2",
+		"playwright": "catalog:",
 		"prettier": "catalog:",
 		"prettier-plugin-svelte": "catalog:",
 		"prettier-plugin-tailwindcss": "catalog:",
@@ -44,8 +44,8 @@
 		"typescript": "catalog:",
 		"typescript-eslint": "catalog:",
 		"vite": "catalog:",
-		"vitest": "^4.1.0",
-		"vitest-browser-svelte": "^2.1.0"
+		"vitest": "catalog:",
+		"vitest-browser-svelte": "catalog:"
 	},
 	"dependencies": {
 		"@fontsource/inter": "catalog:",

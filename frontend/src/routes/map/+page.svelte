@@ -69,11 +69,12 @@
 		}}
 		center={[-74.006, 40.7128]}
 		zoom={12}
-		maxZoom={17}
 		{cursor}
 		class="size-full"
-		style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+		style="{page.url.origin}/martin/style/dark-matter-carto.json"
 	>
+		<!--
+		style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" -->
 		<!-- TODO: custom basemap -->
 		<!-- TODO: adjust bounds -->
 		<GeolocateControl
