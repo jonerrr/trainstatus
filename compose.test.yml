@@ -68,7 +68,7 @@ services:
       - /bin/sh
       - -ec
       - |
-        cp -a /data/. /shared-data/
+        cp -a /valhalla.json /valhalla_tiles.tar /basemap.pmtiles /shared-data/
 
   postgis:
     container_name: postgis

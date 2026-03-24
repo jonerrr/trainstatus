@@ -62,6 +62,6 @@ RUN --mount=type=cache,id=planetiler-sources-cache,target=/data/sources \
 
 FROM scratch
 
-COPY --from=valhalla-builder /build/valhalla.json /data/valhalla.json
-COPY --from=valhalla-builder /data/valhalla_tiles.tar /data/valhalla_tiles.tar
-COPY --from=planetiler-builder /data/basemap.pmtiles /data/basemap.pmtiles
+COPY --from=valhalla-builder /build/valhalla.json /valhalla.json
+COPY --from=valhalla-builder /data/valhalla_tiles.tar /valhalla_tiles.tar
+COPY --from=planetiler-builder /data/basemap.pmtiles /basemap.pmtiles
