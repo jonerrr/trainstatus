@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.0...frontend-v1.1.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* **charts:** add check that source should be monitored ([1295b8e](https://github.com/jonerrr/trainstatus/commit/1295b8ee9f6d392eea2fef7573c1e31de6ee3393))
+
 ## [1.1.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.0.2...frontend-v1.1.0) (2026-03-24)
 
 
