@@ -17,9 +17,9 @@ trap cleanup EXIT
 
 mkdir -p "$out_dir"
 
-podman cp "$container_id:/data/valhalla.json" "$out_dir/valhalla.json"
-podman cp "$container_id:/data/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
-podman cp "$container_id:/data/basemap.pmtiles" "$out_dir/basemap.pmtiles"
+podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
+podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
+podman cp "$container_id:/basemap.pmtiles" "$out_dir/basemap.pmtiles"
 
 sed -i 's#"tile_extract": "/data/valhalla_tiles.tar"#"tile_extract": "'"$out_dir"'/valhalla_tiles.tar"#' "$out_dir/valhalla.json"
 
