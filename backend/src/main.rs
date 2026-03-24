@@ -88,6 +88,29 @@ pub fn debug_rt_data() -> &'static bool {
     DEBUG_RT_DATA.get_or_init(|| var("DEBUG_RT_DATA").is_ok())
 }
 
+/// API route prefix. Defaults to `/api` and is normalized to a leading slash with no trailing slash.
+pub fn api_prefix() -> &'static str {
+    static API_PREFIX: OnceLock<String> = OnceLock::new();
+    API_PREFIX.get_or_init(|| {
+        let raw = var("API_PREFIX").unwrap_or_else(|_| "/api".into());
+        let trimmed = raw.trim();
+
+        if trimmed.is_empty() || trimmed == "/" {
+            return "/".into();
+        }
+
+        format!("/{}", trimmed.trim_matches('/'))
+    })
+}
+
+fn prefixed_path(prefix: &str, path: &str) -> String {
+    if prefix == "/" {
+        return format!("/{}", path.trim_start_matches('/'));
+    }
+
+    format!("{}/{}", prefix.trim_end_matches('/'), path.trim_start_matches('/'))
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
@@ -263,15 +286,20 @@ async fn main() {
         alert_store,
     };
 
+    let api_prefix = api_prefix().to_owned();
+    let api_v1_prefix = prefixed_path(&api_prefix, "v1");
+    let docs_path = prefixed_path(&api_prefix, "docs");
+    let openapi_path = prefixed_path(&api_prefix, "openapi.json");
+
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/v1", api::router(state))
+        .nest(&api_v1_prefix, api::router(state))
         .split_for_parts();
 
     // Clone for openapi.json route
     let openapi_schema = api.clone();
 
     let app = router
-        .merge(Scalar::with_url("/docs", api))
+        .merge(Scalar::with_url(docs_path, api))
         .route(
             "/",
             get(|| async {
@@ -280,7 +308,7 @@ async fn main() {
                 Ok::<_, Infallible>(res)
             }),
         )
-        .route("/openapi.json", get(move || async { Json(openapi_schema) }))
+        .route(&openapi_path, get(move || async { Json(openapi_schema) }))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
