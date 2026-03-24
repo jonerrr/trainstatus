@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:latest AS builder
 
 ARG BASE_URL=http://localhost:5173
 
@@ -14,4 +14,6 @@ RUN set -eux; \
     sed -i "s|http://localhost:5173|${sanitized_base_url}|g" "${style}"; \
     done
 
-CMD ["echo", "Geo style assets container ready."]
+FROM scratch
+
+COPY --from=builder /assets /assets

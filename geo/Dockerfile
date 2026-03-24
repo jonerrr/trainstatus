@@ -1,4 +1,3 @@
-# --- STAGE 1: Cached OSM Download + Merge ---
 FROM debian:bookworm-slim AS osm-data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -28,7 +27,6 @@ RUN --mount=type=cache,id=osm-pbf-cache,target=/var/cache/osm-pbfs \
     /var/cache/osm-pbfs/connecticut-latest.osm.pbf \
     -o /build/merged.osm.pbf
 
-# --- STAGE 2: Valhalla Graph Build ---
 FROM ghcr.io/valhalla/valhalla:3.6.3 AS valhalla-builder
 
 WORKDIR /build
@@ -52,7 +50,6 @@ RUN valhalla_build_extract -c valhalla.json -v
 # (Optional) Delete the raw tiles directory to save space in the builder stage
 # RUN rm -rf /build/valhalla_tiles
 
-# --- STAGE 3: Planetiler Build (uses config.properties) ---
 FROM ghcr.io/onthegomap/planetiler:latest AS planetiler-builder
 
 WORKDIR /data
@@ -63,14 +60,8 @@ RUN --mount=type=cache,id=planetiler-sources-cache,target=/data/sources \
     --mount=type=bind,source=config.properties,target=/data/config.properties,ro \
     java -Xmx4g -cp "/app/resources:/app/classes:/app/libs/*" com.onthegomap.planetiler.Main --config=/data/config.properties
 
-# --- STAGE 4: Tiny Artifact Image ---
-FROM alpine:latest
-
-WORKDIR /data
+FROM scratch
 
 COPY --from=valhalla-builder /build/valhalla.json /data/valhalla.json
-# COPY --from=valhalla-builder /build/valhalla_tiles /data/valhalla_tiles
 COPY --from=valhalla-builder /data/valhalla_tiles.tar /data/valhalla_tiles.tar
 COPY --from=planetiler-builder /data/basemap.pmtiles /data/basemap.pmtiles
-
-CMD ["echo", "Data container ready."]
