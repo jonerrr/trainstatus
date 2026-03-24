@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.0.2...frontend-v1.1.0) (2026-03-24)
+
+
+### Features
+
+* **api:** add dynamic API prefix configuration and update routes ([abf11bb](https://github.com/jonerrr/trainstatus/commit/abf11bb7d98e8801e53110174b97e1335307c722))
+
 ## [1.0.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.0.1...frontend-v1.0.2) (2026-03-23)
 
 
