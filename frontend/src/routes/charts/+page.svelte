@@ -7,7 +7,7 @@
 	import AxisX from '$lib/charts/AxisX.svelte';
 	import AxisY from '$lib/charts/AxisY.svelte';
 	import Lines from '$lib/charts/Lines.svelte';
-	import { type SourceMap } from '$lib/resources/index.svelte';
+	import { type SourceMap, source_info } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
@@ -58,18 +58,19 @@
 	let xAxisInterval = $state<number>(15);
 	let displayHours = $state<number>(3);
 
+	// TODO: add tabs so users have to choose the source
 	// Monitor bus routes in the stop_times resource
 	$effect(() => {
 		for (const source of page.data.selected_sources) {
-			const info = page.data.routes_by_id[source];
-			if (!info) continue;
-
-			// Check if source is bus-like (monitor_routes = true)
+			if (!source_info[source].monitor_routes) {
+				// stop times are already loaded for this source
+				continue;
+			}
 			const resource = all_stop_times[source];
-			if (!resource || !('add_route' in resource)) continue;
+			if (!resource) continue;
 
 			for (const route of routes[source] ?? []) {
-				(resource as any).add_route(route.id);
+				resource.add_route(route.id);
 			}
 		}
 	});
