@@ -16,8 +16,7 @@ export default defineConfig(({ mode }) => {
 				// backend
 				'/api': {
 					target: 'http://localhost:3055',
-					changeOrigin: true,
-					rewrite: (path) => path.replace(/^\/api/, '')
+					changeOrigin: true
 				},
 				// martin server
 				'/martin': {
