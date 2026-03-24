@@ -17,16 +17,16 @@ postgres:
 
 sprites:
   paths:
-    - /sprites/dark-matter
-    - /sprites/frontend
+    - /assets/sprites/dark-matter
+    - /assets/sprites/frontend
 
 styles:
   paths:
-    - /styles
+    - /assets/styles
 
 fonts:
   paths:
-    - /fonts
+    - /assets/fonts
 
 # mbtiles:
 #   sources:

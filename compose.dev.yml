@@ -37,12 +37,12 @@ services:
       postgis:
         condition: service_healthy
     command: ["--config", "/config/martin.yml"]
+    # TODO: maybe copy data from geo-assets container instead of mounting directly.
     volumes:
       - ./geo/martin.yml:/config/martin.yml:Z,ro
-      - ./geo/sprites:/sprites:Z,ro
-      - ./geo/styles:/styles:Z,ro
-      - ./geo/fonts:/fonts:Z,ro
-      # TODO: improve file structure
+      - ./geo/sprites:/assets/sprites:Z,ro
+      - ./geo/styles:/assets/styles:Z,ro
+      - ./geo/fonts:/assets/fonts:Z,ro
       # - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
       - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
 
