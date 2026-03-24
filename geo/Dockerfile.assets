@@ -1,0 +1,17 @@
+FROM alpine:latest
+
+ARG BASE_URL=http://localhost:5173
+
+WORKDIR /data
+
+COPY fonts /data/fonts
+COPY sprites /data/sprites
+COPY styles /data/styles
+
+RUN set -eux; \
+    sanitized_base_url="$(printf '%s' "${BASE_URL}" | sed 's:/*$::')"; \
+    for style in /data/styles/*.json; do \
+    sed -i "s|http://localhost:5173|${sanitized_base_url}|g" "${style}"; \
+    done
+
+CMD ["echo", "Geo style assets container ready."]
