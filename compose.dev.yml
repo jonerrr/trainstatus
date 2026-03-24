@@ -1,7 +1,7 @@
 services:
   postgis:
     container_name: postgis
-    image: docker.io/postgis/postgis:18-3.6-alpine
+    image: docker.io/postgis/postgis:18-3.6-alpine@sha256:0ca74aefd15c59d26f62581cb06cd7c7e0e08269f50d6cd676400684cb061fbb
     ports:
       - 5432:5432
     environment:
@@ -20,7 +20,7 @@ services:
 
   valkey:
     container_name: valkey
-    image: valkey/valkey:alpine
+    image: valkey/valkey:alpine@sha256:84c96f47ebe197e635cd3ddbe3ab74e8bdf783cf3befbfb1c36387275c1cd5d5
     ports:
       - 6379:6379
     volumes:
@@ -28,7 +28,7 @@ services:
 
   martin:
     container_name: martin
-    image: ghcr.io/maplibre/martin:latest
+    image: ghcr.io/maplibre/martin:latest@sha256:9fb167869c47828254332dfe4355c1454a53f19d32d1878db54f8cbdac84c45e
     ports:
       - 3000:3000
     environment:
@@ -47,7 +47,7 @@ services:
       - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
 
   maputnik:
-    image: ghcr.io/maplibre/maputnik:main
+    image: ghcr.io/maplibre/maputnik:main@sha256:f7726a12133e82a7583b6743f395cdf61755885158b398f8226a607ec582bab8
     ports:
       - "8888:8000"
 
