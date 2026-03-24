@@ -40,7 +40,7 @@ jobs:
               uses: docker/build-push-action@v7
               with:
                   context: ./geo
-                  file: ./Dockerfile.assets
+                  file: ./geo/Dockerfile.assets
                   push: true
                   build-args: |
                       BASE_URL=${{ inputs.base_url || 'https://trainstat.us' }}
