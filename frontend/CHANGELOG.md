@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.1...frontend-v1.1.2) (2026-03-25)
+
+
+### Bug Fixes
+
+* **map:** dont load maplibre css externally ([2193e58](https://github.com/jonerrr/trainstatus/commit/2193e58e3035cb98481a58e1a2b51c0ef9f2f484))
+
 ## [1.1.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.0...frontend-v1.1.1) (2026-03-24)
 
 
