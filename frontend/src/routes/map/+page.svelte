@@ -5,15 +5,12 @@
 
 	import type { Source } from '@trainstatus/client';
 	import maplibregl from 'maplibre-gl';
+	import 'maplibre-gl/dist/maplibre-gl.css';
 	import {
-		AttributionControl,
 		CircleLayer,
-		FeatureState,
-		GeoJSONSource,
 		GeolocateControl,
 		LineLayer,
 		MapLibre,
-		SymbolLayer,
 		VectorTileSource
 	} from 'svelte-maplibre-gl';
 
@@ -32,45 +29,11 @@
 <div class="relative flex w-full h-full">
 	<MapLibre
 		bind:map
-		onload={async (map) => {
-			// list layers
-			// const layers = map.getStyle().layers;
-			// console.log(layers.map((l) => l.id));
-			// layers.forEach((layer) => {
-			// 	// if (layer.id === 'background') {
-			// 	// 	map.moveLayer(layer.id, 'waterway-label');
-			// 	// }
-			// 	map.setLayoutProperty(layer.id, 'visibility', 'none');
-			// });
-			// disable background
-			// map.setLayoutProperty('background', 'visibility', 'none');
-			// map.setLayoutProperty('background', 'visibility', 'none');
-			// map.setLayoutProperty('waterway', 'visibility', 'none');
-			// map.setLayoutProperty('water_shadow', 'visibility', 'none');
-			// map.setLayoutProperty('background', 'visibility', 'none');
-			// map.setLayoutProperty('background', 'visibility', 'none');
-			// const bus_up = await map.loadImage($mode !== 'light' ? '/bus-up-white.png' : '/bus-up.png');
-			// map.addImage('bus_up', bus_up.data);
-			// const images = [
-			// 	`bus_${$mode !== 'light' ? 'white' : 'black'}_left`,
-			// 	// `but_white_right`,
-			// 	'bus_full',
-			// 	'bus_half_full'
-			// ];
-			// Promise.all([
-			// 	...images.map(async (img) => {
-			// 		const image = await map.loadImage(`/${img}.png`);
-			// 		map.addImage(img, image.data);
-			// 	})
-			// ]);
-			// generated using https://jobtalle.com/SDFMaker/
-			// const img_sdf = await map.loadImage('/bus_sdf.png');
-			// map.addImage('bus_sdf', img_sdf.data, { sdf: true });
-		}}
 		center={[-74.006, 40.7128]}
 		zoom={12}
 		{cursor}
 		class="size-full"
+		autoloadGlobalCss={false}
 		style="{page.url.origin}/martin/style/dark-matter-carto.json"
 	>
 		<!--
@@ -126,6 +89,14 @@
 					// clicked_routes = e.features;
 					// lnglat = e.lngLat;
 					// maybe make other features undefined here
+					const feat = e.features?.[0].properties;
+					if (!feat) return;
+					const route = page.data.routes_by_id?.[feat.source as Source]?.[feat.id];
+					if (!route) return;
+					open_modal({
+						type: 'route',
+						...route
+					});
 				}}
 			/>
 
