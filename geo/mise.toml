@@ -6,7 +6,7 @@ description = "Copy generated geo artifacts from a container image into ./data"
 run = """
 set -eu
 
-image="${IMAGE:-trainstatus-geo-data}"
+image="ghcr.io/jonerrr/trainstatus-geo-data:latest"
 out_dir="${MISE_CONFIG_ROOT}/data"
 container_id="$(podman create "$image")"
 
@@ -21,7 +21,14 @@ podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
 podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
 podman cp "$container_id:/basemap.pmtiles" "$out_dir/basemap.pmtiles"
 
-sed -i 's#"tile_extract": "/data/valhalla_tiles.tar"#"tile_extract": "'"$out_dir"'/valhalla_tiles.tar"#' "$out_dir/valhalla.json"
+tmp_json="${out_dir}/valhalla.json.tmp"
+if command -v jq >/dev/null 2>&1; then
+	jq --arg tile_extract "${out_dir}/valhalla_tiles.tar" '.mjolnir.tile_extract = $tile_extract' "$out_dir/valhalla.json" >"$tmp_json"
+else
+	echo "jq is required to update valhalla.json (install with: brew install jq)" >&2
+	exit 1
+fi
+mv "$tmp_json" "$out_dir/valhalla.json"
 
 echo "Copied artifacts from $image to $out_dir"
 """
