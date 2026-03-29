@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.3...frontend-v1.1.4) (2026-03-29)
+
+
+### Bug Fixes
+
+* frontend docker build and put api client in frontend folder ([609a8c5](https://github.com/jonerrr/trainstatus/commit/609a8c5b165567980acdf2512688e4d403992153)), closes [#264](https://github.com/jonerrr/trainstatus/issues/264)
+
 ## [1.1.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.2...frontend-v1.1.3) (2026-03-29)
 
 
