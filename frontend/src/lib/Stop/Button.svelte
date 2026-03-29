@@ -3,13 +3,12 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import type { Stop, StopTime } from '$lib/client';
 	import { source_info } from '$lib/resources/index.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 	import { main_route_stops } from '$lib/util.svelte';
-
-	import type { Stop, StopTime } from '@trainstatus/client';
 
 	type StopTimeWithETA = StopTime & { eta: number };
 	type StopTimesByRoute = Map<string, StopTimeWithETA[]>;

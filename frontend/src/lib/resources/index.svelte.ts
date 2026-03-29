@@ -6,7 +6,6 @@ import mta_bus_icon from '$lib/assets/mta_bus.webp';
 import mta_subway_icon from '$lib/assets/mta_subway.webp';
 // TODO: convert to webp
 import njt_bus_icon from '$lib/assets/njt_bus.png';
-
 import type {
 	AlertData,
 	ApiAlert,
@@ -19,7 +18,7 @@ import type {
 	Trip,
 	TripData,
 	VehiclePosition
-} from '@trainstatus/client';
+} from '$lib/client';
 
 export const source_info = {
 	// TODO: increase refresh interval

@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import type { Source } from '$lib/client';
 import {
 	LiveResource,
 	type TripResource,
@@ -9,8 +10,6 @@ import {
 	source_info
 } from '$lib/resources/index.svelte';
 import { current_time } from '$lib/url_params.svelte';
-
-import type { Source } from '@trainstatus/client';
 
 //TODO: compare map and for loop performance
 export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResource<S> {

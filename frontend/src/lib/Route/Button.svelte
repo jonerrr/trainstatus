@@ -1,8 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/Icon.svelte';
+	import type { Route, Source } from '$lib/client';
 	import { alert_context } from '$lib/resources/alerts.svelte';
-
-	import type { Route, Source } from '@trainstatus/client';
 
 	interface Props {
 		data: Route;

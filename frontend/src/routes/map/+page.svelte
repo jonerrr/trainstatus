@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
+	import type { Source } from '$lib/client';
 	import { open_modal } from '$lib/url_params.svelte';
 
-	import type { Source } from '@trainstatus/client';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import {

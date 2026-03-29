@@ -7,6 +7,7 @@
 	import Modal from '$lib/Modal.svelte';
 	import Navbar from '$lib/Navbar.svelte';
 	import SEO from '$lib/SEO.svelte';
+	import type { Source } from '$lib/client';
 	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
 	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
 	import { createStopTimeResource, stop_time_context } from '$lib/resources/stop_times.svelte';
@@ -14,7 +15,6 @@
 	import { current_time } from '$lib/url_params.svelte';
 
 	import '@fontsource/inter';
-	import type { Source } from '@trainstatus/client';
 
 	import '../app.css';
 

@@ -1,8 +1,7 @@
 import { browser } from '$app/environment';
 
+import type { Source } from '$lib/client';
 import { LocalStorage } from '$lib/storage.svelte';
-
-import type { Source } from '@trainstatus/client';
 
 export const COOKIE_NAME = 'selected_sources';
 

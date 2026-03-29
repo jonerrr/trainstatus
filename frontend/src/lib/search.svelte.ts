@@ -1,4 +1,5 @@
-import type { Source, Stop } from '@trainstatus/client';
+import type { Source, Stop } from '$lib/client';
+
 import { Index } from 'flexsearch';
 
 export class StopSearch {

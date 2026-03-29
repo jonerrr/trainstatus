@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 
+	import type { Route, Trip } from '$lib/client';
 	import { open_modal } from '$lib/url_params.svelte';
 
-	import type { Route, Trip } from '@trainstatus/client';
 	import { line } from 'd3-shape';
 
 	const { xGet, yGet, data } = getContext('LayerCake');

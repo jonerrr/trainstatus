@@ -1,10 +1,9 @@
+import type { Route, Source, Stop } from '$lib/client';
 import { index_alerts } from '$lib/resources/alerts.svelte';
 import { index_positions } from '$lib/resources/positions.svelte';
 import { index_stop_times } from '$lib/resources/stop_times.svelte';
 import { index_trips } from '$lib/resources/trips.svelte';
 import { COOKIE_NAME, parse_sources, supported_sources } from '$lib/source_preferences.svelte';
-
-import type { Route, Source, Stop } from '@trainstatus/client';
 
 import type { LayoutServerLoad } from './$types';
 

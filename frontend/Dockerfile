@@ -3,22 +3,18 @@ FROM node:25-alpine@sha256:cf38e1f3c28ac9d81cdc0c51d8220320b3b618780e44ef96a39f7
 RUN npm install -g pnpm
 
 WORKDIR /app
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY frontend/package.json ./frontend/package.json
-COPY client/package.json ./client/package.json
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
-COPY frontend ./frontend
-COPY client ./client
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter frontend build
+COPY . .
+RUN pnpm build
+RUN pnpm prune --production
 
 FROM node:25-alpine@sha256:cf38e1f3c28ac9d81cdc0c51d8220320b3b618780e44ef96a39f76f7dbfef023
 
-WORKDIR /app/frontend
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/frontend/node_modules ./node_modules
-COPY --from=build /app/frontend/build ./build/
-COPY --from=build /app/frontend/package.json ./package.json
+WORKDIR /app
+COPY --from=build /app/build build/
+COPY --from=build /app/node_modules node_modules/
+COPY package.json .
 EXPOSE 3000
 ENV NODE_ENV=production
 CMD ["node", "build"]

@@ -10,12 +10,12 @@
 	import RouteModal from '$lib/Route/Modal.svelte';
 	import StopModal from '$lib/Stop/Modal.svelte';
 	import TripModal from '$lib/Trip/Modal.svelte';
+	import type { Source } from '$lib/client';
 	import { type Pins, route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { close_modal } from '$lib/url_params.svelte';
 
 	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
-	import type { Source } from '@trainstatus/client';
 
 	// TODO: make implement some sort of focus trap and restore using attachments (actually, i think the dialog element does this natively?)
 

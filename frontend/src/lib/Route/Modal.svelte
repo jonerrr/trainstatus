@@ -2,11 +2,11 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	import Icon from '$lib/Icon.svelte';
+	import type { Route } from '$lib/client';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 	import { debounce } from '$lib/util.svelte';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
-	import type { Route } from '@trainstatus/client';
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
 

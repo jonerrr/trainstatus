@@ -7,6 +7,7 @@
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
 	import Transfers from '$lib/Stop/Transfers.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
+	import type { ApiAlert, Stop, StopTime, Trip } from '$lib/client';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 	import type { SourceMap, TypedVehiclePosition } from '$lib/resources/index.svelte';
 	import { position_context } from '$lib/resources/positions.svelte';
@@ -17,7 +18,6 @@
 	import { main_route_stops } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
-	import type { ApiAlert, Stop, StopTime, Trip } from '@trainstatus/client';
 
 	interface Props {
 		show_previous: boolean;

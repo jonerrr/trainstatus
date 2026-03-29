@@ -1,9 +1,8 @@
+import type { ApiAlert, Route, Source, Stop, StopTime, Trip } from '$lib/client';
 import type { AlertResource } from '$lib/resources/alerts.svelte';
 import type { PositionResource } from '$lib/resources/positions.svelte';
 import type { StopTimesResource } from '$lib/resources/stop_times.svelte';
 import type { TripResource } from '$lib/resources/trips.svelte';
-
-import type { ApiAlert, Route, Source, Stop, StopTime, Trip } from '@trainstatus/client';
 
 interface RealtimeInitialValue<T> {
 	source: Source;

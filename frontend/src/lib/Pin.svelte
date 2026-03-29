@@ -1,9 +1,9 @@
 <script lang="ts">
+	import type { Source } from '$lib/client';
 	import type { Pins } from '$lib/pins.svelte';
 	import type { LocalStorage } from '$lib/storage.svelte';
 
 	import { Pin } from '@lucide/svelte';
-	import type { Source } from '@trainstatus/client';
 
 	// TODO: maybe just take the localstorage.current instead of the entire localstorage object
 	let {
