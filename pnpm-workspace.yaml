@@ -5,7 +5,7 @@ packages:
 catalog:
   '@fontsource/inter': ^5.2.8
   '@hey-api/openapi-ts': 0.94.4
-  '@lucide/svelte': ^0.577.0
+  '@lucide/svelte': ^1.0.0
   '@sveltejs/adapter-auto': ^7.0.1
   '@sveltejs/adapter-node': ^5.5.4
   '@sveltejs/kit': ^2.55.0
@@ -39,7 +39,7 @@ catalog:
   svelte-check: ^4.4.5
   svelte-maplibre-gl: ^1.0.3
   tailwindcss: ^4.2.2
-  typescript: ^5.9.3
+  typescript: ^6.0.0
   typescript-eslint: ^8.57.1
   vite: ^8.0.1
   vitest: ^4.1.0
