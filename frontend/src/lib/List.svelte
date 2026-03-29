@@ -56,7 +56,7 @@
 		header_slot,
 		selected_source = $bindable(
 			new LocalStorage<Source>(
-				`${title.toLocaleLowerCase()}_tab`,
+				`${title.toLocaleLowerCase()}Tab`,
 				page.data.selected_sources[0] ?? 'mta_subway'
 			)
 		),

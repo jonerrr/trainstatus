@@ -12,7 +12,7 @@
 	import { Throttled } from 'runed';
 
 	let selected_source = $state(
-		new LocalStorage<Source>('stops_tab', page.data.selected_sources[0] ?? 'mta_subway')
+		new LocalStorage<Source>('stopsTab', page.data.selected_sources[0] ?? 'mta_subway')
 	);
 
 	// Ensure selected source is still enabled

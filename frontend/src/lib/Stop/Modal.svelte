@@ -59,7 +59,7 @@
 
 	// $inspect(stop_times);
 	// TODO: generate defaults instead of hardcoding
-	let selected_direction = new LocalStorage<SourceMap<number>>('direction', {
+	let selected_direction = new LocalStorage<SourceMap<number>>('selectedDirection', {
 		mta_subway: 1,
 		mta_bus: 0,
 		njt_bus: 0
