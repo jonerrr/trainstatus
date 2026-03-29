@@ -28,13 +28,13 @@ fonts:
   paths:
     - /assets/fonts
 
-# mbtiles:
-#   sources:
-#     basemap: /data/basemap.mbtiles
-
-pmtiles:
+mbtiles:
   sources:
-    basemap: /data/basemap.pmtiles
+    basemap: /data/basemap.mbtiles
+
+# pmtiles:
+#   sources:
+#     basemap: /data/basemap.pmtiles
 
 # should be disabled in prod
 web_ui: enable-for-all

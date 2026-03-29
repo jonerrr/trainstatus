@@ -64,4 +64,4 @@ FROM scratch
 
 COPY --from=valhalla-builder /build/valhalla.json /valhalla.json
 COPY --from=valhalla-builder /data/valhalla_tiles.tar /valhalla_tiles.tar
-COPY --from=planetiler-builder /data/basemap.pmtiles /basemap.pmtiles
+COPY --from=planetiler-builder /data/basemap.mbtiles /basemap.mbtiles

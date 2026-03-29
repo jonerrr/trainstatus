@@ -25,7 +25,6 @@
 	]);
 </script>
 
-<!-- diffStyleUpdates -->
 <div class="relative flex w-full h-full">
 	<MapLibre
 		bind:map
@@ -34,11 +33,10 @@
 		{cursor}
 		class="size-full"
 		autoloadGlobalCss={false}
-		style="{page.url.origin}/martin/style/dark-matter-carto.json"
+		style="{page.url.origin}/martin/style/dark-matter.json"
 	>
 		<!--
 		style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" -->
-		<!-- TODO: custom basemap -->
 		<!-- TODO: adjust bounds -->
 		<GeolocateControl
 			position="bottom-left"
@@ -49,11 +47,7 @@
 		/>
 		<!-- TODO: probably move each source into its own component -->
 		<!-- relative urls don't work in tiles param -->
-		<VectorTileSource
-			promoteId="id"
-			id="route"
-			tiles={[`${page.url.origin}/martin/route/{z}/{x}/{y}`]}
-		>
+		<VectorTileSource promoteId="id" id="route" url={`${page.url.origin}/martin/route`}>
 			<LineLayer
 				id="route-layer"
 				sourceLayer="route"
@@ -108,11 +102,7 @@
 		</VectorTileSource>
 
 		<!-- TODO: add another arrow layer that uses compass direction -->
-		<VectorTileSource
-			id="stop"
-			promoteId="id"
-			tiles={[`${page.url.origin}/martin/stop/{z}/{x}/{y}`]}
-		>
+		<VectorTileSource id="stop" promoteId="id" url={`${page.url.origin}/martin/stop`}>
 			<CircleLayer
 				id="stop-layer"
 				sourceLayer="stop"

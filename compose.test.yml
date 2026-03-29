@@ -66,7 +66,7 @@ services:
       - /bin/sh
       - -ec
       - |
-        cp -a /valhalla.json /valhalla_tiles.tar /basemap.pmtiles /shared-data/
+        cp -a /valhalla.json /valhalla_tiles.tar /basemap.mbtiles /shared-data/
 
   postgis:
     container_name: postgis
@@ -118,7 +118,7 @@ services:
       - ./geo/fonts:/assets/fonts:Z,ro
       # TODO: get basemap from geo-data container for testing
       # - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
-      - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
+      - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
 
 volumes:
   trainstatus-db-test:

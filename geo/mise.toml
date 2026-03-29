@@ -1,12 +1,15 @@
-[tasks.build-data]
-run = "podman build -f Dockerfile -t trainstatus-geo-data ."
+[env]
+GEO_DATA_IMAGE = "ghcr.io/jonerrr/trainstatus-geo-data:latest"
 
-[tasks.export-generated-data]
+[tasks.build]
+run = "podman build -f Dockerfile -t $GEO_DATA_IMAGE ."
+
+[tasks.export]
 description = "Copy generated geo artifacts from a container image into ./data"
 run = """
 set -eu
 
-image="ghcr.io/jonerrr/trainstatus-geo-data:latest"
+image="$GEO_DATA_IMAGE"
 out_dir="${MISE_CONFIG_ROOT}/data"
 container_id="$(podman create "$image")"
 
@@ -19,7 +22,7 @@ mkdir -p "$out_dir"
 
 podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
 podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
-podman cp "$container_id:/basemap.pmtiles" "$out_dir/basemap.pmtiles"
+podman cp "$container_id:/basemap.mbtiles" "$out_dir/basemap.mbtiles"
 
 tmp_json="${out_dir}/valhalla.json.tmp"
 if command -v jq >/dev/null 2>&1; then
@@ -32,10 +35,3 @@ mv "$tmp_json" "$out_dir/valhalla.json"
 
 echo "Copied artifacts from $image to $out_dir"
 """
-
-# run = """
-# podman run -it --rm --pull always -v $(pwd):/data \
-#   ghcr.io/systemed/tilemaker:master \
-#   /data/merged.osm.pbf \
-#   --output /data/data.pmtiles
-# """
