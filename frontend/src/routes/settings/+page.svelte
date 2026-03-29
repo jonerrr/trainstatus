@@ -5,7 +5,7 @@
 	import { source_preferences, supported_sources } from '$lib/source_preferences.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
-	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers, Map } from '@lucide/svelte';
+	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers } from '@lucide/svelte';
 	import { CircleX } from '@lucide/svelte';
 	import dayjs from 'dayjs';
 
