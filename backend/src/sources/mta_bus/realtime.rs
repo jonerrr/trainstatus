@@ -9,6 +9,7 @@ use crate::models::{
 };
 use crate::mta_oba_api_key;
 use crate::sources::RealtimeAdapter;
+use crate::sources::mta_bus::AGENCIES;
 use crate::sources::mta_subway::realtime::parse_origin_time;
 use crate::stores::position::PositionStore;
 use crate::stores::static_cache::StaticCacheStore;
@@ -23,8 +24,6 @@ use geo::Point;
 use std::collections::HashMap;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-
-const AGENCIES: [&str; 2] = ["MTABC", "MTA NYCT"];
 
 pub struct MtaBusRealtime;
 
