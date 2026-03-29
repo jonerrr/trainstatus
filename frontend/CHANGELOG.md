@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.2...frontend-v1.1.3) (2026-03-29)
+
+
+### Bug Fixes
+
+* change localstorage keys ([f59e715](https://github.com/jonerrr/trainstatus/commit/f59e715a9cc5f3611c7ab3d881bbbd3593e6a122))
+* **mta_bus:** get route geom from stop group polylines ([1d9e350](https://github.com/jonerrr/trainstatus/commit/1d9e350ac76bdf492208df42f3851bdf8193c7c8))
+
 ## [1.1.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.1...frontend-v1.1.2) (2026-03-25)
 
 
