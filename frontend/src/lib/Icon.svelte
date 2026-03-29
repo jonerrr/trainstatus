@@ -5,7 +5,6 @@
 
 	import { type Route } from '@trainstatus/client';
 
-	// TODO: combine w and h into size
 	const {
 		route,
 		link,
@@ -29,6 +28,33 @@
 		// TODO: maybe differentiate between planned alerts, station notices, etc
 		return alerts.value?.alerts_by_route.has(route.id) ?? false;
 	});
+
+	// TODO: apply this bus prefix thing to map
+	// Make mta bus prefix smaller than rest of short name
+	const route_short_name_parts = $derived.by(() => {
+		const short_name = route.short_name ?? '';
+
+		if (route.data.source !== 'mta_bus') {
+			return {
+				prefix: '',
+				rest: short_name
+			};
+		}
+
+		const match = short_name.match(/^([A-Za-z]+)(.*)$/);
+
+		if (!match || match[2].length === 0) {
+			return {
+				prefix: '',
+				rest: short_name
+			};
+		}
+
+		return {
+			prefix: match[1],
+			rest: match[2]
+		};
+	});
 </script>
 
 <!-- {#snippet alert_icon()}
@@ -49,7 +75,12 @@
 			if (link) open_modal({ type: 'route', ...route });
 		}}
 	>
-		{route.short_name}
+		<span class="bus-short-name">
+			{#if route_short_name_parts.prefix}
+				<span class="bus-short-name-prefix">{route_short_name_parts.prefix}</span>
+			{/if}
+			<span>{route_short_name_parts.rest}</span>
+		</span>
 
 		<!-- {@render alert_icon()} -->
 	</div>
@@ -76,5 +107,16 @@
 	/* the train icon has a weird white dot on webkit browsers. It goes away after hover / active or if I apply translateZ(0) */
 	svg {
 		transform: translateZ(0);
+	}
+
+	.bus-short-name {
+		display: inline-flex;
+		align-items: baseline;
+	}
+
+	.bus-short-name-prefix {
+		font-size: 0.8em;
+		line-height: 1;
+		margin-right: 1px;
 	}
 </style>
