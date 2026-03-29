@@ -43,8 +43,8 @@ services:
       - ./geo/sprites:/assets/sprites:Z,ro
       - ./geo/styles:/assets/styles:Z,ro
       - ./geo/fonts:/assets/fonts:Z,ro
-      # - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
-      - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
+      - ./geo/data/basemap.mbtiles:/data/basemap.mbtiles:Z,ro
+      # - ./geo/data/basemap.pmtiles:/data/basemap.pmtiles:Z,ro
 
   # maputnik:
   #   image: ghcr.io/maplibre/maputnik:main@sha256:f7726a12133e82a7583b6743f395cdf61755885158b398f8226a607ec582bab8

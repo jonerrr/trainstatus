@@ -39,8 +39,8 @@ The best website to check the status of your train (and bus).
 ### Setup
 
 1. Clone the repository
-2. Mise should automatically install required dependencies
+2. Run `mise i` to ensure all tools are installed
 3. Set environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml`
-4. Run `mise //geo:build-data` to build valhalla and basemap tiles
-5. Run `mise //geo:export-generated-data` to export tiles to your machine for local development.
+4. Run `mise //geo:build` to build valhalla and basemap tiles
+5. Run `mise //geo:export` to export tiles to your machine for local development.
 6. Start dbs, backend, and frontend with `mise dev`
