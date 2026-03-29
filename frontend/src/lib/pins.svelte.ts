@@ -1,6 +1,5 @@
+import type { Source } from '$lib/client';
 import { LocalStorage } from '$lib/storage.svelte';
-
-import type { Source } from '@trainstatus/client';
 
 export type Pins = {
 	[K in Source]: string[];

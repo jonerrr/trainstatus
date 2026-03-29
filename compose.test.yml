@@ -14,9 +14,7 @@ services:
       - /run/user/1000/podman/podman.sock:/var/run/docker.sock:Z
 
   ts-frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
+    build: frontend
     environment:
       - HOST=0.0.0.0
       - PORT=3000

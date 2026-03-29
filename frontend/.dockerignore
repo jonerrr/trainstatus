@@ -8,6 +8,7 @@ tests
 .npmrc
 .prettierignore
 .prettierrc
+mise.toml
 Dockerfile
 playwright.config.ts
 .env

@@ -2,10 +2,9 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
+	import type { StopTime } from '$lib/client';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time, open_modal } from '$lib/url_params.svelte';
-
-	import type { StopTime } from '@trainstatus/client';
 
 	interface Props {
 		transfer_stop_times: StopTime[];

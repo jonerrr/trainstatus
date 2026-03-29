@@ -16,7 +16,6 @@ RUN set -eux; \
 
 FROM scratch
 
-# COPY --from=builder /assets /assets
 COPY --from=builder /assets/fonts /fonts
 COPY --from=builder /assets/sprites /sprites
 COPY --from=builder /assets/styles /styles

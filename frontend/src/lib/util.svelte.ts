@@ -1,4 +1,4 @@
-import type { RouteStop, Stop } from '@trainstatus/client';
+import type { RouteStop, Stop } from '$lib/client';
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {

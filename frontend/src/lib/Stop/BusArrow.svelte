@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { CompassDirection } from '$lib/client';
+
 	import {
 		ArrowDown,
 		ArrowDownLeft,
@@ -9,7 +11,6 @@
 		ArrowUpLeft,
 		ArrowUpRight
 	} from '@lucide/svelte';
-	import type { CompassDirection } from '@trainstatus/client';
 
 	const { direction, size = '1.5rem' }: { direction: CompassDirection; size?: string } = $props();
 </script>

@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+import type { Source } from '$lib/client';
 import {
 	LiveResource,
 	type StopTimeResource,
@@ -8,8 +9,6 @@ import {
 	source_info
 } from '$lib/resources/index.svelte';
 import { current_time } from '$lib/url_params.svelte';
-
-import type { Source } from '@trainstatus/client';
 
 export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): StopTimeResource<S> {
 	const by_trip_id = new SvelteMap<string, TypedStopTime<S>[]>();

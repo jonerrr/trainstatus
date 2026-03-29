@@ -2,13 +2,13 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
+	import { type Source, type Stop } from '$lib/client';
 	import { stop_pins } from '$lib/pins.svelte';
 	import { StopSearch } from '$lib/search.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { calculate_stop_height } from '$lib/util.svelte';
 
 	import { CircleX, Search } from '@lucide/svelte';
-	import { type Source, type Stop } from '@trainstatus/client';
 	import { Throttled } from 'runed';
 
 	let selected_source = $state(

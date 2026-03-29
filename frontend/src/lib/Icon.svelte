@@ -1,9 +1,8 @@
 <script lang="ts">
+	import { type Route } from '$lib/client';
 	import icons from '$lib/icons';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
-
-	import { type Route } from '@trainstatus/client';
 
 	const {
 		route,

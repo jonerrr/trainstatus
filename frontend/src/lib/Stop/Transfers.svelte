@@ -3,10 +3,9 @@
 
 	import Icon from '$lib/Icon.svelte';
 	import BusArrow from '$lib/Stop/BusArrow.svelte';
+	import type { CompassDirection, Source, Stop, Transfer } from '$lib/client';
 	import { open_modal } from '$lib/url_params.svelte';
 	import { main_route_stops } from '$lib/util.svelte';
-
-	import type { CompassDirection, Source, Stop, Transfer } from '@trainstatus/client';
 
 	interface Props {
 		stop_source: Source;

@@ -8,13 +8,13 @@
 	import ModalList from '$lib/ModalList.svelte';
 	import Transfers from '$lib/Trip/Transfers.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
+	import type { StopTime, Trip } from '$lib/client';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
 	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
-	import type { StopTime, Trip } from '@trainstatus/client';
 
 	// TODO: standardize modal props so we can simplify the parent modal component
 	interface Props {

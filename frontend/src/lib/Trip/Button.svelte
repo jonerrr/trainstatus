@@ -2,12 +2,12 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
+	import type { Trip } from '$lib/client';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';
-	import type { Trip } from '@trainstatus/client';
 
 	interface Props {
 		data: Trip;

@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import type { Source } from '$lib/client';
 import {
 	LiveResource,
 	type PositionResource,
@@ -9,8 +10,6 @@ import {
 	source_info
 } from '$lib/resources/index.svelte';
 import { current_time } from '$lib/url_params.svelte';
-
-import type { Source } from '@trainstatus/client';
 
 export function index_positions<S extends Source>(
 	data: TypedVehiclePosition<S>[]

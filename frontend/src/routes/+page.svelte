@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 
 	import List from '$lib/List.svelte';
+	import type { Route, Source, Stop, Trip } from '$lib/client';
 	import { route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import {
@@ -12,7 +13,6 @@
 	} from '$lib/util.svelte';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
-	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
 
 	const all_trips = trip_context.get();
 

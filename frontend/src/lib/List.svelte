@@ -12,12 +12,11 @@
 	import RouteButton from '$lib/Route/Button.svelte';
 	import StopButton from '$lib/Stop/Button.svelte';
 	import TripButton from '$lib/Trip/Button.svelte';
+	import type { Route, Source, Stop, Trip } from '$lib/client';
 	import type { Pins } from '$lib/pins.svelte';
 	import { source_info } from '$lib/resources/index.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
-
-	import type { Route, Source, Stop, Trip } from '@trainstatus/client';
 
 	type ItemType = 'stop' | 'route' | 'trip';
 
