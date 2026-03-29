@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/jonerrr/trainstatus/compare/backend-v1.1.2...backend-v1.1.3) (2026-03-29)
+
+
+### Bug Fixes
+
+* **mta_bus:** get route geom from stop group polylines ([1d9e350](https://github.com/jonerrr/trainstatus/commit/1d9e350ac76bdf492208df42f3851bdf8193c7c8))
+
 ## [1.1.2](https://github.com/jonerrr/trainstatus/compare/backend-v1.1.1...backend-v1.1.2) (2026-03-25)
 
 
