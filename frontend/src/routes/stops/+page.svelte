@@ -51,7 +51,7 @@
 		const route = page.data.routes_by_id[selected_source.current]?.[id_check];
 		if (route) {
 			const new_stops: Stop[] = [];
-			// store sequences for sorting later
+			// store stop sequences by stop ID for sorting later
 			const route_stop_sequences: Record<string, number> = {};
 
 			for (const s of page.data.stops[selected_source.current] ?? []) {

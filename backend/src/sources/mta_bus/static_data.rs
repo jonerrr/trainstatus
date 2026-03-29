@@ -23,50 +23,20 @@ use crate::{
 
 // TODO: check etag and only re-import if changed
 /// OpenData SODA2 query URL for fetching bus routes with their geometries (as GeoJSON).
-const ROUTES_URL: &str = "https://data.ny.gov/resource/bzwk-3hb4.geojson?$query=SELECT%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%0AWHERE%20caseless_one_of(%60in_effect%60%2C%20%22true%22)%0AGROUP%20BY%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%20LIMIT%2050000";
+// const ROUTES_URL: &str = "https://data.ny.gov/resource/bzwk-3hb4.geojson?$query=SELECT%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%0AWHERE%20caseless_one_of(%60in_effect%60%2C%20%22true%22)%0AGROUP%20BY%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%20LIMIT%2050000";
 
 /// Maximum distance (in meters) allowed when pairing opposite-direction stops.
 const MAX_OPPOSITE_DIST: f64 = 500.0;
 
 pub struct MtaBusStatic {
-    valhalla: Arc<ValhallaManager>,
+    _valhalla: Arc<ValhallaManager>,
 }
 
 impl MtaBusStatic {
     pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
-        Self { valhalla }
-    }
-
-    async fn snap_route_geometry(
-        &self,
-        route_id: &str,
-        route_geom: &MultiLineString,
-    ) -> MultiLineString {
-        // TODO: fix some routes that end up with broken segments. For example B25 on fulton
-        // maybe try sending the entire linestring but adding the break param
-        let mut snapped = Vec::with_capacity(route_geom.0.len());
-
-        for (line_index, line) in route_geom.0.iter().enumerate() {
-            if line.0.len() < 2 {
-                snapped.push(line.clone());
-                continue;
-            }
-
-            match self.valhalla.trace_route(line).await {
-                Ok(snapped_line) => snapped.push(snapped_line),
-                Err(err) => {
-                    tracing::warn!(
-                        route_id,
-                        line_index,
-                        error = %err,
-                        "MTA bus route snapping failed; preserving original linestring"
-                    );
-                    snapped.push(line.clone());
-                }
-            }
+        Self {
+            _valhalla: valhalla,
         }
-
-        MultiLineString::new(snapped)
     }
 }
 
@@ -131,18 +101,6 @@ impl MtaBusStatic {
         let proj_wgs84 = Proj::from_epsg_code(4326).context("Failed to create WGS84 proj")?;
         let proj_ny = Proj::from_epsg_code(6538).context("Failed to create NY proj")?;
 
-        // Keep Valhalla warm while this import's snapping pass is active.
-        let _import_snap_usage = match self.valhalla.acquire_usage().await {
-            Ok(lease) => Some(lease),
-            Err(err) => {
-                tracing::warn!(
-                    error = %err,
-                    "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
-                );
-                None
-            }
-        };
-
         for mut route in all_routes.into_iter() {
             // Get the stops for the route
             let r_stops = match BusRouteStops::get(&route.id).await {
@@ -164,16 +122,15 @@ impl MtaBusStatic {
 
             let shuttle = route.route_type == 711;
 
-            // Combine all the polylines into one MultiLineString
+            // Build route geometry from each direction's stop-group polylines.
+            let stop_groups = &r_stops.entry.stop_groupings[0].stop_groups;
+            // TODO: add back geom snapping but do each polyline segment separately
             let route_geom = MultiLineString::new(
-                r_stops
-                    .entry
-                    .polylines
+                stop_groups
                     .iter()
-                    .map(|p| p.points.clone())
+                    .flat_map(|group| group.polylines.iter().map(|p| p.points.clone()))
                     .collect::<Vec<LineString>>(),
             );
-            let snapped_geom = self.snap_route_geometry(&route.id, &route_geom).await;
 
             if route.color.is_empty() {
                 tracing::warn!("No color for bus route {}. Setting to white", route.id);
@@ -188,7 +145,7 @@ impl MtaBusStatic {
                 short_name: route.short_name,
                 color: route.color,
                 data: RouteData::MtaBus(MtaBusRouteData { shuttle }),
-                geom: Some(snapped_geom.into()),
+                geom: Some(route_geom.into()),
             });
 
             // --- Opposite-stop matching ---
@@ -207,7 +164,6 @@ impl MtaBusStatic {
                 .collect();
 
             // Extract direction-0 and direction-1 stop ID lists for this route.
-            let stop_groups = &r_stops.entry.stop_groupings[0].stop_groups;
             let dir0_ids: Vec<i32> = stop_groups
                 .iter()
                 .find(|g| g.id == 0)
@@ -241,10 +197,9 @@ impl MtaBusStatic {
 
             stops.extend(new_stops);
 
-            // Parse and collect the route stops for each group/direction
-            let route_stops_g = r_stops.entry.stop_groupings[0]
-                .stop_groups
-                .par_iter()
+            // Parse and collect route stops for each group/direction.
+            let group_route_stops = stop_groups
+                .iter()
                 .map(|rs| {
                     let route_id = &route.id;
 
@@ -266,7 +221,7 @@ impl MtaBusStatic {
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
-            route_stops.extend(route_stops_g.into_iter().flatten());
+            route_stops.extend(group_route_stops.into_iter().flatten());
 
             pb.set_prefix(route.id);
             pb.inc(1);
@@ -403,7 +358,7 @@ struct BusRouteStops {
 struct Entry {
     #[serde(rename = "stopGroupings")]
     stop_groupings: Vec<StopGrouping>,
-    polylines: Vec<PolyLine>,
+    // polylines: Vec<PolyLine>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -420,6 +375,7 @@ struct StopGroup {
     name: StopName,
     #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
     stop_ids: Vec<i32>,
+    polylines: Vec<PolyLine>,
 }
 
 #[derive(Deserialize, Clone)]
