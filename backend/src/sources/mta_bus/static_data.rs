@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
+use futures::FutureExt;
 use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
 use indicatif::{ProgressBar, ProgressStyle};
 use proj4rs::{Proj, transform::transform};
@@ -16,9 +17,13 @@ use crate::{
         stop::{CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     mta_oba_api_key,
-    sources::{StaticAdapter, normalize_title},
+    sources::{StaticAdapter, mta_bus::AGENCIES, normalize_title},
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
+
+// TODO: check etag and only re-import if changed
+/// OpenData SODA2 query URL for fetching bus routes with their geometries (as GeoJSON).
+const ROUTES_URL: &str = "https://data.ny.gov/resource/bzwk-3hb4.geojson?$query=SELECT%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%0AWHERE%20caseless_one_of(%60in_effect%60%2C%20%22true%22)%0AGROUP%20BY%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%20LIMIT%2050000";
 
 /// Maximum distance (in meters) allowed when pairing opposite-direction stops.
 const MAX_OPPOSITE_DIST: f64 = 500.0;
@@ -348,33 +353,43 @@ struct AgencyBusRoute {
 }
 
 impl AgencyBusRoute {
-    async fn get_all() -> anyhow::Result<Vec<Self>> {
-        let client = reqwest::Client::new();
-
-        // Get routes from both agencies
-        let nyct_routes: serde_json::Value = client
-            .get("https://bustime.mta.info/api/where/routes-for-agency/MTA%20NYCT.json")
+    async fn get_agency_routes(agency: &str) -> anyhow::Result<Vec<Self>> {
+        let url = format!(
+            "https://bustime.mta.info/api/where/routes-for-agency/{}.json",
+            agency
+        );
+        let response = reqwest::Client::new()
+            .get(&url)
             .query(&[("key", mta_oba_api_key())])
             .send()
             .await?
             .json::<serde_json::Value>()
             .await?;
 
-        let bc_routes: serde_json::Value = client
-            .get("https://bustime.mta.info/api/where/routes-for-agency/MTABC.json")
-            .query(&[("key", mta_oba_api_key())])
-            .send()
-            .await?
-            .json::<serde_json::Value>()
-            .await?;
-
-        // Combine the two lists
-        let mut routes: Vec<Self> = serde_json::from_value(nyct_routes["data"]["list"].to_owned())?;
-        routes.extend(serde_json::from_value::<Vec<Self>>(
-            bc_routes["data"]["list"].to_owned(),
-        )?);
-
+        let routes = serde_json::from_value(response["data"]["list"].to_owned())?;
         Ok(routes)
+    }
+
+    async fn get_all() -> anyhow::Result<Vec<Self>> {
+        let futures = AGENCIES.iter().map(|agency| {
+            Self::get_agency_routes(agency).map(move |res| {
+                res.context(format!("Failed to fetch routes for agency {}", agency))
+            })
+        });
+
+        Ok(futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .map(|res| match res {
+                Ok(routes) => routes,
+                Err(err) => {
+                    // TODO: probably want to bubble this up instead of silently skipping, but for now we'll just log and skip
+                    tracing::error!(error = %err, "Failed to fetch routes for an agency");
+                    vec![]
+                }
+            })
+            .flatten()
+            .collect())
     }
 }
 
