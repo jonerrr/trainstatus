@@ -1,4 +1,4 @@
-FROM node:25-alpine@sha256:5209bcaca9836eb3448b650396213dbe9d9a34d31840c2ae1f206cb2986a8543 AS build
+FROM node:25-alpine@sha256:cf38e1f3c28ac9d81cdc0c51d8220320b3b618780e44ef96a39f76f7dbfef023 AS build
 
 RUN npm install -g pnpm
 
@@ -12,7 +12,7 @@ COPY client ./client
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter frontend build
 
-FROM node:25-alpine@sha256:5209bcaca9836eb3448b650396213dbe9d9a34d31840c2ae1f206cb2986a8543
+FROM node:25-alpine@sha256:cf38e1f3c28ac9d81cdc0c51d8220320b3b618780e44ef96a39f76f7dbfef023
 
 WORKDIR /app/frontend
 COPY --from=build /app/node_modules /app/node_modules
