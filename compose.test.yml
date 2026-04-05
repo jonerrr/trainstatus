@@ -55,7 +55,7 @@ services:
       - traefik.http.services.backend.loadbalancer.server.port=3055
 
   geo-data:
-    image: ghcr.io/jonerrr/trainstatus-geo-data:latest@sha256:6296a3b25e1edcd74369b56a0da037c982d0f8d7a7d8ca01e3ec2a2946321198
+    image: ghcr.io/jonerrr/trainstatus-geo-data:latest@sha256:c5425f75bdf499285a4582e2925801a7bf099ef64f4700a77e6551ec0ef0865e
     pull_policy: always
     restart: "no"
     volumes:
