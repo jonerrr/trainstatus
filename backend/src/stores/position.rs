@@ -91,7 +91,7 @@ impl PositionStore {
     }
 
     /// Bulk upsert vehicle positions (updates current state only, no history)
-    /// A database trigger automatically updates trip_geometry when positions with trip_id and geom are upserted
+    /// A database trigger appends trip history points when positions with trip_id and geom are upserted
     #[tracing::instrument(skip(self, positions), fields(source = %source.as_str(), count = positions.len()), level = "debug")]
     pub async fn save_vehicle_positions(
         &self,

@@ -360,7 +360,7 @@ impl RealtimeAdapter for MtaBusRealtime {
 
         // 5. Link positions to trips via vehicle_id
         // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
-        // The database trigger will automatically update trip_geometry
+        // The database trigger will automatically append trip history points
         for position in &mut positions {
             if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id) {
                 // Translate input_id to actual DB id
@@ -370,7 +370,7 @@ impl RealtimeAdapter for MtaBusRealtime {
             }
         }
 
-        // 6. Save positions (trigger handles trip_geometry automatically)
+        // 6. Save positions (trigger appends trip history points automatically)
         position_store
             .save_vehicle_positions(GtfsSource::source(self), &positions)
             .await?;

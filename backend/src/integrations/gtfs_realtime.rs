@@ -171,7 +171,7 @@ pub async fn run_pipeline<T: GtfsSource>(
         }
     }
 
-    // Save positions (trigger handles trip_geometry automatically for positions with trip_id and geom)
+    // Save positions (trigger appends trip history points for positions with trip_id and geom)
     position_store
         .save_vehicle_positions(adapter.source(), &positions)
         .await?;
