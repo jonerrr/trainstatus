@@ -227,7 +227,7 @@ fn spawn_import(
             )
             .await;
 
-        if let Ok(_) = &result {
+        if result.is_ok() {
             info!("Import successful");
             let _ = sqlx::query!(
                 "UPDATE source SET updated_at = NOW() WHERE id = $1",

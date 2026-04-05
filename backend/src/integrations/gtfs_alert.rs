@@ -5,6 +5,13 @@ use crate::stores::alert::AlertStore;
 use async_trait::async_trait;
 use tracing::{debug, info, instrument, warn};
 
+type ProcessedAlert = (
+    Alert,
+    Vec<AlertTranslation>,
+    Vec<ActivePeriod>,
+    Vec<AffectedEntity>,
+);
+
 #[async_trait]
 pub trait GtfsAlertSource: Send + Sync {
     fn source(&self) -> Source;
@@ -15,16 +22,7 @@ pub trait GtfsAlertSource: Send + Sync {
     /// Process a GTFS-RT alert into our internal Alert representation.
     /// Returns None if the alert should be skipped (e.g., missing mercury extension).
     /// The entity_id is the original entity ID from the feed.
-    fn process_alert(
-        &self,
-        entity_id: String,
-        alert: GtfsAlert,
-    ) -> Option<(
-        Alert,
-        Vec<AlertTranslation>,
-        Vec<ActivePeriod>,
-        Vec<AffectedEntity>,
-    )>;
+    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<ProcessedAlert>;
 
     /// Parse route_id for this source (e.g., convert "SS" to "SI" for subway)
     fn parse_route_id(&self, route_id: String) -> Option<String> {

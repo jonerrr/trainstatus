@@ -1,4 +1,4 @@
-use crate::{AppState, models::source::Source};
+use crate::AppState;
 use axum::{
     extract::{FromRequestParts, Query},
     response::{IntoResponse, Response},
@@ -119,17 +119,17 @@ where
 //     }
 // }
 
-#[derive(Deserialize, IntoParams)]
-pub struct Parameters {
-    /// Data source
-    source: Source,
-    // /// Return in GeoJSON format instead of JSON
-    // #[serde(default)]
-    // geojson: bool,
-    // /// Filter by route type. If none provided, all routes are returned.
-    // #[serde(default)]
-    // route_type: Option<route::RouteType>,
-}
+// #[derive(Deserialize, IntoParams)]
+// pub struct Parameters {
+//     /// Data source
+//     source: Source,
+//     // /// Return in GeoJSON format instead of JSON
+//     // #[serde(default)]
+//     // geojson: bool,
+//     // /// Filter by route type. If none provided, all routes are returned.
+//     // #[serde(default)]
+//     // route_type: Option<route::RouteType>,
+// }
 
 // this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
 // #[derive(Debug)]

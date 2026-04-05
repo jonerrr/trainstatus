@@ -22,7 +22,7 @@ use crate::{
 };
 
 // TODO: check etag and only re-import if changed
-/// OpenData SODA2 query URL for fetching bus routes with their geometries (as GeoJSON).
+// /// OpenData SODA2 query URL for fetching bus routes with their geometries (as GeoJSON).
 // const ROUTES_URL: &str = "https://data.ny.gov/resource/bzwk-3hb4.geojson?$query=SELECT%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%0AWHERE%20caseless_one_of(%60in_effect%60%2C%20%22true%22)%0AGROUP%20BY%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%20LIMIT%2050000";
 
 /// Maximum distance (in meters) allowed when pairing opposite-direction stops.
@@ -376,7 +376,7 @@ impl AgencyBusRoute {
         Ok(futures::future::join_all(futures)
             .await
             .into_iter()
-            .map(|res| match res {
+            .flat_map(|res| match res {
                 Ok(routes) => routes,
                 Err(err) => {
                     // TODO: probably want to bubble this up instead of silently skipping, but for now we'll just log and skip
@@ -384,7 +384,6 @@ impl AgencyBusRoute {
                     vec![]
                 }
             })
-            .flatten()
             .collect())
     }
 }

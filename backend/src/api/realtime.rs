@@ -1,4 +1,4 @@
-use super::{AppError, AppState, CurrentTime, Parameters, TimeParams, parse_list};
+use super::{AppError, AppState, CurrentTime, TimeParams, parse_list};
 use crate::models::position::VehiclePosition;
 use crate::models::source::Source;
 use crate::models::trip::StopTime;
@@ -50,7 +50,7 @@ pub struct StopTimesParameters {
     path = "/stop_times/{source}",
     tag = "REALTIME",
     params(
-        Parameters,
+        ("source" = Source, Path, description = "Data source"),
         StopTimesParameters,
         TimeParams
     ),

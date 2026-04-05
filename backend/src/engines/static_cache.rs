@@ -67,18 +67,19 @@ fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs)
 
     let mut runs = false;
 
-    if let Some(cal) = calendar {
-        if date >= cal.start_date && date <= cal.end_date {
-            runs = match date.weekday() {
-                chrono::Weekday::Mon => cal.monday,
-                chrono::Weekday::Tue => cal.tuesday,
-                chrono::Weekday::Wed => cal.wednesday,
-                chrono::Weekday::Thu => cal.thursday,
-                chrono::Weekday::Fri => cal.friday,
-                chrono::Weekday::Sat => cal.saturday,
-                chrono::Weekday::Sun => cal.sunday,
-            };
-        }
+    if let Some(cal) = calendar
+        && date >= cal.start_date
+        && date <= cal.end_date
+    {
+        runs = match date.weekday() {
+            chrono::Weekday::Mon => cal.monday,
+            chrono::Weekday::Tue => cal.tuesday,
+            chrono::Weekday::Wed => cal.wednesday,
+            chrono::Weekday::Thu => cal.thursday,
+            chrono::Weekday::Fri => cal.friday,
+            chrono::Weekday::Sat => cal.saturday,
+            chrono::Weekday::Sun => cal.sunday,
+        };
     }
 
     if let Some(dates) = calendar_dates {
@@ -96,9 +97,9 @@ fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs)
 }
 
 fn calculate_datetime(date: NaiveDate, seconds_since_midnight: u32) -> Option<DateTime<Utc>> {
-    let hours = (seconds_since_midnight / 3600) as u32;
-    let minutes = ((seconds_since_midnight % 3600) / 60) as u32;
-    let seconds = (seconds_since_midnight % 60) as u32;
+    let hours = seconds_since_midnight / 3600;
+    let minutes = (seconds_since_midnight % 3600) / 60;
+    let seconds = seconds_since_midnight % 60;
 
     // Handle times > 24:00:00 (GTFS allows this)
     let (extra_days, hours) = (hours / 24, hours % 24);
