@@ -29,14 +29,42 @@ use crate::{
 const MAX_OPPOSITE_DIST: f64 = 500.0;
 
 pub struct MtaBusStatic {
-    _valhalla: Arc<ValhallaManager>,
+    valhalla: Arc<ValhallaManager>,
 }
 
 impl MtaBusStatic {
     pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
-        Self {
-            _valhalla: valhalla,
+        Self { valhalla }
+    }
+
+    async fn snap_route_geometry(
+        &self,
+        route_id: &str,
+        route_geom: &MultiLineString,
+    ) -> MultiLineString {
+        let mut snapped = Vec::with_capacity(route_geom.0.len());
+
+        for (line_index, line) in route_geom.0.iter().enumerate() {
+            if line.0.len() < 2 {
+                snapped.push(line.clone());
+                continue;
+            }
+
+            match self.valhalla.trace_route(line).await {
+                Ok(snapped_line) => snapped.push(snapped_line),
+                Err(err) => {
+                    tracing::warn!(
+                        route_id,
+                        line_index,
+                        error = %err,
+                        "MTA bus route snapping failed; preserving original linestring"
+                    );
+                    snapped.push(line.clone());
+                }
+            }
         }
+
+        MultiLineString::new(snapped)
     }
 }
 
@@ -101,6 +129,18 @@ impl MtaBusStatic {
         let proj_wgs84 = Proj::from_epsg_code(4326).context("Failed to create WGS84 proj")?;
         let proj_ny = Proj::from_epsg_code(6538).context("Failed to create NY proj")?;
 
+        // Keep Valhalla warm while this import's snapping pass is active.
+        let _import_snap_usage = match self.valhalla.acquire_usage().await {
+            Ok(lease) => Some(lease),
+            Err(err) => {
+                tracing::warn!(
+                    error = %err,
+                    "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
+                );
+                None
+            }
+        };
+
         for mut route in all_routes.into_iter() {
             // Get the stops for the route
             let r_stops = match BusRouteStops::get(&route.id).await {
@@ -124,13 +164,14 @@ impl MtaBusStatic {
 
             // Build route geometry from each direction's stop-group polylines.
             let stop_groups = &r_stops.entry.stop_groupings[0].stop_groups;
-            // TODO: add back geom snapping but do each polyline segment separately
+
             let route_geom = MultiLineString::new(
                 stop_groups
                     .iter()
                     .flat_map(|group| group.polylines.iter().map(|p| p.points.clone()))
                     .collect::<Vec<LineString>>(),
             );
+            let route_geom = self.snap_route_geometry(&route.id, &route_geom).await;
 
             if route.color.is_empty() {
                 tracing::warn!("No color for bus route {}. Setting to white", route.id);
