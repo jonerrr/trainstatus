@@ -27,7 +27,7 @@ pub struct Route {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct MtaBusData {
+pub struct MtaBusRouteData {
     pub shuttle: bool,
 }
 
@@ -35,7 +35,7 @@ pub struct MtaBusData {
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum RouteData {
-    MtaBus(MtaBusData),
+    MtaBus(MtaBusRouteData),
     MtaSubway,
     NjtBus,
 }
@@ -44,7 +44,7 @@ impl_discriminated_data!(
     RouteData,
     Source,
     {
-        MtaBus => MtaBusData,
+        MtaBus => MtaBusRouteData,
         MtaSubway,
         NjtBus,
     }

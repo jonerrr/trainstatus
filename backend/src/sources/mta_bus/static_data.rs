@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     engines::valhalla::ValhallaManager,
     models::{
-        route::{MtaBusData as MtaBusRouteData, Route, RouteData},
+        route::{MtaBusRouteData, Route, RouteData},
         source::Source,
         stop::{CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
