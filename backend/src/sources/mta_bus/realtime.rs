@@ -413,3 +413,53 @@ fn parse_bus_origin_time(trip_id: &str) -> Option<NaiveTime> {
 
     parse_origin_time(time_num)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::feed::FeedMessage;
+    use crate::stores::static_cache::StaticCacheStore;
+    use bb8_redis::RedisConnectionManager;
+    use prost::Message;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn load_fixture(path: &str) -> FeedMessage {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("tests/fixtures");
+        d.push(path);
+        let bytes = fs::read(d).expect("Failed to read fixture file");
+        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
+    }
+
+    #[tokio::test]
+    async fn test_process_bus_trip_from_fixture() {
+        let fixture = load_fixture("mta_bus/mta_bus-trips.pb");
+        let adapter = MtaBusRealtime;
+        
+        let mut trip_count = 0;
+        for entity in fixture.entity {
+            if let Some(update) = entity.trip_update {
+                let manager = RedisConnectionManager::new("redis://localhost").unwrap();
+                let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
+                let cache = StaticCacheStore::new(redis_pool);
+
+                let (trip, stop_times) = adapter.process_trip(update, &cache).await;
+                if let Some(trip) = trip {
+                    trip_count += 1;
+                    assert!(!trip.original_id.is_empty());
+                    assert!(!trip.vehicle_id.is_empty());
+                    // MTA Bus direction is usually 0 or 1
+                    assert!(trip.direction == 0 || trip.direction == 1);
+                    
+                    if !stop_times.is_empty() {
+                        let st = &stop_times[0];
+                        assert_eq!(st.trip_id, trip.id);
+                        assert!(!st.stop_id.is_empty());
+                    }
+                }
+            }
+        }
+        assert!(trip_count > 0, "Should have processed at least one bus trip from fixture");
+    }
+}

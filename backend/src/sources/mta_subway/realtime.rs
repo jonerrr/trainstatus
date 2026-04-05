@@ -333,3 +333,57 @@ pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
     let s = (normalized % 60) as u32;
     NaiveTime::from_hms_opt(h, m, s)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::feed::FeedMessage;
+    use crate::stores::static_cache::StaticCacheStore;
+    use bb8_redis::RedisConnectionManager;
+    use prost::Message;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn load_fixture(path: &str) -> FeedMessage {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("tests/fixtures");
+        d.push(path);
+        let bytes = fs::read(d).expect("Failed to read fixture file");
+        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
+    }
+
+    #[tokio::test]
+    async fn test_process_subway_trip_from_fixture() {
+        let fixture = load_fixture("mta_subway/mta_subway-ace.pb");
+        let adapter = MtaSubwayRealtime;
+        
+        // We don't need a real redis for this unit test as _static_cache_store is unused in subway process_trip
+        // but we need a placeholder if we were to call it. 
+        // For now, subway doesn't use it.
+        
+        let mut trip_count = 0;
+        for entity in fixture.entity {
+            if let Some(update) = entity.trip_update {
+                let manager = RedisConnectionManager::new("redis://localhost").unwrap();
+                let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
+                let cache = StaticCacheStore::new(redis_pool);
+
+                let (trip, stop_times) = adapter.process_trip(update, &cache).await;
+                if let Some(trip) = trip {
+                    trip_count += 1;
+                    assert!(!trip.original_id.is_empty());
+                    assert!(!trip.vehicle_id.is_empty());
+                    // MTA Subway direction is usually 1 or 3
+                    assert!(trip.direction == 1 || trip.direction == 3);
+                    
+                    if !stop_times.is_empty() {
+                        let st = &stop_times[0];
+                        assert_eq!(st.trip_id, trip.id);
+                        assert!(!st.stop_id.is_empty());
+                    }
+                }
+            }
+        }
+        assert!(trip_count > 0, "Should have processed at least one trip from fixture");
+    }
+}

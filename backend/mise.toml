@@ -11,6 +11,10 @@ run = "sqlx migrate run"
 depends = ["//backend:migrate"]
 run = "cargo run"
 
+[tasks.test]
+env = { SQLX_OFFLINE = "true", DATABASE_URL = "postgres://trains:trains@localhost:5432/trains" }
+run = "cargo test"
+
 [tasks.reset-db]
 confirm = "Are you sure?"
 run = """

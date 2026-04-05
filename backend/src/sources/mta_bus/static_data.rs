@@ -384,6 +384,7 @@ struct StopName {
     name: String,
 }
 
+// TODO: double check which polylines im using / combining. I think i should be looking at a different field
 #[derive(Deserialize, Clone)]
 struct PolyLine {
     #[serde(deserialize_with = "de_polyline")]

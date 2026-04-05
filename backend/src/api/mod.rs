@@ -39,6 +39,7 @@ where
 
 pub fn router(state: AppState) -> OpenApiRouter {
     OpenApiRouter::new()
+        .route("/health", axum::routing::get(|| async { "OK" }))
         .routes(routes!(static_data::routes_handler))
         .routes(routes!(static_data::stops_handler))
         .routes(routes!(realtime::trips_handler))
