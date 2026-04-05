@@ -1,13 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
-    sync::Arc,
     time::Duration,
 };
 
 use crate::{
     engines::static_cache::expand_gtfs,
-    engines::valhalla::ValhallaManager,
     models::{
         route::{Route, RouteData},
         source::Source,
@@ -38,42 +36,44 @@ struct BusRoute {
     bus_route_description: String,
 }
 
-pub struct NjtBusStatic {
-    valhalla: Arc<ValhallaManager>,
-}
+pub struct NjtBusStatic;
+// pub struct NjtBusStatic {
+//     valhalla: Arc<ValhallaManager>,
+// }
 
 impl NjtBusStatic {
-    pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
-        Self { valhalla }
-    }
+    // pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
+    //     Self { valhalla }
+    // }
 
-    async fn snap_route_geometries(&self, route_geometries: &mut HashMap<String, MultiLineString>) {
-        for (route_id, geometry) in route_geometries.iter_mut() {
-            let mut snapped_lines = Vec::with_capacity(geometry.0.len());
+    // Valhalla kept having issues snapping some routes. So disabling for now.
+    // async fn snap_route_geometries(&self, route_geometries: &mut HashMap<String, MultiLineString>) {
+    //     for (route_id, geometry) in route_geometries.iter_mut() {
+    //         let mut snapped_lines = Vec::with_capacity(geometry.0.len());
 
-            for (line_index, line) in geometry.0.iter().enumerate() {
-                if line.0.len() < 2 {
-                    snapped_lines.push(line.clone());
-                    continue;
-                }
+    //         for (line_index, line) in geometry.0.iter().enumerate() {
+    //             if line.0.len() < 2 {
+    //                 snapped_lines.push(line.clone());
+    //                 continue;
+    //             }
 
-                match self.valhalla.trace_route(line).await {
-                    Ok(snapped_line) => snapped_lines.push(snapped_line),
-                    Err(err) => {
-                        tracing::warn!(
-                            route_id,
-                            line_index,
-                            error = %err,
-                            "NJT bus route snapping failed; preserving original linestring"
-                        );
-                        snapped_lines.push(line.clone());
-                    }
-                }
-            }
+    //             match self.valhalla.trace_route(line).await {
+    //                 Ok(snapped_line) => snapped_lines.push(snapped_line),
+    //                 Err(err) => {
+    //                     tracing::warn!(
+    //                         route_id,
+    //                         line_index,
+    //                         error = %err,
+    //                         "NJT bus route snapping failed; preserving original linestring"
+    //                     );
+    //                     snapped_lines.push(line.clone());
+    //                 }
+    //             }
+    //         }
 
-            *geometry = MultiLineString::new(snapped_lines);
-        }
-    }
+    //         *geometry = MultiLineString::new(snapped_lines);
+    //     }
+    // }
 }
 
 #[async_trait]
@@ -131,21 +131,21 @@ impl StaticAdapter for NjtBusStatic {
             .context("Failed to fetch BUSDV2 route metadata")?;
 
         // TODO: either fix or remove valhalla route snapping for njt bus
-        let mut route_geom_map = fetch_route_geometries(&bus_routes, &gtfs)
+        let route_geom_map = fetch_route_geometries(&bus_routes, &gtfs)
             .await
             .context("Failed to fetch NJT route geometries")?;
 
         // Keep Valhalla warm while this import's snapping pass is active.
-        let _import_snap_usage = match self.valhalla.acquire_usage().await {
-            Ok(lease) => Some(lease),
-            Err(err) => {
-                tracing::warn!(
-                    error = %err,
-                    "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
-                );
-                None
-            }
-        };
+        // let _import_snap_usage = match self.valhalla.acquire_usage().await {
+        //     Ok(lease) => Some(lease),
+        //     Err(err) => {
+        //         tracing::warn!(
+        //             error = %err,
+        //             "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
+        //         );
+        //         None
+        //     }
+        // };
 
         // self.snap_route_geometries(&mut route_geom_map).await;
 

@@ -9,12 +9,7 @@ use axum::{
 use bb8_redis::RedisConnectionManager;
 use http::{HeaderValue, Method, StatusCode, request::Parts};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{
-    convert::Infallible,
-    env::var,
-    sync::Arc,
-    time::Duration,
-};
+use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
 use tokio::{
     signal,
     sync::broadcast::{self, Sender},
@@ -32,12 +27,12 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 use backend::{
-    AppState, VERSION, api_prefix, debug_rt_data, mta_oba_api_key, prefixed_path, valhalla_config,
-    api, engines, models, sources, stores,
+    AppState, VERSION, api, api_prefix, engines, models, prefixed_path, sources,
     sources::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
         njt_bus::realtime::NjtBusRealtime,
     },
+    stores, valhalla_config,
 };
 
 #[tokio::main]
@@ -98,9 +93,7 @@ async fn main() {
         Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
             valhalla_manager.clone(),
         )),
-        Arc::new(sources::njt_bus::static_data::NjtBusStatic::new(
-            valhalla_manager,
-        )),
+        Arc::new(sources::njt_bus::static_data::NjtBusStatic),
     ];
 
     let static_controller = engines::static_data::run(
