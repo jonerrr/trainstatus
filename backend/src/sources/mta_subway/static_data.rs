@@ -2,7 +2,8 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::Point;
+use geo::{Geometry, Point};
+use geojson::FeatureCollection;
 use gtfs_structures::StopTransfer;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer};
@@ -19,6 +20,12 @@ use crate::{
     sources::StaticAdapter,
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
+
+/// URL for MTA subway GTFS data. Note that this GTFS feed is updated infrequently and often missing data, so we also pull from MTA internal APIs for stops and route geometries.
+const GTFS_SCHEDULE_URL: &str = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip";
+
+/// NY OpenData endpoint for route shapes.
+const SERVICE_LINES_GEOM_URL: &str = "https://data.ny.gov/resource/s692-irgq.geojson";
 
 // Deserialize strings to i16
 fn de_str_to_i16<'de, D>(deserializer: D) -> Result<i16, D::Error>
@@ -159,18 +166,20 @@ impl StaticAdapter for MtaSubwayStatic {
         _static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
         // TODO: use gtfsReader to only select wanted files
-        let gtfs = gtfs_structures::Gtfs::from_url_async(
-            "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip",
-        )
-        .await
-        .context("Failed to fetch GTFS data from MTA")?;
+        let gtfs = gtfs_structures::Gtfs::from_url_async(GTFS_SCHEDULE_URL)
+            .await
+            .context("Failed to fetch GTFS data from MTA")?;
 
         let route_ids: Vec<String> = gtfs.routes.keys().cloned().collect();
 
         // gtfs.get_stop("101N").unwrap().transfers.first().unwrap().
 
+        let route_geom_map = Self::create_route_geom_map()
+            .await
+            .context("Failed to fetch route geometries from NY OpenData")?;
+
         // Import routes
-        let routes = Self::import_routes(&gtfs);
+        let routes = Self::import_routes(&gtfs, route_geom_map);
         route_store
             .save_all(Source::MtaSubway, &routes)
             .await
@@ -228,26 +237,61 @@ impl MtaSubwayStatic {
         format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b)
     }
 
+    /// Download and parse the MTA service lines dataset and return a map of route_id to geometry.
+    async fn create_route_geom_map() -> anyhow::Result<HashMap<String, Geometry>> {
+        let geojson: FeatureCollection = reqwest::get(SERVICE_LINES_GEOM_URL).await?.json().await?;
+        let mut geom_map = HashMap::new();
+
+        for feature in geojson.features {
+            let Some(geom) = feature
+                .geometry
+                .and_then(|g| Geometry::<f64>::try_from(g).ok())
+            else {
+                continue;
+            };
+
+            let Some(props) = feature.properties else {
+                continue;
+            };
+
+            let Some(serde_json::Value::String(service)) = props.get("service") else {
+                continue;
+            };
+
+            // hardcode some mappings from service to gtfs route_id
+            let route_id = match service.as_str() {
+                "SF" => "FS",  // Franklin shuttle
+                "ST" => "GS",  // 42nd street shuttle
+                "SR" => "H",   // Far rockaway shuttle
+                "SIR" => "SI", // Staten island railway
+                // TODO: add some warning for unmapped routes / changes in the dataset
+                _ => service,
+            }
+            .to_string();
+
+            geom_map.insert(route_id, geom.into());
+        }
+
+        Ok(geom_map)
+    }
+
     /// Parse routes from GTFS data
-    fn import_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
+    fn import_routes(
+        gtfs: &gtfs_structures::Gtfs,
+        route_geom_map: HashMap<String, Geometry>,
+    ) -> Vec<Route> {
         gtfs.routes
             .values()
             .into_iter()
             .map(|route| {
-                // let geom = gtfs.shapes TODO: parse geom
-                let route_color = match route.id.as_str() {
-                    // SI Color from MTA website
-                    "SI" => "0F61A9".to_string(),
-                    // From GS route color in static GTFS
-                    "FS" | "H" => {
-                        let gs_route = gtfs.routes.get("GS").unwrap();
-                        gs_route
-                            .color
-                            .map(Self::rgb_to_hex)
-                            .unwrap_or_else(|| "00933C".to_string())
-                    }
-                    _ => Self::rgb_to_hex(route.color()),
-                };
+                // TODO: parse geom
+                // Used to have some hardcoded colors. But they finally added them into the GTFS static data
+                let route_color = Self::rgb_to_hex(route.color());
+                let geom = route_geom_map.get(&route.id).cloned().map(|g| g.into());
+
+                if geom.is_none() {
+                    tracing::warn!(route_id = route.id, "No geometry found");
+                }
 
                 Route {
                     id: route.id.clone(),
@@ -256,7 +300,7 @@ impl MtaSubwayStatic {
                     short_name: route.short_name.clone().unwrap(),
                     color: route_color,
                     data: RouteData::MtaSubway,
-                    geom: None,
+                    geom,
                 }
             })
             .collect()
