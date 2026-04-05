@@ -11,7 +11,7 @@ use std::io::Read;
 #[serde(transparent)]
 pub struct Geom(pub geo::Geometry<f64>);
 
-// 2. Implement GeozeroGeometry (delegate to inner)
+// Implement GeozeroGeometry (delegate to inner)
 impl GeozeroGeometry for Geom {
     fn process_geom<P: GeomProcessor>(&self, processor: &mut P) -> Result<()> {
         self.0.process_geom(processor)
@@ -25,7 +25,7 @@ impl GeozeroGeometry for Geom {
     }
 }
 
-// 3. Implement FromWkb (delegate to inner)
+// Implement FromWkb (delegate to inner)
 impl FromWkb for Geom {
     fn from_wkb<R: Read>(rdr: &mut R, dialect: WkbDialect) -> Result<Self> {
         let g = geo::Geometry::from_wkb(rdr, dialect)?;
