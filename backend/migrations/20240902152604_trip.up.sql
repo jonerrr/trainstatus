@@ -41,15 +41,20 @@ CREATE TABLE IF NOT EXISTS realtime.vehicle_position (
 CREATE INDEX idx_vehicle_position_trip_id ON realtime.vehicle_position (trip_id);
 CREATE INDEX idx_vehicle_position_gix ON realtime.vehicle_position USING GIST(geom);
 
--- Trip geometry (LineString that accumulates position points over trip lifetime)
--- Points are appended when new positions come in
-CREATE TABLE IF NOT EXISTS realtime.trip_geometry (
-    trip_id UUID PRIMARY KEY REFERENCES realtime.trip(id) ON DELETE CASCADE,
-    geom geometry(LINESTRING, 4326) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+-- Trip history points
+CREATE TABLE IF NOT EXISTS realtime.trip_history_point (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    trip_id UUID NOT NULL REFERENCES realtime.trip(id) ON DELETE CASCADE,
+    geom geometry(POINT, 4326) NOT NULL,
+    recorded_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE INDEX idx_trip_geometry_gix ON realtime.trip_geometry USING GIST(geom);
+CREATE UNIQUE INDEX idx_trip_history_point_trip_id_recorded_at_geom_unique
+    ON realtime.trip_history_point (trip_id, recorded_at, ST_AsEWKB(geom));
+
+CREATE INDEX idx_trip_history_point_trip_id_recorded_at
+    ON realtime.trip_history_point (trip_id, recorded_at DESC);
+CREATE INDEX idx_trip_history_point_gix ON realtime.trip_history_point USING GIST(geom);
 
 CREATE INDEX idx_trip_created_at ON realtime.trip (created_at);
 

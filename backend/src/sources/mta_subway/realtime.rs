@@ -267,7 +267,7 @@ impl GtfsSource for MtaSubwayRealtime {
         let updated_at = vehicle.timestamp?;
         let updated_at = DateTime::from_timestamp(updated_at as i64, 0)?;
 
-        // Trains don't have GPS coordinates, so no geometry (no trip_geometry created)
+        // Trains don't have GPS coordinates, so no trip history point is created
         Some(VehiclePosition {
             vehicle_id,
             trip_id: None, // Trains don't need trip_id linking since no GPS
