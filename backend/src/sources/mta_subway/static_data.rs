@@ -269,7 +269,7 @@ impl MtaSubwayStatic {
             }
             .to_string();
 
-            geom_map.insert(route_id, geom.into());
+            geom_map.insert(route_id, geom);
         }
 
         Ok(geom_map)
@@ -282,7 +282,6 @@ impl MtaSubwayStatic {
     ) -> Vec<Route> {
         gtfs.routes
             .values()
-            .into_iter()
             .map(|route| {
                 // TODO: parse geom
                 // Used to have some hardcoded colors. But they finally added them into the GTFS static data

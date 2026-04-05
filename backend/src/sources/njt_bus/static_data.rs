@@ -313,7 +313,7 @@ async fn fetch_route_geometries(
             }
             None => {
                 unresolved_line_string_ids += 1;
-                line_string_id.into()
+                line_string_id
             }
         };
 
@@ -501,11 +501,10 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 if !dir0.contains(&st.stop.id) {
                     dir0.push(st.stop.id.clone());
                 }
-            } else if direction == 1 {
-                if !dir1.contains(&st.stop.id) {
+            } else if direction == 1
+                && !dir1.contains(&st.stop.id) {
                     dir1.push(st.stop.id.clone());
                 }
-            }
 
             // Prefer per-stop headsign, fall back to trip headsign
             let raw_headsign = st

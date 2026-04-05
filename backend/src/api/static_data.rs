@@ -25,12 +25,11 @@ fn cache_headers(etag_hash: &str) -> HeaderMap {
 
 /// Returns `true` if the client's `If-None-Match` header matches the stored etag.
 fn etag_matches(request_headers: &HeaderMap, etag_hash: &str) -> bool {
-    if let Some(inm) = request_headers.get(http::header::IF_NONE_MATCH) {
-        if let Ok(inm_str) = inm.to_str() {
+    if let Some(inm) = request_headers.get(http::header::IF_NONE_MATCH)
+        && let Ok(inm_str) = inm.to_str() {
             let quoted = format!("\"{}\"", etag_hash);
             return inm_str == quoted || inm_str == "*";
         }
-    }
     false
 }
 

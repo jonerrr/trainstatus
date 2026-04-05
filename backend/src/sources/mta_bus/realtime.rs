@@ -297,8 +297,8 @@ impl RealtimeAdapter for MtaBusRealtime {
                 }
 
                 // Process vehicles and merge with OBA data
-                if let Some(vehicle) = entity.vehicle {
-                    if let Some(mut position) =
+                if let Some(vehicle) = entity.vehicle
+                    && let Some(mut position) =
                         self.process_vehicle(vehicle, static_cache_store).await
                     {
                         // Merge OBA data if available
@@ -313,7 +313,6 @@ impl RealtimeAdapter for MtaBusRealtime {
                         }
                         positions.push(position);
                     }
-                }
             }
         }
 
@@ -337,8 +336,7 @@ impl RealtimeAdapter for MtaBusRealtime {
                     if let Some(db_err) = e
                         .downcast_ref::<sqlx::Error>()
                         .and_then(|x| x.as_database_error())
-                    {
-                        if db_err.code().as_deref() == Some("23503") {
+                        && db_err.code().as_deref() == Some("23503") {
                             warn!("Missing static data for bus. Forcing update...");
 
                             if let Err(update_err) = static_controller
@@ -351,7 +349,6 @@ impl RealtimeAdapter for MtaBusRealtime {
                             attempts += 1;
                             continue;
                         }
-                    }
 
                     return Err(e);
                 }

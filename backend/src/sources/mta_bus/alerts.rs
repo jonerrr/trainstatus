@@ -145,7 +145,7 @@ impl GtfsAlertSource for MtaBusAlerts {
         let affected_entities: Vec<AffectedEntity> = alert
             .informed_entity
             .iter()
-            .filter_map(|entity| {
+            .map(|entity| {
                 let route_id = entity.route_id.clone().and_then(|r| self.parse_route_id(r));
                 let stop_id = entity.stop_id.clone().and_then(|s| self.parse_stop_id(s));
 
@@ -161,13 +161,13 @@ impl GtfsAlertSource for MtaBusAlerts {
                     })
                     .unwrap_or(0);
 
-                Some(AffectedEntity {
+                AffectedEntity {
                     alert_id,
                     route_id,
                     source: Source::MtaBus,
                     stop_id,
                     sort_order,
-                })
+                }
             })
             .collect();
 
