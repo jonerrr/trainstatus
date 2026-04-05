@@ -29,8 +29,8 @@
       "groupName": "science"
     },
     {
-      "description": "Group root tools (mise) separately or bundle them into backend",
-      "matchFileNames": ["mise.toml", "mise.local.toml"],
+      "description": "Group root tools",
+      "matchFileNames": ["mise.toml"],
       "groupName": "tooling"
     }
   ]
