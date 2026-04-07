@@ -1,7 +1,7 @@
 services:
   postgis:
     container_name: postgis
-    image: docker.io/postgis/postgis:18-3.6-alpine
+    image: docker.io/postgis/postgis:18-3.6-alpine@sha256:ebabf77ca7fcc821ecc6e6fc21458f04b7264de27686044ba8b84cd74a7f47f8
     ports:
       - 5432:5432
     environment:
