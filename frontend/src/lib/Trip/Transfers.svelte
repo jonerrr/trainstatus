@@ -20,7 +20,7 @@
 	<div class="font-medium">Transfers:</div>
 	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
 		{#each transfer_stop_times as st (st.trip_id)}
-			{@const trip = trips[st.data.source]?.value?.get(st.trip_id)}
+			{@const trip = trips[st.data.source]?.current?.get(st.trip_id)}
 			{#if trip}
 				{@const route = page.data.routes_by_id[st.data.source]?.[trip.route_id]}
 				{#if route}
