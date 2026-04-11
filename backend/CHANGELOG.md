@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/jonerrr/trainstatus/compare/backend-v1.1.4...backend-v1.2.0) (2026-04-11)
+
+
+### Features
+
+* **mta_subway:** add route geometry ([8c219f9](https://github.com/jonerrr/trainstatus/commit/8c219f98c3f20f9866a6bca9f8c7698dc1b00c0a)), closes [#271](https://github.com/jonerrr/trainstatus/issues/271)
+
+
+### Bug Fixes
+
+* various clippy warnings ([9f648be](https://github.com/jonerrr/trainstatus/commit/9f648beb64c18b10a6bbbc1b098bcd67f636f905))
+
 ## [1.1.4](https://github.com/jonerrr/trainstatus/compare/backend-v1.1.3...backend-v1.1.4) (2026-03-29)
 
 
