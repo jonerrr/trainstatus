@@ -22,9 +22,7 @@
 			) ?? []
 	);
 
-	const alerts_loading = $derived(
-		alerts?.status !== 'ready' && !route_alerts.length
-	);
+	const alerts_loading = $derived(alerts?.status !== 'ready' && !route_alerts.length);
 </script>
 
 <section class="flex items-center gap-1">

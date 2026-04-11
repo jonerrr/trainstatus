@@ -93,8 +93,14 @@
 
 {#snippet eta_or_loading(route_stop_times: StopTimeWithETA[])}
 	{#if is_loading}
-		<span class="inline-block w-8 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5">&nbsp;</span>
-		<span class="inline-block w-10 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5">&nbsp;</span>
+		<span
+			class="inline-block w-8 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
+			>&nbsp;</span
+		>
+		<span
+			class="inline-block w-10 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
+			>&nbsp;</span
+		>
 	{:else if route_stop_times.length}
 		{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 			{@render eta(stop_time.eta)}

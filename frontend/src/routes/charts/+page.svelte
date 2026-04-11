@@ -627,9 +627,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex h-full items-center justify-center text-neutral-400">
-				No data available
-			</div>
+			<div class="flex h-full items-center justify-center text-neutral-400">No data available</div>
 		{/if}
 	</div>
 </div>

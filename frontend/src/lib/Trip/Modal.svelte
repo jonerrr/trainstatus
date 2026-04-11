@@ -35,8 +35,7 @@
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
 
 	const st_loading = $derived(
-		!source_stop_times ||
-			(source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
+		!source_stop_times || (source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
 	);
 
 	const stop_times = $derived(
@@ -44,7 +43,7 @@
 			(st) =>
 				st.arrival.getTime() > current_time.ms ||
 				show_previous ||
-				page.url.pathname.startsWith('/charts')
+				page.url.pathname.startsWith('/charts') // charts only show trips that have already passed TODO: maybe remove this
 		)
 	);
 
@@ -56,6 +55,7 @@
 				const stop = page.data.stops_by_id[trip.data.source]?.[stop_times[0].stop_id];
 				const routeStop = stop?.routes.find((r) => r.route_id === trip.route_id);
 				if (!routeStop) return 'Unknown';
+				// this shouldn't be necessary since we should only be looking at bus routes, but just in case (and also to satisfy type checker)
 				return routeStop.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
 			case 'mta_subway':
 				const last_st = stop_times[stop_times.length - 1];
@@ -82,8 +82,7 @@
 				if (transfers[st.stop_id].length > 3) break;
 				if (transfer_st.trip_id === st.trip_id || transfer_st.arrival < st.arrival) continue;
 
-				const transfer_trip =
-					all_trips[transfer_st.data.source]?.current?.get(transfer_st.trip_id);
+				const transfer_trip = all_trips[transfer_st.data.source]?.current?.get(transfer_st.trip_id);
 				if (
 					!transfer_trip ||
 					transfer_trip.route_id === trip.route_id ||
@@ -104,8 +103,12 @@
 					[];
 				for (const transfer_st of t_stop_st) {
 					if (transfer_st.arrival < st.arrival) continue;
-					const transfer_trip =
-						all_trips[transfer_st.data.source]?.current?.get(transfer_st.trip_id);
+					const transfer_trip = all_trips[transfer_st.data.source]?.current?.get(
+						transfer_st.trip_id
+					);
+
+					// TODO: maybe don't check direction bc it can be different for other stops
+					// also now with the multi-source setup, each source has different direction numbers (e.g. 1&3 for subway, 0&1 for bus), so we should check direction within the same source but not across sources
 
 					if (
 						!transfer_trip ||

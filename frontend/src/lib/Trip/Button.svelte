@@ -20,8 +20,7 @@
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(data.id) ?? []);
 
 	const is_loading = $derived(
-		!source_stop_times ||
-			(source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
+		!source_stop_times || (source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
 	);
 
 	const stop_times = $derived(

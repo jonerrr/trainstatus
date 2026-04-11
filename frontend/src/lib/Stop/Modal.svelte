@@ -10,7 +10,11 @@
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
 	import type { Stop, StopTime, Trip } from '$lib/client';
 	import { alert_context } from '$lib/resources/alerts.svelte';
-	import { source_info, type SourceMap, type TypedVehiclePosition } from '$lib/resources/index.svelte';
+	import {
+		type SourceMap,
+		type TypedVehiclePosition,
+		source_info
+	} from '$lib/resources/index.svelte';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
@@ -50,8 +54,7 @@
 	const current_stop_times = $derived(stop_times_store?.current.by_stop_id.get(stop.id) ?? []);
 
 	const st_loading = $derived(
-		!stop_times_store ||
-			(stop_times_store.status !== 'ready' && current_stop_times.length === 0)
+		!stop_times_store || (stop_times_store.status !== 'ready' && current_stop_times.length === 0)
 	);
 
 	const { stop_times_with_trip, active_routes } = $derived.by(() => {
@@ -76,6 +79,8 @@
 		njt_bus: 0
 	});
 
+	// if its a train, we only want to show stop times for the selected direction
+	// TODO: handle bus stops with opposite_stop_id once implemented
 	const selected_stop_times = $derived(
 		stop.data.source === 'mta_subway'
 			? stop_times_with_trip.filter(
@@ -84,6 +89,8 @@
 			: stop_times_with_trip
 	);
 
+	// if there are more than 6 routes, show the main ones first and sort the rest by active vs inactive and then id length
+	// test lots of routes with http://localhost:5173/stops?s=400354
 	const route_stops = $derived.by(() => {
 		const main_rs = main_route_stops(stop.routes);
 		if (stop.routes.length < 6) return main_rs;
