@@ -1,6 +1,8 @@
-FROM rust:latest@sha256:e8e2bb5ff27ad3b369a4f667392464e6ec399cfe81c1230ae78edb1036b9bd74 AS build
+FROM rust:slim AS build
 
-RUN apt update && apt install -y protobuf-compiler
+RUN set -eux; \
+    apt-get update; \
+    apt-get install --yes --no-install-recommends protobuf-compiler;
 
 WORKDIR /app
 COPY . .
