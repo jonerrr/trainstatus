@@ -18,7 +18,8 @@
 
 	$effect(() => {
 		for (const [source, resource] of Object.entries(all_trips)) {
-			const map = resource.value;
+			if (resource.status !== 'ready') continue;
+			const map = resource.current;
 			if (!map) continue;
 			const src = source as Source;
 			const current = trip_pins.current[src];
@@ -39,7 +40,7 @@
 			page.data.selected_sources.map((source) => [
 				source,
 				trip_pins.current[source]
-					?.map((pin) => all_trips[source]?.value?.get(pin))
+					?.map((pin) => all_trips[source]?.current?.get(pin))
 					.filter((t) => t !== undefined) ?? []
 			])
 		) as Record<Source, Trip[]>;

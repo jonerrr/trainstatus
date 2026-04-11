@@ -22,7 +22,7 @@
 	const alerts = $derived(alert_context.getSource(route.data.source));
 
 	const route_alerts = $derived(
-		alerts?.value?.alerts_by_route
+		alerts?.current?.alerts_by_route
 			.get(route.id)
 			?.sort(
 				(a, b) =>

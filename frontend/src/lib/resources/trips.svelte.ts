@@ -11,7 +11,6 @@ import {
 } from '$lib/resources/index.svelte';
 import { current_time } from '$lib/url_params.svelte';
 
-//TODO: compare map and for loop performance
 export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResource<S> {
 	return new SvelteMap(
 		data.map((trip) => [
@@ -25,7 +24,7 @@ export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResourc
 	);
 }
 
-export function createTripResource<S extends Source>(source: S, initial_value: TripResource<S>) {
+export function createTripResource<S extends Source>(source: S) {
 	const resource = new LiveResource<TripResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} trips`);
@@ -40,10 +39,10 @@ export function createTripResource<S extends Source>(source: S, initial_value: T
 			const data: TypedTrip<S>[] = await res.json();
 			return index_trips<S>(data);
 		},
+		new SvelteMap(),
 		{
-			initial_value,
 			interval: source_info[source].refresh_interval.trips,
-			debounce: 500 // TODO: increase time
+			debounce: 500
 		}
 	);
 

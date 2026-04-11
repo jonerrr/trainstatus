@@ -179,24 +179,19 @@ export function createMultiSourceContext<ResourceMap extends SourceMap<unknown>>
 
 type Fetcher<T> = (signal: AbortSignal) => Promise<T>;
 
-interface LiveResourceOptions<T> {
+export type ResourceStatus = 'initial' | 'fetching' | 'ready' | 'error';
+
+interface LiveResourceOptions {
 	interval?: number;
 	enabled?: boolean;
 	debounce?: number;
-	initial_value: T;
 }
 
 export class LiveResource<T> {
-	// State
-	// TODO: rename value to current (which is what runed and LocalStorage call it)
-	value: T = $state() as T;
-	error = $state<Error | null>(null);
-	last_updated = $state<Date | null>(null);
-	offline = $state(false);
-	// @ts-ignore
-	is_fetching = $state(false);
+	current: T = $state() as T;
+	status: ResourceStatus = $state<ResourceStatus>('initial');
+	error: Error | null = $state(null);
 
-	// Configuration
 	#interval_ms: number = $state(5000);
 	#enabled: boolean = $state(true);
 	#debounce_ms: number = $state(0);
@@ -206,16 +201,15 @@ export class LiveResource<T> {
 	#debounce_timer: ReturnType<typeof setTimeout> | undefined;
 	#abort_controller: AbortController | undefined;
 
-	// Pending resolvers waiting for next successful fetch
 	#pending_resolvers: Array<() => void> = [];
+	#ready_resolvers: Array<(value: T) => void> = [];
 
-	constructor(fetcher: Fetcher<T>, options: LiveResourceOptions<T>) {
+	constructor(fetcher: Fetcher<T>, initial_value: T, options: LiveResourceOptions = {}) {
 		this.#fetcher = fetcher;
-		this.value = options.initial_value;
+		this.current = initial_value;
 		if (options.interval) this.#interval_ms = options.interval;
 		if (options.enabled !== undefined) this.#enabled = options.enabled;
 		if (options.debounce) this.#debounce_ms = options.debounce;
-		// if (options.initial_value !== undefined) this.value = options.initial_value;
 
 		$effect(() => {
 			if (this.#enabled) {
@@ -234,9 +228,10 @@ export class LiveResource<T> {
 
 	#startInterval() {
 		this.#stopInterval();
+		const delay = this.status === 'initial' ? 0 : this.#interval_ms;
 		this.#interval_timer = setTimeout(() => {
 			this.refresh();
-		}, this.#interval_ms);
+		}, delay);
 	}
 
 	#stopInterval() {
@@ -279,34 +274,51 @@ export class LiveResource<T> {
 		return promise;
 	}
 
-	async #executeFetch() {
-		if (this.is_fetching) return;
+	/**
+	 * Returns a promise that resolves with the current value once the resource
+	 * has successfully fetched at least once. Resolves immediately if already ready.
+	 */
+	whenReady(): Promise<T> {
+		if (this.status === 'ready') return Promise.resolve(this.current);
+		return new Promise<T>((resolve) => {
+			this.#ready_resolvers.push(resolve);
+		});
+	}
 
-		this.is_fetching = true;
+	async #executeFetch() {
+		if (this.status === 'fetching') return;
+
+		this.status = 'fetching';
 		this.#abort_controller = new AbortController();
 
 		try {
 			const data = await this.#fetcher(this.#abort_controller.signal);
 
 			if (!this.#abort_controller.signal.aborted) {
-				this.value = data;
+				this.current = data;
 				this.error = null;
-				this.offline = false;
-				this.last_updated = new Date();
+				this.status = 'ready';
 
-				// Resolve all pending waiters
 				const resolvers = this.#pending_resolvers.splice(0);
 				for (const resolve of resolvers) resolve();
+
+				const ready_resolvers = this.#ready_resolvers.splice(0);
+				for (const resolve of ready_resolvers) resolve(data);
 			}
 		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') return;
-			console.error('Resource fetch failed:', e);
-			this.error = e as Error;
-			if (e instanceof Error && e.message === 'Offline') this.offline = true;
-			// Don't resolve pending on error - they'll wait for next successful fetch
+			if (e instanceof Error && e.name === 'AbortError') {
+				// Status cleared in `finally` — avoids leaving `fetching`, which would block
+				// subsequent `#executeFetch` calls at the guard below.
+			} else {
+				console.error('Resource fetch failed:', e);
+				this.error = e as Error;
+				this.status = 'error';
+			}
 		} finally {
-			// @ts-ignore
-			this.is_fetching = false;
+			// Abort paths (catch AbortError, or fetch resolved after abort) never assign
+			// `status`, so we would stay `fetching` forever and block future refreshes.
+			if (this.status === 'fetching') this.status = 'ready';
+
 			if (this.#enabled) this.#startInterval();
 		}
 	}

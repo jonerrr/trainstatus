@@ -1,4 +1,4 @@
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '$lib/client';
 import {
@@ -36,120 +36,110 @@ const EMPTY_INDEX: StopTimeResource<Source> = {
 	by_stop_id: new SvelteMap()
 };
 
-export function createStopTimeResource<S extends Source>(
-	source: S,
-	initial_value: StopTimeResource<S>
-) {
-	const monitored_routes = new SvelteSet<string>();
+/**
+ * Live stop times for a source: same `LiveResource` surface as trips/positions/alerts
+ * (`current`, `status`, `refresh`, …) plus route monitoring helpers for sources that
+ * require `route_ids` on the API.
+ */
+export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTimeResource<S>> {
+	#monitored_routes = new Set<string>();
+	readonly #source: S;
 
-	const resource = new LiveResource<StopTimeResource<S>>(
-		async (signal) => {
-			console.log(`updating ${source} stop times`);
+	constructor(source: S) {
+		const empty = EMPTY_INDEX as StopTimeResource<S>;
+		super(
+			async (signal) => {
+				console.log(`updating ${source} stop times`);
 
-			const routes = [...monitored_routes];
+				const routes = [...this.#monitored_routes];
 
-			// Sources that require explicit routes (e.g. bus) return empty until
-			// at least one route is monitored, avoiding a useless all-routes request.
-			if (source_info[source].monitor_routes && routes.length === 0) {
-				return EMPTY_INDEX as StopTimeResource<S>;
+				if (source_info[source].monitor_routes && routes.length === 0) {
+					return empty;
+				}
+
+				const query_params = new URLSearchParams();
+				const at = current_time.value;
+				if (at) query_params.set('at', at.toString());
+				// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
+				if (routes.length) query_params.set('route_ids', routes.join(','));
+
+				const params_str = query_params.toString();
+				const url = params_str
+					? `/api/v1/stop_times/${source}?${params_str}`
+					: `/api/v1/stop_times/${source}`;
+
+				const res = await fetch(url, { signal });
+
+				if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
+				if (!res.ok) throw new Error(`Failed to fetch stop times: ${res.status}`);
+
+				const data: TypedStopTime<S>[] = await res.json();
+				return index_stop_times<S>(data);
+			},
+			empty,
+			{
+				interval: source_info[source].refresh_interval.stop_times,
+				debounce: 500
 			}
+		);
+		this.#source = source;
 
-			const query_params = new URLSearchParams();
-			const at = current_time.value;
-			if (at) query_params.set('at', at.toString());
-			// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
-			if (routes.length) query_params.set('route_ids', routes.join(','));
-
-			const params_str = query_params.toString();
-			const url = params_str
-				? `/api/v1/stop_times/${source}?${params_str}`
-				: `/api/v1/stop_times/${source}`;
-
-			const res = await fetch(url, { signal });
-
-			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
-			if (!res.ok) throw new Error(`Failed to fetch stop times: ${res.status}`);
-
-			const data: TypedStopTime<S>[] = await res.json();
-			return index_stop_times<S>(data);
-		},
-		{
-			initial_value,
-			interval: source_info[source].refresh_interval.stop_times,
-			debounce: 500
-		}
-	);
-
-	let prev_time = current_time.value;
-	$effect(() => {
-		const val = current_time.value;
-		if (val !== prev_time) {
-			prev_time = val;
-			resource.refresh();
-		}
-	});
-
-	return {
-		get value() {
-			return resource.value;
-		},
-		get error() {
-			return resource.error;
-		},
-		get is_fetching() {
-			return resource.is_fetching;
-		},
-		get last_updated() {
-			return resource.last_updated;
-		},
-		get offline() {
-			return resource.offline;
-		},
-
-		get by_trip_id() {
-			return resource.value?.by_trip_id ?? EMPTY_INDEX.by_trip_id;
-		},
-		get by_stop_id() {
-			return resource.value?.by_stop_id ?? EMPTY_INDEX.by_stop_id;
-		},
-
-		get monitored_routes(): ReadonlySet<string> {
-			return monitored_routes;
-		},
-
-		/**
-		 * Add a route to monitor. Debounces the underlying fetch so multiple calls
-		 * within the debounce window are coalesced into a single request.
-		 *
-		 * @returns A promise that resolves once the fetch that includes this route
-		 *   completes successfully. If the route was already monitored and data is
-		 *   available, resolves immediately.
-		 */
-		add_route(route_id: string): Promise<void> {
-			if (monitored_routes.has(route_id)) {
-				// Already tracked — resolve right away if we have data, otherwise
-				// wait for the next successful fetch (e.g. initial load still pending).
-				return resource.value ? Promise.resolve() : resource.next_refresh();
+		let prev_time = current_time.value;
+		$effect(() => {
+			const val = current_time.value;
+			if (val !== prev_time) {
+				prev_time = val;
+				this.refresh();
 			}
-			monitored_routes.add(route_id);
-			return resource.next_refresh();
-		},
+		});
+	}
 
-		/**
-		 * Stop monitoring a route. The change takes effect on the next refresh cycle;
-		 * no immediate re-fetch is triggered.
-		 */
-		remove_route(route_id: string): void {
-			monitored_routes.delete(route_id);
-		},
+	get monitored_routes(): ReadonlySet<string> {
+		return this.#monitored_routes;
+	}
 
-		refresh(): Promise<void> | undefined {
-			return resource.refresh();
+	add_route(route_id: string): Promise<void> {
+		if (this.#monitored_routes.has(route_id)) {
+			return this.status === 'ready' ? Promise.resolve() : this.next_refresh();
 		}
-	};
+		this.#monitored_routes.add(route_id);
+		return this.next_refresh();
+	}
+
+	remove_route(route_id: string): void {
+		this.#monitored_routes.delete(route_id);
+	}
+
+	/**
+	 * Ensures routes are monitored (for monitor_routes sources) or data is
+	 * loaded, then returns stop times for the given stop. The returned array
+	 * is a reactive read from the underlying SvelteMap.
+	 */
+	async getForStop(stop_id: string, route_ids?: string[]): Promise<TypedStopTime<S>[]> {
+		if (source_info[this.#source].monitor_routes && route_ids?.length) {
+			await Promise.all(route_ids.map((id) => this.add_route(id)));
+		} else {
+			await this.whenReady();
+		}
+		return this.current?.by_stop_id.get(stop_id) ?? [];
+	}
+
+	/**
+	 * Waits for data to be loaded, then returns stop times for the given trip.
+	 * The returned array is a reactive read from the underlying SvelteMap.
+	 */
+	async getForTrip(trip_id: string): Promise<TypedStopTime<S>[]> {
+		await this.whenReady();
+		return this.current?.by_trip_id.get(trip_id) ?? [];
+	}
 }
 
-export type StopTimeStore<S extends Source> = ReturnType<typeof createStopTimeResource<S>>;
-export type StopTimeResources = { [S in Source]: StopTimeStore<S> };
+export function createStopTimeResource<S extends Source>(source: S): StopTimeLiveResource<S> {
+	return new StopTimeLiveResource(source);
+}
+
+export type StopTimeResources = Partial<{
+	[S in Source]: StopTimeLiveResource<S>;
+}>;
 
 export const stop_time_context = createMultiSourceContext<StopTimeResources>();
