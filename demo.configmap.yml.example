@@ -1,0 +1,10 @@
+# Copy this file to demo.configmap.yml and fill in backend-env values there.
+# demo.configmap.yml is gitignored and should remain local.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-env
+data:
+  MTA_OBA_API_KEY: REPLACE_ME
+  NJT_USERNAME: REPLACE_ME
+  NJT_PASSWORD: REPLACE_ME

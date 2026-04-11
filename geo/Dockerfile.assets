@@ -1,17 +1,30 @@
 FROM alpine:latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS builder
 
-ARG BASE_URL=http://localhost:5173
+ARG STYLE_BASE_URLS=http://localhost:5173,https://trainstat.us
 
-WORKDIR /assets
+WORKDIR /work
 
 COPY fonts /assets/fonts
 COPY sprites /assets/sprites
-COPY styles /assets/styles
+COPY styles /work/styles
 
 RUN set -eux; \
-    sanitized_base_url="$(printf '%s' "${BASE_URL}" | sed 's:/*$::')"; \
-    for style in /assets/styles/*.json; do \
-    sed -i "s|http://localhost:5173|${sanitized_base_url}|g" "${style}"; \
+    mkdir -p /assets/styles; \
+    for style in /work/styles/*.json; do \
+    [ -f "${style}" ] || continue; \
+    cp "${style}" /assets/styles/; \
+    done; \
+    IFS=','; \
+    for raw_url in ${STYLE_BASE_URLS}; do \
+    base_url="$(printf '%s' "${raw_url}" | sed 's:/*$::')"; \
+    [ -n "${base_url}" ] || continue; \
+    slug="$(printf '%s' "${base_url}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#[^a-zA-Z0-9]+#-#g; s#^-+##; s#-+$##' | tr '[:upper:]' '[:lower:]')"; \
+    [ -n "${slug}" ] || slug=default; \
+    for template in /work/styles/*.json.tmpl; do \
+    [ -f "${template}" ] || continue; \
+    style_name="$(basename "${template}" .json.tmpl)"; \
+    sed "s|__BASE_URL__|${base_url}|g" "${template}" > "/assets/styles/${style_name}.${slug}.json"; \
+    done; \
     done
 
 FROM scratch

@@ -1,0 +1,308 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: trainstatus-app
+  labels:
+    app: trainstatus
+spec:
+  # restartPolicy: Always
+  containers:
+    - name: traefik
+      image: traefik:v3.6@sha256:5ae9c349154d5298a5d61a7b25e5f3a9f53314f1515e87632120b95051c7917c
+      args:
+        - --api.insecure=true
+        - --entrypoints.web.address=:80
+        - --providers.file.filename=/etc/traefik/dynamic.yml
+        - --providers.file.watch=true
+      ports:
+        - containerPort: 80
+          hostPort: 5173
+        - containerPort: 8080
+          hostPort: 8080
+      volumeMounts:
+        - name: traefik-dynamic
+          mountPath: /etc/traefik/dynamic.yml
+          subPath: dynamic.yml
+          readOnly: true
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi"
+    # build images with mise build task
+    - name: frontend
+      image: ghcr.io/jonerrr/trainstatus-frontend:latest
+      imagePullPolicy: Never
+      env:
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "3001"
+        - name: ORIGIN
+          value: "http://traefik"
+      ports:
+        - containerPort: 3001
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+    - name: backend
+      image: ghcr.io/jonerrr/trainstatus-backend:latest
+      imagePullPolicy: Never
+      env:
+        - name: DATABASE_URL
+          value: "postgres://trains:trains@127.0.0.1:5432/trains"
+        - name: REDIS_URL
+          value: "redis://127.0.0.1:6379"
+        - name: ADDRESS
+          value: "0.0.0.0:3055"
+        - name: MTA_OBA_API_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: backend-env
+              key: MTA_OBA_API_KEY
+              optional: false
+        - name: NJT_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: backend-env
+              key: NJT_USERNAME
+              optional: false
+        - name: NJT_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: backend-env
+              key: NJT_PASSWORD
+              optional: false
+      volumeMounts:
+        - name: geo-data
+          mountPath: /data
+          readOnly: true
+      ports:
+        - containerPort: 3055
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+
+    - name: postgis
+      image: docker.io/postgis/postgis:18-3.6-alpine@sha256:ebabf77ca7fcc821ecc6e6fc21458f04b7264de27686044ba8b84cd74a7f47f8
+      env:
+        - name: POSTGRES_USER
+          value: "trains"
+        - name: POSTGRES_PASSWORD
+          value: "trains"
+        - name: POSTGRES_DB
+          value: "trains"
+      ports:
+        - containerPort: 5432
+          hostPort: 5432
+      volumeMounts:
+        - name: trainstatus-db-demo
+          mountPath: /var/lib/postgresql/data
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+      livenessProbe:
+        exec:
+          command:
+            - pg_isready
+            - -U
+            - trains
+            - -d
+            - trains
+        initialDelaySeconds: 5
+        periodSeconds: 5
+
+    - name: valkey
+      image: valkey/valkey:alpine@sha256:e1095c6c76ee982cb2d1e07edbb7fb2a53606630a1d810d5a47c9f646b708bf5
+      ports:
+        - containerPort: 6379
+          hostPort: 6379
+      volumeMounts:
+        - name: trainstatus-cache-demo
+          mountPath: /data
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+
+    - name: martin
+      image: ghcr.io/maplibre/martin:latest@sha256:13416ff1ec035af655e80b2d1889cf8ac234a013fde1308bb63c93d31b5db7a4
+      env:
+        - name: DATABASE_URL
+          value: "postgresql://trains:trains@127.0.0.1:5432/trains"
+      args:
+        - --config
+        - /config/martin.yml
+      volumeMounts:
+        - name: geo-data
+          mountPath: /data
+          readOnly: true
+        - name: geo-assets
+          mountPath: /assets
+          readOnly: true
+        - name: martin-config
+          mountPath: /config/martin.yml
+          subPath: martin.yml
+      ports:
+        - containerPort: 3000
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+  volumes:
+    # Podman kube image volumes are local-only and mounted read-only.
+    - name: geo-data
+      image:
+        reference: ghcr.io/jonerrr/trainstatus-geo-data:latest
+        pullPolicy: Never
+    - name: geo-assets
+      image:
+        reference: ghcr.io/jonerrr/trainstatus-geo-assets:latest
+        pullPolicy: Never
+    - name: trainstatus-db-demo
+      persistentVolumeClaim:
+        claimName: trainstatus-db-demo
+    - name: trainstatus-cache-demo
+      persistentVolumeClaim:
+        claimName: trainstatus-cache-demo
+    - name: martin-config
+      configMap:
+        name: martin-config
+    - name: traefik-dynamic
+      configMap:
+        name: traefik-dynamic
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trainstatus-db-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trainstatus-cache-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: martin-config
+data:
+  martin.yml: |-
+    route_prefix: /martin
+
+    postgres:
+      # The connection URL will be read from DATABASE_URL env var
+      connection_string: $DATABASE_URL
+
+      auto_publish:
+        tables:
+          from_schemas:
+            - static
+          # must be integer (but we are using string)
+          # id_columns: id
+        # TODO: add back functions once they are fixed
+        # functions:
+        #   from_schemas:
+        #     - realtime
+
+    sprites:
+      paths:
+        - /assets/sprites/dark-matter
+        - /assets/sprites/frontend
+
+    styles:
+      sources:
+        dark-matter: /assets/styles/dark-matter.localhost-5173.json
+        # For hosted environments, switch to:
+        # dark-matter: /assets/styles/dark-matter.trainstat-us.json
+
+    fonts:
+      paths:
+        - /assets/fonts
+
+    mbtiles:
+      sources:
+        basemap: /data/basemap.mbtiles
+
+    # should be disabled in prod
+    web_ui: enable-for-all
+
+    cors: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-dynamic
+data:
+  dynamic.yml: |-
+    http:
+      routers:
+        backend:
+          rule: "PathPrefix(`/api`)"
+          service: backend
+          entryPoints:
+            - web
+          priority: 100
+        martin:
+          rule: "PathPrefix(`/martin`)"
+          service: martin
+          entryPoints:
+            - web
+          priority: 90
+        frontend:
+          rule: "PathPrefix(`/`)"
+          service: frontend
+          entryPoints:
+            - web
+          priority: 1
+      services:
+        backend:
+          loadBalancer:
+            servers:
+              - url: "http://127.0.0.1:3055"
+        martin:
+          loadBalancer:
+            servers:
+              - url: "http://127.0.0.1:3000"
+        frontend:
+          loadBalancer:
+            servers:
+              - url: "http://127.0.0.1:3001"

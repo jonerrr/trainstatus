@@ -1,5 +1,8 @@
 [tasks.dev]
 run = "pnpm dev"
 
+[tasks.build]
+run = "podman build -f Dockerfile -t ghcr.io/jonerrr/trainstatus-frontend ."
+
 [env]
 # VITE_ALLOWED_HOSTS = ""

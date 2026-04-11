@@ -19,11 +19,15 @@ DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
 REDIS_URL = "redis://localhost:6379"
 
 [tasks.start-containers]
-run = "podman compose -f compose.dev.yml up -d"
+run = "podman kube play --replace dev.pod.yml"
 
 [tasks.dev]
-depends = ["start-containers"]
+# broken since it the sqlx mig fails because the database isn't ready yet. need to add a wait-for step or something.
+# depends = ["start-containers"]
 run = { tasks = ["//backend:dev", "//frontend:dev"] }
 
-[tasks.preview]
-run = "podman compose -f compose.test.yml up -d"
+[tasks.build]
+run = { tasks = ["//backend:build", "//frontend:build"] }
+
+[tasks.demo]
+run = "podman kube play --replace demo.pod.yml --configmap demo.configmap.yml"
