@@ -25,7 +25,7 @@
 	const show_alert_icon = $derived.by(() => {
 		if (!show_alerts || !alerts) return false;
 		// TODO: maybe differentiate between planned alerts, station notices, etc
-		return alerts.value?.alerts_by_route.has(route.id) ?? false;
+		return alerts.current?.alerts_by_route.has(route.id) ?? false;
 	});
 
 	// TODO: apply this bus prefix thing to map

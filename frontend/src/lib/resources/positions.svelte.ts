@@ -24,10 +24,7 @@ export function index_positions<S extends Source>(
 		])
 	);
 }
-export function createPositionResource<S extends Source>(
-	source: S,
-	initial_value: PositionResource<S>
-) {
+export function createPositionResource<S extends Source>(source: S) {
 	const resource = new LiveResource<PositionResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} positions`);
@@ -39,12 +36,11 @@ export function createPositionResource<S extends Source>(
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
 			if (!res.ok) throw new Error('Failed to fetch vehicle positions');
 
-			// Cast is safe because we're fetching for a specific source
 			const data = (await res.json()) as TypedVehiclePosition<S>[];
 			return index_positions<S>(data);
 		},
+		new SvelteMap(),
 		{
-			initial_value,
 			interval: source_info[source].refresh_interval.positions,
 			debounce: 500
 		}
