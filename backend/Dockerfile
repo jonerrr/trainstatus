@@ -13,5 +13,5 @@ FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817
 
 WORKDIR /app
 COPY --from=build /app/target/release/backend /backend
-EXPOSE 3055
+# EXPOSE 3055
 ENTRYPOINT [ "/backend" ]

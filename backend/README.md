@@ -2,17 +2,21 @@
 
 ## Structure
 
-- `protos` folder contains GTFS protobuf definitions
-- `realtime` folder contains SIRI, GTFS-RT, parsing and handling logic
-- `static_data` folder contains fetching and parsing static bus and train data logic
-- `api` folder contains the API routes
+TODO: Discuss backend structure
 
 ## Config
 
-| Environmental Variable | Usage                                                                  | Required |
-| ---------------------- | ---------------------------------------------------------------------- | -------- |
-| `DATABASE_URL`         | PostgreSQL database URL                                                | Yes      |
-| `ADDRESS`              | Address for axum to bind to. Defaults to `127.0.0.1:3055`              | Yes      |
-| `FORCE_UPDATE`         | If set, static data will update on startup                             | No       |
-| `DEBUG_GTFS`           | If set, saves all realtime GTFS data as a txt and pb file to `./gtfs/` | No       |
-| `READ_ONLY`            | If set, the backend will not update any realtime or static data        | No       |
+| Environment Variable | Usage                                                                                            | Required | Default               |
+| -------------------- | ------------------------------------------------------------------------------------------------ | -------- | --------------------- |
+| `DATABASE_URL`       | PostgreSQL connection URL used to create the sqlx pool and run migrations on startup.            | Yes      | None                  |
+| `REDIS_URL`          | Redis/Valkey connection URL used for cache reads/writes and startup connectivity checks.         | Yes      | None                  |
+| `ADDRESS`            | Bind address for the Axum HTTP server listener.                                                  | No       | `127.0.0.1:3055`      |
+| `MTA_OBA_API_KEY`    | API key for MTA Bus Time OBA endpoints used by the MTA bus source.                               | Yes      | None                  |
+| `NJT_USERNAME`       | NJ Transit API username used to authenticate and fetch access tokens.                            | Yes      | None                  |
+| `NJT_PASSWORD`       | NJ Transit API password used to authenticate and fetch access tokens.                            | Yes      | None                  |
+| `VALHALLA_CONFIG`    | Path to the Valhalla config file used to initialize Valhalla integration.                        | No       | `/data/valhalla.json` |
+| `API_PREFIX`         | Base URL prefix for API routes and docs routes (`/v1`, `/docs`, `/openapi.json`).                | No       | `/api`                |
+| `DEBUG_RT_DATA`      | If set (to any value), writes raw realtime payloads and decoded debug output to `./debug_data/`. | No       | Disabled (unset)      |
+
+<!-- | `READ_ONLY`            | If set, the backend will not update any realtime or static data        | No       | -->
+<!-- | `FORCE_UPDATE`         | If set, static data will update on startup                             | No       | -->
