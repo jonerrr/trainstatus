@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
+	import Skeleton from '$lib/Skeleton.svelte';
 	import AxisX from '$lib/charts/AxisX.svelte';
 	import AxisY from '$lib/charts/AxisY.svelte';
 	import Lines from '$lib/charts/Lines.svelte';
@@ -23,6 +24,13 @@
 
 	const all_trips = trip_context.get();
 	const all_stop_times = stop_time_context.get();
+
+	const trips_loading = $derived(
+		page.data.selected_sources.some((s) => {
+			const r = all_trips[s];
+			return !r || r.status !== 'ready';
+		})
+	);
 
 	let routes = $state<SourceMap<Route[]>>(
 		Object.fromEntries(
@@ -87,7 +95,7 @@
 			const source_routes = routes[source];
 			if (!source_routes?.length) continue;
 
-			const trips_map = all_trips?.[source]?.value;
+			const trips_map = all_trips?.[source]?.current;
 			if (!trips_map) continue;
 
 			const stop_times_resource = all_stop_times?.[source];
@@ -97,7 +105,7 @@
 				if (!source_routes.some((r) => r.id === trip.route_id)) continue;
 				if (trip.direction !== direction) continue;
 
-				const trip_st = stop_times_resource?.by_trip_id.get(trip.id);
+				const trip_st = stop_times_resource?.current.by_trip_id.get(trip.id);
 				if (!trip_st?.length) continue;
 
 				const trip_points: Array<{ stop_id: string; stop_name: string; time: Date }> = [];
@@ -590,12 +598,13 @@
 
 	<!-- Chart container with proper overflow handling -->
 	<div class="relative flex-1 overflow-hidden">
-		{#if data.route_trips.length && data.yDomain.length}
-			<!-- Scrollable container with both scroll directions -->
+		{#if trips_loading}
+			<div class="flex h-full items-center justify-center">
+				<Skeleton lines={8} class="w-3/4" />
+			</div>
+		{:else if data.route_trips.length && data.yDomain.length}
 			<div class="absolute inset-0 overflow-auto">
-				<!-- Chart with minimum dimensions but able to shrink -->
 				<div bind:this={svgContainer} class="h-full min-h-125 w-full min-w-325">
-					<!-- TODO: fix lines where the arrival times are identical (because mta is bad) from creating invalid lines (crosses same Y twice) -->
 					<LayerCake
 						debug={false}
 						ssr
@@ -618,7 +627,9 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex h-full items-center justify-center text-neutral-400">No data available</div>
+			<div class="flex h-full items-center justify-center text-neutral-400">
+				No data available
+			</div>
 		{/if}
 	</div>
 </div>

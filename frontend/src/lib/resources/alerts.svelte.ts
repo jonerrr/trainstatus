@@ -47,7 +47,7 @@ export function index_alerts<S extends Source>(data: ApiAlert[]): AlertResource<
 	return { alerts, alerts_by_route };
 }
 
-export function createAlertResource<S extends Source>(source: S, initial_value: AlertResource<S>) {
+export function createAlertResource<S extends Source>(source: S) {
 	const resource = new LiveResource<AlertResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} alerts`);
@@ -63,7 +63,8 @@ export function createAlertResource<S extends Source>(source: S, initial_value: 
 
 			return index_alerts<S>(data);
 		},
-		{ initial_value, interval: source_info[source].refresh_interval.alerts, debounce: 500 }
+		{ alerts: [], alerts_by_route: new SvelteMap() },
+		{ interval: source_info[source].refresh_interval.alerts, debounce: 500 }
 	);
 
 	let prev_time = current_time.value;

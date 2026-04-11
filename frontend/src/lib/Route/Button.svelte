@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/Icon.svelte';
-	import type { Route, Source } from '$lib/client';
+	import Skeleton from '$lib/Skeleton.svelte';
+	import type { Route } from '$lib/client';
 	import { alert_context } from '$lib/resources/alerts.svelte';
 
 	interface Props {
@@ -12,7 +13,7 @@
 	const alerts = $derived(alert_context.getSource(data.data.source));
 
 	const route_alerts = $derived(
-		alerts?.value?.alerts_by_route
+		alerts?.current?.alerts_by_route
 			.get(data.id)
 			?.sort(
 				(a, b) =>
@@ -20,13 +21,17 @@
 					a.entities.find((e) => e.route_id === data.id)!.sort_order
 			) ?? []
 	);
-	// const alerts: any[] = [];
+
+	const alerts_loading = $derived(
+		alerts?.status !== 'ready' && !route_alerts.length
+	);
 </script>
 
-<!-- <Button state={{ modal: 'route', data }} {pin_rune}> -->
 <section class="flex items-center gap-1">
 	<Icon height={36} width={36} link={true} route={data} />
-	{#if route_alerts.length}
+	{#if alerts_loading}
+		<Skeleton lines={1} class="w-24" />
+	{:else if route_alerts.length}
 		<div class="font-semibold">
 			{#if 'alert_type' in route_alerts[0].data}
 				{route_alerts[0].data.alert_type}
@@ -43,4 +48,3 @@
 		No Alerts
 	{/if}
 </section>
-<!-- </Button> -->

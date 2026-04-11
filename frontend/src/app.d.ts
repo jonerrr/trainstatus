@@ -1,13 +1,4 @@
-import type { ApiAlert, Route, Source, Stop, StopTime, Trip } from '$lib/client';
-import type { AlertResource } from '$lib/resources/alerts.svelte';
-import type { PositionResource } from '$lib/resources/positions.svelte';
-import type { StopTimesResource } from '$lib/resources/stop_times.svelte';
-import type { TripResource } from '$lib/resources/trips.svelte';
-
-interface RealtimeInitialValue<T> {
-	source: Source;
-	data: T;
-}
+import type { Route, Source, Stop, Trip } from '$lib/client';
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
@@ -15,23 +6,13 @@ declare global {
 	namespace App {
 		// interface Error {}
 		// interface Locals {}
-		// maybe this should be maps
 		interface PageData {
 			selected_sources: Source[];
 			stops: Partial<Record<Source, Stop[]>>;
 			routes: Partial<Record<Source, Route[]>>;
 			stops_by_id: Partial<Record<Source, Record<string, Stop>>>;
 			routes_by_id: Partial<Record<Source, Record<string, Route>>>;
-			// Initial realtime values as SourceMaps
-			initial_trips: RealtimeInitialValue<TripResource>[];
-			initial_stop_times: RealtimeInitialValue<StopTimesResource>[];
-			initial_positions: RealtimeInitialValue<PositionResource>[];
-			initial_alerts: RealtimeInitialValue<AlertResource>[];
-			// Current time param for RT fetches
 			at?: string;
-			// used to keep track of the current monitored
-			// current_monitored_routes: string[];
-			// initial_promise: Promise<[void, void]>;
 		}
 		// <T extends string | number>
 		interface PageState {

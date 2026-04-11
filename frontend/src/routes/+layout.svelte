@@ -28,30 +28,28 @@
 	if (page.data.at) current_time.value = parseInt(page.data.at);
 	// TODO: fix clearing time not working
 
-	// TODO: handle offline from new fetching method (and find a new way to display it since header is removed)
-	const { initial_trips, initial_stop_times, initial_positions, initial_alerts } = page.data;
 	trip_context.set(
 		Object.fromEntries(
-			initial_trips.map(({ source, data }) => [source, createTripResource(source, data)])
-		) as any
+			page.data.selected_sources.map((source) => [source, createTripResource(source)])
+		)
 	);
 
 	stop_time_context.set(
 		Object.fromEntries(
-			initial_stop_times.map(({ source, data }) => [source, createStopTimeResource(source, data)])
-		) as any
+			page.data.selected_sources.map((source) => [source, createStopTimeResource(source)])
+		)
 	);
 
 	position_context.set(
 		Object.fromEntries(
-			initial_positions.map(({ source, data }) => [source, createPositionResource(source, data)])
-		) as any
+			page.data.selected_sources.map((source) => [source, createPositionResource(source)])
+		)
 	);
 
 	alert_context.set(
 		Object.fromEntries(
-			initial_alerts.map(({ source, data }) => [source, createAlertResource(source, data)])
-		) as any
+			page.data.selected_sources.map((source) => [source, createAlertResource(source)])
+		)
 	);
 
 	// Initialize modal from URL params on page load
@@ -84,7 +82,7 @@
 			const all_trips_data = trip_context.get();
 			if (all_trips_data) {
 				for (const source of sources) {
-					const trip = all_trips_data[source]?.value?.get(trip_id);
+					const trip = all_trips_data[source]?.current?.get(trip_id);
 					if (trip) {
 						tick().then(() => replaceState('', { modal: { ...trip, type: 'trip' } }));
 						break;
