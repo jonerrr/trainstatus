@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: trainstatus-dev
+  labels:
+    app: trainstatus-dev
+spec:
+  # restartPolicy: Always
+  containers:
+    - name: postgis
+      image: docker.io/postgis/postgis:18-3.6-alpine
+      env:
+        - name: POSTGRES_USER
+          value: "trains"
+        - name: POSTGRES_PASSWORD
+          value: "trains"
+        - name: POSTGRES_DB
+          value: "trains"
+      ports:
+        - containerPort: 5432
+          hostPort: 5432
+      volumeMounts:
+        - name: trainstatus-db-dev
+          mountPath: /var/lib/postgresql/data
+        - name: postgresql-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+          readOnly: true
+        - name: postgis-shm
+          mountPath: /dev/shm
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+      livenessProbe:
+        exec:
+          command:
+            - pg_isready
+            - -U
+            - trains
+            - -d
+            - trains
+        initialDelaySeconds: 5
+        periodSeconds: 5
+
+    - name: valkey
+      image: valkey/valkey:alpine@sha256:e1095c6c76ee982cb2d1e07edbb7fb2a53606630a1d810d5a47c9f646b708bf5
+      ports:
+        - containerPort: 6379
+          hostPort: 6379
+      volumeMounts:
+        - name: trainstatus-cache-dev
+          mountPath: /data
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "64Mi"
+        limits:
+          cpu: "250m"
+          memory: "256Mi"
+
+    - name: martin
+      image: ghcr.io/maplibre/martin:latest@sha256:13416ff1ec035af655e80b2d1889cf8ac234a013fde1308bb63c93d31b5db7a4
+      env:
+        - name: DATABASE_URL
+          value: "postgresql://trains:trains@127.0.0.1:5432/trains"
+      args:
+        - --config
+        - /config/martin.yml
+      ports:
+        - containerPort: 3000
+          hostPort: 3000
+      volumeMounts:
+        - name: geo-data
+          mountPath: /data
+          readOnly: true
+        - name: geo-assets
+          mountPath: /assets
+          readOnly: true
+        - name: martin-config
+          mountPath: /config/martin.yml
+          subPath: martin.yml
+          readOnly: true
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+
+  volumes:
+    - name: geo-data
+      image:
+        reference: ghcr.io/jonerrr/trainstatus-geo-data:latest
+        pullPolicy: Never
+    - name: geo-assets
+      image:
+        reference: ghcr.io/jonerrr/trainstatus-geo-assets:latest
+        pullPolicy: Never
+    - name: trainstatus-db-dev
+      persistentVolumeClaim:
+        claimName: trainstatus-db-dev
+    - name: trainstatus-cache-dev
+      persistentVolumeClaim:
+        claimName: trainstatus-cache-dev
+    - name: martin-config
+      configMap:
+        name: martin-config-dev
+    - name: postgresql-config
+      configMap:
+        name: postgresql-config-dev
+    - name: postgis-shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trainstatus-db-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trainstatus-cache-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: martin-config-dev
+data:
+  martin.yml: |-
+    route_prefix: /martin
+
+    postgres:
+      # The connection URL will be read from DATABASE_URL env var
+      connection_string: $DATABASE_URL
+
+      auto_publish:
+        tables:
+          from_schemas:
+            - static
+          # must be integer (but we are using string)
+          # id_columns: id
+        # TODO: add back functions once they are fixed
+        # functions:
+        #   from_schemas:
+        #     - realtime
+
+    sprites:
+      paths:
+        - /assets/sprites/dark-matter
+        - /assets/sprites/frontend
+
+    styles:
+      sources:
+        dark-matter: /assets/styles/dark-matter.localhost-5173.json
+        # If STYLE_BASE_URLS contains additional URLs when building geo-assets,
+        # point this to the matching generated file (for example: dark-matter.example-com.json).
+
+    fonts:
+      paths:
+        - /assets/fonts
+
+    mbtiles:
+      sources:
+        basemap: /data/basemap.mbtiles
+
+    # should be disabled in prod
+    web_ui: enable-for-all
+
+    cors: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-config-dev
+data:
+  postgresql.conf: |-
+    log_statement = 'all'
+    log_min_error_statement = 'error'
+    log_min_messages = 'error'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'

@@ -1,11 +1,19 @@
 [env]
 GEO_DATA_IMAGE = "ghcr.io/jonerrr/trainstatus-geo-data:latest"
+GEO_ASSETS_IMAGE = "ghcr.io/jonerrr/trainstatus-geo-assets:latest"
 
 [tasks.build]
-run = "podman build -f Dockerfile -t $GEO_DATA_IMAGE ."
+run = { tasks = ["//geo:build:data", "//geo:build:assets"] }
+
+[tasks."build:data"]
+run = "podman build -f Dockerfile.assets -t $GEO_DATA_IMAGE ."
+
+[tasks."build:assets"]
+run = "podman build -f Dockerfile.assets -t $GEO_ASSETS_IMAGE ."
 
 [tasks.export]
-description = "Copy generated geo artifacts from a container image into ./data"
+# TODO: remove other exports once 100% sure they aren't needed
+description = "Export valhalla config for local development"
 run = """
 set -eu
 
@@ -21,14 +29,14 @@ trap cleanup EXIT
 mkdir -p "$out_dir"
 
 podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
-podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
-podman cp "$container_id:/basemap.mbtiles" "$out_dir/basemap.mbtiles"
+# podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
+# podman cp "$container_id:/basemap.mbtiles" "$out_dir/basemap.mbtiles"
 
 tmp_json="${out_dir}/valhalla.json.tmp"
 if command -v jq >/dev/null 2>&1; then
 	jq --arg tile_extract "${out_dir}/valhalla_tiles.tar" '.mjolnir.tile_extract = $tile_extract' "$out_dir/valhalla.json" >"$tmp_json"
 else
-	echo "jq is required to update valhalla.json (install with: brew install jq)" >&2
+	echo "jq is required to update valhalla.json" >&2
 	exit 1
 fi
 mv "$tmp_json" "$out_dir/valhalla.json"

@@ -3,10 +3,10 @@ name: Update Geo Assets
 on:
     workflow_dispatch:
         inputs:
-            base_url:
-                description: Base URL to embed in style JSON references
+            style_base_urls:
+                description: Comma-separated base URLs for generated style JSON files
                 required: false
-                default: https://trainstat.us
+                default: "http://localhost:5173,https://trainstat.us"
 
 permissions:
     contents: read
@@ -43,6 +43,6 @@ jobs:
                   file: ./geo/Dockerfile.assets
                   push: true
                   build-args: |
-                      BASE_URL=${{ inputs.base_url || 'https://trainstat.us' }}
+                      STYLE_BASE_URLS=${{ inputs.style_base_urls || 'http://localhost:5173,https://trainstat.us' }}
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}

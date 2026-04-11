@@ -40,25 +40,33 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 
 ## Self Hosting
 
-- Use the prebuilt container images linked to this repository.
-- Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
-- Requires PostgreSQL with PostGIS and Valkey/Redis.
-- See `compose.test.yml` for example deployment with traefik. You will need to update the URLs inside of `geo/styles/<style>.json` to match the URL you are hosting it on.
-
-## Development
-
 ### Requirements
 
 - Podman (Docker can be used, but tasks use podman)
-- [Mise](https://mise.jdx.dev/)
 - [BusTime API Key](https://register.developer.obanyc.com/)
 - [NJT Developer Account](https://developer.njtransit.com/registration/register)
 
+- Use the prebuilt container images linked to this repository.
+- Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
+- Requires PostgreSQL with PostGIS and Valkey/Redis.
+- Geo styles are generated from `geo/styles/*.json.tmpl` during the geo-assets image build.
+  - Set `STYLE_BASE_URLS` when building `geo/Dockerfile.assets` to include your host URL(s) (comma-separated).
+- See `demo.pod.yml` for an example deployment with traefik:
+  - Copy `demo.configmap.yml.example` to `demo.configmap.yml` and fill in the required values.
+  - In `demo.pod.yml`, set `martin.yml -> styles.sources.dark-matter` to the matching generated filename (for example `dark-matter.example-com.json`).
+  - Launch it with `podman kube play --replace demo.pod.yml --configmap demo.configmap.yml`.
+- **NOTE**: You might need to restart the martin container on the first run so it can pickup the PostGIS tables
+
+## Development
+
 ### Setup
 
-1. Clone the repository
-2. Run `mise i` to ensure all tools are installed
-3. Set environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml`
-4. Run `mise //geo:build` to build valhalla and basemap tiles
-5. Run `mise //geo:export` to export tiles to your machine for local development.
-6. Start dbs, backend, and frontend with `mise dev`
+1. Install [mise](https://mise.jdx.dev/), which is used for installing various tools and running tasks.
+2. Clone the repository
+3. Run `mise i` to ensure all tools are installed
+4. Set environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml`
+5. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
+6. Start PostGIS, Valkey, and Martin from `dev.pod.yml` with `mise start-containers`.
+7. Once PostGIS is up, start backend and frontend with `mise dev`.
+
+To stop and clean up the local dev pod, run `podman kube down dev.pod.yml`.

@@ -11,6 +11,9 @@ run = "sqlx migrate run"
 depends = ["//backend:migrate"]
 run = "cargo run"
 
+[tasks.build]
+run = "podman build -f Dockerfile -t ghcr.io/jonerrr/trainstatus-backend ."
+
 [tasks.test]
 env = { SQLX_OFFLINE = "true", DATABASE_URL = "postgres://trains:trains@localhost:5432/trains" }
 run = "cargo test"
@@ -18,10 +21,12 @@ run = "cargo test"
 [tasks.reset-db]
 confirm = "Are you sure?"
 run = """
-podman compose -f ../compose.dev.yml down -v
-podman compose -f ../compose.dev.yml up -d
+podman kube down ../dev.pod.yml --force
+podman kube play --replace ../dev.pod.yml
+echo "Run DB migrations after the database is ready."
 """
-depends_post = ["//backend:migrate"]
+# TODO: make kube play block until the db is ready, then run the migration automatically.
+# depends_post = ["//backend:migrate"]
 
 [env]
 VALHALLA_CONFIG = "../geo/data/valhalla.json"
