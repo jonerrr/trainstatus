@@ -49,7 +49,7 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 - Use the prebuilt container images linked to this repository.
 - Required environment variables are listed in `backend/README.md` and `frontend/README.md`.
 - Requires PostgreSQL with PostGIS and Valkey/Redis.
-- Geo styles are generated from `geo/styles/*.json.tmpl` during the geo-assets image build.
+- Geo styles are generated from `geo/styles/*.json` during the geo-assets image build.
   - Set `STYLE_BASE_URLS` when building `geo/Dockerfile.assets` to include your host URL(s) (comma-separated).
 - See `demo.pod.yml` for an example deployment with traefik:
   - Copy `demo.configmap.yml.example` to `demo.configmap.yml` and fill in the required values.

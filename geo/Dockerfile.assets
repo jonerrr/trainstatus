@@ -20,9 +20,9 @@ RUN set -eux; \
     [ -n "${base_url}" ] || continue; \
     slug="$(printf '%s' "${base_url}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#[^a-zA-Z0-9]+#-#g; s#^-+##; s#-+$##' | tr '[:upper:]' '[:lower:]')"; \
     [ -n "${slug}" ] || slug=default; \
-    for template in /work/styles/*.json.tmpl; do \
+    for template in /work/styles/*.json; do \
     [ -f "${template}" ] || continue; \
-    style_name="$(basename "${template}" .json.tmpl)"; \
+    style_name="$(basename "${template}" .json)"; \
     sed "s|__BASE_URL__|${base_url}|g" "${template}" > "/assets/styles/${style_name}.${slug}.json"; \
     done; \
     done
