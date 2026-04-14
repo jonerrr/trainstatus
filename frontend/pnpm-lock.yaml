@@ -43,94 +43,94 @@ importers:
         specifier: 0.95.0
         version: 0.95.0(typescript@6.0.2)
       '@sveltejs/adapter-auto':
-        specifier: ^7.0.1
+        specifier: 7.0.1
         version: 7.0.1(@sveltejs/kit@2.57.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)))(svelte@5.55.3(@typescript-eslint/types@8.58.1))(typescript@6.0.2)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)))
       '@sveltejs/adapter-node':
-        specifier: ^5.5.4
+        specifier: 5.5.4
         version: 5.5.4(@sveltejs/kit@2.57.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)))(svelte@5.55.3(@typescript-eslint/types@8.58.1))(typescript@6.0.2)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)))
       '@sveltejs/kit':
-        specifier: ^2.57.1
+        specifier: 2.57.1
         version: 2.57.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)))(svelte@5.55.3(@typescript-eslint/types@8.58.1))(typescript@6.0.2)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.0.0
         version: 7.0.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))
       '@tailwindcss/forms':
-        specifier: ^0.5.11
+        specifier: 0.5.11
         version: 0.5.11(tailwindcss@4.2.2)
       '@trivago/prettier-plugin-sort-imports':
-        specifier: ^6.0.2
+        specifier: 6.0.2
         version: 6.0.2(prettier-plugin-svelte@3.5.1(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1)))(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1))
       '@types/d3-scale':
-        specifier: ^4.0.9
+        specifier: 4.0.9
         version: 4.0.9
       '@types/d3-shape':
-        specifier: ^3.1.8
+        specifier: 3.1.8
         version: 3.1.8
       '@types/d3-time':
-        specifier: ^3.0.4
+        specifier: 3.0.4
         version: 3.0.4
       '@types/eslint':
-        specifier: ^9.6.1
+        specifier: 9.6.1
         version: 9.6.1
       '@types/node':
-        specifier: ^25.6.0
+        specifier: 25.6.0
         version: 25.6.0
       '@vitest/browser-playwright':
-        specifier: ^4.1.4
+        specifier: 4.1.4
         version: 4.1.4(playwright@1.59.1)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))(vitest@4.1.4)
       eslint:
-        specifier: ^10.2.0
+        specifier: 10.2.0
         version: 10.2.0(jiti@2.6.1)
       eslint-config-prettier:
-        specifier: ^10.1.8
+        specifier: 10.1.8
         version: 10.1.8(eslint@10.2.0(jiti@2.6.1))
       eslint-plugin-svelte:
-        specifier: ^3.17.0
+        specifier: 3.17.0
         version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.3(@typescript-eslint/types@8.58.1))
       globals:
-        specifier: ^17.4.0
+        specifier: 17.4.0
         version: 17.4.0
       maplibre-gl:
-        specifier: ^5.22.0
+        specifier: 5.22.0
         version: 5.22.0
       playwright:
-        specifier: ^1.59.1
+        specifier: 1.59.1
         version: 1.59.1
       prettier:
-        specifier: ^3.8.2
+        specifier: 3.8.2
         version: 3.8.2
       prettier-plugin-svelte:
-        specifier: ^3.5.1
+        specifier: 3.5.1
         version: 3.5.1(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1))
       prettier-plugin-tailwindcss:
-        specifier: ^0.7.2
+        specifier: 0.7.2
         version: 0.7.2(@trivago/prettier-plugin-sort-imports@6.0.2(prettier-plugin-svelte@3.5.1(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1)))(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1)))(prettier-plugin-svelte@3.5.1(prettier@3.8.2)(svelte@5.55.3(@typescript-eslint/types@8.58.1)))(prettier@3.8.2)
       svelte:
         specifier: 5.55.3
         version: 5.55.3(@typescript-eslint/types@8.58.1)
       svelte-check:
-        specifier: ^4.4.5
+        specifier: 4.4.6
         version: 4.4.6(picomatch@4.0.4)(svelte@5.55.3(@typescript-eslint/types@8.58.1))(typescript@6.0.2)
       svelte-maplibre-gl:
-        specifier: ^1.0.3
+        specifier: 1.0.3
         version: 1.0.3(maplibre-gl@5.22.0)(svelte@5.55.3(@typescript-eslint/types@8.58.1))
       tailwindcss:
-        specifier: ^4.2.2
+        specifier: 4.2.2
         version: 4.2.2
       typescript:
-        specifier: ^6.0.0
+        specifier: 6.0.2
         version: 6.0.2
       typescript-eslint:
-        specifier: ^8.58.1
+        specifier: 8.58.1
         version: 8.58.1(eslint@10.2.0(jiti@2.6.1))(typescript@6.0.2)
       vite:
-        specifier: ^8.0.8
+        specifier: 8.0.8
         version: 8.0.8(@types/node@25.6.0)(jiti@2.6.1)
       vitest:
-        specifier: ^4.1.4
+        specifier: 4.1.4
         version: 4.1.4(@types/node@25.6.0)(@vitest/browser-playwright@4.1.4)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1))
       vitest-browser-svelte:
-        specifier: ^2.1.0
+        specifier: 2.1.0
         version: 2.1.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))(vitest@4.1.4)
 
 packages:
@@ -1678,10 +1678,6 @@ packages:
     resolution: {integrity: sha512-orRsuYpJVw8LdAwqqLykBj9ecS5/cRHlI5+nvTo8LcCKmzDmqVORXtOIYEEQuL9D4BxtA1lm5isAqzQZCoQ6Eg==}
     engines: {node: '>=4'}
 
-  postcss@8.5.8:
-    resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
-    engines: {node: ^10 || ^12 || >=14}
-
   postcss@8.5.9:
     resolution: {integrity: sha512-7a70Nsot+EMX9fFU3064K/kdHWZqGVY+BADLyXc8Dfv+mTLLVl6JzJpPaCZ2kQL9gIJvKXSLMHhqdRRjwQeFtw==}
     engines: {node: ^10 || ^12 || >=14}
@@ -1909,10 +1905,6 @@ packages:
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
-
-  tinyexec@1.0.4:
-    resolution: {integrity: sha512-u9r3uZC0bdpGOXtlxUIdwf9pkmvhqJdrVCH9fapQtgy/OeTTMZ1nqH7agtvEfmGui6e1XxjcdrlxvxJvc3sMqw==}
-    engines: {node: '>=18'}
 
   tinyexec@1.1.1:
     resolution: {integrity: sha512-VKS/ZaQhhkKFMANmAOhhXVoIfBXblQxGX1myCQ2faQrfmobMftXeJPcZGp0gS07ocvGJWDLZGyOZDadDBqYIJg==}
@@ -3049,9 +3041,9 @@ snapshots:
       esutils: 2.0.3
       globals: 16.5.0
       known-css-properties: 0.37.0
-      postcss: 8.5.8
-      postcss-load-config: 3.1.4(postcss@8.5.8)
-      postcss-safe-parser: 7.0.1(postcss@8.5.8)
+      postcss: 8.5.9
+      postcss-load-config: 3.1.4(postcss@8.5.9)
+      postcss-safe-parser: 7.0.1(postcss@8.5.9)
       semver: 7.7.4
       svelte-eslint-parser: 1.6.0(svelte@5.55.3(@typescript-eslint/types@8.58.1))
     optionalDependencies:
@@ -3424,7 +3416,7 @@ snapshots:
     dependencies:
       citty: 0.2.2
       pathe: 2.0.3
-      tinyexec: 1.0.4
+      tinyexec: 1.1.1
 
   obug@2.1.1: {}
 
@@ -3504,31 +3496,25 @@ snapshots:
 
   pngjs@7.0.0: {}
 
-  postcss-load-config@3.1.4(postcss@8.5.8):
+  postcss-load-config@3.1.4(postcss@8.5.9):
     dependencies:
       lilconfig: 2.1.0
       yaml: 1.10.3
     optionalDependencies:
-      postcss: 8.5.8
+      postcss: 8.5.9
 
-  postcss-safe-parser@7.0.1(postcss@8.5.8):
+  postcss-safe-parser@7.0.1(postcss@8.5.9):
     dependencies:
-      postcss: 8.5.8
+      postcss: 8.5.9
 
-  postcss-scss@4.0.9(postcss@8.5.8):
+  postcss-scss@4.0.9(postcss@8.5.9):
     dependencies:
-      postcss: 8.5.8
+      postcss: 8.5.9
 
   postcss-selector-parser@7.1.1:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
-
-  postcss@8.5.8:
-    dependencies:
-      nanoid: 3.3.11
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
 
   postcss@8.5.9:
     dependencies:
@@ -3701,8 +3687,8 @@ snapshots:
       eslint-scope: 8.4.0
       eslint-visitor-keys: 4.2.1
       espree: 10.4.0
-      postcss: 8.5.8
-      postcss-scss: 4.0.9(postcss@8.5.8)
+      postcss: 8.5.9
+      postcss-scss: 4.0.9(postcss@8.5.9)
       postcss-selector-parser: 7.1.1
       semver: 7.7.4
     optionalDependencies:
@@ -3739,8 +3725,6 @@ snapshots:
   tapable@2.3.2: {}
 
   tinybench@2.9.0: {}
-
-  tinyexec@1.0.4: {}
 
   tinyexec@1.1.1: {}
 
