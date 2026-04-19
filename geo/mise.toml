@@ -6,7 +6,7 @@ GEO_ASSETS_IMAGE = "ghcr.io/jonerrr/trainstatus-geo-assets:latest"
 run = { tasks = ["//geo:build:data", "//geo:build:assets"] }
 
 [tasks."build:data"]
-run = "podman build -f Dockerfile.assets -t $GEO_DATA_IMAGE ."
+run = "podman build -f Dockerfile -t $GEO_DATA_IMAGE ."
 
 [tasks."build:assets"]
 run = "podman build -f Dockerfile.assets -t $GEO_ASSETS_IMAGE ."
