@@ -28,7 +28,7 @@
 	const trips_loading = $derived(
 		page.data.selected_sources.some((s) => {
 			const r = all_trips[s];
-			return !r || r.status !== 'ready';
+			return !r || (r.status !== 'ready' && !r.current.size);
 		})
 	);
 
