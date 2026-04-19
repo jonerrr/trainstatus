@@ -188,7 +188,7 @@ data:
     # should be disabled in prod
     web_ui: enable-for-all
 
-    cors: false
+    cors: true
 
 ---
 apiVersion: v1
