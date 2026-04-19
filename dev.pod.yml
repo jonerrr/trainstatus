@@ -47,7 +47,7 @@ spec:
         periodSeconds: 5
 
     - name: valkey
-      image: valkey/valkey:alpine@sha256:e1095c6c76ee982cb2d1e07edbb7fb2a53606630a1d810d5a47c9f646b708bf5
+      image: valkey/valkey:alpine
       ports:
         - containerPort: 6379
           hostPort: 6379
@@ -63,7 +63,7 @@ spec:
           memory: "256Mi"
 
     - name: martin
-      image: ghcr.io/maplibre/martin:latest@sha256:13416ff1ec035af655e80b2d1889cf8ac234a013fde1308bb63c93d31b5db7a4
+      image: ghcr.io/maplibre/martin:latest
       env:
         - name: DATABASE_URL
           value: "postgresql://trains:trains@127.0.0.1:5432/trains"
