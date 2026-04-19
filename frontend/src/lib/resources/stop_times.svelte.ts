@@ -42,7 +42,8 @@ const EMPTY_INDEX: StopTimeResource<Source> = {
  * require `route_ids` on the API.
  */
 export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTimeResource<S>> {
-	#monitored_routes = new Set<string>();
+	/** route_id → number of active holders */
+	#monitored_routes = new Map<string, number>();
 	readonly #source: S;
 
 	constructor(source: S) {
@@ -51,7 +52,7 @@ export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTim
 			async (signal) => {
 				console.log(`updating ${source} stop times`);
 
-				const routes = [...this.#monitored_routes];
+				const routes = [...this.#monitored_routes.keys()];
 
 				if (source_info[source].monitor_routes && routes.length === 0) {
 					return empty;
@@ -95,19 +96,27 @@ export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTim
 	}
 
 	get monitored_routes(): ReadonlySet<string> {
-		return this.#monitored_routes;
+		return new Set(this.#monitored_routes.keys());
 	}
 
 	add_route(route_id: string): Promise<void> {
-		if (this.#monitored_routes.has(route_id)) {
-			return this.status === 'ready' ? Promise.resolve() : this.next_refresh();
+		const count = this.#monitored_routes.get(route_id) ?? 0;
+		this.#monitored_routes.set(route_id, count + 1);
+		// Only trigger a fetch the first time this route is registered
+		if (count === 0) {
+			return this.next_refresh();
 		}
-		this.#monitored_routes.add(route_id);
-		return this.next_refresh();
+		return this.status === 'ready' ? Promise.resolve() : this.next_refresh();
 	}
 
 	remove_route(route_id: string): void {
-		this.#monitored_routes.delete(route_id);
+		const count = this.#monitored_routes.get(route_id);
+		if (count === undefined) return;
+		if (count <= 1) {
+			this.#monitored_routes.delete(route_id);
+		} else {
+			this.#monitored_routes.set(route_id, count - 1);
+		}
 	}
 
 	/**

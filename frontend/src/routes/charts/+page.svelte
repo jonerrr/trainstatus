@@ -69,6 +69,9 @@
 	// TODO: add tabs so users have to choose the source
 	// Monitor bus routes in the stop_times resource
 	$effect(() => {
+		// Track what we registered so the cleanup can undo exactly that set.
+		const registered: Array<{ source: Source; route_id: string }> = [];
+
 		for (const source of page.data.selected_sources) {
 			if (!source_info[source].monitor_routes) {
 				// stop times are already loaded for this source
@@ -79,8 +82,15 @@
 
 			for (const route of routes[source] ?? []) {
 				resource.add_route(route.id);
+				registered.push({ source, route_id: route.id });
 			}
 		}
+
+		return () => {
+			for (const { source, route_id } of registered) {
+				all_stop_times[source]?.remove_route(route_id);
+			}
+		};
 	});
 
 	const data = $derived.by(() => {
