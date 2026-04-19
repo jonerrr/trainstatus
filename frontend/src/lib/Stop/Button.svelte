@@ -26,9 +26,15 @@
 
 	$effect(() => {
 		if (stop_times && source_info[stop.data.source]?.monitor_routes) {
-			for (const r of stop.routes) {
-				stop_times.add_route(r.route_id);
+			const route_ids = stop.routes.map((r) => r.route_id);
+			for (const id of route_ids) {
+				stop_times.add_route(id);
 			}
+			return () => {
+				for (const id of route_ids) {
+					stop_times.remove_route(id);
+				}
+			};
 		}
 	});
 
