@@ -60,34 +60,31 @@
 		const trip_id = url.searchParams.get('t');
 		const source_id = url.searchParams.get('src') as Source | null;
 
-		const sources: Source[] = source_id ? [source_id] : page.data.selected_sources;
-		// TODO: require source param so we don't need to iterate through sources
+		if (!source_id) {
+			console.warn('No source specified in URL params, skipping modal initialization');
+			return;
+		}
+
 		if (stop_id) {
-			for (const source of sources) {
-				const stop = page.data.stops_by_id[source]?.[stop_id];
-				if (stop) {
-					tick().then(() => replaceState('', { modal: { ...stop, type: 'stop' } }));
-					break;
-				}
+			const stop = page.data.stops_by_id[source_id]?.[stop_id];
+			if (stop) {
+				tick().then(() => replaceState('', { modal: { ...stop, type: 'stop' } }));
 			}
 		} else if (route_id) {
-			for (const source of sources) {
-				const route = page.data.routes_by_id[source]?.[route_id];
-				if (route) {
-					tick().then(() => replaceState('', { modal: { ...route, type: 'route' } }));
-					break;
-				}
+			const route = page.data.routes_by_id[source_id]?.[route_id];
+			if (route) {
+				tick().then(() => replaceState('', { modal: { ...route, type: 'route' } }));
 			}
 		} else if (trip_id) {
 			const all_trips_data = trip_context.get();
-			if (all_trips_data) {
-				for (const source of sources) {
-					const trip = all_trips_data[source]?.current?.get(trip_id);
-					if (trip) {
+			const resource = all_trips_data[source_id];
+			if (resource) {
+				resource.whenReady().then((trips) => {
+					const trip = trips.get(trip_id);
+					if (trip && page.url.searchParams.get('t') === trip_id) {
 						tick().then(() => replaceState('', { modal: { ...trip, type: 'trip' } }));
-						break;
 					}
-				}
+				});
 			}
 		}
 	});
