@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.0...frontend-v1.2.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* **charts:** loading skeleton ([d7d8236](https://github.com/jonerrr/trainstatus/commit/d7d8236ece486263881d803f4d5378d2cd3a6c9f)), closes [#307](https://github.com/jonerrr/trainstatus/issues/307)
+* trip share url not working ([e5f19d9](https://github.com/jonerrr/trainstatus/commit/e5f19d965353a2737b38c3cdaaa5031917937e32)), closes [#325](https://github.com/jonerrr/trainstatus/issues/325)
+* unmonitor old routes ([7c8c1c7](https://github.com/jonerrr/trainstatus/commit/7c8c1c72cdf31676374bc15f627c6a3b08d8e030)), closes [#319](https://github.com/jonerrr/trainstatus/issues/319)
+
 ## [1.2.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.1.4...frontend-v1.2.0) (2026-04-11)
 
 
