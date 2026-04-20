@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/jonerrr/trainstatus/compare/backend-v1.2.0...backend-v1.2.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* **deps:** update backend ([#318](https://github.com/jonerrr/trainstatus/issues/318)) ([197d6a3](https://github.com/jonerrr/trainstatus/commit/197d6a342941d358a881c7d42ea4a778bba3ee0b))
+* **mta_subway:** update geometry handling to support multiple features per route ([de28839](https://github.com/jonerrr/trainstatus/commit/de28839a1282be4a3a72fc4571f22ca64c3b3d87))
+
 ## [1.2.0](https://github.com/jonerrr/trainstatus/compare/backend-v1.1.4...backend-v1.2.0) (2026-04-11)
 
 
