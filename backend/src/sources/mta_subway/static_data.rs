@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::{Geometry, Point};
+use geo::{Geometry, LineString, MultiLineString, Point};
 use geojson::FeatureCollection;
 use gtfs_structures::StopTransfer;
 use rayon::prelude::*;
@@ -238,9 +238,10 @@ impl MtaSubwayStatic {
     }
 
     /// Download and parse the MTA service lines dataset and return a map of route_id to geometry.
-    async fn create_route_geom_map() -> anyhow::Result<HashMap<String, Geometry>> {
+    async fn create_route_geom_map() -> anyhow::Result<HashMap<String, MultiLineString<f64>>> {
         let geojson: FeatureCollection = reqwest::get(SERVICE_LINES_GEOM_URL).await?.json().await?;
-        let mut geom_map = HashMap::new();
+        // For some reason like 2 of the routes have multiple features, so we need to store the pieces and combine them at the end
+        let mut geom_parts_map: HashMap<String, Vec<LineString<f64>>> = HashMap::new();
 
         for feature in geojson.features {
             let Some(geom) = feature
@@ -248,6 +249,12 @@ impl MtaSubwayStatic {
                 .and_then(|g| Geometry::<f64>::try_from(g).ok())
             else {
                 continue;
+            };
+
+            let line_parts: Vec<LineString<f64>> = match geom {
+                Geometry::LineString(line) => vec![line],
+                Geometry::MultiLineString(multi) => multi.0,
+                _ => continue,
             };
 
             let Some(props) = feature.properties else {
@@ -269,8 +276,16 @@ impl MtaSubwayStatic {
             }
             .to_string();
 
-            geom_map.insert(route_id, geom);
+            geom_parts_map
+                .entry(route_id)
+                .or_default()
+                .extend(line_parts);
         }
+
+        let geom_map = geom_parts_map
+            .into_iter()
+            .map(|(route_id, lines)| (route_id, MultiLineString(lines)))
+            .collect();
 
         Ok(geom_map)
     }
@@ -278,7 +293,7 @@ impl MtaSubwayStatic {
     /// Parse routes from GTFS data
     fn import_routes(
         gtfs: &gtfs_structures::Gtfs,
-        route_geom_map: HashMap<String, Geometry>,
+        route_geom_map: HashMap<String, MultiLineString<f64>>,
     ) -> Vec<Route> {
         gtfs.routes
             .values()

@@ -29,7 +29,7 @@ trap cleanup EXIT
 mkdir -p "$out_dir"
 
 podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
-# podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
+podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
 # podman cp "$container_id:/basemap.mbtiles" "$out_dir/basemap.mbtiles"
 
 tmp_json="${out_dir}/valhalla.json.tmp"
