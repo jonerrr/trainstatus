@@ -60,7 +60,7 @@ utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
 
 [dev-dependencies]
-axum-test = "=19.1.1"
+axum-test = "=20.0.0"
 test-log = { version = "=0.2.20", default-features = false, features = ["trace"] }
 tokio-test = "=0.4.5"
 
