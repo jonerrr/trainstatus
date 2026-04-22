@@ -13,6 +13,7 @@ dependencies = [
   "lonboard>=0.12.1",
   "matplotlib>=3.10.3",
   "movingpandas>=0.21.0",
+  "notebook>=7.5.5",
   "polars>=1.30.0",
   "polars-st>=0.3.0",
   "polyline>=2.0.4",
