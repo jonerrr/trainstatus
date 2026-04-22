@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.1...frontend-v1.2.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* separate load function into universal and server side ([025a83d](https://github.com/jonerrr/trainstatus/commit/025a83dc51393958c2cea94b10e11bc1d8bf19bc))
+
 ## [1.2.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.0...frontend-v1.2.1) (2026-04-20)
 
 
