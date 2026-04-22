@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.2...frontend-v1.2.3) (2026-04-22)
+
+
+### Bug Fixes
+
+* **deps:** update frontend to fix twcss vite bug ([787f263](https://github.com/jonerrr/trainstatus/commit/787f263f1926304ff4e1f760bc14cc14461168c3))
+* **mise:** run pnpm install if dep list changed when running dev task ([684a5b5](https://github.com/jonerrr/trainstatus/commit/684a5b505d7e675ce186b48534134f0ace14f1a0))
+
 ## [1.2.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.1...frontend-v1.2.2) (2026-04-22)
 
 
