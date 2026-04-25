@@ -47,7 +47,6 @@ tower = { version = "0.5.2", features = ["buffer", "limit"] }
 tower-http = { version = "0.6.6", features = [
   "compression-br",
   "compression-gzip",
-  "cors",
   "normalize-path",
   "timeout",
   "trace",
