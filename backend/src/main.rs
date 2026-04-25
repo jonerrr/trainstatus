@@ -130,7 +130,12 @@ async fn main() {
 
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
-    servers((url = "/api")),
+    // Don't override `servers` here. `OpenApiRouter::nest(&api_v1_prefix, …)`
+    // already rewrites every path to start with the configured API_PREFIX
+    // (e.g. `/api/v1/stops/…`). Adding `servers((url = "/api"))` made the
+    // generated client URL `/api/api/v1/stops/…` — the prefix was applied
+    // twice (issue #341). Letting utoipa default to no `servers` entry
+    // means the paths are served as-is on the request origin.
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
