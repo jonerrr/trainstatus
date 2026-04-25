@@ -1,4 +1,4 @@
-FROM rust:slim@sha256:319f354c6f068b01c19292555033a0e6133b4249a893c479aec3b0b8ab2f660a AS build
+FROM rust:slim@sha256:c03ea1587a8e4474ae1a3f4a377cbb35ad53d2eb5c27f0bdf1ca8986025e322f AS build
 
 RUN set -eux; \
     apt-get update; \
@@ -12,6 +12,7 @@ RUN cargo build --release
 FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817fdee9b58c5e7b2adb6e422749c43
 
 WORKDIR /app
-COPY --from=build /app/target/release/backend /backend
+COPY --chown=ubuntu:ubuntu --from=build /app/target/release/backend /backend
+USER ubuntu
 # EXPOSE 3055
 ENTRYPOINT [ "/backend" ]

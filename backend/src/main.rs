@@ -16,10 +16,7 @@ use tokio::{
 };
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
-    compression::CompressionLayer,
-    cors::{AllowOrigin, CorsLayer},
-    normalize_path::NormalizePathLayer,
-    trace::TraceLayer,
+    compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
@@ -129,15 +126,6 @@ async fn main() {
 
     engines::alerts::run(&alert_store, alert_adapters).await;
 
-    let cors_layer =
-        CorsLayer::new()
-            .allow_methods([Method::GET])
-            .allow_origin(AllowOrigin::predicate(
-                |origin: &HeaderValue, _request_parts: &Parts| {
-                    origin.as_bytes().ends_with(b".trainstat.us")
-                },
-            ));
-
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
     #[derive(OpenApi)]
@@ -186,7 +174,6 @@ async fn main() {
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
                 .layer(CompressionLayer::new())
-                .layer(cors_layer)
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,

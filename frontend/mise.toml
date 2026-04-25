@@ -1,5 +1,12 @@
+[tasks.pnpm-install]
+description = "Installs dependencies with pnpm"
+run = "pnpm install"
+sources = ["package.json", "pnpm-lock.yaml", "mise.toml"]
+outputs = ["node_modules/.pnpm/lock.yaml"]
+
 [tasks.dev]
 run = "pnpm dev"
+depends = ["pnpm-install"]
 
 [tasks.build]
 run = "podman build -f Dockerfile -t ghcr.io/jonerrr/trainstatus-frontend ."

@@ -10,7 +10,7 @@ spec:
     - name: traefik
       image: traefik:v3
       args:
-        - --api.insecure=true
+        - --api.insecure=true # REMOVE IN PROD!!!!!!!!!!
         - --entrypoints.web.address=:80
         - --providers.file.filename=/etc/traefik/dynamic.yml
         - --providers.file.watch=true
