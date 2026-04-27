@@ -356,11 +356,11 @@ mod tests {
     async fn test_process_subway_trip_from_fixture() {
         let fixture = load_fixture("mta_subway/mta_subway-ace.pb");
         let adapter = MtaSubwayRealtime;
-        
+
         // We don't need a real redis for this unit test as _static_cache_store is unused in subway process_trip
-        // but we need a placeholder if we were to call it. 
+        // but we need a placeholder if we were to call it.
         // For now, subway doesn't use it.
-        
+
         let mut trip_count = 0;
         for entity in fixture.entity {
             if let Some(update) = entity.trip_update {
@@ -375,7 +375,7 @@ mod tests {
                     assert!(!trip.vehicle_id.is_empty());
                     // MTA Subway direction is usually 1 or 3
                     assert!(trip.direction == 1 || trip.direction == 3);
-                    
+
                     if !stop_times.is_empty() {
                         let st = &stop_times[0];
                         assert_eq!(st.trip_id, trip.id);
@@ -384,6 +384,9 @@ mod tests {
                 }
             }
         }
-        assert!(trip_count > 0, "Should have processed at least one trip from fixture");
+        assert!(
+            trip_count > 0,
+            "Should have processed at least one trip from fixture"
+        );
     }
 }

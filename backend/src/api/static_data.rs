@@ -26,10 +26,11 @@ fn cache_headers(etag_hash: &str) -> HeaderMap {
 /// Returns `true` if the client's `If-None-Match` header matches the stored etag.
 fn etag_matches(request_headers: &HeaderMap, etag_hash: &str) -> bool {
     if let Some(inm) = request_headers.get(http::header::IF_NONE_MATCH)
-        && let Ok(inm_str) = inm.to_str() {
-            let quoted = format!("\"{}\"", etag_hash);
-            return inm_str == quoted || inm_str == "*";
-        }
+        && let Ok(inm_str) = inm.to_str()
+    {
+        let quoted = format!("\"{}\"", etag_hash);
+        return inm_str == quoted || inm_str == "*";
+    }
     false
 }
 
@@ -62,7 +63,11 @@ pub async fn routes_handler(
         return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
 
-    let routes = state.route_store.get_all(source).await?;
+    // TODO: improve get_all api so we don't have to fetch all the data just to remove the geometry
+    let mut routes = state.route_store.get_all(source).await?;
+    for r in &mut routes {
+        r.geom = None;
+    }
 
     let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())

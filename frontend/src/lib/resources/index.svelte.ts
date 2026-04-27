@@ -26,7 +26,7 @@ export const source_info = {
 	// TODO: make it possible to disable refresh_interval for sources
 	// TODO: make it possible to update refresh_interval time dynamically (e.g. if user is offline)
 	mta_bus: {
-		name: 'Bus',
+		name: 'MTA Bus',
 		icon: mta_bus_icon,
 		refresh_interval: {
 			trips: 30_000,
@@ -39,7 +39,7 @@ export const source_info = {
 		monitor_routes: true
 	},
 	mta_subway: {
-		name: 'Subway',
+		name: 'MTA Subway',
 		icon: mta_subway_icon,
 		refresh_interval: {
 			trips: 30_000,

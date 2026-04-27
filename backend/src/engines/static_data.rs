@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, instrument};
 
+use crate::engines::trajectory::compute_stop_distances_from_geometry;
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
 use crate::stores::route::RouteStore;
@@ -160,7 +161,38 @@ async fn run_source_handler(
                                 pending_waiters.push(respond_to);
                             }
                             Ok(false) => {
-                                // No update needed - respond immediately
+                                // TODO: either check all sources for staleness here, or add separate check
+                                // No update needed, but we should ensure the stop distance cache is populated.
+                                // If the server restarted and Redis was cleared, we need to rebuild it
+                                // from the DB without triggering a full expensive import.
+                                if static_cache_store
+                                    .get_stop_distance_table(adapter.source())
+                                    .await
+                                    .is_empty()
+                                {
+                                    info!(
+                                        "Stop distance cache is empty for {:?}, rebuilding from DB...",
+                                        adapter.source()
+                                    );
+                                    match compute_stop_distance_table(
+                                        adapter.source(),
+                                        &route_store,
+                                        &stop_store,
+                                        &static_cache_store,
+                                    )
+                                    .await
+                                    {
+                                        Ok(count) => info!(
+                                            "Cached stop distance table ({} route+direction pairs)",
+                                            count
+                                        ),
+                                        Err(e) => {
+                                            error!("Failed to compute stop distance table: {:#}", e)
+                                        }
+                                    }
+                                }
+
+                                // respond immediately
                                 let _ = respond_to.send(Ok(()));
                             }
                             Err(e) => {
@@ -245,6 +277,24 @@ fn spawn_import(
             {
                 error!("Failed to compute proximity transfers: {:#}", e);
             }
+
+            // Compute stop distance table for the trajectory engine.
+            // This projects each stop onto its route geometry to get cumulative distances.
+            // Non-fatal — trajectory rendering is degraded but not broken without it.
+            match compute_stop_distance_table(
+                adapter_clone.source(),
+                &route_store_clone,
+                &stop_store_clone,
+                &static_cache_store_clone,
+            )
+            .await
+            {
+                Ok(count) => info!(
+                    "Cached stop distance table ({} route+direction pairs)",
+                    count
+                ),
+                Err(e) => error!("Failed to compute stop distance table: {:#}", e),
+            }
         } else if let Err(e) = &result {
             error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
         }
@@ -290,4 +340,67 @@ async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyho
     let refresh_secs = adapter.refresh_interval().as_secs() as i64;
 
     Ok(elapsed > refresh_secs)
+}
+
+/// Compute and cache the stop distance table for a source.
+///
+/// After routes and stops have been imported, this function:
+/// 1. Fetches all routes (with geometry) and stops from the stores
+/// 2. Extracts the route_stop associations from each stop's `routes` field
+/// 3. Calls `compute_stop_distances_from_geometry` to project stops onto route lines
+/// 4. Caches the result in Redis via `StaticCacheStore`
+///
+/// Returns the number of (route_id, direction) entries in the table.
+async fn compute_stop_distance_table(
+    source: Source,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
+    static_cache_store: &StaticCacheStore,
+) -> anyhow::Result<usize> {
+    let routes = route_store.get_all(source).await?;
+    let stops = stop_store.get_all(source).await?;
+
+    // Build route_stops tuples from each stop's routes field.
+    // For MTA Subway, direction is inferred from the stop_id suffix:
+    //   stop_id ending in 'N' → direction 1 (northbound)
+    //   stop_id ending in 'S' → direction 3 (southbound)
+    // For bus sources, direction comes from the RouteStopData variant.
+    let mut route_stops: Vec<(String, String, i16)> = Vec::new();
+    for stop in &stops {
+        for rs in &stop.routes {
+            let direction = match &rs.data {
+                crate::models::stop::RouteStopData::MtaSubway { .. } => {
+                    // MTA Subway encodes direction in stop_id suffix
+                    if rs.stop_id.ends_with('N') {
+                        1
+                    } else if rs.stop_id.ends_with('S') {
+                        3
+                    } else {
+                        // Parent stop — add both directions
+                        route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), 1));
+                        route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), 3));
+                        continue;
+                    }
+                }
+                crate::models::stop::RouteStopData::MtaBus { direction, .. } => *direction,
+                crate::models::stop::RouteStopData::NjtBus { direction, .. } => *direction,
+            };
+            route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), direction));
+        }
+    }
+
+    tracing::info!(
+        "Extracted {} route_stops from {} stops (source={:?})",
+        route_stops.len(),
+        stops.len(),
+        source
+    );
+
+    let table = compute_stop_distances_from_geometry(&routes, &stops, &route_stops)?;
+    let count = table.len();
+    static_cache_store
+        .set_stop_distance_table(source, &table)
+        .await?;
+
+    Ok(count)
 }

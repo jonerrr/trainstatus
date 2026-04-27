@@ -24,6 +24,7 @@ pub struct AppState {
     pub stop_time_store: crate::stores::stop_time::StopTimeStore,
     pub position_store: crate::stores::position::PositionStore,
     pub alert_store: crate::stores::alert::AlertStore,
+    pub static_cache_store: crate::stores::static_cache::StaticCacheStore,
 }
 
 impl AppState {
@@ -34,6 +35,7 @@ impl AppState {
         stop_time_store: crate::stores::stop_time::StopTimeStore,
         position_store: crate::stores::position::PositionStore,
         alert_store: crate::stores::alert::AlertStore,
+        static_cache_store: crate::stores::static_cache::StaticCacheStore,
     ) -> Self {
         Self {
             route_store,
@@ -42,6 +44,7 @@ impl AppState {
             stop_time_store,
             position_store,
             alert_store,
+            static_cache_store,
         }
     }
 }
@@ -81,5 +84,9 @@ pub fn prefixed_path(prefix: &str, path: &str) -> String {
         return format!("/{}", path.trim_start_matches('/'));
     }
 
-    format!("{}/{}", prefix.trim_end_matches('/'), path.trim_start_matches('/'))
+    format!(
+        "{}/{}",
+        prefix.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    )
 }

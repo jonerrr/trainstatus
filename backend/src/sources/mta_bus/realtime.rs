@@ -300,19 +300,19 @@ impl RealtimeAdapter for MtaBusRealtime {
                 if let Some(vehicle) = entity.vehicle
                     && let Some(mut position) =
                         self.process_vehicle(vehicle, static_cache_store).await
-                    {
-                        // Merge OBA data if available
-                        if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
-                            // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
-                            if let PositionData::MtaBus(data) = &mut position.data {
-                                data.passengers = oba_data.occupancy_count;
-                                data.capacity = oba_data.occupancy_capacity;
-                                data.status = Some(oba_data.status.clone());
-                                data.phase = Some(oba_data.phase.clone());
-                            }
+                {
+                    // Merge OBA data if available
+                    if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
+                        // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
+                        if let PositionData::MtaBus(data) = &mut position.data {
+                            data.passengers = oba_data.occupancy_count;
+                            data.capacity = oba_data.occupancy_capacity;
+                            data.status = Some(oba_data.status.clone());
+                            data.phase = Some(oba_data.phase.clone());
                         }
-                        positions.push(position);
                     }
+                    positions.push(position);
+                }
             }
         }
 
@@ -336,19 +336,20 @@ impl RealtimeAdapter for MtaBusRealtime {
                     if let Some(db_err) = e
                         .downcast_ref::<sqlx::Error>()
                         .and_then(|x| x.as_database_error())
-                        && db_err.code().as_deref() == Some("23503") {
-                            warn!("Missing static data for bus. Forcing update...");
+                        && db_err.code().as_deref() == Some("23503")
+                    {
+                        warn!("Missing static data for bus. Forcing update...");
 
-                            if let Err(update_err) = static_controller
-                                .force_update(GtfsSource::source(self))
-                                .await
-                            {
-                                anyhow::bail!("Ensure update failed: {}", update_err);
-                            }
-
-                            attempts += 1;
-                            continue;
+                        if let Err(update_err) = static_controller
+                            .force_update(GtfsSource::source(self))
+                            .await
+                        {
+                            anyhow::bail!("Ensure update failed: {}", update_err);
                         }
+
+                        attempts += 1;
+                        continue;
+                    }
 
                     return Err(e);
                 }
@@ -433,7 +434,7 @@ mod tests {
     async fn test_process_bus_trip_from_fixture() {
         let fixture = load_fixture("mta_bus/mta_bus-trips.pb");
         let adapter = MtaBusRealtime;
-        
+
         let mut trip_count = 0;
         for entity in fixture.entity {
             if let Some(update) = entity.trip_update {
@@ -448,7 +449,7 @@ mod tests {
                     assert!(!trip.vehicle_id.is_empty());
                     // MTA Bus direction is usually 0 or 1
                     assert!(trip.direction == 0 || trip.direction == 1);
-                    
+
                     if !stop_times.is_empty() {
                         let st = &stop_times[0];
                         assert_eq!(st.trip_id, trip.id);
@@ -457,6 +458,9 @@ mod tests {
                 }
             }
         }
-        assert!(trip_count > 0, "Should have processed at least one bus trip from fixture");
+        assert!(
+            trip_count > 0,
+            "Should have processed at least one bus trip from fixture"
+        );
     }
 }

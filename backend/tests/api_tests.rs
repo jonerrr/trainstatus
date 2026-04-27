@@ -1,9 +1,13 @@
-use backend::api::router;
-use backend::AppState;
 use axum_test::TestServer;
-use sqlx::postgres::PgPoolOptions;
+use backend::AppState;
+use backend::api::router;
+use backend::stores::static_cache::StaticCacheStore;
+use backend::stores::{
+    alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
+    stop_time::StopTimeStore, trip::TripStore,
+};
 use bb8_redis::RedisConnectionManager;
-use backend::stores::{route::RouteStore, stop::StopStore, trip::TripStore, stop_time::StopTimeStore, position::PositionStore, alert::AlertStore};
+use sqlx::postgres::PgPoolOptions;
 
 #[tokio::test]
 async fn test_health_route() {
@@ -18,7 +22,8 @@ async fn test_health_route() {
 async fn mock_app_state() -> AppState {
     let pg_pool = PgPoolOptions::new()
         .max_connections(1)
-        .connect_lazy("postgres://localhost/unused").unwrap();
+        .connect_lazy("postgres://localhost/unused")
+        .unwrap();
 
     let manager = RedisConnectionManager::new("redis://localhost").unwrap();
     let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
@@ -30,5 +35,6 @@ async fn mock_app_state() -> AppState {
         StopTimeStore::new(pg_pool.clone(), redis_pool.clone()),
         PositionStore::new(pg_pool.clone(), redis_pool.clone()),
         AlertStore::new(pg_pool.clone(), redis_pool.clone()),
+        StaticCacheStore::new(redis_pool.clone()),
     )
 }

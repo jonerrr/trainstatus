@@ -1,7 +1,6 @@
 experimental_monorepo_root = true
 
 [tools]
-# "github:protomaps/go-pmtiles" = "latest"
 "aqua:astral-sh/uv" = "latest"
 "core:rust" = "latest"
 "core:node" = "latest"
@@ -19,7 +18,7 @@ DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
 REDIS_URL = "redis://localhost:6379"
 
 [tasks.start-containers]
-run = "podman kube play --replace dev.pod.yml"
+run = "podman kube play dev.pod.yml"
 
 [tasks.dev]
 # broken since it the sqlx mig fails because the database isn't ready yet. need to add a wait-for step or something.

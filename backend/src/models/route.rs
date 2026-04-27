@@ -22,7 +22,7 @@ pub struct Route {
     pub data: RouteData,
     /// Not included in API response. Use martin tile server layer for geometry instead.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(skip_deserializing)]
+    #[schema(ignore, value_type = Option<Object>)]
     pub geom: Option<Geom>,
 }
 

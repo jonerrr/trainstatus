@@ -130,7 +130,6 @@ async fn main() {
 
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
-    servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
@@ -146,6 +145,7 @@ async fn main() {
         stop_time_store,
         position_store,
         alert_store,
+        static_cache_store,
     };
 
     let api_prefix = api_prefix().to_owned();
