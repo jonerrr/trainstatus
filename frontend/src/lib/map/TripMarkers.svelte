@@ -85,8 +85,6 @@
 	let renderInvalidated = $state(true);
 	let lastRenderedTime: number | null = $state(null);
 
-	let featuresData = $state<MarkerFeatureCollection>(emptyFeatureCollection);
-
 	function colorToCss(color: [number, number, number]): string {
 		return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 	}
@@ -187,7 +185,6 @@
 	}
 
 	function renderMarkers(t: number) {
-		// 3. IMPERATIVE UPDATE: Bypass Svelte's reactivity for 60fps performance
 		const map = mapCtx.map;
 		if (!map) return;
 
@@ -202,7 +199,6 @@
 	}
 
 	async function openTripModal(tripId: string, routeId: string, color: string) {
-		// Use the safely extracted resource
 		const trip = tripResource?.current?.get(tripId);
 		if (trip) {
 			open_modal({ type: 'trip', ...trip });
