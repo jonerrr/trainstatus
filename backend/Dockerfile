@@ -9,7 +9,7 @@ COPY . .
 ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817fdee9b58c5e7b2adb6e422749c43
+FROM ghcr.io/valhalla/valhalla:3.7.0@sha256:c19b052fa132474da719e0e931007cd3931f25c43890f88acf270ba837fdc89f
 
 WORKDIR /app
 COPY --chown=ubuntu:ubuntu --from=build /app/target/release/backend /backend
