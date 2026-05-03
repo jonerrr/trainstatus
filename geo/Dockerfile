@@ -27,7 +27,7 @@ RUN --mount=type=cache,id=osm-pbf-cache,target=/var/cache/osm-pbfs \
     /var/cache/osm-pbfs/connecticut-latest.osm.pbf \
     -o /build/merged.osm.pbf
 
-FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817fdee9b58c5e7b2adb6e422749c43 AS valhalla-builder
+FROM ghcr.io/valhalla/valhalla:3.7.0@sha256:c19b052fa132474da719e0e931007cd3931f25c43890f88acf270ba837fdc89f AS valhalla-builder
 
 WORKDIR /build
 COPY --from=osm-data /build/merged.osm.pbf /build/merged.osm.pbf
