@@ -11,8 +11,15 @@ run = "sqlx migrate run"
 depends = ["//backend:migrate"]
 run = "cargo run"
 
+# TODO: combine into 1 task with args
+[tasks."fixtures:mta_subway"]
+run = "cargo run --features fixture-capture --bin fixtures -- mta_subway"
+
+[tasks."fixtures:mta_bus"]
+run = "cargo run --features fixture-capture --bin fixtures -- mta_bus"
+
 [tasks.build]
-run = "podman build -f Dockerfile -t ghcr.io/jonerrr/trainstatus-backend ."
+run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t ghcr.io/jonerrr/trainstatus-backend ."
 
 [tasks.test]
 env = { SQLX_OFFLINE = "true", DATABASE_URL = "postgres://trains:trains@localhost:5432/trains" }

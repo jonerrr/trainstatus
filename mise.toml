@@ -17,8 +17,9 @@ config_roots = ["backend", "frontend", "geo", "science"]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
 REDIS_URL = "redis://localhost:6379"
 
-[tasks.start-containers]
-run = "podman kube play dev.pod.yml"
+[tasks."containers:init"]
+description = "Create the pods for development."
+run = "podman kube play dev.pod.yml --replace"
 
 [tasks.dev]
 # broken since it the sqlx mig fails because the database isn't ready yet. need to add a wait-for step or something.

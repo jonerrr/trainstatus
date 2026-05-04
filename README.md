@@ -1,7 +1,7 @@
 # Train Status
 
 > [!WARNING]
-> This is a work in progress. Some features are still missing/broken.
+> This is a work in progress. Some features are still missing/broken and breaking changes will occur.
 
 The best website to check the status of your train (and bus).
 

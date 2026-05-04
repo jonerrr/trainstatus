@@ -1,5 +1,8 @@
 FROM rust:slim@sha256:c03ea1587a8e4474ae1a3f4a377cbb35ad53d2eb5c27f0bdf1ca8986025e322f AS build
 
+ARG MTA_API_URL
+ENV MTA_API_URL=${MTA_API_URL}
+
 RUN set -eux; \
     apt-get update; \
     apt-get install --yes --no-install-recommends protobuf-compiler;
