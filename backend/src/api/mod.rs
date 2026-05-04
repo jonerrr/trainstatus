@@ -52,7 +52,6 @@ pub fn router(state: AppState) -> OpenApiRouter {
 }
 
 // not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
-#[allow(dead_code)]
 pub fn json_headers() -> &'static HeaderMap {
     static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
     HEADERS.get_or_init(|| {

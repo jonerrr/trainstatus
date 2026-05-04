@@ -3,9 +3,9 @@ use bb8_redis::RedisConnectionManager;
 use redis::AsyncCommands;
 use std::time::Duration;
 
-use crate::engines::trajectory::StopDistanceTable;
 use crate::models::source::Source;
 use crate::models::static_cache::CachedTrip;
+use crate::utils::trajectory::StopDistanceTable;
 
 /// TTL for the stop distance table — 48 hours (same as other static data)
 const STOP_DIST_TTL: Duration = Duration::from_secs(48 * 60 * 60);
@@ -14,7 +14,7 @@ const STOP_DIST_TTL: Duration = Duration::from_secs(48 * 60 * 60);
 pub struct StaticCacheStore {
     redis_pool: Pool<RedisConnectionManager>,
 }
-
+// TODO: maybe replace this with a postgres UNCLOGGED table
 impl StaticCacheStore {
     pub fn new(redis_pool: Pool<RedisConnectionManager>) -> Self {
         Self { redis_pool }

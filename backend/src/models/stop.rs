@@ -19,6 +19,12 @@ pub struct Stop {
     // probably also make a custom serializer/deserializer
     #[schema(schema_with = point_schema)]
     pub geom: Geom,
+    // TODO: consider implementing parent stop id
+    // I think we might want to just find the route ids on the parent stop ids and attach them to the actual stop and not include other location types
+    // pub parent_stop_id: Option<String>,
+    /// See https://gtfs.org/documentation/schedule/reference/#stopstxt location_type field for more details on what these values represent
+    /// Values above 4 are not
+    // pub location_type: i16,
     #[sqlx(json)]
     pub transfers: Vec<Transfer>,
     #[sqlx(json)]
@@ -37,22 +43,92 @@ pub struct Transfer {
     pub min_transfer_time: Option<i16>,
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EgressType {
+    Staircase,
+    Elevator,
+    Escalator,
+    FareControl,
+    Door,
+    Exit,
+    Ramp,
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum VerticalDirection {
+    Up,
+    Down,
+    None,
+}
+
+// TODO: this should match the trip direction (and maybe add east and west)
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PlatformDirection {
+    North,
+    South,
+}
+
+/// Represents a marker on the platform that indicates where a consist will stop.
+/// For example if we have "marked_as: "S", direction: North, position_ft: 13",
+/// That means this marker is for northbound trains which will arrive from the south and stop 13 feet from the north end of the platform.
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct CarMarker {
+    /// The label on the platform. Usually is a number representing the amount of cars in the consist.
+    /// Sometimes its "S" or "OPTO S", which seems to be short for the motorman's stop board.
+    pub marked_as: String,
+    /// One-person operations
+    pub is_opto: bool,
+    /// Length of the consist in feet that this marker is meant to accommodate
+    pub consist_length_ft: Option<f32>,
+    /// Position of the marker on the platform in feet starting from the railway north end of the platform
+    /// The value can be between 0 and the length of the platform edge.
+    pub position_ft: f32,
+    /// Direction of the trips that the marker is for.
+    pub direction: PlatformDirection,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct EgressPoint {
+    pub id: i32,
+    pub egress_type: EgressType,
+    // TODO: double check reference point
+    /// Position of the egress point on the platform in feet from a reference point
+    pub position_ft: f32,
+    pub vertical_direction: VerticalDirection,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct PlatformEdge {
+    pub id: String,
+    // #[serde(rename = "sectionId")]
+    // pub section_id: String,
+    pub length_ft: f32,
+    pub car_markers: Vec<CarMarker>,
+    pub egress_points: Vec<EgressPoint>,
+}
+
+// TODO: should we use pathAdjusted or normal lat/lng for mtasubway
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct MtaSubwayStopData {
-    pub ada: bool,
-    /// Notes about ADA accessibility at the stop
-    #[schema(example = "Uptown only")]
-    pub notes: Option<String>,
+    pub gtfs_stop_id: String,
+    pub bubble_id: String,
+    pub platform_edges: Vec<PlatformEdge>,
+    pub line: String,
+    pub is_major: bool,
     #[schema(example = "242 St")]
     pub north_headsign: String,
     #[schema(example = "Manhattan")]
     pub south_headsign: String,
-    // TODO: maybe remove borough since its not used (and can be determined from geom)
-    pub borough: Borough,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct MtaBusStopData {
+    pub bearing: Option<f64>,
+    pub is_boardable: bool,
     pub direction: CompassDirection,
 }
 
@@ -159,8 +235,8 @@ pub enum CompassDirection {
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
 // Thanks MTA for that
 // Shout out to N12 for being included in the static gtfs data even though its not a real stop (The lat/long point to Stillwell ave station)
-pub const FAKE_STOP_IDS: [&str; 28] = [
-    "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
-    "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
-    "S12", "S10",
-];
+// pub const FAKE_STOP_IDS: [&str; 28] = [
+//     "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
+//     "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
+//     "S12", "S10",
+// ];

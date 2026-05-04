@@ -1,8 +1,6 @@
 use crate::AppState;
 use crate::api::AppError;
-use crate::models::route::Route;
-use crate::models::source::Source;
-use crate::models::stop::Stop;
+use crate::models::{route::Route, source::Source, stop::Stop};
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use http::{HeaderMap, StatusCode};
@@ -63,11 +61,7 @@ pub async fn routes_handler(
         return Ok(StatusCode::NOT_MODIFIED.into_response());
     }
 
-    // TODO: improve get_all api so we don't have to fetch all the data just to remove the geometry
-    let mut routes = state.route_store.get_all(source).await?;
-    for r in &mut routes {
-        r.geom = None;
-    }
+    let routes = state.route_store.get_all(source).await?;
 
     let json = serde_json::to_string(&routes).map_err(anyhow::Error::from)?;
     Ok((cache_headers(&etag), json).into_response())

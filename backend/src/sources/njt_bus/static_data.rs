@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::{
-    engines::static_cache::expand_gtfs,
     models::{
         route::{Route, RouteData},
         source::Source,
@@ -13,6 +12,7 @@ use crate::{
     },
     sources::{StaticAdapter, normalize_title, normalize_whitespace},
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
+    utils::static_cache::expand_gtfs,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -23,6 +23,7 @@ use tracing::{info, warn};
 
 use super::{NJT_BUS_ROUTES_URL, NjtApi};
 
+// TODO: use the per-service dataset instead since we are now storing route geometries as shapes
 const NJT_DEFAULT_COLOR: &str = "1A2B57";
 const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
@@ -36,11 +37,14 @@ struct BusRoute {
     bus_route_description: String,
 }
 
+// TODO: retest using valhalla to snap routes since I think they fixed some issues with overlapping roads in the latest version of valhalla
 pub struct NjtBusStatic;
 // pub struct NjtBusStatic {
 //     valhalla: Arc<ValhallaManager>,
 // }
 
+// TODO: setup shape insertion
+// TODO: fix parent stop handling
 impl NjtBusStatic {
     // pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
     //     Self { valhalla }
@@ -400,7 +404,7 @@ fn positions_to_linestring(positions: &[geojson::Position]) -> LineString {
 
 fn build_routes(
     gtfs: &gtfs_structures::Gtfs,
-    geom_map: &HashMap<String, MultiLineString>,
+    _geom_map: &HashMap<String, MultiLineString>,
 ) -> Vec<Route> {
     gtfs.routes
         .values()
@@ -424,8 +428,8 @@ fn build_routes(
                     .map(normalize_whitespace)
                     .unwrap_or_default(),
                 color,
+                text_color: "#FFFFFF".into(),
                 data: RouteData::NjtBus,
-                geom: geom_map.get(&r.id).cloned().map(Into::into),
             }
         })
         .collect()
@@ -447,6 +451,7 @@ fn build_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<Stop> {
                 id: s.id.clone(),
                 name,
                 geom: Point::new(lon, lat).into(),
+                // parent_station_id: None,
                 transfers: vec![],
                 routes: vec![],
                 data: StopData::NjtBus(NjtBusStopData { stop_code }),

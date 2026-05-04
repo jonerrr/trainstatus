@@ -144,6 +144,11 @@
 				?.current?.get(trip.vehicle_id)}
 			<VehicleCapacity {position} />
 			<div>#{trip.vehicle_id}</div>
+		{:else if trip.data.source === 'mta_subway'}
+			<!-- TODO: improve ui -->
+			<!-- {#if trip.data.consist_cars?.length}
+				<div>#{trip.data.consist_cars[0].type}</div>
+			{/if} -->
 		{/if}
 
 		{#if route}

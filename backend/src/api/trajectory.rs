@@ -1,6 +1,6 @@
 use super::{AppError, AppState, CurrentTime, TimeParams, parse_list};
-use crate::engines::trajectory::{self, StopDistanceTable, Trajectory, stop_dist_key};
 use crate::models::source::Source;
+use crate::utils::trajectory::{self, StopDistanceTable, Trajectory, source_projected_epsg_code};
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use geo::LineString;
@@ -24,7 +24,7 @@ pub struct TrajectoriesParameters {
 
 /// Default sampling resolution in seconds
 const DEFAULT_DT_S: f64 = 5.0;
-
+// TODO: refactor this entire thing
 #[utoipa::path(
     get,
     path = "/trajectories/{source}",
@@ -85,7 +85,44 @@ pub async fn trajectories_handler(
         ));
     }
 
-    // 5. Fetch routes (for geometry and color)
+    // 5. Fetch shapes and build geom_map (shape_id -> LineString)
+    let shapes = state.route_store.get_all_shapes(source).await?;
+
+    let mut shape_geom_map: HashMap<String, LineString> = HashMap::new();
+    for shape in &shapes {
+        match &shape.geom.0 {
+            geo::Geometry::LineString(ls) => {
+                shape_geom_map.insert(shape.id.clone(), ls.clone());
+            }
+            _ => continue,
+        }
+    }
+
+    // Build per-trip assembled geometry by concatenating shape_ids in order
+    let mut geom_map: HashMap<String, LineString> = HashMap::new();
+    for trip in &trips {
+        if trip.shape_ids.is_empty() {
+            continue;
+        }
+
+        // Use the shape_ids list as a cache key
+        let cache_key = trip.shape_ids.join(",");
+        if geom_map.contains_key(&cache_key) {
+            continue;
+        }
+
+        let mut coords = Vec::new();
+        for sid in &trip.shape_ids {
+            if let Some(ls) = shape_geom_map.get(sid) {
+                coords.extend(ls.0.iter().copied());
+            }
+        }
+        if !coords.is_empty() {
+            geom_map.insert(cache_key, LineString::new(coords));
+        }
+    }
+
+    // Fetch routes for color
     let routes = state.route_store.get_all(source).await?;
     let route_map: HashMap<&str, &crate::models::route::Route> =
         routes.iter().map(|r| (r.id.as_str(), r)).collect();
@@ -96,6 +133,8 @@ pub async fn trajectories_handler(
         .get_stop_distance_table(source)
         .await;
 
+    let epsg_code = source_projected_epsg_code(source);
+
     // 7. Generate trajectories
     let mut trajectories = Vec::with_capacity(trips.len());
     for trip in &trips {
@@ -104,23 +143,20 @@ pub async fn trajectories_handler(
             None => continue,
         };
 
-        // Extract route geometry
-        let route_line = match &route.geom {
-            Some(geom) => match &geom.0 {
-                geo::Geometry::LineString(ls) => ls.clone(),
-                geo::Geometry::MultiLineString(mls) => {
-                    let coords: Vec<geo::Coord<f64>> =
-                        mls.0.iter().flat_map(|ls| ls.0.iter().copied()).collect();
-                    LineString::new(coords)
-                }
-                _ => continue,
-            },
+        // Determine the geometry cache key for this trip's shapes
+        if trip.shape_ids.is_empty() {
+            continue;
+        }
+        let cache_key = trip.shape_ids.join(",");
+
+        // Extract shape geometry
+        let shape_line = match geom_map.get(&cache_key) {
+            Some(l) => l,
             None => continue,
         };
 
-        // Look up stop distance entries for this route+direction
-        let key = stop_dist_key(&trip.route_id, trip.direction);
-        let stop_dist_entries = match stop_dist_table.get(&key) {
+        // Look up stop distance entries for this shape
+        let stop_dist_entries = match stop_dist_table.get(&cache_key) {
             Some(entries) => entries,
             None => continue,
         };
@@ -140,9 +176,10 @@ pub async fn trajectories_handler(
             &trip.route_id,
             &route.color,
             &sorted_sts,
-            &route_line,
+            &shape_line,
             stop_dist_entries,
             DEFAULT_DT_S,
+            epsg_code,
         ) {
             trajectories.push(traj);
         }

@@ -152,6 +152,7 @@ impl GtfsSource for MtaBusRealtime {
             id: Uuid::now_v7(),
             original_id: mta_id,
             route_id,
+            shape_ids: vec![],
             direction,
             created_at,
             vehicle_id,

@@ -2,150 +2,164 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::{Geometry, LineString, MultiLineString, Point};
-use geojson::FeatureCollection;
-use gtfs_structures::StopTransfer;
-use rayon::prelude::*;
-use serde::{Deserialize, Deserializer};
+use geo::{LineString, Point};
+use serde::Deserialize;
 
 use crate::{
     models::{
         route::{Route, RouteData},
+        shape::Shape,
         source::Source,
         stop::{
-            Borough, FAKE_STOP_IDS, MtaSubwayStopData, RouteStop, RouteStopData, Stop, StopData,
-            StopType,
+            CarMarker, EgressPoint, EgressType, MtaSubwayStopData, PlatformDirection, PlatformEdge,
+            RouteStop, RouteStopData, Stop, StopData, StopType, VerticalDirection,
         },
     },
     sources::StaticAdapter,
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 
-/// URL for MTA subway GTFS data. Note that this GTFS feed is updated infrequently and often missing data, so we also pull from MTA internal APIs for stops and route geometries.
-const GTFS_SCHEDULE_URL: &str = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip";
+const SUBWAY_INFRASTRUCTURE_URL: &str = concat!(env!("MTA_API_URL"), "/v1/infrastructure/subway");
 
-/// NY OpenData endpoint for route shapes.
-const SERVICE_LINES_GEOM_URL: &str = "https://data.ny.gov/resource/s692-irgq.geojson";
+const EXIT_STRATEGY_URL: &str = concat!(
+    env!("MTA_API_URL"),
+    "/v1/infrastructure/subway/exit-strategy?major=0"
+);
 
-// Deserialize strings to i16
-fn de_str_to_i16<'de, D>(deserializer: D) -> Result<i16, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    str.parse().map_err(serde::de::Error::custom)
-}
+// TODO: fix transfers not being included
 
-// Remove everything before : in stop_id and route_id
-fn de_remove_prefix<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    str.split_once(':')
-        .map(|(_, id)| id.to_string())
-        .ok_or("failed to split id")
-        .map_err(serde::de::Error::custom)
-}
-
-fn de_ada<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    match str.as_str() {
-        "2" => Ok(true), // ADA accessible for only 1 direction (see notes)
-        "1" => Ok(true), // ADA accessible for both directions
-        "0" => Ok(false),
-        _ => Err(serde::de::Error::custom("invalid ada value")),
-    }
-}
-
-fn de_str_opt<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    match str.as_str() {
-        "" => Ok(None),
-        _ => Ok(Some(str)),
-    }
-}
-
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct StationResponse {
-    #[serde(deserialize_with = "de_remove_prefix")]
+struct HeliumSubwayInfrastructure {
+    #[serde(default)]
+    stations: Vec<HeliumStation>,
+    #[serde(default)]
+    routes: Vec<HeliumRoute>,
+    #[serde(default)]
+    shape_segments: HashMap<String, Vec<[f64; 2]>>,
+    #[serde(default)]
+    gtfs_stops: Vec<HeliumGtfsStop>,
+    #[serde(default)]
+    bubbles: Vec<HeliumBubble>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumStation {
+    station_id: i32,
+    line: String,
+    primary_name: String,
+    secondary_name: Option<String>,
+    // latitude: f64,
+    // longitude: f64,
+    path_adjusted_latitude: f64,
+    path_adjusted_longitude: f64,
+    // borough: String,
+    is_major: bool,
+    station_group_id: String,
+    canonical_route_ids: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumRoute {
     route_id: String,
-    #[serde(deserialize_with = "de_str_to_i16")]
-    stop_sequence: i16,
-    #[serde(deserialize_with = "de_remove_prefix")]
-    stop_id: String,
-    stop_name: String,
-    // 0 = full time, 1 = part time, 2 = late night, 3 = rush hour one dir, 4 = rush hour
-    #[serde(deserialize_with = "de_str_to_i16")]
-    stop_type: i16,
-    #[serde(deserialize_with = "de_ada")]
-    ada: bool,
-    #[serde(deserialize_with = "de_str_opt")]
-    notes: Option<String>,
-    borough: String,
+    route_name: String,
+    color: String,
+    text_color: Option<String>,
 }
 
-impl From<StationResponse> for RouteStop {
-    fn from(value: StationResponse) -> Self {
-        let stop_type = match value.stop_type {
-            0 => StopType::FullTime,
-            1 => StopType::PartTime,
-            2 => StopType::LateNight,
-            3 => StopType::RushHour,
-            4 => StopType::RushHourOneDirection,
-            5 => StopType::WeekdayOnly,
-            6 => StopType::NightsWeekendsOnly,
-            _ => {
-                tracing::warn!(
-                    "Unknown stop type {} for stop {}",
-                    value.stop_type,
-                    value.stop_id
-                );
-                StopType::Unknown
-            }
-        };
-
-        RouteStop {
-            route_id: value.route_id,
-            stop_id: value.stop_id,
-            stop_sequence: value.stop_sequence,
-            data: RouteStopData::MtaSubway { stop_type },
-        }
-    }
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumGtfsStop {
+    gtfs_stop_id: String,
+    parent_station_id: i32,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-struct NearbyStation {
-    groups: Vec<NearbyGroup>,
-    stop: NearbyStop,
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBubble {
+    bubble_id: String,
+    station_id: i32,
+    sections: Vec<HeliumBubbleSection>,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-struct NearbyGroup {
-    headsign: String,
-    times: Vec<StationTime>,
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBubbleSection {
+    station_section_id: String,
+    placement: String, // "TOP" or "BOTTOM"
+    title: String,     // e.g. "Uptown", "Downtown"
 }
 
-#[derive(Deserialize, Clone, Debug)]
-struct NearbyStop {
-    #[serde(deserialize_with = "de_remove_prefix")]
-    id: String,
-    lat: f32,
-    lon: f32,
+// --- Exit strategy response structs ---
+
+#[derive(Deserialize, Debug)]
+struct ExitStrategyResponse {
+    release: ExitStrategyRelease,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-struct StationTime {
-    #[serde(deserialize_with = "de_remove_prefix", rename = "stopId")]
-    stop_id: String,
+#[derive(Deserialize, Debug)]
+struct ExitStrategyRelease {
+    dataset: ExitStrategyDataset,
 }
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyDataset {
+    exit_strategy: Vec<ExitStrategyStation>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyStation {
+    mrn: i32,
+    platform_edges: Vec<ExitStrategyPlatformEdge>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyPlatformEdge {
+    platform_edge_id: String,
+    spec: Option<ExitStrategySpec>,
+    egress_points: Vec<ExitStrategyEgressPoint>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategySpec {
+    #[serde(default)]
+    length_ft: f32,
+    #[serde(default)]
+    car_markers: Vec<ExitStrategyCarMarker>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyCarMarker {
+    marked_as: String,
+    is_opto: Option<bool>,
+    consist_length_ft: Option<f32>,
+    // #[serde(default)]
+    position_ft: f32,
+    // #[serde(default)]
+    direction: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyEgressPoint {
+    // #[serde(default)]
+    id: i32,
+    // #[serde(default)]
+    egress_type: String,
+    // #[serde(default)]
+    position_ft: f32,
+    // #[serde(default)]
+    vertical_direction: String,
+}
+
+// --- Static adapter ---
 
 pub struct MtaSubwayStatic;
 
@@ -156,7 +170,7 @@ impl StaticAdapter for MtaSubwayStatic {
     }
 
     fn refresh_interval(&self) -> Duration {
-        Duration::from_secs(60 * 60 * 24 * 7) // 7 days
+        Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
     async fn import(
@@ -165,253 +179,267 @@ impl StaticAdapter for MtaSubwayStatic {
         stop_store: &StopStore,
         _static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
-        // TODO: use gtfsReader to only select wanted files
-        let gtfs = gtfs_structures::Gtfs::from_url_async(GTFS_SCHEDULE_URL)
-            .await
-            .context("Failed to fetch GTFS data from MTA")?;
-
-        let route_ids: Vec<String> = gtfs.routes.keys().cloned().collect();
-
-        // gtfs.get_stop("101N").unwrap().transfers.first().unwrap().
-
-        let route_geom_map = Self::create_route_geom_map()
-            .await
-            .context("Failed to fetch route geometries from NY OpenData")?;
-
-        // Import routes
-        let routes = Self::import_routes(&gtfs, route_geom_map);
-        route_store
-            .save_all(Source::MtaSubway, &routes)
-            .await
-            .context("Failed to save routes to database")?;
-
-        // Import stops, route_stops, and transfers
-        let (stops, route_stops) = self
-            .import_stops(&route_ids)
-            .await
-            .context("Failed to fetch stops from MTA API")?;
-
-        let transfers: HashMap<String, StopTransfer> = gtfs
-            .stops
-            .values()
-            .flat_map(|stop| {
-                stop.transfers.iter().filter_map(move |transfer| {
-                    if FAKE_STOP_IDS.contains(&stop.id.as_str())
-                        || FAKE_STOP_IDS.contains(&transfer.to_stop_id.as_str())
-                    {
-                        None
-                    } else {
-                        Some((
-                            stop.id.clone(),
-                            StopTransfer {
-                                to_stop_id: transfer.to_stop_id.clone(),
-                                transfer_type: transfer.transfer_type,
-                                min_transfer_time: transfer.min_transfer_time,
-                            },
-                        ))
-                    }
-                })
-            })
-            .collect();
-
-        stop_store
-            .save_all(Source::MtaSubway, &stops)
-            .await
-            .context("Failed to save stops to database")?;
-        stop_store
-            .save_all_route_stops(Source::MtaSubway, &route_stops)
-            .await
-            .context("Failed to save route_stops to database")?;
-        stop_store
-            .save_all_transfers(Source::MtaSubway, transfers)
-            .await
-            .context("Failed to save transfers to database")?;
-
-        Ok(())
-    }
-}
-
-impl MtaSubwayStatic {
-    /// Convert RGB color to hex string
-    fn rgb_to_hex(color: rgb::RGB<u8>) -> String {
-        format!("{:02X}{:02X}{:02X}", color.r, color.g, color.b)
-    }
-
-    /// Download and parse the MTA service lines dataset and return a map of route_id to geometry.
-    async fn create_route_geom_map() -> anyhow::Result<HashMap<String, MultiLineString<f64>>> {
-        let geojson: FeatureCollection = reqwest::get(SERVICE_LINES_GEOM_URL).await?.json().await?;
-        // For some reason like 2 of the routes have multiple features, so we need to store the pieces and combine them at the end
-        let mut geom_parts_map: HashMap<String, Vec<LineString<f64>>> = HashMap::new();
-
-        for feature in geojson.features {
-            let Some(geom) = feature
-                .geometry
-                .and_then(|g| Geometry::<f64>::try_from(g).ok())
-            else {
-                continue;
-            };
-
-            let line_parts: Vec<LineString<f64>> = match geom {
-                Geometry::LineString(line) => vec![line],
-                Geometry::MultiLineString(multi) => multi.0,
-                _ => continue,
-            };
-
-            let Some(props) = feature.properties else {
-                continue;
-            };
-
-            let Some(serde_json::Value::String(service)) = props.get("service") else {
-                continue;
-            };
-
-            // hardcode some mappings from service to gtfs route_id
-            let route_id = match service.as_str() {
-                "SF" => "FS",  // Franklin shuttle
-                "ST" => "GS",  // 42nd street shuttle
-                "SR" => "H",   // Far rockaway shuttle
-                "SIR" => "SI", // Staten island railway
-                // TODO: add some warning for unmapped routes / changes in the dataset
-                _ => service,
-            }
-            .to_string();
-
-            geom_parts_map
-                .entry(route_id)
-                .or_default()
-                .extend(line_parts);
-        }
-
-        let geom_map = geom_parts_map
-            .into_iter()
-            .map(|(route_id, lines)| (route_id, MultiLineString(lines)))
-            .collect();
-
-        Ok(geom_map)
-    }
-
-    /// Parse routes from GTFS data
-    fn import_routes(
-        gtfs: &gtfs_structures::Gtfs,
-        route_geom_map: HashMap<String, MultiLineString<f64>>,
-    ) -> Vec<Route> {
-        gtfs.routes
-            .values()
-            .map(|route| {
-                // TODO: parse geom
-                // Used to have some hardcoded colors. But they finally added them into the GTFS static data
-                let route_color = Self::rgb_to_hex(route.color());
-                let geom = route_geom_map.get(&route.id).cloned().map(|g| g.into());
-
-                if geom.is_none() {
-                    tracing::warn!(route_id = route.id, "No geometry found");
-                }
-
-                Route {
-                    id: route.id.clone(),
-                    // source: Source::MtaSubway,
-                    long_name: route.long_name.clone().unwrap(),
-                    short_name: route.short_name.clone().unwrap(),
-                    color: route_color,
-                    data: RouteData::MtaSubway,
-                    geom,
-                }
-            })
-            .collect()
-    }
-
-    /// Fetch and parse subway stops from MTA internal APIs
-    async fn import_stops(
-        &self,
-        route_ids: &[String],
-    ) -> anyhow::Result<(Vec<Stop>, Vec<RouteStop>)> {
-        let mut stations: Vec<StationResponse> = vec![];
-        let mut route_stops: Vec<RouteStop> = vec![];
-
         let client = reqwest::Client::new();
 
-        for route in route_ids.iter() {
-            let mut route_stations: Vec<StationResponse> = client
-                .get(format!(
-                    "https://collector-otp-prod.camsys-apps.com/schedule/MTASBWY/stopsForRoute?apikey=qeqy84JE7hUKfaI0Lxm2Ttcm6ZA0bYrP&routeId=MTASBWY:{}",
-                    route
-                ))
-                .send()
-                .await?
-                .json()
-                .await?;
-
-            route_stops.extend(route_stations.clone().into_iter().map(|s| s.into()));
-            stations.append(&mut route_stations);
-        }
-
-        stations.sort_by_key(|s| s.stop_id.clone());
-        stations.dedup_by(|a, b| a.stop_id == b.stop_id);
-        stations.retain(|s| !FAKE_STOP_IDS.contains(&s.stop_id.as_str()));
-
-        let stop_ids = stations
-            .par_iter()
-            .map(|s| "MTASBWY:".to_owned() + &s.stop_id)
-            .collect::<Vec<String>>()
-            .join(",");
-
-        // Internal MTA endpoint for nearby station info (headsigns, etc.)
-        let nearby_stations: Vec<NearbyStation> = client
-            .get(format!(
-                "https://otp-mta-prod.camsys-apps.com/otp/routers/default/nearby?apikey=Z276E3rCeTzOQEoBPPN4JCEc6GfvdnYE&stops={}",
-                stop_ids
-            ))
+        // 1. Fetch infrastructure data
+        let infra: HeliumSubwayInfrastructure = client
+            .get(SUBWAY_INFRASTRUCTURE_URL)
             .send()
             .await?
             .json()
-            .await?;
+            .await
+            .context("Failed to fetch subway infrastructure")?;
 
-        let stops = nearby_stations
-            .into_par_iter()
-            .map(|station| {
-                // Find the first group with N or S stop times to determine headsigns
-                let north_headsign = station
-                    .groups
-                    .par_iter()
-                    .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('N')))
-                    .map(|group| group.headsign.clone());
+        tracing::info!(
+            "Subway infrastructure: {} stations, {} routes, {} shape_segments, {} gtfs_stops, {} bubbles",
+            infra.stations.len(),
+            infra.routes.len(),
+            infra.shape_segments.len(),
+            infra.gtfs_stops.len(),
+            infra.bubbles.len(),
+        );
 
-                let south_headsign = station
-                    .groups
-                    .par_iter()
-                    .find_first(|group| group.times.iter().any(|time| time.stop_id.ends_with('S')))
-                    .map(|group| group.headsign.clone());
+        // 2. Fetch exit strategy data
+        let exit_data: ExitStrategyResponse = client
+            .get(EXIT_STRATEGY_URL)
+            .send()
+            .await?
+            .json()
+            .await
+            .context("Failed to fetch exit strategy data")?;
 
-                let station_data = stations
-                    .par_iter()
-                    .find_first(|s| s.stop_id == station.stop.id)
-                    .unwrap();
+        // Build lookup maps
+        let exit_map: HashMap<i32, &ExitStrategyStation> = exit_data
+            .release
+            .dataset
+            .exit_strategy
+            .iter()
+            .map(|es| (es.mrn, es))
+            .collect();
+
+        // Build gtfsStopId -> parentStationId mapping
+        let _gtfs_to_station: HashMap<&str, i32> = infra
+            .gtfs_stops
+            .iter()
+            .map(|g| (g.gtfs_stop_id.as_str(), g.parent_station_id))
+            .collect();
+
+        // Also build the reverse: stationId -> first gtfsStopId (for preserving in stop data)
+        let mut station_to_gtfs: HashMap<i32, String> = HashMap::new();
+        for g in &infra.gtfs_stops {
+            station_to_gtfs
+                .entry(g.parent_station_id)
+                .or_insert_with(|| g.gtfs_stop_id.clone());
+        }
+
+        // Build bubble headsigns: stationId -> (north_headsign, south_headsign)
+        let mut headsign_map: HashMap<i32, (String, String)> = HashMap::new();
+        for bubble in &infra.bubbles {
+            let mut north = String::new();
+            let mut south = String::new();
+            for section in &bubble.sections {
+                match section.placement.as_str() {
+                    "TOP" => north = section.title.clone(),
+                    "BOTTOM" => south = section.title.clone(),
+                    _ => {}
+                }
+            }
+            headsign_map.insert(bubble.station_id, (north, south));
+        }
+
+        // Build bubble section_id map: stationId -> (north_section_id, south_section_id)
+        let mut section_id_map: HashMap<i32, (String, String)> = HashMap::new();
+        for bubble in &infra.bubbles {
+            let mut north = String::new();
+            let mut south = String::new();
+            for section in &bubble.sections {
+                match section.placement.as_str() {
+                    "TOP" => north = section.station_section_id.clone(),
+                    "BOTTOM" => south = section.station_section_id.clone(),
+                    _ => {}
+                }
+            }
+            section_id_map.insert(bubble.station_id, (north, south));
+        }
+
+        // Build bubble_id lookup: stationId -> bubbleId
+        let bubble_id_map: HashMap<i32, String> = infra
+            .bubbles
+            .iter()
+            .map(|b| (b.station_id, b.bubble_id.clone()))
+            .collect();
+
+        // 3. Import Routes
+        let routes: Vec<Route> = infra
+            .routes
+            .iter()
+            .map(|r| Route {
+                id: r.route_id.clone(),
+                long_name: r.route_name.clone(),
+                short_name: r.route_id.clone(),
+                color: r.color.clone(),
+                text_color: r
+                    .text_color
+                    .clone()
+                    .unwrap_or_else(|| "#FFFFFF".to_string()),
+                data: RouteData::MtaSubway,
+            })
+            .collect();
+        route_store.save_all(Source::MtaSubway, &routes).await?;
+
+        // 4. Import Stops (stations)
+        let stops: Vec<Stop> = infra
+            .stations
+            .iter()
+            .map(|s| {
+                let name = match &s.secondary_name {
+                    Some(sec) if !sec.is_empty() => format!("{}-{}", s.primary_name, sec),
+                    _ => s.primary_name.clone(),
+                };
+
+                let (north_headsign, south_headsign) =
+                    headsign_map.get(&s.station_id).cloned().unwrap_or_default();
+
+                let bubble_id = bubble_id_map
+                    .get(&s.station_id)
+                    .cloned()
+                    .unwrap_or_default();
+
+                let gtfs_stop_id = station_to_gtfs
+                    .get(&s.station_id)
+                    .cloned()
+                    .unwrap_or_default();
+
+                // Build platform edges from exit strategy data
+                let platform_edges = exit_map
+                    .get(&s.station_id)
+                    .map(|es| {
+                        es.platform_edges
+                            .iter()
+                            .map(|pe| {
+                                let (length_ft, car_markers) = match &pe.spec {
+                                    Some(spec) => (
+                                        spec.length_ft,
+                                        spec.car_markers
+                                            .iter()
+                                            .map(|cm| CarMarker {
+                                                marked_as: cm.marked_as.clone(),
+                                                is_opto: cm.is_opto.unwrap_or(false),
+                                                consist_length_ft: cm.consist_length_ft,
+                                                position_ft: cm.position_ft,
+                                                direction: match cm.direction.as_str() {
+                                                    "SOUTH" => PlatformDirection::South,
+                                                    _ => PlatformDirection::North,
+                                                },
+                                            })
+                                            .collect(),
+                                    ),
+                                    None => (0.0, vec![]),
+                                };
+
+                                // let section_id = match car_markers.first().map(|cm| cm.direction) {
+                                //     Some(PlatformDirection::North) => section_id_map.get(&s.station_id).map(|(n, _)| n.clone()).unwrap_or_default(),
+                                //     Some(PlatformDirection::South) => section_id_map.get(&s.station_id).map(|(_, s)| s.clone()).unwrap_or_default(),
+                                //     None => String::new(),
+                                // };
+
+                                PlatformEdge {
+                                    id: pe.platform_edge_id.clone(),
+                                    // section_id,
+                                    length_ft,
+                                    car_markers,
+                                    egress_points: pe
+                                        .egress_points
+                                        .iter()
+                                        .map(|ep| EgressPoint {
+                                            id: ep.id,
+                                            egress_type: match ep.egress_type.as_str() {
+                                                "STAIRCASE" => EgressType::Staircase,
+                                                "ELEVATOR" => EgressType::Elevator,
+                                                "ESCALATOR" => EgressType::Escalator,
+                                                "FARE_CONTROL" => EgressType::FareControl,
+                                                "DOOR" => EgressType::Door,
+                                                "EXIT" => EgressType::Exit,
+                                                "RAMP" => EgressType::Ramp,
+                                                _ => EgressType::Unknown,
+                                            },
+                                            position_ft: ep.position_ft,
+                                            vertical_direction: match ep.vertical_direction.as_str()
+                                            {
+                                                "UP" => VerticalDirection::Up,
+                                                "DOWN" => VerticalDirection::Down,
+                                                _ => VerticalDirection::None,
+                                            },
+                                        })
+                                        .collect(),
+                                }
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
 
                 Stop {
-                    id: station.stop.id.clone(),
-                    // source: Source::MtaSubway,
-                    name: station_data.stop_name.to_owned(),
-                    geom: Point::new(station.stop.lon as f64, station.stop.lat as f64).into(),
-                    routes: vec![],
+                    id: s.station_id.to_string(),
+                    name,
+                    geom: Point::new(s.path_adjusted_longitude, s.path_adjusted_latitude).into(),
                     transfers: vec![],
                     data: StopData::MtaSubway(MtaSubwayStopData {
-                        ada: station_data.ada,
-                        north_headsign: north_headsign.unwrap_or_else(|| "Northbound".to_string()),
-                        south_headsign: south_headsign.unwrap_or_else(|| "Southbound".to_string()),
-                        notes: station_data.notes.clone(),
-                        borough: match station_data.borough.as_ref() {
-                            "Brooklyn" => Borough::Brooklyn,
-                            "Queens" => Borough::Queens,
-                            "Staten Island" => Borough::StatenIsland,
-                            "Manhattan" => Borough::Manhattan,
-                            "Bronx" => Borough::Bronx,
-                            _ => unreachable!(),
-                        },
+                        gtfs_stop_id,
+                        bubble_id,
+                        platform_edges,
+                        line: s.line.clone(),
+                        is_major: s.is_major,
+                        north_headsign,
+                        south_headsign,
                     }),
+                    routes: vec![],
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
+        stop_store.save_all(Source::MtaSubway, &stops).await?;
 
-        Ok((stops, route_stops))
+        // 5. Import RouteStops (from station.canonicalRouteIds)
+        let mut route_stops = Vec::new();
+        for s in &infra.stations {
+            for (i, route_id) in s.canonical_route_ids.iter().enumerate() {
+                route_stops.push(RouteStop {
+                    route_id: route_id.clone(),
+                    stop_id: s.station_id.to_string(),
+                    stop_sequence: i as i16,
+                    data: RouteStopData::MtaSubway {
+                        stop_type: StopType::FullTime,
+                    },
+                });
+            }
+        }
+        stop_store
+            .save_all_route_stops(Source::MtaSubway, &route_stops)
+            .await?;
+
+        // 6. Import Shape Segments (each segment is a shape row)
+        let shapes: Vec<Shape> = infra
+            .shape_segments
+            .iter()
+            .filter_map(|(id, coords)| {
+                if coords.len() < 2 {
+                    return None;
+                }
+                let points: Vec<geo::Coord<f64>> = coords
+                    .iter()
+                    .map(|p| geo::Coord { x: p[0], y: p[1] })
+                    .collect();
+                Some(Shape {
+                    id: id.clone(),
+                    source: Source::MtaSubway,
+                    geom: LineString::new(points).into(),
+                    data: serde_json::Value::Null,
+                })
+            })
+            .collect();
+        route_store
+            .save_all_shapes(Source::MtaSubway, &shapes)
+            .await?;
+
+        Ok(())
     }
 }

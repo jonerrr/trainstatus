@@ -29,6 +29,8 @@ fn parse_mta_language(lang: Option<&str>) -> (AlertFormat, String) {
     }
 }
 
+// TODO: get alerts from helium api since this doesn't have the right stop ids
+// OR switch back to use gtfs stop id for everything
 pub struct MtaSubwayAlerts;
 
 #[async_trait]
@@ -64,9 +66,10 @@ impl GtfsAlertSource for MtaSubwayAlerts {
         }
 
         // Filter out fake stop IDs
-        if crate::models::stop::FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-            return None;
-        }
+        // TODO: FAKE_STOP_IDS is commented out since subway now uses stationIds
+        // if crate::models::stop::FAKE_STOP_IDS.contains(&stop_id.as_str()) {
+        //     return None;
+        // }
 
         Some(stop_id)
     }

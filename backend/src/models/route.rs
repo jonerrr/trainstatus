@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 
 use crate::{
     impl_discriminated_data,
-    models::{geom::Geom, source::Source},
+    models::source::Source,
 };
 
 #[derive(Serialize, Deserialize, ToSchema, FromRow)]
@@ -18,17 +18,16 @@ pub struct Route {
     pub short_name: String,
     #[schema(example = "#EE352E")]
     pub color: String,
+    #[schema(example = "#FFFFFF")]
+    pub text_color: String,
     #[sqlx(flatten)]
     pub data: RouteData,
-    /// Not included in API response. Use martin tile server layer for geometry instead.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(ignore, value_type = Option<Object>)]
-    pub geom: Option<Geom>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct MtaBusRouteData {
-    pub shuttle: bool,
+    pub sort_key: i32,
+    pub service_types: Vec<String>,
 }
 
 /// Stop data changes based on the `Source`

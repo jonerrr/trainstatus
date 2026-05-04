@@ -10,6 +10,8 @@
 	import type { MapLayerMouseEvent, GeoJSONSource as MapLibreGeoJSONSource } from 'maplibre-gl';
 	import { CircleLayer, GeoJSONSource, getMapContext } from 'svelte-maplibre-gl';
 
+	// TODO: double check that this works when ?at param is specified
+
 	// TODO: use generated types
 	interface TrajectoryData {
 		trip_id: string;

@@ -66,6 +66,7 @@ impl TripStore {
                     t.original_id,
                     t.vehicle_id,
                     t.route_id,
+                    t.shape_ids,
                     t.source,
                     t.direction,
                     t.created_at,
@@ -105,20 +106,58 @@ impl TripStore {
             return Ok(HashMap::new());
         }
 
+        // TODO: remove this once we figure out why this is happening
+        // Deduplicate trips based on unique constraint: (original_id, vehicle_id, created_at, direction)
+        let mut unique_trips = HashMap::new();
+        for (trip, sts) in data {
+            let key = (
+                trip.original_id.clone(),
+                trip.vehicle_id.clone(),
+                trip.created_at,
+                trip.direction,
+            );
+            // Keep the one with the latest updated_at
+            unique_trips
+                .entry(key)
+                .and_modify(
+                    |(existing_trip, existing_sts): &mut (Trip, Vec<StopTime>)| {
+                        if trip.updated_at > existing_trip.updated_at {
+                            *existing_trip = trip.clone();
+                            *existing_sts = sts.clone();
+                        }
+                    },
+                )
+                .or_insert_with(|| (trip.clone(), sts.clone()));
+        }
+
+        let deduped_data: Vec<_> = unique_trips.into_values().collect();
+
         // Prepare vectors for bulk insert
-        let input_ids: Vec<Uuid> = data.iter().map(|(t, _)| t.id).collect();
+        let input_ids: Vec<Uuid> = deduped_data.iter().map(|(t, _)| t.id).collect();
         // TODO: maybe make original and vehicle id uppercase for consistency
-        let original_ids: Vec<String> = data.iter().map(|(t, _)| t.original_id.clone()).collect();
-        let vehicle_ids: Vec<String> = data.iter().map(|(t, _)| t.vehicle_id.clone()).collect();
-        let route_ids: Vec<String> = data
+        let original_ids: Vec<String> = deduped_data
+            .iter()
+            .map(|(t, _)| t.original_id.clone())
+            .collect();
+        let vehicle_ids: Vec<String> = deduped_data
+            .iter()
+            .map(|(t, _)| t.vehicle_id.clone())
+            .collect();
+        let route_ids: Vec<String> = deduped_data
             .iter()
             .map(|(t, _)| t.route_id.to_uppercase())
             .collect();
-        let sources: Vec<Source> = vec![source; data.len()];
-        let directions: Vec<i16> = data.iter().map(|(t, _)| t.direction).collect();
-        let created_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.created_at).collect();
-        let updated_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.updated_at).collect();
-        let trip_data: Vec<serde_json::Value> = data
+        let shape_ids_json: Vec<serde_json::Value> = deduped_data
+            .iter()
+            .map(|(t, _)| serde_json::to_value(&t.shape_ids).unwrap())
+            .collect();
+        let sources: Vec<Source> = vec![source; deduped_data.len()];
+        let directions: Vec<i16> = deduped_data.iter().map(|(t, _)| t.direction).collect();
+        let created_ats: Vec<DateTime<Utc>> =
+            deduped_data.iter().map(|(t, _)| t.created_at).collect();
+        let updated_ats: Vec<DateTime<Utc>> =
+            deduped_data.iter().map(|(t, _)| t.updated_at).collect();
+        let trip_data: Vec<serde_json::Value> = deduped_data
             .iter()
             .map(|(t, _)| serde_json::to_value(&t.data).unwrap())
             .collect();
@@ -127,21 +166,35 @@ impl TripStore {
         // Bulk insert/upsert trips and get mapping from input_id -> actual_id
         // We use a CTE to map the input_id (which we generated) to the actual_id (from DB)
         // matching on the unique constraint columns.
+        // Note: shape_ids are passed as jsonb and converted to varchar[] in SQL
+        // because UNNEST doesn't handle array-of-arrays well.
         let records  = sqlx::query!(
             r#"
             WITH input_rows AS (
-                SELECT * FROM UNNEST(
-                    $1::uuid[], $2::text[], $3::text[], $4::text[], $5::source_enum[],
-                    $6::smallint[], $7::timestamptz[], $8::timestamptz[], $9::jsonb[]
-                ) AS t(input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)
+                SELECT
+                    t.input_id,
+                    t.original_id,
+                    t.vehicle_id,
+                    t.route_id,
+                    ARRAY(SELECT jsonb_array_elements_text(t.shape_ids_json))::varchar[] AS shape_ids,
+                    t.source,
+                    t.direction,
+                    t.created_at,
+                    t.updated_at,
+                    t.data
+                FROM UNNEST(
+                    $1::uuid[], $2::text[], $3::text[], $4::text[], $5::jsonb[], $6::source_enum[],
+                    $7::smallint[], $8::timestamptz[], $9::timestamptz[], $10::jsonb[]
+                ) AS t(input_id, original_id, vehicle_id, route_id, shape_ids_json, source, direction, created_at, updated_at, data)
             ),
             inserted_rows AS (
-                INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)
-                SELECT input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data
+                INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data)
+                SELECT input_id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data
                 FROM input_rows
                 ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
                     data = EXCLUDED.data,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    shape_ids = EXCLUDED.shape_ids
                 RETURNING id, original_id, vehicle_id, created_at, direction
             )
             SELECT
@@ -158,6 +211,7 @@ impl TripStore {
             &original_ids,
             &vehicle_ids,
             &route_ids,
+            &shape_ids_json,
             &sources as &[Source],
             &directions as &[i16],
             &created_ats,
@@ -183,7 +237,7 @@ impl TripStore {
         let mut seen_stop_times = std::collections::HashSet::new();
         let mut duplicate_count = 0usize;
 
-        for (trip, sts) in data {
+        for (trip, sts) in deduped_data {
             if let Some(&actual_id) = id_map.get(&trip.id) {
                 for st in sts {
                     let stop_id = st.stop_id.to_uppercase();

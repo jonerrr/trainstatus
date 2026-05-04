@@ -5,12 +5,12 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, instrument};
 
-use crate::engines::trajectory::compute_stop_distances_from_geometry;
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
 use crate::stores::route::RouteStore;
 use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::stop::StopStore;
+use crate::utils::trajectory::{compute_stop_distances_from_geometry, source_projected_epsg_code};
 
 type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
 
@@ -161,36 +161,37 @@ async fn run_source_handler(
                                 pending_waiters.push(respond_to);
                             }
                             Ok(false) => {
+                                // TODO: fix stop distance table, it seems to be causing a giant memory leak
                                 // TODO: either check all sources for staleness here, or add separate check
                                 // No update needed, but we should ensure the stop distance cache is populated.
                                 // If the server restarted and Redis was cleared, we need to rebuild it
                                 // from the DB without triggering a full expensive import.
-                                if static_cache_store
-                                    .get_stop_distance_table(adapter.source())
-                                    .await
-                                    .is_empty()
-                                {
-                                    info!(
-                                        "Stop distance cache is empty for {:?}, rebuilding from DB...",
-                                        adapter.source()
-                                    );
-                                    match compute_stop_distance_table(
-                                        adapter.source(),
-                                        &route_store,
-                                        &stop_store,
-                                        &static_cache_store,
-                                    )
-                                    .await
-                                    {
-                                        Ok(count) => info!(
-                                            "Cached stop distance table ({} route+direction pairs)",
-                                            count
-                                        ),
-                                        Err(e) => {
-                                            error!("Failed to compute stop distance table: {:#}", e)
-                                        }
-                                    }
-                                }
+                                // if static_cache_store
+                                //     .get_stop_distance_table(adapter.source())
+                                //     .await
+                                //     .is_empty()
+                                // {
+                                //     info!(
+                                //         "Stop distance cache is empty for {:?}, rebuilding from DB...",
+                                //         adapter.source()
+                                //     );
+                                //     match compute_stop_distance_table(
+                                //         adapter.source(),
+                                //         &route_store,
+                                //         &stop_store,
+                                //         &static_cache_store,
+                                //     )
+                                //     .await
+                                //     {
+                                //         Ok(count) => info!(
+                                //             "Cached stop distance table ({} route+direction pairs)",
+                                //             count
+                                //         ),
+                                //         Err(e) => {
+                                //             error!("Failed to compute stop distance table: {:#}", e)
+                                //         }
+                                //     }
+                                // }
 
                                 // respond immediately
                                 let _ = respond_to.send(Ok(()));
@@ -357,46 +358,34 @@ async fn compute_stop_distance_table(
     stop_store: &StopStore,
     static_cache_store: &StaticCacheStore,
 ) -> anyhow::Result<usize> {
-    let routes = route_store.get_all(source).await?;
+    let shapes = route_store.get_all_shapes(source).await?;
     let stops = stop_store.get_all(source).await?;
 
-    // Build route_stops tuples from each stop's routes field.
-    // For MTA Subway, direction is inferred from the stop_id suffix:
-    //   stop_id ending in 'N' → direction 1 (northbound)
-    //   stop_id ending in 'S' → direction 3 (southbound)
-    // For bus sources, direction comes from the RouteStopData variant.
-    let mut route_stops: Vec<(String, String, i16)> = Vec::new();
-    for stop in &stops {
-        for rs in &stop.routes {
-            let direction = match &rs.data {
-                crate::models::stop::RouteStopData::MtaSubway { .. } => {
-                    // MTA Subway encodes direction in stop_id suffix
-                    if rs.stop_id.ends_with('N') {
-                        1
-                    } else if rs.stop_id.ends_with('S') {
-                        3
-                    } else {
-                        // Parent stop — add both directions
-                        route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), 1));
-                        route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), 3));
-                        continue;
-                    }
-                }
-                crate::models::stop::RouteStopData::MtaBus { direction, .. } => *direction,
-                crate::models::stop::RouteStopData::NjtBus { direction, .. } => *direction,
-            };
-            route_stops.push((rs.route_id.clone(), rs.stop_id.clone(), direction));
+    // Build geom_map: shape_id -> LineString from the shape's geometry
+    let mut geom_map = HashMap::new();
+    for shape in &shapes {
+        match &shape.geom.0 {
+            geo::Geometry::LineString(ls) => {
+                geom_map.insert(shape.id.clone(), ls.clone());
+            }
+            _ => continue,
         }
     }
 
-    tracing::info!(
-        "Extracted {} route_stops from {} stops (source={:?})",
-        route_stops.len(),
-        stops.len(),
-        source
-    );
+    // Map shape to stops served by its route
+    let mut id_stops = Vec::new();
+    for stop in &stops {
+        for _rs in &stop.routes {
+            // For now, project this stop onto all shapes
+            // TODO: filter by route association once shapes are linked to routes
+            for shape in &shapes {
+                id_stops.push((shape.id.clone(), stop.id.clone()));
+            }
+        }
+    }
 
-    let table = compute_stop_distances_from_geometry(&routes, &stops, &route_stops)?;
+    let epsg_code = source_projected_epsg_code(source);
+    let table = compute_stop_distances_from_geometry(&geom_map, &stops, &id_stops, epsg_code)?;
     let count = table.len();
     static_cache_store
         .set_stop_distance_table(source, &table)

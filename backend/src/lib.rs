@@ -5,6 +5,7 @@ pub mod macros;
 pub mod models;
 pub mod sources;
 pub mod stores;
+pub mod utils;
 
 use std::env::var;
 use std::sync::OnceLock;
@@ -48,6 +49,11 @@ impl AppState {
         }
     }
 }
+
+// pub fn mta_api_url() -> &'static str {
+//     static API_URL: OnceLock<String> = OnceLock::new();
+//     API_URL.get_or_init(|| var("MTA_API_URL").expect("MTA_API_URL must be set"))
+// }
 
 pub fn mta_oba_api_key() -> &'static str {
     static API_KEY: OnceLock<String> = OnceLock::new();

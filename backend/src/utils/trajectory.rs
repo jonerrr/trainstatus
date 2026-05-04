@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
-use geo::{Coord, LineString, Point};
+use anyhow::Context;
+use geo::{Coord, Distance, Euclidean, LineString, Point};
+use proj4rs::{Proj, transform::transform};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::engines::pchip::PchipInterpolator;
 use crate::models::route::Route;
+use crate::models::source::Source;
 use crate::models::stop::Stop;
+use crate::utils::pchip::PchipInterpolator;
 
 // ──────────────────────────────────────────────────────────────────────
 // Physical constants
@@ -34,6 +37,14 @@ pub fn stop_dist_key(route_id: &str, direction: i16) -> String {
     format!("{}:{}", route_id, direction)
 }
 
+// TODO: maybe store this in each source's StaticAdapter trait
+/// Projected EPSG code used for a source's distance calculations.
+pub fn source_projected_epsg_code(source: Source) -> u16 {
+    match source {
+        Source::MtaBus | Source::MtaSubway | Source::NjtBus => 6538,
+    }
+}
+
 /// Trait for computing stop-to-distance mappings along route geometries.
 ///
 /// Each transit source can implement this to handle its own route/stop topology.
@@ -55,6 +66,7 @@ pub trait StopDistanceProvider: Send + Sync {
         routes: &[Route],
         stops: &[Stop],
         route_stops: &[(String, String, i16)],
+        epsg_code: u16,
     ) -> anyhow::Result<StopDistanceTable>;
 }
 
@@ -71,56 +83,47 @@ pub trait StopDistanceProvider: Send + Sync {
 /// This works for any GTFS-based source where route geometries are stored
 /// as `geo::LineString` and stops have `(lat, lng)` positions.
 pub fn compute_stop_distances_from_geometry(
-    routes: &[Route],
+    geom_map: &HashMap<String, LineString>,
     stops: &[Stop],
-    route_stops: &[(String, String, i16)],
+    id_stops: &[(String, String)], // (geom_id, stop_id)
+    epsg_code: u16,
 ) -> anyhow::Result<StopDistanceTable> {
-    // Index routes by id for fast lookup
-    let route_map: HashMap<&str, &Route> = routes.iter().map(|r| (r.id.as_str(), r)).collect();
+    let proj_wgs84 = Proj::from_epsg_code(4326).context("Failed to create WGS84 proj")?;
+    let proj_target = Proj::from_epsg_code(epsg_code)
+        .with_context(|| format!("Failed to create EPSG:{} proj", epsg_code))?;
 
     // Index stops by id
     let stop_map: HashMap<&str, &Stop> = stops.iter().map(|s| (s.id.as_str(), s)).collect();
 
-    // Group route_stops by (route_id, direction)
+    // Group id_stops by geom_id
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
-    for (route_id, stop_id, direction) in route_stops {
+    for (geom_id, stop_id) in id_stops {
         groups
-            .entry(stop_dist_key(route_id, *direction))
+            .entry(geom_id.clone())
             .or_default()
             .push(stop_id.clone());
     }
 
     let mut table = StopDistanceTable::new();
 
-    for (key, stop_ids) in &groups {
-        // Parse route_id from the key (format: "route_id:direction")
-        let route_id = key.split(':').next().unwrap_or("");
-        let route = match route_map.get(route_id) {
-            Some(r) => r,
-            None => continue, // Skip unknown routes
-        };
-
-        // Extract LineString geometry
-        let line = match &route.geom {
-            Some(geom) => match &geom.0 {
-                geo::Geometry::LineString(ls) => ls.clone(),
-                geo::Geometry::MultiLineString(mls) => {
-                    // Merge all linestrings into one
-                    let coords: Vec<Coord<f64>> =
-                        mls.0.iter().flat_map(|ls| ls.0.iter().copied()).collect();
-                    LineString::new(coords)
-                }
-                _ => continue,
-            },
-            None => continue, // Skip routes without geometry
+    for (geom_id, stop_ids) in &groups {
+        let line = match geom_map.get(geom_id) {
+            Some(l) => l,
+            None => continue,
         };
 
         if line.0.len() < 2 {
             continue;
         }
 
-        // Build cumulative distance array along the LineString
-        let cum_dist = cumulative_distances(&line);
+        let projected_line = match project_linestring_wgs84_to_epsg(line, &proj_wgs84, &proj_target)
+        {
+            Some(line) => line,
+            None => continue,
+        };
+
+        // Build cumulative distance array along the projected LineString.
+        let cum_dist = cumulative_distances(&projected_line);
 
         // Project each stop onto the line and compute its distance
         let mut stop_distances: Vec<(String, f64)> = Vec::new();
@@ -136,7 +139,14 @@ pub fn compute_stop_distances_from_geometry(
                 _ => continue,
             };
 
-            if let Some(dist) = project_point_onto_line(&stop_point, &line, &cum_dist) {
+            let projected_stop =
+                match project_point_wgs84_to_epsg(&stop_point, &proj_wgs84, &proj_target) {
+                    Some(point) => point,
+                    None => continue,
+                };
+
+            if let Some(dist) = project_point_onto_line(&projected_stop, &projected_line, &cum_dist)
+            {
                 stop_distances.push((stop_id.clone(), dist));
             }
         }
@@ -144,7 +154,7 @@ pub fn compute_stop_distances_from_geometry(
         // Sort by cumulative distance
         stop_distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        table.insert(key.clone(), stop_distances);
+        table.insert(geom_id.clone(), stop_distances);
     }
 
     Ok(table)
@@ -246,10 +256,17 @@ pub fn generate_trajectory(
     route_line: &LineString,
     stop_dist_entries: &[(String, f64)], // ordered (stop_id, distance_m) from StopDistanceTable
     dt_s: f64,
+    epsg_code: u16,
 ) -> Option<Trajectory> {
     if stop_times.len() < 2 || route_line.0.len() < 2 {
         return None;
     }
+
+    let proj_wgs84 = Proj::from_epsg_code(4326).ok()?;
+    let proj_target = Proj::from_epsg_code(epsg_code).ok()?;
+
+    let projected_route_line =
+        project_linestring_wgs84_to_epsg(route_line, &proj_wgs84, &proj_target)?;
 
     // Build stop_id → distance lookup
     let dist_lookup: HashMap<&str, f64> = stop_dist_entries
@@ -293,6 +310,7 @@ pub fn generate_trajectory(
 
     // Sample at dt_s resolution
     let t_max = *t_rel.last().unwrap();
+
     let n_samples = ((t_max / dt_s).ceil() as usize).max(2);
     let mut sampled_t = Vec::with_capacity(n_samples + 1);
     let mut t = 0.0;
@@ -310,7 +328,7 @@ pub fn generate_trajectory(
     let sampled_s = interp.evaluate_array(&sampled_t);
 
     // Build cumulative distances along the route geometry
-    let cum_dist = cumulative_distances(route_line);
+    let cum_dist = cumulative_distances(&projected_route_line);
     let total_route_dist = *cum_dist.last().unwrap_or(&0.0);
 
     if total_route_dist <= 0.0 {
@@ -359,9 +377,8 @@ pub fn generate_trajectory(
 /// Returns a Vec of length `line.0.len()` where `result[0] = 0.0` and
 /// `result[i]` is the total distance from `line[0]` to `line[i]`.
 ///
-/// Uses degree-based Euclidean distance (sufficient for projection/interpolation
-/// at the scale of a city). For haversine accuracy, a geodesic crate could be
-/// used, but for map-snap route geometry this is more than adequate.
+/// The line should already be in a projected coordinate system so the result
+/// is expressed in meters.
 pub fn cumulative_distances(line: &LineString) -> Vec<f64> {
     let coords = &line.0;
     let mut cum = Vec::with_capacity(coords.len());
@@ -370,11 +387,7 @@ pub fn cumulative_distances(line: &LineString) -> Vec<f64> {
     for i in 1..coords.len() {
         let p1 = Point::new(coords[i - 1].x, coords[i - 1].y);
         let p2 = Point::new(coords[i].x, coords[i].y);
-        // Use a rough degree→meter conversion for NYC latitude (~40.7°)
-        // 1° lat ≈ 111,320 m, 1° lon ≈ 84,400 m at lat 40.7°
-        let dx = (p2.x() - p1.x()) * 84_400.0;
-        let dy = (p2.y() - p1.y()) * 111_320.0;
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dist = Euclidean.distance(&p1, &p2);
         cum.push(cum[i - 1] + dist);
     }
 
@@ -468,9 +481,7 @@ pub fn project_point_onto_line(
             y: a.y + t * by,
         };
 
-        let dx = (point.x() - proj.x) * 84_400.0;
-        let dy = (point.y() - proj.y) * 111_320.0;
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dist = Euclidean.distance(point, &Point::new(proj.x, proj.y));
 
         if dist < best_dist {
             best_dist = dist;
@@ -499,46 +510,67 @@ fn parse_color(hex: &str) -> [u8; 3] {
     }
 }
 
+fn project_point_wgs84_to_epsg(point: &Point<f64>, from: &Proj, to: &Proj) -> Option<Point<f64>> {
+    let mut projected = Point::new(point.x().to_radians(), point.y().to_radians());
+    transform(from, to, &mut projected).ok()?;
+    Some(projected)
+}
+
+fn project_linestring_wgs84_to_epsg(
+    line: &LineString,
+    from: &Proj,
+    to: &Proj,
+) -> Option<LineString> {
+    let mut coords = Vec::with_capacity(line.0.len());
+
+    for coord in &line.0 {
+        let point = Point::new(coord.x, coord.y);
+        let projected = project_point_wgs84_to_epsg(&point, from, to)?;
+        coords.push(Coord {
+            x: projected.x(),
+            y: projected.y(),
+        });
+    }
+
+    Some(LineString::new(coords))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_cumulative_distances() {
-        // Simple horizontal line at lat 0 (each degree ≈ 84,400 m lon)
+        // Simple horizontal line in projected meters.
         let line = LineString::new(vec![
-            Coord { x: 0.0, y: 40.7 },
-            Coord { x: 0.001, y: 40.7 },
-            Coord { x: 0.002, y: 40.7 },
+            Coord { x: 0.0, y: 0.0 },
+            Coord { x: 100.0, y: 0.0 },
+            Coord { x: 200.0, y: 0.0 },
         ]);
         let cum = cumulative_distances(&line);
         assert_eq!(cum.len(), 3);
         assert!((cum[0] - 0.0).abs() < 1e-6);
-        // Each segment ≈ 0.001 * 84400 ≈ 84.4 m
-        assert!((cum[1] - 84.4).abs() < 1.0);
-        assert!((cum[2] - 168.8).abs() < 1.0);
+        assert!((cum[1] - 100.0).abs() < 1.0e-6);
+        assert!((cum[2] - 200.0).abs() < 1.0e-6);
     }
 
     #[test]
     fn test_distance_to_coord() {
-        let line = LineString::new(vec![
-            Coord { x: -74.0, y: 40.7 },
-            Coord { x: -73.9, y: 40.7 },
-        ]);
+        let line = LineString::new(vec![Coord { x: 0.0, y: 0.0 }, Coord { x: 100.0, y: 0.0 }]);
         let cum = cumulative_distances(&line);
 
         // Start
         let c = distance_to_coord(0.0, &line, &cum).unwrap();
-        assert!((c.x - (-74.0)).abs() < 1e-10);
+        assert!((c.x - 0.0).abs() < 1e-10);
 
         // End
         let total = *cum.last().unwrap();
         let c = distance_to_coord(total, &line, &cum).unwrap();
-        assert!((c.x - (-73.9)).abs() < 1e-10);
+        assert!((c.x - 100.0).abs() < 1e-10);
 
         // Midpoint
         let c = distance_to_coord(total / 2.0, &line, &cum).unwrap();
-        assert!((c.x - (-73.95)).abs() < 0.001);
+        assert!((c.x - 50.0).abs() < 1.0e-10);
     }
 
     #[test]
@@ -568,21 +600,32 @@ mod tests {
 
     #[test]
     fn test_project_point_onto_line() {
-        let line = LineString::new(vec![
-            Coord { x: -74.0, y: 40.7 },
-            Coord { x: -73.9, y: 40.7 },
-        ]);
+        let line = LineString::new(vec![Coord { x: 0.0, y: 0.0 }, Coord { x: 100.0, y: 0.0 }]);
         let cum = cumulative_distances(&line);
 
         // Point exactly on the line midpoint
-        let p = Point::new(-73.95, 40.7);
+        let p = Point::new(50.0, 0.0);
         let d = project_point_onto_line(&p, &line, &cum).unwrap();
         let total = *cum.last().unwrap();
-        assert!((d - total / 2.0).abs() < 50.0); // within 50m tolerance
+        assert!((d - total / 2.0).abs() < 1.0e-10);
 
         // Point at start
-        let p = Point::new(-74.0, 40.7);
+        let p = Point::new(0.0, 0.0);
         let d = project_point_onto_line(&p, &line, &cum).unwrap();
-        assert!(d < 10.0); // near start
+        assert!(d < 1.0e-10); // near start
+    }
+
+    #[test]
+    fn test_project_point_wgs84_to_epsg() {
+        let proj_wgs84 = Proj::from_epsg_code(4326).expect("Failed to create WGS84 proj");
+        let proj_target = Proj::from_epsg_code(3857).expect("Failed to create EPSG:3857 proj");
+
+        let point = Point::new(1.0, 0.0);
+        let projected = project_point_wgs84_to_epsg(&point, &proj_wgs84, &proj_target)
+            .expect("projection should succeed");
+
+        assert!(projected.x() > 110_000.0);
+        assert!(projected.x() < 112_000.0);
+        assert!(projected.y().abs() < 1.0);
     }
 }

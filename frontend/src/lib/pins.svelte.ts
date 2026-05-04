@@ -5,7 +5,7 @@ export type Pins = {
 	[K in Source]: string[];
 };
 export const stop_pins = new LocalStorage<Pins>('stopPins', {
-	mta_subway: ['106'],
+	mta_subway: ['1'],
 	mta_bus: ['400086'],
 	njt_bus: []
 	// lirr: [],

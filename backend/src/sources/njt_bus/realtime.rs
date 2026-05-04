@@ -152,6 +152,7 @@ impl GtfsSource for NjtBusRealtime {
             id: Uuid::now_v7(),
             original_id: trip_id,
             route_id,
+            shape_ids: vec![], // TODO: add these
             direction,
             created_at,
             vehicle_id,

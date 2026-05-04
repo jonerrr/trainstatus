@@ -7,7 +7,7 @@ use axum::{
     routing::get,
 };
 use bb8_redis::RedisConnectionManager;
-use http::{HeaderValue, Method, StatusCode, request::Parts};
+use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
 use tokio::{
@@ -134,6 +134,7 @@ async fn main() {
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
     ),
+    // TODO: maybe add route, stop, and shape models here
     components(schemas(models::source::Source))
     )]
     struct ApiDoc;

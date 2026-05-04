@@ -1,5 +1,9 @@
 use crate::{
-    models::{route::Route, source::Source},
+    models::{
+        route::Route,
+        shape::Shape,
+        source::Source,
+    },
     stores::{cache_get, cache_set_with_etag},
 };
 use bb8_redis::RedisConnectionManager;
@@ -44,8 +48,8 @@ impl RouteStore {
                 long_name,
                 short_name,
                 color,
-                data,
-                geom
+                text_color,
+                data
             FROM
                 static.route
             WHERE
@@ -80,27 +84,24 @@ impl RouteStore {
         let sources: Vec<_> = routes.iter().map(|_| source).collect();
         let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
         let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
-        let colors: Vec<_> = routes.iter().map(|r| format!("#{}", r.color)).collect();
+        let colors: Vec<_> = routes.iter().map(|r| &r.color).collect();
+        let text_colors: Vec<_> = routes.iter().map(|r| &r.text_color).collect();
         let datas: Vec<_> = routes
             .iter()
             .map(|r| serde_json::to_value(&r.data).unwrap())
             .collect();
-        let geoms: Vec<_> = routes
-            .iter()
-            .map(|r| r.geom.clone().map(wkb::Encode))
-            .collect();
 
         sqlx::query!(
             r#"
-            INSERT INTO static.route (id, source, long_name, short_name, color, data, geom)
+            INSERT INTO static.route (id, source, long_name, short_name, color, text_color, data)
             SELECT
                 u.id,
                 u.source,
                 u.long_name,
                 u.short_name,
                 u.color,
-                u.data,
-                ST_SetSRID(u.geom, 4326)
+                u.text_color,
+                u.data
             FROM
                 unnest(
                     $1::text[],
@@ -108,23 +109,23 @@ impl RouteStore {
                     $3::text[],
                     $4::text[],
                     $5::text[],
-                    $6::jsonb[],
-                    $7::geometry[]
-                ) AS u(id, source, long_name, short_name, color, data, geom)
+                    $6::text[],
+                    $7::jsonb[]
+                ) AS u(id, source, long_name, short_name, color, text_color, data)
             ON CONFLICT (id, source) DO UPDATE SET
                 long_name = EXCLUDED.long_name,
                 short_name = EXCLUDED.short_name,
                 color = EXCLUDED.color,
-                data = EXCLUDED.data,
-                geom = EXCLUDED.geom
+                text_color = EXCLUDED.text_color,
+                data = EXCLUDED.data
             "#,
             &ids as _,
             &sources as _,
             &long_names as _,
             &short_names as _,
             &colors as _,
+            &text_colors as _,
             &datas as _,
-            &geoms as _,
         )
         .execute(&self.pg_pool)
         .await?;
@@ -132,5 +133,45 @@ impl RouteStore {
         self.populate_cache(source).await?;
 
         Ok(())
+    }
+
+    pub async fn save_all_shapes(&self, source: Source, shapes: &[Shape]) -> anyhow::Result<()> {
+        let ids: Vec<_> = shapes.iter().map(|s| &s.id).collect();
+        let sources: Vec<_> = vec![source; shapes.len()];
+        let geoms: Vec<_> = shapes
+            .iter()
+            .map(|s| wkb::Encode(s.geom.clone()))
+            .collect();
+        let datas: Vec<_> = shapes
+            .iter()
+            .map(|s| serde_json::to_value(&s.data).unwrap())
+            .collect();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO static.shape (id, source, geom, data)
+            SELECT id, source, ST_SetSRID(geom, 4326), data FROM UNNEST($1::text[], $2::source_enum[], $3::geometry[], $4::jsonb[])
+                AS t(id, source, geom, data)
+            ON CONFLICT (id, source) DO UPDATE SET
+                geom = EXCLUDED.geom,
+                data = EXCLUDED.data
+            "#,
+            &ids as _,
+            &sources as _,
+            &geoms as _,
+            &datas as _,
+        )
+        .execute(&self.pg_pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn get_all_shapes(&self, source: Source) -> anyhow::Result<Vec<Shape>> {
+        Ok(sqlx::query_as::<_, Shape>(
+            "SELECT id, source, geom, data FROM static.shape WHERE source = $1",
+        )
+        .bind(source)
+        .fetch_all(&self.pg_pool)
+        .await?)
     }
 }
