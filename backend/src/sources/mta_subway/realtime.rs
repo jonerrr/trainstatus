@@ -192,8 +192,9 @@ impl RealtimeAdapter for MtaSubwayRealtime {
                         trip_id,
                         stop_id: stop.station_id.to_string(),
                         arrival,
-                        departure: arrival, // Helium only provides est_arrive_at
+                        departure: arrival, // Helium only provides est_arrive_at (but in gtfs they were always identical anyway)
                         data: StopTimeData::MtaSubway(MtaSubwayStopTimeData {
+                            // TODO: remove track fields since helium uses platform edges instead
                             scheduled_track: None,
                             actual_track: None,
                             platform_edges: stop.platform_edges.clone(),

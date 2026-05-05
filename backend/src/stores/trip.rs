@@ -1,5 +1,6 @@
 use crate::{
     models::{
+        geom::Geom,
         source::Source,
         trip::{StopTime, Trip},
     },
@@ -11,6 +12,25 @@ use sqlx::PgPool;
 use std::time::Instant;
 use std::{collections::HashMap, time::Duration};
 use uuid::Uuid;
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct TrajectoryInputRow {
+    pub trip_id: Uuid,
+    pub route_id: String,
+    pub route_color: String,
+    pub direction: i16,
+    pub trip_geom: Geom,
+    pub stop_id: String,
+    pub arrival_unix: f64,
+    pub departure_unix: f64,
+    pub stop_distance_m: f64,
+    pub car_count: Option<i32>,
+    pub car_length_feet: Option<i32>,
+    #[sqlx(json)]
+    pub stop_time_data: serde_json::Value,
+    #[sqlx(json)]
+    pub stop_data: serde_json::Value,
+}
 
 const TTL: Duration = Duration::from_secs(30);
 
@@ -87,6 +107,93 @@ impl TripStore {
         )
         .bind(source)
         .bind(at)
+        .fetch_all(&self.pg_pool)
+        .await?)
+    }
+
+    /// Return PostGIS-prepared trajectory inputs for active trips.
+    ///
+    /// This pushes per-trip shape assembly and stop projection to SQL so the
+    /// handler can focus on interpolation and response shaping.
+    pub async fn get_trajectory_inputs(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+        route_ids: Option<&[String]>,
+    ) -> anyhow::Result<Vec<TrajectoryInputRow>> {
+        let route_ids_vec: Vec<String> = route_ids.map(|r| r.to_vec()).unwrap_or_default();
+        let has_route_filter = !route_ids_vec.is_empty();
+
+        Ok(sqlx::query_as::<_, TrajectoryInputRow>(
+            r#"
+            WITH filtered_trips AS (
+                SELECT
+                    t.id,
+                    t.route_id,
+                    t.direction,
+                    t.source,
+                    t.shape_ids,
+                    (t.data->'consist'->>'car_count')::int AS car_count,
+                    (t.data->'consist'->>'car_length_feet')::int AS car_length_feet
+                FROM realtime.trip t
+                WHERE
+                    t.source = $1
+                    AND t.updated_at >= (($2)::timestamp with time zone - INTERVAL '5 minutes')
+                    AND t.id = ANY(
+                        SELECT t2.id
+                        FROM realtime.trip t2
+                        LEFT JOIN realtime.stop_time st2 ON st2.trip_id = t2.id
+                        WHERE st2.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                    )
+                    AND ($4 = false OR t.route_id = ANY($3))
+            ),
+            trip_lines AS (
+                SELECT
+                    ft.id AS trip_id,
+                    ft.route_id,
+                    ft.direction,
+                    ft.car_count,
+                    ft.car_length_feet,
+                    r.color AS route_color,
+                    ST_LineMerge(ST_MakeLine(sh.geom ORDER BY us.ord)) AS trip_geom
+                FROM filtered_trips ft
+                JOIN static.route r ON r.id = ft.route_id AND r.source = ft.source
+                JOIN LATERAL UNNEST(ft.shape_ids) WITH ORDINALITY AS us(shape_id, ord) ON TRUE
+                JOIN static.shape sh ON sh.id = us.shape_id AND sh.source = ft.source
+                GROUP BY ft.id, ft.route_id, ft.direction, ft.car_count, ft.car_length_feet, r.color
+            )
+            SELECT
+                tl.trip_id,
+                tl.route_id,
+                tl.route_color,
+                tl.direction,
+                tl.trip_geom,
+                st.stop_id,
+                EXTRACT(EPOCH FROM st.arrival)::double precision AS arrival_unix,
+                EXTRACT(EPOCH FROM st.departure)::double precision AS departure_unix,
+                (
+                    ST_LineLocatePoint(tl.trip_geom, s.geom)
+                    * ST_Length(tl.trip_geom::geography)
+                )::double precision AS stop_distance_m
+                ,tl.car_count,
+                tl.car_length_feet,
+                st.data AS stop_time_data,
+                s.data AS stop_data
+            FROM trip_lines tl
+            JOIN realtime.stop_time st ON st.trip_id = tl.trip_id
+            JOIN static.stop s ON s.id = st.stop_id AND s.source = $1
+            WHERE
+                st.source = $1
+                AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                AND GeometryType(tl.trip_geom) = 'LINESTRING'
+                AND ST_NPoints(tl.trip_geom) >= 2
+            ORDER BY tl.trip_id, st.arrival
+            "#,
+        )
+        .bind(source)
+        .bind(at)
+        .bind(&route_ids_vec)
+        .bind(has_route_filter)
         .fetch_all(&self.pg_pool)
         .await?)
     }

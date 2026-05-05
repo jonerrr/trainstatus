@@ -253,6 +253,7 @@ impl RealtimeAdapter for NjtBusRealtime {
     }
 }
 
+// TODO: move to tests folder
 #[cfg(test)]
 mod tests {
     use super::*;

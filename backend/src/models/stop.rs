@@ -72,6 +72,7 @@ pub enum PlatformDirection {
     South,
 }
 
+// TODO: convert all units to metric before insertion
 /// Represents a marker on the platform that indicates where a consist will stop.
 /// For example if we have "marked_as: "S", direction: North, position_ft: 13",
 /// That means this marker is for northbound trains which will arrive from the south and stop 13 feet from the north end of the platform.
@@ -112,7 +113,7 @@ pub struct PlatformEdge {
 }
 
 // TODO: should we use pathAdjusted or normal lat/lng for mtasubway
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MtaSubwayStopData {
     pub gtfs_stop_id: String,
     pub bubble_id: String,
@@ -125,21 +126,21 @@ pub struct MtaSubwayStopData {
     pub south_headsign: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MtaBusStopData {
     pub bearing: Option<f64>,
     pub is_boardable: bool,
     pub direction: CompassDirection,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct NjtBusStopData {
     /// Public-facing 5-digit stop code (e.g. "10001"), shown on signs and NJT apps
     pub stop_code: String,
 }
 
 /// Stop data changes based on the `Source`
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopData {
     MtaSubway(MtaSubwayStopData),
