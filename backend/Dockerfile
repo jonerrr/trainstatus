@@ -1,4 +1,4 @@
-FROM rust:slim@sha256:81099830a1e1d244607b9a7a30f3ff6ecadc52134a933b4635faba24f52840c9 AS build
+FROM rust:slim@sha256:a6ed0cbc27f063c367aee8373f35fdf4dcf8be7596c4d19d6643e3252e514c2e AS build
 
 RUN set -eux; \
     apt-get update; \
