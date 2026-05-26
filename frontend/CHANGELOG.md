@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.3...frontend-v1.2.4) (2026-05-26)
+
+
+### Bug Fixes
+
+* **docker:** make containers rootless ([b297e28](https://github.com/jonerrr/trainstatus/commit/b297e2852cee5f0ffe1eb536f0da9929d805160a)), closes [#337](https://github.com/jonerrr/trainstatus/issues/337)
+
 ## [1.2.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.2...frontend-v1.2.3) (2026-04-22)
 
 
