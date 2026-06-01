@@ -16,7 +16,7 @@
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
-	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
+	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {
 		show_previous: boolean;
@@ -135,14 +135,11 @@
 	type OpenTransfers = Record<string, boolean>;
 
 	const open_transfers = $state<OpenTransfers>({});
-
 	const subway_consist = $derived(trip.data.source === 'mta_subway' ? trip.data.consist : null);
 	const subway_consist_cars = $derived(
 		trip.data.source === 'mta_subway' ? (trip.data.consist_cars ?? []) : []
 	);
-	const total_consist_length_feet = $derived(
-		subway_consist ? subway_consist.car_count * subway_consist.car_length_feet : null
-	);
+	const subway_consist_model = $derived(subway_consist_cars[0]?.type);
 </script>
 
 <div class="flex items-center gap-1 p-1">
@@ -174,42 +171,61 @@
 </div>
 <!-- TODO: rework -->
 {#if trip.data.source === 'mta_subway'}
-	<div class="mx-2 mb-2 rounded-md border border-neutral-700 bg-neutral-900/70 p-3 text-sm">
-		<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Consist</div>
+	<details
+		class="group mx-2 mb-2 overflow-hidden rounded-xl border border-neutral-700/80 bg-neutral-900/80 text-sm shadow-sm shadow-black/20"
+	>
+		<summary
+			class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-neutral-100 transition hover:bg-neutral-800/60 [&::-webkit-details-marker]:hidden"
+		>
+			<div class="flex min-w-0 flex-1 items-center gap-2">
+				<div class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Consist</div>
 
-		{#if subway_consist}
-			<div class="grid grid-cols-2 gap-2">
-				<div>
-					<div class="text-neutral-400">Cars</div>
-					<div>{subway_consist.car_count}</div>
-				</div>
-				<div>
-					<div class="text-neutral-400">Per Car</div>
-					<div>{subway_consist.car_length_feet} ft</div>
-				</div>
-				<div>
-					<div class="text-neutral-400">Total Length</div>
-					<div>{total_consist_length_feet} ft</div>
-				</div>
-				<div>
-					<div class="text-neutral-400">Reported Cars</div>
-					<div>{subway_consist_cars.length || 'None listed'}</div>
-				</div>
+				{#if subway_consist}
+					<div class="flex min-w-0 items-center gap-1.5 text-xs text-neutral-300">
+						<span class="truncate">{subway_consist.car_count} cars</span>
+						{#if subway_consist_model}
+							<Circle class="h-1 w-1 shrink-0 fill-current text-neutral-500" />
+							<span class="truncate">{subway_consist_model}</span>
+						{/if}
+					</div>
+				{:else}
+					<div class="truncate text-xs text-neutral-400">No consist details available</div>
+				{/if}
 			</div>
 
-			{#if subway_consist_cars.length}
-				<div class="mt-3 flex flex-wrap gap-2">
-					{#each subway_consist_cars as car (car.number)}
-						<div class="rounded bg-neutral-800 px-2 py-1 text-xs">
-							#{car.number}{car.type ? ` · ${car.type}` : ''}
+			<ChevronDown class="h-4 w-4 shrink-0 text-neutral-400 transition group-open:rotate-180" />
+		</summary>
+
+		<div class="border-t border-neutral-800 px-3 pt-2 pb-3">
+			{#if subway_consist}
+				{#if subway_consist_cars.length}
+					<div class="overflow-x-auto pb-1">
+						<div class="mx-auto flex w-fit min-w-max items-center justify-center gap-px">
+							{#each subway_consist_cars as car, index (car.number)}
+								<div
+									class={[
+										'flex min-h-7 items-center justify-center border border-neutral-600 bg-neutral-800 px-2.5 text-center text-[0.7rem] leading-none shadow-inner shadow-white/5',
+										index === 0 && 'rounded-l-full pl-3.5',
+										index === subway_consist_cars.length - 1 && 'rounded-r-full pr-3.5',
+										index !== 0 && 'border-l-0'
+									]}
+									title={car.number}
+								>
+									<div class="font-medium text-neutral-100">#{car.number}</div>
+								</div>
+							{/each}
 						</div>
-					{/each}
+					</div>
+				{:else}
+					<div class="text-xs text-neutral-400">No cars are listed for this train yet.</div>
+				{/if}
+			{:else}
+				<div class="text-xs text-neutral-400">
+					No consist details are available for this train yet.
 				</div>
 			{/if}
-		{:else}
-			<div class="text-neutral-400">No consist details are available for this train yet.</div>
-		{/if}
-	</div>
+		</div>
+	</details>
 {/if}
 
 {#if st_loading}
