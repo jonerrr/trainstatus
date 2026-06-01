@@ -1,24 +1,23 @@
 <script lang="ts">
-	import { onDestroy, onMount, untrack } from 'svelte';
+	import { type ComponentProps, onDestroy, untrack } from 'svelte';
 
 	import { page } from '$app/state';
 
 	import type { Source } from '$lib/client';
+	import {
+		type ActiveVehicle,
+		type RenderUnitTable,
+		buildActiveVehiclesAtTime,
+		normalizeBearingForIcon,
+		renderUnitTableFromIPC
+	} from '$lib/map/trajectoryArrow';
+	import { VEHICLE_ICON_ATLAS, VEHICLE_ICON_MAPPING } from '$lib/map/vehicleIcons';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
 
 	import type { PickingInfo } from '@deck.gl/core';
 	import { IconLayer } from '@deck.gl/layers';
 	import { DeckGLOverlay } from '@svelte-maplibre-gl/deckgl';
-
-	import {
-		buildActiveVehiclesAtTime,
-		normalizeBearingForIcon,
-		renderUnitTableFromIPC,
-		type ActiveVehicle,
-		type RenderUnitTable
-	} from '$lib/map/trajectoryArrow';
-	import { VEHICLE_ICON_ATLAS, VEHICLE_ICON_MAPPING } from '$lib/map/vehicleIcons';
 
 	let {
 		source = 'mta_subway',
@@ -159,6 +158,7 @@
 	}
 
 	async function openTripModal(tripId: string) {
+		// TODO: why do we need to check if the trip is already loaded? should we just try to load it and let the resource handle caching?
 		const trip = tripResource?.current?.get(tripId);
 		if (trip) {
 			open_modal({ type: 'trip', ...trip });
@@ -178,11 +178,20 @@
 		}
 	}
 
-	function handleDeckClick(info: PickingInfo<ActiveVehicle>) {
+	// i love typescript!!!!
+	type DeckGLOnClick = ComponentProps<typeof DeckGLOverlay>['onClick'];
+	type DeckGLClickArgs = Parameters<NonNullable<DeckGLOnClick>>;
+	type DeckGLClickEvent = DeckGLClickArgs[1];
+
+	function handleDeckClick(info: PickingInfo, event: DeckGLClickEvent) {
 		const tripId = info.object?.tripId;
-		if (tripId) {
-			void openTripModal(tripId);
-		}
+		if (!tripId) return;
+
+		// prevent the click handler of the route linestring below from also firing and opening the wrong modal
+		event.preventDefault();
+		event.stopPropagation();
+
+		void openTripModal(tripId);
 	}
 
 	async function fetchTrajectories(
