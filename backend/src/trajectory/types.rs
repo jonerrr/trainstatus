@@ -155,9 +155,7 @@ impl HotSnapshot {
         }
     }
 
-    pub fn historical_from(
-        render_units: std::collections::HashMap<String, RenderUnit>,
-    ) -> Self {
+    pub fn historical_from(render_units: std::collections::HashMap<String, RenderUnit>) -> Self {
         Self {
             generated_at: Utc::now(),
             render_units,

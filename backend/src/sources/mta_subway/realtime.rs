@@ -117,19 +117,12 @@ impl RealtimeAdapter for MtaSubwayRealtime {
         let mut positions = Vec::new();
 
         for helium_trip in response.trips {
-            let direction: i16 = match helium_trip.direction.as_str() {
-                // TODO: probably convert east and west to north/south, since GTFS_RT only has 2 directions per route
-                "NORTH" => 1,
-                "EAST" => 2,
-                "SOUTH" => 3,
-                "WEST" => 4,
-                other => {
-                    warn!(
-                        "Unknown direction '{}' for trip {}",
-                        other, helium_trip.trip_id
-                    );
-                    continue;
-                }
+            let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
+                warn!(
+                    "Unknown direction '{}' for trip {}",
+                    helium_trip.direction, helium_trip.trip_id
+                );
+                continue;
             };
 
             // Parse the trip_id to extract created_at from origin time
@@ -287,6 +280,14 @@ impl RealtimeAdapter for MtaSubwayRealtime {
 
 // --- Helpers ---
 
+fn normalize_subway_direction(direction: &str) -> Option<i16> {
+    match direction {
+        "NORTH" | "EAST" => Some(1),
+        "SOUTH" | "WEST" => Some(3),
+        _ => None,
+    }
+}
+
 /// Parses the MTA's origin time format into NaiveTime.
 pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
     let minutes = origin_time as f64 / 100.0;
@@ -357,5 +358,19 @@ fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<Da
         Trip::created_at(tomorrow, origin_time)
     } else {
         Some(candidate)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_subway_direction;
+
+    #[test]
+    fn normalizes_subway_directions_to_north_south() {
+        assert_eq!(normalize_subway_direction("NORTH"), Some(1));
+        assert_eq!(normalize_subway_direction("EAST"), Some(1));
+        assert_eq!(normalize_subway_direction("SOUTH"), Some(3));
+        assert_eq!(normalize_subway_direction("WEST"), Some(3));
+        assert_eq!(normalize_subway_direction("UP"), None);
     }
 }

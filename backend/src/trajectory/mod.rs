@@ -22,7 +22,7 @@ pub use geometry::{route_length_m, shape_key_from_line};
 pub use render_units::{expand_render_units, source_render_config};
 pub use snapshot::{snapshot_from_rows, source_supports_trajectories};
 pub use types::{
-    ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit,
-    Trajectory, TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot,
-    bbox_intersects, compute_path_bbox, round_to_5min_bucket, source_projected_epsg_code,
+    ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit, Trajectory,
+    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, bbox_intersects,
+    compute_path_bbox, round_to_5min_bucket, source_projected_epsg_code,
 };

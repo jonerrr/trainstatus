@@ -305,8 +305,16 @@ mod mta_subway_tests {
         assert_eq!(units[0].unit_count, Some(8));
         assert_eq!(units[0].length_m, 18.288);
         assert!(units[0].positions.len() >= units[1].positions.len());
-        assert!(units.iter().all(|unit| unit.bearings.len() == unit.timestamps.len()));
-        assert!(units.iter().all(|unit| unit.positions.len() == unit.timestamps.len()));
+        assert!(
+            units
+                .iter()
+                .all(|unit| unit.bearings.len() == unit.timestamps.len())
+        );
+        assert!(
+            units
+                .iter()
+                .all(|unit| unit.positions.len() == unit.timestamps.len())
+        );
     }
 
     #[test]

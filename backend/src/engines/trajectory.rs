@@ -106,12 +106,7 @@ async fn refresh_source(
                     .await?;
                 snapshot.shape_length_m = shape_geom.length_m;
                 let computed = compute_trajectory_async(
-                    &engine,
-                    source,
-                    &snapshot,
-                    prev_state,
-                    &cache,
-                    &config,
+                    &engine, source, &snapshot, prev_state, &cache, &config,
                 )
                 .await
                 .ok()?;

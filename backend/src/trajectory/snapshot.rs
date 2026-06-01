@@ -30,7 +30,9 @@ pub fn snapshot_from_rows(
                 .map(|length| count as f64 * length as f64 * 0.3048)
         })
     });
-    let consist_car_count = rows.iter().find_map(|row| row.car_count.map(|count| count as i16));
+    let consist_car_count = rows
+        .iter()
+        .find_map(|row| row.car_count.map(|count| count as i16));
     let consist_car_length_m = rows
         .iter()
         .find_map(|row| row.car_length_feet.map(|length| length as f32 * 0.3048));

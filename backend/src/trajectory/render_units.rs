@@ -90,17 +90,23 @@ fn expand_consist_units(
                 continue;
             }
 
-            let Some(coord) =
-                distance_to_coord(center_distance, &shape_geom.wgs84_line, &shape_geom.cum_dist)
-            else {
+            let Some(coord) = distance_to_coord(
+                center_distance,
+                &shape_geom.wgs84_line,
+                &shape_geom.cum_dist,
+            ) else {
                 continue;
             };
 
             positions.push([coord.x, coord.y]);
             timestamps.push(trajectory.timestamps[sample_index]);
             bearings.push(
-                bearing_at_distance(center_distance, &shape_geom.wgs84_line, &shape_geom.cum_dist)
-                    .unwrap_or(trajectory.bearings[sample_index]),
+                bearing_at_distance(
+                    center_distance,
+                    &shape_geom.wgs84_line,
+                    &shape_geom.cum_dist,
+                )
+                .unwrap_or(trajectory.bearings[sample_index]),
             );
         }
 
@@ -141,7 +147,8 @@ fn build_single_unit(
     passengers: Option<i32>,
     config: SourceRenderConfig,
 ) -> Option<RenderUnit> {
-    if trajectory.path.len() < 2 || trajectory.timestamps.len() < 2 || trajectory.bearings.len() < 2 {
+    if trajectory.path.len() < 2 || trajectory.timestamps.len() < 2 || trajectory.bearings.len() < 2
+    {
         return None;
     }
 
@@ -168,8 +175,10 @@ fn build_single_unit(
 }
 
 fn trip_passengers(trip: &TripSnapshot) -> Option<i32> {
-    trip.positions.iter().find_map(|position| match &position.data {
-        PositionData::MtaBus(data) => data.passengers,
-        _ => None,
-    })
+    trip.positions
+        .iter()
+        .find_map(|position| match &position.data {
+            PositionData::MtaBus(data) => data.passengers,
+            _ => None,
+        })
 }
