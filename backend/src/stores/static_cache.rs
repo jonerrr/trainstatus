@@ -10,7 +10,7 @@ use crate::models::static_cache::CachedTrip;
 pub struct StaticCacheStore {
     redis_pool: Pool<RedisConnectionManager>,
 }
-
+// TODO: maybe replace this with a postgres UNCLOGGED table
 impl StaticCacheStore {
     pub fn new(redis_pool: Pool<RedisConnectionManager>) -> Self {
         Self { redis_pool }

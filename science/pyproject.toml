@@ -3,7 +3,7 @@ name = "science"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.14.4"
 dependencies = [
   "altair>=5.5.0",
   "connectorx>=0.4.3",
@@ -13,6 +13,7 @@ dependencies = [
   "lonboard>=0.12.1",
   "matplotlib>=3.10.3",
   "movingpandas>=0.21.0",
+  "notebook>=7.5.5",
   "polars>=1.30.0",
   "polars-st>=0.3.0",
   "polyline>=2.0.4",

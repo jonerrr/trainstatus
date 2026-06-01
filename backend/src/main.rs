@@ -7,7 +7,7 @@ use axum::{
     routing::get,
 };
 use bb8_redis::RedisConnectionManager;
-use http::{HeaderValue, Method, StatusCode, request::Parts};
+use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
 use tokio::{
@@ -126,15 +126,26 @@ async fn main() {
 
     engines::alerts::run(&alert_store, alert_adapters).await;
 
+    let trajectory_engine = Arc::new(backend::trajectory::TrajectoryEngine::new());
+    let trajectory_cache = Arc::new(backend::trajectory::TrajectoryCache::new());
+
+    engines::trajectory::run(
+        trip_store.clone(),
+        position_store.clone(),
+        trajectory_engine.clone(),
+        trajectory_cache.clone(),
+    )
+    .await;
+
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
-    servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
     ),
+    // TODO: maybe add route, stop, and shape models here
     components(schemas(models::source::Source))
     )]
     struct ApiDoc;
@@ -146,6 +157,9 @@ async fn main() {
         stop_time_store,
         position_store,
         alert_store,
+        static_cache_store,
+        trajectory_engine,
+        trajectory_cache,
     };
 
     let api_prefix = api_prefix().to_owned();

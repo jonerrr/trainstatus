@@ -54,9 +54,10 @@ pub(super) async fn get_token(api: NjtApi) -> anyhow::Result<String> {
     let mut guard = mutex.lock().await;
 
     if let Some((ref token, acquired_at)) = *guard
-        && acquired_at.elapsed() < Duration::from_secs(23 * 60 * 60) {
-            return Ok(token.clone());
-        }
+        && acquired_at.elapsed() < Duration::from_secs(23 * 60 * 60)
+    {
+        return Ok(token.clone());
+    }
 
     let token = authenticate(api)
         .await

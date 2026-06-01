@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import { slide } from 'svelte/transition';
 
 	import { page } from '$app/state';
@@ -72,7 +73,7 @@
 		for (const st of stop_times) {
 			transfers[st.stop_id] = [];
 
-			const added_routes = new Set<string>();
+			const added_routes = new SvelteSet<string>();
 
 			const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id];
 			if (!stop) continue;
@@ -134,6 +135,14 @@
 	type OpenTransfers = Record<string, boolean>;
 
 	const open_transfers = $state<OpenTransfers>({});
+
+	const subway_consist = $derived(trip.data.source === 'mta_subway' ? trip.data.consist : null);
+	const subway_consist_cars = $derived(
+		trip.data.source === 'mta_subway' ? (trip.data.consist_cars ?? []) : []
+	);
+	const total_consist_length_feet = $derived(
+		subway_consist ? subway_consist.car_count * subway_consist.car_length_feet : null
+	);
 </script>
 
 <div class="flex items-center gap-1 p-1">
@@ -163,12 +172,51 @@
 		</div>
 	{/if}
 </div>
+<!-- TODO: rework -->
+{#if trip.data.source === 'mta_subway'}
+	<div class="mx-2 mb-2 rounded-md border border-neutral-700 bg-neutral-900/70 p-3 text-sm">
+		<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Consist</div>
+
+		{#if subway_consist}
+			<div class="grid grid-cols-2 gap-2">
+				<div>
+					<div class="text-neutral-400">Cars</div>
+					<div>{subway_consist.car_count}</div>
+				</div>
+				<div>
+					<div class="text-neutral-400">Per Car</div>
+					<div>{subway_consist.car_length_feet} ft</div>
+				</div>
+				<div>
+					<div class="text-neutral-400">Total Length</div>
+					<div>{total_consist_length_feet} ft</div>
+				</div>
+				<div>
+					<div class="text-neutral-400">Reported Cars</div>
+					<div>{subway_consist_cars.length || 'None listed'}</div>
+				</div>
+			</div>
+
+			{#if subway_consist_cars.length}
+				<div class="mt-3 flex flex-wrap gap-2">
+					{#each subway_consist_cars as car (car.number)}
+						<div class="rounded bg-neutral-800 px-2 py-1 text-xs">
+							#{car.number}{car.type ? ` · ${car.type}` : ''}
+						</div>
+					{/each}
+				</div>
+			{/if}
+		{:else}
+			<div class="text-neutral-400">No consist details are available for this train yet.</div>
+		{/if}
+	</div>
+{/if}
 
 {#if st_loading}
 	<Skeleton lines={6} class="p-2" />
 {:else}
 	<ModalList>
-		{#each stop_times as st}
+		{#each stop_times as st (`${st.stop_id}:${st.arrival.toISOString()}`)}
 			{@const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id]}
 			{#if stop}
 				<div class="relative text-base">

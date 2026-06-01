@@ -144,9 +144,10 @@ pub async fn run_pipeline<T: GtfsSource>(
             }
 
             if let Some(vehicle) = entity.vehicle
-                && let Some(pos) = adapter.process_vehicle(vehicle, static_cache_store).await {
-                    positions.push(pos);
-                }
+                && let Some(pos) = adapter.process_vehicle(vehicle, static_cache_store).await
+            {
+                positions.push(pos);
+            }
         }
     }
 
@@ -164,9 +165,10 @@ pub async fn run_pipeline<T: GtfsSource>(
     // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
     for position in &mut positions {
         if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id)
-            && let Some(&actual_id) = id_map.get(&input_id) {
-                position.trip_id = Some(actual_id);
-            }
+            && let Some(&actual_id) = id_map.get(&input_id)
+        {
+            position.trip_id = Some(actual_id);
+        }
     }
 
     // Save positions (trigger appends trip history points for positions with trip_id and geom)

@@ -2,8 +2,6 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: trainstatus-app
-  labels:
-    app: trainstatus
 spec:
   # restartPolicy: Always
   containers:

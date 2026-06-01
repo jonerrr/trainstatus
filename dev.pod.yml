@@ -2,10 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: trainstatus-dev
-  labels:
-    app: trainstatus-dev
 spec:
-  # restartPolicy: Always
   containers:
     - name: postgis
       image: docker.io/postgis/postgis:18-3.6-alpine
@@ -59,8 +56,8 @@ spec:
           cpu: "50m"
           memory: "64Mi"
         limits:
-          cpu: "250m"
-          memory: "256Mi"
+          cpu: "1000m"
+          memory: "1Gi"
 
     - name: martin
       image: ghcr.io/maplibre/martin:latest
@@ -161,10 +158,9 @@ data:
             - static
           # must be integer (but we are using string)
           # id_columns: id
-        # TODO: add back functions once they are fixed
-        # functions:
-        #   from_schemas:
-        #     - realtime
+        functions:
+          from_schemas:
+            - realtime
 
     sprites:
       paths:

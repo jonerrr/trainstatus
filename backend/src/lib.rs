@@ -5,6 +5,8 @@ pub mod macros;
 pub mod models;
 pub mod sources;
 pub mod stores;
+pub mod trajectory;
+pub mod utils;
 
 use std::env::var;
 use std::sync::OnceLock;
@@ -24,6 +26,9 @@ pub struct AppState {
     pub stop_time_store: crate::stores::stop_time::StopTimeStore,
     pub position_store: crate::stores::position::PositionStore,
     pub alert_store: crate::stores::alert::AlertStore,
+    pub static_cache_store: crate::stores::static_cache::StaticCacheStore,
+    pub trajectory_engine: std::sync::Arc<crate::trajectory::TrajectoryEngine>,
+    pub trajectory_cache: std::sync::Arc<crate::trajectory::TrajectoryCache>,
 }
 
 impl AppState {
@@ -34,6 +39,9 @@ impl AppState {
         stop_time_store: crate::stores::stop_time::StopTimeStore,
         position_store: crate::stores::position::PositionStore,
         alert_store: crate::stores::alert::AlertStore,
+        static_cache_store: crate::stores::static_cache::StaticCacheStore,
+        trajectory_engine: std::sync::Arc<crate::trajectory::TrajectoryEngine>,
+        trajectory_cache: std::sync::Arc<crate::trajectory::TrajectoryCache>,
     ) -> Self {
         Self {
             route_store,
@@ -42,9 +50,17 @@ impl AppState {
             stop_time_store,
             position_store,
             alert_store,
+            static_cache_store,
+            trajectory_engine,
+            trajectory_cache,
         }
     }
 }
+
+// pub fn mta_api_url() -> &'static str {
+//     static API_URL: OnceLock<String> = OnceLock::new();
+//     API_URL.get_or_init(|| var("MTA_API_URL").expect("MTA_API_URL must be set"))
+// }
 
 pub fn mta_oba_api_key() -> &'static str {
     static API_KEY: OnceLock<String> = OnceLock::new();
@@ -81,5 +97,9 @@ pub fn prefixed_path(prefix: &str, path: &str) -> String {
         return format!("/{}", path.trim_start_matches('/'));
     }
 
-    format!("{}/{}", prefix.trim_end_matches('/'), path.trim_start_matches('/'))
+    format!(
+        "{}/{}",
+        prefix.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    )
 }

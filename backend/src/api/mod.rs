@@ -14,6 +14,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 // pub mod websocket;
 pub mod realtime;
 pub mod static_data;
+pub mod trajectory;
 pub mod util;
 
 pub struct AppError(anyhow::Error);
@@ -46,11 +47,11 @@ pub fn router(state: AppState) -> OpenApiRouter {
         .routes(routes!(realtime::stop_times_handler))
         .routes(routes!(realtime::positions_handler))
         .routes(routes!(realtime::alerts_handler))
+        .routes(routes!(trajectory::trajectories_handler))
         .with_state(state)
 }
 
 // not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
-#[allow(dead_code)]
 pub fn json_headers() -> &'static HeaderMap {
     static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
     HEADERS.get_or_init(|| {

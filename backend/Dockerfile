@@ -1,4 +1,7 @@
-FROM rust:slim@sha256:a6ed0cbc27f063c367aee8373f35fdf4dcf8be7596c4d19d6643e3252e514c2e AS build
+FROM rust:slim@sha256:c03ea1587a8e4474ae1a3f4a377cbb35ad53d2eb5c27f0bdf1ca8986025e322f AS build
+
+ARG MTA_API_URL
+ENV MTA_API_URL=${MTA_API_URL}
 
 RUN set -eux; \
     apt-get update; \
@@ -9,7 +12,7 @@ COPY . .
 ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM ghcr.io/valhalla/valhalla:3.7.0@sha256:c19b052fa132474da719e0e931007cd3931f25c43890f88acf270ba837fdc89f
+FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817fdee9b58c5e7b2adb6e422749c43
 
 WORKDIR /app
 COPY --chown=ubuntu:ubuntu --from=build /app/target/release/backend /backend

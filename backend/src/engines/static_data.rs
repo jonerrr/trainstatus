@@ -160,7 +160,6 @@ async fn run_source_handler(
                                 pending_waiters.push(respond_to);
                             }
                             Ok(false) => {
-                                // No update needed - respond immediately
                                 let _ = respond_to.send(Ok(()));
                             }
                             Err(e) => {
@@ -244,6 +243,10 @@ fn spawn_import(
                 .await
             {
                 error!("Failed to compute proximity transfers: {:#}", e);
+            }
+
+            if adapter_clone.source() == crate::models::source::Source::MtaSubway {
+                crate::trajectory::bump_platform_static_version();
             }
         } else if let Err(e) = &result {
             error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);

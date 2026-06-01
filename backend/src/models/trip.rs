@@ -17,6 +17,7 @@ pub struct Trip {
     pub vehicle_id: String,
     #[schema(example = "1")]
     pub route_id: String,
+    pub shape_ids: Vec<String>,
     /// For the MTA subway, 1 is northbound, 3 is southbound.
     /// For the MTA buses, the direction is 0 or 1, but it corresponds to which stops the bus serves, not cardinality. You can determine this by looking at the `RouteStop` data for the stops the trip serves.
     pub direction: i16,
@@ -26,6 +27,25 @@ pub struct Trip {
     pub updated_at: DateTime<Utc>,
     #[sqlx(json)]
     pub data: TripData,
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
+pub struct Consist {
+    pub car_count: i32,
+    pub car_length_feet: i32,
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
+pub struct ConsistCar {
+    pub number: String,
+    #[serde(rename = "type")]
+    pub car_type: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
+pub struct MtaSubwayTripData {
+    pub consist: Option<Consist>,
+    pub consist_cars: Vec<ConsistCar>,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema, PartialEq, Debug)]
@@ -50,7 +70,7 @@ pub struct NjtBusData {
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum TripData {
     MtaBus(MtaBusData),
-    MtaSubway,
+    MtaSubway(MtaSubwayTripData),
     NjtBus(NjtBusData),
 }
 
@@ -59,7 +79,7 @@ impl_discriminated_data!(
     Source,
     {
         MtaBus => MtaBusData,
-        MtaSubway,
+        MtaSubway => MtaSubwayTripData,
         NjtBus => NjtBusData,
     }
 );
@@ -107,6 +127,8 @@ pub struct MtaSubwayStopTimeData {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(example = "B2")]
     pub actual_track: Option<String>,
+    #[serde(default)]
+    pub platform_edges: Vec<String>,
 }
 
 #[derive(PartialEq, Clone, Serialize, Deserialize, ToSchema, Hash, Eq)]

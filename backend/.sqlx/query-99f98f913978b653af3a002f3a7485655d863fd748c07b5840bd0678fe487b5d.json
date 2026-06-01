@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.shape (id, source, geom, data)\n            SELECT id, source, ST_SetSRID(geom, 4326), data FROM UNNEST($1::text[], $2::source_enum[], $3::geometry[], $4::jsonb[])\n                AS t(id, source, geom, data)\n            ON CONFLICT (id, source) DO UPDATE SET\n                geom = EXCLUDED.geom,\n                data = EXCLUDED.data\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_rail",
+                      "njt_bus",
+                      "lirr",
+                      "mnr"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99f98f913978b653af3a002f3a7485655d863fd748c07b5840bd0678fe487b5d"
+}

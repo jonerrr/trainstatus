@@ -28,7 +28,12 @@ pub async fn run(
             loop {
                 let source = adapter.source();
                 if let Err(e) = adapter
-                    .run(&controller, &static_cache_store, &trip_store, &position_store)
+                    .run(
+                        &controller,
+                        &static_cache_store,
+                        &trip_store,
+                        &position_store,
+                    )
                     .await
                 {
                     error!("Realtime pipeline error for {:?}: {}", source, e);
