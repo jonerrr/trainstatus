@@ -167,6 +167,7 @@ impl TrajectoryCache {
         Some(dist)
     }
 
+    // TODO: rename this
     pub fn get_platform_match_sync(
         &self,
         key: PlatformMatchKey,

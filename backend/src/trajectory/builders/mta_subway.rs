@@ -231,22 +231,37 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
                 _ => return Err(anyhow::anyhow!("Expected MTA subway stop data")),
             };
             let platform_edges = Self::platform_edges_for_stop(stop, &stop_data_mta.platform_edges);
-            let platform_edge_ids: Vec<String> =
-                platform_edges.iter().map(|edge| edge.id.clone()).collect();
-            let key = TrajectoryCache::platform_match_key(
-                Source::MtaSubway,
-                &stop.stop_id,
-                trip.direction,
-                consist_length_m,
-                &platform_edge_ids,
-            );
-            let platform_match = caches
-                .get_platform_match_sync(key, || {
+            let platform_match = if platform_edges.is_empty() {
+                None
+            } else {
+                let platform_edge_ids: Vec<String> =
+                    platform_edges.iter().map(|edge| edge.id.clone()).collect();
+                let key = TrajectoryCache::platform_match_key(
+                    Source::MtaSubway,
+                    &stop.stop_id,
+                    trip.direction,
+                    consist_length_m,
+                    &platform_edge_ids,
+                );
+                caches.get_platform_match_sync(key, || {
                     Self::match_platform_edge(&platform_edges, trip.direction, consist_length_m)
                 })
-                .ok_or_else(|| {
-                    anyhow::anyhow!("No platform edge found for stop {}", stop.stop_id)
-                })?;
+            };
+
+            let platform_match = match platform_match {
+                Some(pm) => pm,
+                None => {
+                    // Fallback to a default virtual platform edge (e.g. 600 feet / 182.88 meters long).
+                    // Centering the consist on the platform.
+                    let default_platform_length_m = 182.88;
+                    let position_m = (default_platform_length_m + consist_length_m) / 2.0;
+                    PlatformMatch {
+                        platform_edge_id: format!("{}-FALLBACK", stop.stop_id),
+                        position_m,
+                        platform_edge_length_m: default_platform_length_m,
+                    }
+                }
+            };
 
             all_knots.extend(Self::build_stop_knots(
                 stop,
