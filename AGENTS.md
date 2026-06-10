@@ -1,4 +1,4 @@
-# Train Status - Copilot Instructions
+# Train Status - Agent Instructions
 
 ## Project Overview
 

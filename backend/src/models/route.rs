@@ -25,6 +25,12 @@ pub struct Route {
 pub struct MtaBusRouteData {
     pub sort_key: i32,
     pub service_types: Vec<String>,
+    // TODO: double check if theres a better way to link mta bus shapes to live trips.
+    /// All shape IDs associated with this route (from Helium infra, via stop-route data).
+    /// Used at realtime to pick the best-fitting shape for a trip when GTFS-RT
+    /// does not provide shape_id directly.
+    #[serde(default)]
+    pub shape_ids: Vec<String>,
 }
 
 /// Stop data changes based on the `Source`

@@ -60,6 +60,19 @@ async fn refresh_source(
         return Ok(());
     }
 
+    // Cache the resolved shape IDs back to the database.
+    // This is a no-op for trips that already have shape_ids, but for buses it saves the resolved shape.
+    let shapes_to_cache: Vec<(uuid::Uuid, String)> = rows
+        .iter()
+        .map(|r| (r.trip_id, r.shape_id.clone()))
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    if let Err(e) = trip_store.update_resolved_shapes(&shapes_to_cache).await {
+        error!("Failed to update resolved shape IDs for {:?}: {:#}", source, e);
+    }
+
     let mut trip_rows: HashMap<uuid::Uuid, Vec<_>> = HashMap::new();
     for row in rows {
         trip_rows.entry(row.trip_id).or_default().push(row);

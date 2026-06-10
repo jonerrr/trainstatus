@@ -119,8 +119,9 @@ impl RealtimeAdapter for MtaSubwayRealtime {
         for helium_trip in response.trips {
             let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
                 warn!(
-                    "Unknown direction '{}' for trip {}",
-                    helium_trip.direction, helium_trip.trip_id
+                    direction = helium_trip.direction,
+                    trip_id = helium_trip.trip_id,
+                    "Unknown direction"
                 );
                 continue;
             };

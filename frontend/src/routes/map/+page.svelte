@@ -5,6 +5,7 @@
 	import Filters from '$lib/map/Filters.svelte';
 	import TripMarkersLoader from '$lib/map/TripMarkersLoader.svelte';
 	import { MapFilters } from '$lib/map/filters.svelte';
+	import type { ActiveVehicle } from '$lib/map/trajectoryArrow';
 	import { open_modal } from '$lib/url_params.svelte';
 
 	import maplibregl from 'maplibre-gl';
@@ -23,6 +24,17 @@
 	let map = $state<maplibregl.Map>();
 
 	let filters = $state(new MapFilters());
+
+	let hoveredTripId = $state<string | null>(null);
+	let hoveredObject = $state<ActiveVehicle | null>(null);
+	let hoverX = $state(0);
+	let hoverY = $state(0);
+
+	let hoveredLineRouteId = $state<string | null>(null);
+	let hoveredLineRouteSource = $state<string | null>(null);
+
+	const activeHoveredRouteId = $derived(hoveredObject?.routeId ?? hoveredLineRouteId);
+	const activeHoveredRouteSource = $derived(hoveredObject?.source ?? hoveredLineRouteSource);
 
 	// TODO: move filter handing into a svelte.ts file and then share it with the filter ui component
 	// const source_filter: maplibregl.FilterSpecification = $derived([
@@ -79,22 +91,34 @@
 							10,
 							[
 								'case',
-								['boolean', ['feature-state', 'hover'], false],
-								2, // Hovered width at zoom 10
+								[
+									'all',
+									['==', ['get', 'id'], activeHoveredRouteId ?? ''],
+									['==', ['get', 'source'], activeHoveredRouteSource ?? '']
+								],
+								2.5, // Hovered width at zoom 10
 								1 // Normal width at zoom 10
 							],
 							15,
 							[
 								'case',
-								['boolean', ['feature-state', 'hover'], false],
-								6, // Hovered width at zoom 15
+								[
+									'all',
+									['==', ['get', 'id'], activeHoveredRouteId ?? ''],
+									['==', ['get', 'source'], activeHoveredRouteSource ?? '']
+								],
+								7, // Hovered width at zoom 15
 								3 // Normal width at zoom 15
 							],
 							18,
 							[
 								'case',
-								['boolean', ['feature-state', 'hover'], false],
-								12, // Hovered width at zoom 18
+								[
+									'all',
+									['==', ['get', 'id'], activeHoveredRouteId ?? ''],
+									['==', ['get', 'source'], activeHoveredRouteSource ?? '']
+								],
+								14, // Hovered width at zoom 18
 								6 // Normal width at zoom 18
 							]
 						],
@@ -106,17 +130,41 @@
 						// 	6 // Value if zoom is 15 or greater
 						// ],
 						'line-color': ['get', 'color'],
-						'line-opacity': 1.0
+						'line-opacity': activeHoveredRouteId
+							? [
+									'case',
+									[
+										'all',
+										['==', ['get', 'id'], activeHoveredRouteId],
+										['==', ['get', 'source'], activeHoveredRouteSource]
+									],
+									1.0,
+									0.35
+								]
+							: 1.0
 					}}
 					onmousemove={(e) => {
+						// TODO: fix this not working, trip and route are still hovered at the same time
+						if (hoveredObject) {
+							hoveredLineRouteId = null;
+							hoveredLineRouteSource = null;
+							return;
+						}
 						cursor = 'pointer';
-						// hovered_routes = e.features;
+						const feat = e.features?.[0]?.properties;
+						if (feat) {
+							hoveredLineRouteId = feat.id;
+							hoveredLineRouteSource = feat.source;
+						}
 					}}
 					onmouseleave={() => {
+						if (hoveredObject) return;
 						cursor = 'default';
-						// hovered_routes = undefined;
+						hoveredLineRouteId = null;
+						hoveredLineRouteSource = null;
 					}}
 					onclick={(e) => {
+						if (hoveredObject) return;
 						console.log(e.features);
 						// clicked_routes = e.features;
 						// lnglat = e.lngLat;
@@ -183,14 +231,17 @@
 						'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 14, 0.8]
 					}}
 					onmousemove={(e) => {
+						if (hoveredObject) return;
 						cursor = 'pointer';
 						// hovered_stop = e.features?.[0];
 					}}
 					onmouseleave={() => {
+						if (hoveredObject) return;
 						cursor = 'default';
 						// hovered_stop = undefined;
 					}}
 					onclick={(e) => {
+						if (hoveredObject) return;
 						console.log(e.features);
 						const feat = e.features?.[0].properties;
 						if (!feat) return;
@@ -215,10 +266,60 @@
 			</VectorTileSource>
 		{/if}
 
-		{#if filters.layers['trip']}
-			{#each filters.sources as source (source)}
-				<TripMarkersLoader {source} enabled />
-			{/each}
+		{#if filters.layers['trip'] && filters.sources.length > 0}
+			<TripMarkersLoader
+				sources={filters.sources}
+				enabled
+				bind:cursor
+				bind:hoveredTripId
+				bind:hoveredObject
+				bind:hoverX
+				bind:hoverY
+			/>
 		{/if}
 	</MapLibre>
+
+	{#if hoveredObject}
+		{@const route =
+			page.data.routes_by_id?.[hoveredObject.source as Source]?.[hoveredObject.routeId]}
+		{#if route}
+			<div
+				class="pointer-events-none absolute z-9999 flex flex-col gap-1.5 rounded-lg border border-neutral-800 bg-neutral-950/90 p-3 text-xs text-white shadow-2xl backdrop-blur-md transition-all duration-75"
+				style="left: {hoverX + 15}px; top: {hoverY + 15}px;"
+			>
+				<div class="flex items-center gap-2">
+					<!-- Route Pill/Badge -->
+					<div
+						class="flex size-6 items-center justify-center rounded-full text-center text-sm font-black text-white"
+						style="background-color: {route.color};"
+					>
+						{route.short_name}
+					</div>
+					<div class="flex flex-col">
+						<span class="font-semibold text-neutral-100">{route.long_name}</span>
+						<span class="text-[10px] text-neutral-400 capitalize">
+							{hoveredObject.source.replace('_', ' ')}
+						</span>
+					</div>
+				</div>
+
+				<div class="h-px bg-neutral-800 my-0.5"></div>
+
+				<div class="flex flex-col gap-1 text-[11px] text-neutral-300">
+					<div>
+						<span class="text-neutral-500">Trip ID:</span>
+						<code class="rounded bg-neutral-900 px-1 py-0.5 text-neutral-200">
+							{hoveredObject.tripId}
+						</code>
+					</div>
+					{#if hoveredObject.passengers !== null && hoveredObject.passengers !== undefined}
+						<div>
+							<span class="text-neutral-500">Occupancy:</span>
+							<span class="text-neutral-200 font-medium">{hoveredObject.passengers} pax</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
+	{/if}
 </div>

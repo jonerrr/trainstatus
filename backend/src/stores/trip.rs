@@ -20,6 +20,9 @@ pub struct TrajectoryInputRow {
     pub route_color: String,
     pub direction: i16,
     pub trip_geom: Geom,
+    /// The shape ID that was selected for this trip (either from the trip's own
+    /// shape_ids or resolved via best-fit from the route's shape list).
+    pub shape_id: String,
     pub stop_id: String,
     pub arrival_unix: f64,
     pub departure_unix: f64,
@@ -115,6 +118,12 @@ impl TripStore {
     ///
     /// This pushes per-trip shape assembly and stop projection to SQL so the
     /// handler can focus on interpolation and response shaping.
+    ///
+    /// For sources where GTFS-RT provides `shape_ids` on the trip (e.g. MTA Subway),
+    /// those are used directly. For sources that do not (e.g. MTA Bus), we fall back
+    /// to picking the best-fitting shape from the route's stored shape_ids
+    /// (populated at static import time from the Helium infrastructure API).
+    /// "Best" = the shape with the smallest average ST_Distance to the trip's stops.
     pub async fn get_trajectory_inputs(
         &self,
         source: Source,
@@ -147,7 +156,10 @@ impl TripStore {
                     )
                     AND ($4 = false OR t.route_id = ANY($3))
             ),
-            trip_lines AS (
+            -- Determine effective shape_ids per trip:
+            -- If the trip itself has shape_ids (e.g. subway), use those directly.
+            -- Otherwise fall back to the route-level shape_ids stored in static.route.data.
+            trip_shape_candidates AS (
                 SELECT
                     ft.id AS trip_id,
                     ft.route_id,
@@ -155,12 +167,56 @@ impl TripStore {
                     ft.car_count,
                     ft.car_length_feet,
                     r.color AS route_color,
-                    ST_LineMerge(ST_MakeLine(sh.geom ORDER BY us.ord)) AS trip_geom
+                    r.source AS route_source,
+                    CASE
+                        WHEN array_length(ft.shape_ids, 1) > 0
+                            THEN ft.shape_ids
+                        ELSE
+                            ARRAY(
+                                SELECT jsonb_array_elements_text(r.data->'shape_ids')
+                            )
+                    END AS effective_shape_ids
                 FROM filtered_trips ft
                 JOIN static.route r ON r.id = ft.route_id AND r.source = ft.source
-                JOIN LATERAL UNNEST(ft.shape_ids) WITH ORDINALITY AS us(shape_id, ord) ON TRUE
-                JOIN static.shape sh ON sh.id = us.shape_id AND sh.source = ft.source
-                GROUP BY ft.id, ft.route_id, ft.direction, ft.car_count, ft.car_length_feet, r.color
+            ),
+            -- For trips with a single explicit shape_id list (subway), just merge them.
+            -- For trips using route-level shapes, score each candidate shape by average
+            -- ST_Distance from the trip's upcoming stops and pick the best one.
+            best_shape AS (
+                SELECT DISTINCT ON (tsc.trip_id)
+                    tsc.trip_id,
+                    tsc.route_id,
+                    tsc.direction,
+                    tsc.car_count,
+                    tsc.car_length_feet,
+                    tsc.route_color,
+                    sh.id AS shape_id,
+                    sh.geom AS shape_geom,
+                    AVG(ST_Distance(sh.geom::geography, s.geom::geography)) AS avg_stop_dist_m
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
+                JOIN static.shape sh ON sh.id = sid AND sh.source = tsc.route_source
+                JOIN realtime.stop_time st ON st.trip_id = tsc.trip_id
+                JOIN static.stop s ON s.id = st.stop_id AND s.source = tsc.route_source
+                WHERE st.source = tsc.route_source
+                  AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                GROUP BY tsc.trip_id, tsc.route_id, tsc.direction, tsc.car_count,
+                         tsc.car_length_feet, tsc.route_color, sh.id, sh.geom
+                ORDER BY tsc.trip_id, avg_stop_dist_m ASC
+            ),
+            trip_lines AS (
+                SELECT
+                    bs.trip_id,
+                    bs.route_id,
+                    bs.direction,
+                    bs.car_count,
+                    bs.car_length_feet,
+                    bs.route_color,
+                    bs.shape_id,
+                    bs.shape_geom AS trip_geom
+                FROM best_shape bs
+                WHERE GeometryType(bs.shape_geom) = 'LINESTRING'
+                  AND ST_NPoints(bs.shape_geom) >= 2
             )
             SELECT
                 tl.trip_id,
@@ -168,6 +224,7 @@ impl TripStore {
                 tl.route_color,
                 tl.direction,
                 tl.trip_geom,
+                tl.shape_id,
                 st.stop_id,
                 EXTRACT(EPOCH FROM st.arrival)::double precision AS arrival_unix,
                 EXTRACT(EPOCH FROM st.departure)::double precision AS departure_unix,
@@ -185,8 +242,6 @@ impl TripStore {
             WHERE
                 st.source = $1
                 AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
-                AND GeometryType(tl.trip_geom) = 'LINESTRING'
-                AND ST_NPoints(tl.trip_geom) >= 2
             ORDER BY tl.trip_id, st.arrival
             "#,
         )
@@ -298,10 +353,14 @@ impl TripStore {
                 INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data)
                 SELECT input_id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data
                 FROM input_rows
-                ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
+                 ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
                     data = EXCLUDED.data,
                     updated_at = EXCLUDED.updated_at,
-                    shape_ids = EXCLUDED.shape_ids
+                    shape_ids = CASE
+                        WHEN EXCLUDED.shape_ids IS NOT NULL AND array_length(EXCLUDED.shape_ids, 1) > 0
+                        THEN EXCLUDED.shape_ids
+                        ELSE realtime.trip.shape_ids
+                    END
                 RETURNING id, original_id, vehicle_id, created_at, direction
             )
             SELECT
@@ -404,5 +463,37 @@ impl TripStore {
 
         // might want to insert positions from here instead of returning the map
         Ok(id_map)
+    }
+
+    // TODO: improve this. i don't like how the shape resolution is separate from the main insert also maybe this should be using moka?
+    /// Cache resolved shape IDs on trips that don't have shape IDs set.
+    pub async fn update_resolved_shapes(&self, shapes: &[(Uuid, String)]) -> anyhow::Result<()> {
+        if shapes.is_empty() {
+            return Ok(());
+        }
+
+        let mut trip_ids = Vec::with_capacity(shapes.len());
+        let mut shape_ids = Vec::with_capacity(shapes.len());
+
+        for (trip_id, shape_id) in shapes {
+            trip_ids.push(*trip_id);
+            shape_ids.push(shape_id.clone());
+        }
+
+        sqlx::query!(
+            r#"
+            UPDATE realtime.trip AS t
+            SET shape_ids = ARRAY[u.shape_id]
+            FROM UNNEST($1::uuid[], $2::text[]) AS u(trip_id, shape_id)
+            WHERE t.id = u.trip_id
+              AND (t.shape_ids IS NULL OR array_length(t.shape_ids, 1) IS NULL OR array_length(t.shape_ids, 1) = 0)
+            "#,
+            &trip_ids,
+            &shape_ids,
+        )
+        .execute(&self.pg_pool)
+        .await?;
+
+        Ok(())
     }
 }

@@ -112,12 +112,32 @@ impl StaticAdapter for MtaBusStatic {
         let infra = fetch_infrastructure(&client).await?;
 
         // 2. Import Routes
+        // First pass: collect all shape_ids per route from stop-route data.
+        // The GTFS-RT feed does not include shape_id, so we store all shapes
+        // for a route here so the trajectory engine can pick the best one at runtime.
+        let mut route_name_to_shape_ids: HashMap<String, Vec<String>> = HashMap::new();
+        for stop in &infra.stops {
+            for route in &stop.routes {
+                let key = route.route_name.to_uppercase();
+                let entry = route_name_to_shape_ids.entry(key).or_default();
+                for shape_id in &route.shape_ids {
+                    if !entry.contains(shape_id) {
+                        entry.push(shape_id.clone());
+                    }
+                }
+            }
+        }
+
         let mut route_id_map = HashMap::new();
         let routes: Vec<Route> = infra
             .routes
             .iter()
             .map(|r| {
                 route_id_map.insert(r.route_name.to_uppercase(), r.route_id.clone());
+                let shape_ids = route_name_to_shape_ids
+                    .get(&r.route_name.to_uppercase())
+                    .cloned()
+                    .unwrap_or_default();
                 Route {
                     id: r.route_id.clone(),
                     long_name: r.route_name.clone(),
@@ -130,6 +150,7 @@ impl StaticAdapter for MtaBusStatic {
                     data: RouteData::MtaBus(MtaBusRouteData {
                         sort_key: r.sort_key,
                         service_types: r.service_types.clone(),
+                        shape_ids,
                     }),
                 }
             })

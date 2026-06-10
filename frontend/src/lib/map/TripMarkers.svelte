@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { type ComponentProps, onDestroy, untrack } from 'svelte';
 
+	import { SvelteMap } from 'svelte/reactivity';
+
 	import { page } from '$app/state';
 
 	import type { Source } from '$lib/client';
@@ -20,17 +22,25 @@
 	import { DeckGLOverlay } from '@svelte-maplibre-gl/deckgl';
 
 	let {
-		source = 'mta_subway',
+		sources = ['mta_subway'],
 		refreshInterval = 30_000,
-		enabled = true
+		enabled = true,
+		cursor = $bindable(),
+		hoveredTripId = $bindable(null),
+		hoveredObject = $bindable(null),
+		hoverX = $bindable(0),
+		hoverY = $bindable(0)
 	}: {
-		source?: Source;
+		sources?: Source[];
 		routeIds?: string[];
 		refreshInterval?: number;
 		enabled?: boolean;
+		cursor?: 'default' | 'pointer' | undefined;
+		hoveredTripId?: string | null;
+		hoveredObject?: ActiveVehicle | null;
+		hoverX?: number;
+		hoverY?: number;
 	} = $props();
-
-	const tripResource = $derived(trip_context.getSource(source));
 
 	const fixedAt = $derived.by(() => {
 		const atParam = page.url.searchParams.get('at');
@@ -39,7 +49,9 @@
 		return Number.isFinite(parsed) ? parsed : null;
 	});
 
-	let renderUnits = $state<RenderUnitTable | null>(null);
+	const tripResources = trip_context.get();
+
+	let renderUnitsBySource = new SvelteMap<Source, RenderUnitTable>();
 	let activeVehicles: ActiveVehicle[] = [];
 	let activeVehicleCount = $state(0);
 	let frameVersion = $state(0);
@@ -54,7 +66,7 @@
 
 		return [
 			new IconLayer<ActiveVehicle>({
-				id: `trip-markers-rail-outline-${source}`,
+				id: `trip-markers-rail-outline`,
 				data: railVehicles,
 				iconAtlas: VEHICLE_ICON_ATLAS,
 				iconMapping: VEHICLE_ICON_MAPPING,
@@ -62,7 +74,10 @@
 				getPosition: (vehicle) => vehicle.position,
 				getColor: (vehicle) => getVehicleOutlineColor(vehicle),
 				getAngle: (vehicle) => normalizeBearingForIcon(vehicle.bearing),
-				getSize: (vehicle) => vehicle.lengthM * 1.18,
+				getSize: (vehicle) => {
+					const baseSize = vehicle.lengthM * 1.18;
+					return vehicle.tripId === hoveredTripId ? baseSize * 1.3 : baseSize;
+				},
 				sizeUnits: 'meters',
 				billboard: false,
 				alphaCutoff: 0,
@@ -72,12 +87,12 @@
 					getPosition: frameVersion,
 					getAngle: frameVersion,
 					getColor: frameVersion,
-					getSize: frameVersion,
+					getSize: [frameVersion, hoveredTripId],
 					getIcon: frameVersion
 				}
 			}),
 			new IconLayer<ActiveVehicle>({
-				id: `trip-markers-rail-fill-${source}`,
+				id: `trip-markers-rail-fill`,
 				data: railVehicles,
 				iconAtlas: VEHICLE_ICON_ATLAS,
 				iconMapping: VEHICLE_ICON_MAPPING,
@@ -85,7 +100,10 @@
 				getPosition: (vehicle) => vehicle.position,
 				getColor: (vehicle) => getVehicleFillColor(vehicle),
 				getAngle: (vehicle) => normalizeBearingForIcon(vehicle.bearing),
-				getSize: (vehicle) => vehicle.lengthM * 0.94,
+				getSize: (vehicle) => {
+					const baseSize = vehicle.lengthM * 0.94;
+					return vehicle.tripId === hoveredTripId ? baseSize * 1.3 : baseSize;
+				},
 				sizeUnits: 'meters',
 				billboard: false,
 				alphaCutoff: 0,
@@ -95,12 +113,12 @@
 					getPosition: frameVersion,
 					getAngle: frameVersion,
 					getColor: frameVersion,
-					getSize: frameVersion,
+					getSize: [frameVersion, hoveredTripId],
 					getIcon: frameVersion
 				}
 			}),
 			new IconLayer<ActiveVehicle>({
-				id: `trip-markers-bus-${source}`,
+				id: `trip-markers-bus`,
 				data: busVehicles,
 				iconAtlas: VEHICLE_ICON_ATLAS,
 				iconMapping: VEHICLE_ICON_MAPPING,
@@ -108,7 +126,10 @@
 				getPosition: (vehicle) => vehicle.position,
 				getColor: (vehicle) => vehicle.color,
 				getAngle: (vehicle) => normalizeBearingForIcon(vehicle.bearing),
-				getSize: (vehicle) => vehicle.lengthM,
+				getSize: (vehicle) => {
+					const baseSize = vehicle.lengthM;
+					return vehicle.tripId === hoveredTripId ? baseSize * 1.3 : baseSize;
+				},
 				sizeUnits: 'meters',
 				billboard: false,
 				alphaCutoff: 0,
@@ -118,7 +139,7 @@
 					getPosition: frameVersion,
 					getAngle: frameVersion,
 					getColor: frameVersion,
-					getSize: frameVersion,
+					getSize: [frameVersion, hoveredTripId],
 					getIcon: frameVersion
 				}
 			})
@@ -147,25 +168,33 @@
 		frameVersion += 1;
 	}
 
-	function updateVehiclesAtTime(table: RenderUnitTable | null, t: number) {
-		if (!table) {
-			clearActiveVehicles();
-			return;
+	function updateAllVehiclesAtTime(t: number) {
+		let combined: ActiveVehicle[] = [];
+		for (const src of sources) {
+			const table = renderUnitsBySource.get(src);
+			if (table) {
+				const vehicles: ActiveVehicle[] = [];
+				buildActiveVehiclesAtTime(table, t, vehicles);
+				combined.push(...vehicles);
+			}
 		}
-
-		activeVehicleCount = buildActiveVehiclesAtTime(table, t, activeVehicles).length;
+		activeVehicles = combined;
+		activeVehicleCount = combined.length;
 		frameVersion += 1;
 	}
 
 	async function openTripModal(tripId: string) {
-		// TODO: why do we need to check if the trip is already loaded? should we just try to load it and let the resource handle caching?
-		const trip = tripResource?.current?.get(tripId);
+		const vehicle = activeVehicles.find((v) => v.tripId === tripId);
+		if (!vehicle) return;
+		const source = vehicle.source as Source;
+		const tripResource = tripResources[source];
+		if (!tripResource) return;
+
+		const trip = tripResource.current?.get(tripId);
 		if (trip) {
 			open_modal({ type: 'trip', ...trip });
 			return;
 		}
-
-		if (!tripResource) return;
 
 		try {
 			const trips = await tripResource.whenReady();
@@ -178,7 +207,6 @@
 		}
 	}
 
-	// i love typescript!!!!
 	type DeckGLOnClick = ComponentProps<typeof DeckGLOverlay>['onClick'];
 	type DeckGLClickArgs = Parameters<NonNullable<DeckGLOnClick>>;
 	type DeckGLClickEvent = DeckGLClickArgs[1];
@@ -187,11 +215,29 @@
 		const tripId = info.object?.tripId;
 		if (!tripId) return;
 
-		// prevent the click handler of the route linestring below from also firing and opening the wrong modal
 		event.preventDefault();
 		event.stopPropagation();
 
 		void openTripModal(tripId);
+	}
+
+	function handleDeckHover(info: PickingInfo) {
+		const tripId = info.object?.tripId;
+		if (tripId) {
+			cursor = 'pointer';
+			hoveredTripId = tripId;
+			hoveredObject = info.object as ActiveVehicle;
+			hoverX = info.x;
+			hoverY = info.y;
+		} else {
+			if (hoveredTripId && sources.includes(hoveredObject?.source as Source)) {
+				if (cursor === 'pointer') {
+					cursor = 'default';
+				}
+				hoveredTripId = null;
+				hoveredObject = null;
+			}
+		}
 	}
 
 	async function fetchTrajectories(
@@ -200,8 +246,6 @@
 		currentEnabled: boolean
 	) {
 		if (!currentEnabled) {
-			renderUnits = null;
-			clearActiveVehicles();
 			return;
 		}
 
@@ -214,13 +258,13 @@
 
 			const res = await fetch(url);
 			if (!res.ok) {
-				console.error(`Failed to fetch trajectories: ${res.status}`);
+				console.error(`Failed to fetch trajectories for ${currentSource}: ${res.status}`);
 				return;
 			}
 
 			const nextRenderUnits = renderUnitTableFromIPC(await res.arrayBuffer());
-			renderUnits = nextRenderUnits;
-			updateVehiclesAtTime(nextRenderUnits, currentFixedAt ?? Date.now() / 1000);
+			renderUnitsBySource.set(currentSource, nextRenderUnits);
+			updateAllVehiclesAtTime(currentFixedAt ?? Date.now() / 1000);
 
 			if (nextRenderUnits.table.numRows > 0 && activeVehicleCount === 0) {
 				console.warn(
@@ -228,25 +272,24 @@
 				);
 			}
 		} catch (err) {
-			console.error('Error fetching trajectories:', err);
+			console.error(`Error fetching trajectories for ${currentSource}:`, err);
 		}
 	}
 
 	let isRunning = false;
 
 	function animate() {
-		const currentRenderUnits = renderUnits;
-		if (!enabled || !currentRenderUnits || fixedAt !== null) {
+		if (!enabled || renderUnitsBySource.size === 0 || fixedAt !== null) {
 			isRunning = false;
 			animationId = undefined;
 			return;
 		}
-		updateVehiclesAtTime(currentRenderUnits, Date.now() / 1000);
+		updateAllVehiclesAtTime(Date.now() / 1000);
 		animationId = requestAnimationFrame(animate);
 	}
 
 	function startAnimation() {
-		if (!isRunning && enabled && renderUnits && fixedAt === null) {
+		if (!isRunning && enabled && renderUnitsBySource.size > 0 && fixedAt === null) {
 			isRunning = true;
 			animationId = requestAnimationFrame(animate);
 		}
@@ -264,10 +307,10 @@
 
 	$effect(() => {
 		const currentEnabled = enabled;
-		const currentRenderUnits = renderUnits;
+		const hasRenderUnits = renderUnitsBySource.size > 0;
 		const currentFixedAt = fixedAt;
 
-		if (currentEnabled && currentRenderUnits && currentFixedAt === null) {
+		if (currentEnabled && hasRenderUnits && currentFixedAt === null) {
 			startAnimation();
 		} else {
 			stopAnimation();
@@ -276,31 +319,41 @@
 
 	$effect(() => {
 		const currentFixedAt = fixedAt;
-		const currentRenderUnits = renderUnits;
-		if (currentRenderUnits) {
+		if (renderUnitsBySource.size > 0) {
 			untrack(() => {
-				updateVehiclesAtTime(currentRenderUnits, currentFixedAt ?? Date.now() / 1000);
+				updateAllVehiclesAtTime(currentFixedAt ?? Date.now() / 1000);
 			});
 		}
 	});
 
 	$effect(() => {
 		const currentEnabled = enabled;
-		const currentSource = source;
+		const currentSources = sources;
 		const currentFixedAt = fixedAt;
 		untrack(() => {
 			if (!currentEnabled) {
-				renderUnits = null;
+				renderUnitsBySource.clear();
 				clearActiveVehicles();
 				return;
 			}
-			void fetchTrajectories(currentSource, currentFixedAt, currentEnabled);
+
+			// Remove keys for sources that are no longer active
+			for (const key of Array.from(renderUnitsBySource.keys())) {
+				if (!currentSources.includes(key)) {
+					renderUnitsBySource.delete(key);
+				}
+			}
+
+			// Fetch trajectories for active sources
+			for (const src of currentSources) {
+				void fetchTrajectories(src, currentFixedAt, currentEnabled);
+			}
 		});
 	});
 
 	$effect(() => {
 		const currentEnabled = enabled;
-		const currentSource = source;
+		const currentSources = sources;
 		const currentFixedAt = fixedAt;
 		const currentRefreshInterval = refreshInterval;
 
@@ -312,7 +365,9 @@
 		if (!currentEnabled || currentFixedAt !== null) return;
 
 		fetchTimer = setInterval(() => {
-			void fetchTrajectories(currentSource, null, currentEnabled);
+			for (const src of currentSources) {
+				void fetchTrajectories(src, null, currentEnabled);
+			}
 		}, currentRefreshInterval);
 
 		return () => {
@@ -330,5 +385,10 @@
 </script>
 
 {#if enabled}
-	<DeckGLOverlay interleaved layers={deckLayers} onClick={handleDeckClick} />
+	<DeckGLOverlay
+		interleaved
+		layers={deckLayers}
+		onClick={handleDeckClick}
+		onHover={handleDeckHover}
+	/>
 {/if}
