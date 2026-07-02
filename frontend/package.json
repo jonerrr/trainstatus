@@ -16,7 +16,7 @@
 		"test": "pnpm run test:unit -- --run"
 	},
 	"devDependencies": {
-		"@hey-api/openapi-ts": "0.97.1",
+		"@hey-api/openapi-ts": "0.97.3",
 		"@sveltejs/adapter-auto": "7.0.1",
 		"@sveltejs/adapter-node": "5.5.4",
 		"@sveltejs/kit": "2.59.1",
