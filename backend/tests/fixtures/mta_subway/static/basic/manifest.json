@@ -1,0 +1,18 @@
+{
+  "source": "mta_subway",
+  "kind": "static",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "exit_strategy",
+      "path": "raw/exit_strategy.json",
+      "format": "json"
+    },
+    {
+      "name": "infrastructure",
+      "path": "raw/infrastructure.json",
+      "format": "json"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}

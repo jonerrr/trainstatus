@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::{
@@ -23,6 +25,16 @@ use super::{NJT_ALERTS_URL, NjtApi, get_token, njt_post_future};
 
 pub struct NjtBusAlerts;
 
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let token = get_token(NjtApi::GtfsG2).await?;
+    let bytes = njt_post_future(NJT_ALERTS_URL, token).await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert("alerts.pb".to_string(), bytes.to_vec());
+    Ok(fixtures)
+}
+
 #[async_trait]
 impl GtfsAlertSource for NjtBusAlerts {
     fn source(&self) -> Source {
@@ -33,7 +45,7 @@ impl GtfsAlertSource for NjtBusAlerts {
         let token = match get_token(NjtApi::GtfsG2).await {
             Ok(t) => t,
             Err(e) => {
-                tracing::error!("NJT auth failed for alerts: {:?}", e);
+                tracing::error!(error = %e, "NJT auth failed for alerts");
                 return vec![];
             }
         };

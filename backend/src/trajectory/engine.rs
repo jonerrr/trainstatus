@@ -4,7 +4,9 @@ use std::sync::Arc;
 use crate::models::source::Source;
 
 use super::builder::{TrajectoryBuilder, validate_knots};
-use super::builders::{mta_bus::MtaBusBuilder, mta_subway::MtaSubwayBuilder, schedule_stop::ScheduleStopBuilder};
+use super::builders::{
+    mta_bus::MtaBusBuilder, mta_subway::MtaSubwayBuilder, schedule_stop::ScheduleStopBuilder,
+};
 use super::cache::TrajectoryCache;
 use super::continuity;
 use super::geometry::ShapeGeometry;

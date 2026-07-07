@@ -8,6 +8,7 @@ use crate::{
     models::{
         route::{Route, RouteData},
         source::Source,
+        static_dataset::StaticDataset,
         stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     sources::{StaticAdapter, normalize_title, normalize_whitespace},
@@ -29,7 +30,7 @@ const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
 const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct BusRoute {
     #[serde(rename = "BusRouteID")]
     bus_route_id: String,
@@ -112,19 +113,7 @@ impl StaticAdapter for NjtBusStatic {
         .context("GTFS parse task panicked")?
         .context("Failed to parse NJT GTFS")?;
 
-        tracing::info!(
-            "NJT GTFS parsed: {} routes, {} stops, {} trips",
-            gtfs.routes.len(),
-            gtfs.stops.len(),
-            gtfs.trips.len()
-        );
-
-        // Expand and cache trips for 48 hours in Redis
         let cached_trips = expand_gtfs(Source::NjtBus, &gtfs);
-        static_cache_store
-            .cache_trips(Source::NjtBus, &cached_trips)
-            .await
-            .context("Failed to cache NJT trips in Redis")?;
 
         let bus_routes_token = super::get_token(NjtApi::BusDv2)
             .await
@@ -153,50 +142,33 @@ impl StaticAdapter for NjtBusStatic {
 
         // self.snap_route_geometries(&mut route_geom_map).await;
 
-        // Build all entities
-        let routes = build_routes(&gtfs, &route_geom_map);
-        let stops = build_stops(&gtfs);
-        let route_stops = build_route_stops(&gtfs);
+        let dataset = build_static_dataset(&gtfs, &route_geom_map, cached_trips);
 
-        tracing::info!(
-            "NJT: built {} routes, {} stops, {} route_stops",
-            routes.len(),
-            stops.len(),
-            route_stops.len()
-        );
-
+        // TODO: move this to a standardized print method in StaticDataset
         #[cfg(debug_assertions)]
         {
             // additional sanity check: look for duplicates in the raw vector (before storing)
             let mut seen: HashMap<(String, String), usize> = HashMap::new();
-            for rs in &route_stops {
+            for rs in &dataset.route_stops {
                 let key = (rs.route_id.clone(), rs.stop_id.clone());
                 *seen.entry(key).or_insert(0) += 1;
             }
             for ((rid, sid), count) in seen {
                 if count > 1 {
                     tracing::warn!(
-                        "raw route_stops vector contains duplicate entries for route_id={} stop_id={} count={}",
-                        rid,
-                        sid,
-                        count
+                        route_id = %rid,
+                        stop_id = %sid,
+                        count,
+                        "Raw route_stops vector contains duplicate entries"
                     );
                 }
             }
         }
 
-        route_store
-            .save_all(Source::NjtBus, &routes)
+        dataset
+            .persist(route_store, stop_store, static_cache_store)
             .await
-            .context("Failed to save NJT routes to database")?;
-        stop_store
-            .save_all(Source::NjtBus, &stops)
-            .await
-            .context("Failed to save NJT stops to database")?;
-        stop_store
-            .save_all_route_stops(Source::NjtBus, &route_stops)
-            .await
-            .context("Failed to save NJT route_stops to database")?;
+            .context("Failed to persist NJT static dataset")?;
 
         Ok(())
     }
@@ -234,6 +206,38 @@ async fn fetch_bus_routes(token: &str) -> anyhow::Result<Vec<BusRoute>> {
         .await?;
 
     Ok(routes)
+}
+
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<std::collections::BTreeMap<String, Vec<u8>>> {
+    let gtfs_token = super::get_token(NjtApi::GtfsG2)
+        .await
+        .context("NJT GTFS authentication failed")?;
+    let bus_routes_token = super::get_token(NjtApi::BusDv2)
+        .await
+        .context("NJT BUSDV2 authentication failed")?;
+
+    let gtfs_zip = download_gtfs(&gtfs_token).await?;
+    let bus_routes = fetch_bus_routes(&bus_routes_token).await?;
+    let route_geometries = reqwest::Client::new()
+        .get(NJT_ARCGIS_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+
+    let mut fixtures = std::collections::BTreeMap::new();
+    fixtures.insert("gtfs.zip".to_string(), gtfs_zip);
+    fixtures.insert(
+        "bus_routes.json".to_string(),
+        serde_json::to_vec_pretty(&bus_routes)?,
+    );
+    fixtures.insert(
+        "route_geometries.geojson".to_string(),
+        route_geometries.to_vec(),
+    );
+    Ok(fixtures)
 }
 
 // ── Route geometry (ArcGIS) ───────────────────────────────────────────────────
@@ -435,6 +439,23 @@ fn build_routes(
         .collect()
 }
 
+// TODO: why is this function necessary?
+// the only thing i can see it being useful for is for fixture generation
+fn build_static_dataset(
+    gtfs: &gtfs_structures::Gtfs,
+    route_geom_map: &HashMap<String, MultiLineString>,
+    cached_trips: Vec<crate::models::static_cache::CachedTrip>,
+) -> StaticDataset {
+    StaticDataset {
+        source: Source::NjtBus,
+        routes: build_routes(gtfs, route_geom_map),
+        stops: build_stops(gtfs),
+        route_stops: build_route_stops(gtfs),
+        shapes: vec![],
+        cached_trips,
+    }
+}
+
 // ── Build stops ───────────────────────────────────────────────────────────────
 
 fn build_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<Stop> {
@@ -620,7 +641,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
     //
     // The debug check above will still warn about duplicates, but this step
     // prevents the insertion error when running the importer.
-
+    // TODO: remove this once we take into account the parent stop
     // perform deduplication in-place to avoid large allocations
     let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
     for rs in result.into_iter() {

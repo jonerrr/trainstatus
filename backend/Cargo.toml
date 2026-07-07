@@ -35,37 +35,15 @@ prost = "0.14.1"
 rayon = "1.11.0"
 redis = "1.0.1"
 regex = "1.12.2"
-reqwest = {
-  version = "0.13.2",
-  default-features = false,
-  features = ["json", "multipart", "query"]
-}
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "multipart", "query"] }
 rgb = "0.8.52"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["raw_value"] }
-sqlx = {
-  version = "0.8.6",
-  features = [
-    "chrono",
-    "json",
-    "postgres",
-    "runtime-tokio-rustls",
-    "uuid",
-  ]
-}
+sqlx = { version = "0.8.6", features = ["chrono", "json", "postgres", "runtime-tokio-rustls", "uuid"] }
 titlecase = "3.6.0"  # TODO: remove
 tokio = { version = "1.48.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["buffer", "limit"] }
-tower-http = {
-  version = "0.6.6",
-  features = [
-    "compression-br",
-    "compression-gzip",
-    "normalize-path",
-    "timeout",
-    "trace",
-  ]
-}
+tower-http = { version = "0.6.6", features = ["compression-br", "compression-gzip", "normalize-path", "timeout", "trace"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
@@ -75,11 +53,7 @@ uuid = { version = "1.18.1", features = ["serde", "v7"] }
 
 [dev-dependencies]
 axum-test = "=20.0.0"
-test-log = {
-  version = "=0.2.20",
-  default-features = false,
-  features = ["trace"]
-}
+test-log = { version = "=0.2.20", default-features = false, features = ["trace"] }
 tokio-test = "=0.4.5"
 
 [build-dependencies]

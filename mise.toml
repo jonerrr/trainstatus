@@ -1,4 +1,7 @@
-experimental_monorepo_root = true
+monorepo_root = true
+
+[monorepo]
+config_roots = ["backend", "frontend", "geo", "science"]
 
 [tools]
 "aqua:astral-sh/uv" = "latest"
@@ -9,9 +12,6 @@ experimental_monorepo_root = true
 "cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres", default-features = false }
 # installing with mise caused the rust vscode extension not to work
 # protoc = "latest"
-
-[monorepo]
-config_roots = ["backend", "frontend", "geo", "science"]
 
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"

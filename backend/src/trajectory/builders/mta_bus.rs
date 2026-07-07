@@ -48,7 +48,7 @@ impl MtaBusBuilder {
     ///
     /// Knot layout (mirrors `MtaSubwayBuilder::build_stop_knots`):
     ///
-    /// ```
+    /// ```text
     ///  t_approach   t_arrive  t_depart  t_clear
     ///      |            |         |         |
     ///   s_approach  s_stop    s_stop    s_depart
@@ -165,10 +165,10 @@ impl TrajectoryBuilder for MtaBusBuilder {
             let original_len = all_knots.len();
             let anchor_t = anchor.t_event;
             let anchor_s = anchor.s_m;
-            all_knots
-                .retain(|k| !(k.t_event < anchor_t && k.s_m + ANCHOR_DISTANCE_TOLERANCE_M < anchor_s));
-            stats.pre_anchor_knots_dropped =
-                original_len.saturating_sub(all_knots.len()) as u32;
+            all_knots.retain(|k| {
+                !(k.t_event < anchor_t && k.s_m + ANCHOR_DISTANCE_TOLERANCE_M < anchor_s)
+            });
+            stats.pre_anchor_knots_dropped = original_len.saturating_sub(all_knots.len()) as u32;
 
             all_knots.push(anchor);
             all_knots.sort_by(|a, b| {
@@ -232,10 +232,7 @@ mod tests {
 
     #[test]
     fn generates_four_knots_per_stop() {
-        let stops = vec![
-            make_stop("A", 1000.0, 100.0),
-            make_stop("B", 1120.0, 300.0),
-        ];
+        let stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1120.0, 300.0)];
         let trip = make_trip(stops, 500.0);
         let kinematics = BusKinematicsConfig::default();
 
@@ -275,10 +272,7 @@ mod tests {
 
     #[test]
     fn knots_are_time_ordered() {
-        let stops = vec![
-            make_stop("A", 1000.0, 100.0),
-            make_stop("B", 1200.0, 300.0),
-        ];
+        let stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1200.0, 300.0)];
         let trip = make_trip(stops, 500.0);
         let builder = MtaBusBuilder;
         let cache = crate::trajectory::TrajectoryCache::new();

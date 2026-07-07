@@ -21,7 +21,7 @@ pub struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        error!("Internal server error: {}", self.0);
+        error!(error = %self.0, "Internal server error");
 
         (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong :(").into_response()
     }
@@ -174,7 +174,7 @@ where
                     },
                     _ => {
                         // TODO: maybe return a 400 instead of logging
-                        tracing::error!("Invalid timestamp: {}", at);
+                        tracing::error!(timestamp = at, "Invalid timestamp");
                         CurrentTime {
                             time: Utc::now(),
                             user_specified: false,

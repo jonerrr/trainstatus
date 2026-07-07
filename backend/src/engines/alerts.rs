@@ -11,7 +11,11 @@ pub async fn run(alert_store: &AlertStore, adapters: Vec<Arc<dyn AlertsAdapter>>
         tokio::spawn(async move {
             loop {
                 if let Err(e) = adapter.run(&alert_store).await {
-                    error!("Alert pipeline error for {:?}: {}", adapter.source(), e);
+                    error!(
+                        source = %adapter.source(),
+                        error = %e,
+                        "Alert pipeline error"
+                    );
                 }
 
                 sleep(adapter.refresh_interval()).await;

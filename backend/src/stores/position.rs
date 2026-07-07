@@ -92,7 +92,7 @@ impl PositionStore {
 
     /// Bulk upsert vehicle positions (updates current state only, no history)
     /// A database trigger appends trip history points when positions with trip_id and geom are upserted
-    #[tracing::instrument(skip(self, positions), fields(source = %source.as_str(), count = positions.len()), level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self, positions), fields(source = %source, count = positions.len()))]
     pub async fn save_vehicle_positions(
         &self,
         source: Source,
@@ -156,7 +156,7 @@ impl PositionStore {
         .execute(&self.pg_pool)
         .await?;
 
-        tracing::debug!("Upserted {} vehicle positions", positions.len());
+        tracing::debug!(count = positions.len(), "Upserted vehicle positions");
 
         // Populate cache (write-through)
         self.populate_cache(source).await?;

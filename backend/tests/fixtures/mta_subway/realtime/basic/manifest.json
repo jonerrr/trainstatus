@@ -1,0 +1,13 @@
+{
+  "source": "mta_subway",
+  "kind": "realtime",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "trips",
+      "path": "raw/trips.json",
+      "format": "json"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}

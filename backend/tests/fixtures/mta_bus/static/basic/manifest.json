@@ -1,0 +1,13 @@
+{
+  "source": "mta_bus",
+  "kind": "static",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "infrastructure",
+      "path": "raw/infrastructure.json",
+      "format": "json"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}

@@ -1,5 +1,7 @@
 pub mod api;
 pub mod engines;
+#[cfg(feature = "fixture-capture")]
+pub mod fixtures;
 pub mod integrations;
 pub mod macros;
 pub mod models;

@@ -104,7 +104,7 @@ pub async fn run(
     }
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = %adapter.source()))]
 async fn run_source_handler(
     pool: PgPool,
     route_store: RouteStore,
@@ -142,7 +142,7 @@ async fn run_source_handler(
                         match needs_update {
                             Ok(true) if !import_in_progress => {
                                 // Need update and none in progress - start one
-                                info!("Starting import (triggered by ensure_updated)");
+                                info!(source = %adapter.source(), "Starting import triggered by ensure_updated");
                                 pending_waiters.push(respond_to);
 
                                 // Collect any other pending requests
@@ -164,7 +164,7 @@ async fn run_source_handler(
                             }
                             Err(e) => {
                                 // Error checking - respond with error
-                                error!("Error checking update status: {:#}", e);
+                                error!(error = %e, "Error checking update status");
                                 let _ = respond_to.send(Err(e));
                             }
                             _ => unreachable!(),
@@ -175,7 +175,7 @@ async fn run_source_handler(
                             // Piggyback on the in-progress import
                             pending_waiters.push(respond_to);
                         } else {
-                            info!("Starting import (forced)");
+                            info!(source = %adapter.source(), "Starting forced import");
                             pending_waiters.push(respond_to);
 
                             // Drain any other queued requests
@@ -198,7 +198,7 @@ async fn run_source_handler(
     }
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = %adapter.source()))]
 fn spawn_import(
     pool: &PgPool,
     route_store: &RouteStore,
@@ -227,7 +227,7 @@ fn spawn_import(
             .await;
 
         if result.is_ok() {
-            info!("Import successful");
+            info!(source = %adapter_clone.source(), "Import successful");
             let _ = sqlx::query!(
                 "UPDATE source SET updated_at = NOW() WHERE id = $1",
                 adapter_clone.source() as Source
@@ -242,21 +242,21 @@ fn spawn_import(
                 .compute_proximity_transfers(Some(adapter_clone.source()))
                 .await
             {
-                error!("Failed to compute proximity transfers: {:#}", e);
+                error!(source = %adapter_clone.source(), error = %e, "Failed to compute proximity transfers");
             }
 
             if adapter_clone.source() == crate::models::source::Source::MtaSubway {
                 crate::trajectory::bump_platform_static_version();
             }
         } else if let Err(e) = &result {
-            error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
+            error!(source = %adapter_clone.source(), error = %e, "Import failed");
         }
 
         let _ = import_tx_clone.send(result).await;
     });
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = %adapter.source()))]
 async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyhow::Result<bool> {
     // Ensure the source exists in the table, inserting if needed
     // Use epoch time so it triggers an immediate update on first run

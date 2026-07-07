@@ -255,7 +255,7 @@ impl TripStore {
 
     /// Bulk insert trips with their stop times so we can remap to the correct trip IDs.
     /// Returns a map of input_id -> actual_id for callers that need to reference the saved trips.
-    #[tracing::instrument(skip(self, data), fields(source = %source.as_str(), count = data.len()), level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self, data), fields(source = %source, count = data.len()))]
     pub async fn save_all(
         &self,
         source: Source,

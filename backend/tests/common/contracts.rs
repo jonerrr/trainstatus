@@ -1,35 +1,51 @@
-use backend::models::source::Source;
-use backend::sources::StaticAdapter;
+use backend::models::static_dataset::StaticDataset;
 
-// This function panics (fails the test) if the baseline contract is violated
-pub async fn assert_standard_static_import<A: StaticAdapter>(
-    adapter: &A,
-    route_store: &RouteStore,
-    stop_store: &StopStore,
-    // ... other stores
-) {
-    // 1. Run the import
-    // adapter.import(route_store, stop_store, ...).await.expect("Import failed");
+use super::TestStores;
 
-    let source = adapter.source();
-    let routes = route_store.get_all(source).await.unwrap();
-    let stops = stop_store.get_all(source).await.unwrap();
-
-    // 2. Standard Assertions
+pub fn assert_static_dataset_contract(dataset: &StaticDataset) {
+    let report = dataset.validate().expect("static dataset should validate");
+    assert!(report.route_count > 0, "dataset must include routes");
+    assert!(report.stop_count > 0, "dataset must include stops");
     assert!(
-        !routes.is_empty(),
-        "[{:?}] Must import at least one route",
-        source
+        report.missing_route_references.is_empty(),
+        "route_stops must reference known routes"
     );
     assert!(
-        !stops.is_empty(),
-        "[{:?}] Must import at least one stop",
-        source
+        report.missing_stop_references.is_empty(),
+        "route_stops must reference known stops"
     );
+}
 
-    // 3. Relational Integrity Checks
-    for route in routes {
-        // Assert every route has an ID, color, etc.
-        assert!(!route.id.is_empty());
-    }
+pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores: &TestStores) {
+    dataset
+        .persist(
+            &stores.route_store,
+            &stores.stop_store,
+            &stores.static_cache_store,
+        )
+        .await
+        .expect("first static import should persist");
+
+    dataset
+        .persist(
+            &stores.route_store,
+            &stores.stop_store,
+            &stores.static_cache_store,
+        )
+        .await
+        .expect("second static import should be idempotent");
+
+    let routes = stores
+        .route_store
+        .get_all(dataset.source)
+        .await
+        .expect("routes should load");
+    let stops = stores
+        .stop_store
+        .get_all(dataset.source)
+        .await
+        .expect("stops should load");
+
+    assert_eq!(routes.len(), dataset.routes.len());
+    assert_eq!(stops.len(), dataset.stops.len());
 }

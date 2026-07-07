@@ -41,7 +41,7 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    tracing::info!("Starting Train Status API v{}", VERSION);
+    tracing::info!(version = VERSION, "Starting Train Status API");
 
     let pg_connect_option: PgConnectOptions = var("DATABASE_URL").unwrap().parse().unwrap();
     let pg_pool = PgPoolOptions::new()
@@ -205,7 +205,7 @@ async fn main() {
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "127.0.0.1:3055".into()))
             .await
             .unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!(address = %listener.local_addr().unwrap(), "Listening");
 
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .with_graceful_shutdown(shutdown_signal(shutdown_tx))

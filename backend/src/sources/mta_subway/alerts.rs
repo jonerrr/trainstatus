@@ -12,6 +12,8 @@ use crate::sources::AlertsAdapter;
 use crate::stores::alert::AlertStore;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 // TODO: reuse parse_mta_language from mta_bus/alert.rs
@@ -32,6 +34,21 @@ fn parse_mta_language(lang: Option<&str>) -> (AlertFormat, String) {
 // TODO: get alerts from helium api since this doesn't have the right stop ids
 // OR switch back to use gtfs stop id for everything
 pub struct MtaSubwayAlerts;
+
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let bytes = reqwest::get(
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
+    )
+    .await?
+    .error_for_status()?
+    .bytes()
+    .await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert("alerts.pb".to_string(), bytes.to_vec());
+    Ok(fixtures)
+}
 
 #[async_trait]
 impl GtfsAlertSource for MtaSubwayAlerts {

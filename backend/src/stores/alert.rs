@@ -211,7 +211,7 @@ impl AlertStore {
             )
             .execute(&mut *tx)
             .await?;
-            tracing::debug!("Deleted {} cloned alerts", cloned_mta_ids.len());
+            tracing::debug!(count = cloned_mta_ids.len(), "Deleted cloned alerts");
         }
 
         // let test_alert = alerts
@@ -304,7 +304,7 @@ impl AlertStore {
         let id_mapping: std::collections::HashMap<uuid::Uuid, uuid::Uuid> =
             id_rows.into_iter().map(|r| (r.new_id, r.id)).collect();
 
-        tracing::debug!("Inserted {} alerts", alerts.len());
+        tracing::debug!(count = alerts.len(), "Inserted alerts");
 
         // Insert translations
         if !translations.is_empty() {
@@ -380,7 +380,7 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} translations", filtered_translations.len());
+                tracing::debug!(count = filtered_translations.len(), "Inserted translations");
             }
         }
 
@@ -444,7 +444,7 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} active periods", filtered_periods.len());
+                tracing::debug!(count = filtered_periods.len(), "Inserted active periods");
             }
         }
 
@@ -540,7 +540,10 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} affected entities", filtered_entities.len());
+                tracing::debug!(
+                    count = filtered_entities.len(),
+                    "Inserted affected entities"
+                );
             }
         }
 

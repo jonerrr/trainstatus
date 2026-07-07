@@ -1,3 +1,6 @@
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
+
 use crate::engines::static_data::StaticController;
 use crate::models::source::Source;
 use crate::models::{
@@ -37,13 +40,10 @@ struct HeliumTrip {
     #[serde(default)]
     shape_segment_ids: Vec<String>,
     is_assigned: bool,
-    is_delayed: bool,
     estimated_longitude: Option<f64>,
     estimated_latitude: Option<f64>,
-    headsign: String,
     consist: Option<HeliumConsist>,
     stops: Vec<HeliumTripStop>,
-    source: String,
     updated_at: Option<i64>,
     #[serde(default)]
     consist_cars: Vec<HeliumConsistCar>,
@@ -82,6 +82,143 @@ struct HeliumTripStop {
 
 pub struct MtaSubwayRealtime;
 
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let response = reqwest::Client::new()
+        .get(SUBWAY_TRIPS_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<serde_json::Value>()
+        .await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert(
+        "trips.json".to_string(),
+        serde_json::to_vec_pretty(&response)?,
+    );
+    Ok(fixtures)
+}
+
+pub fn build_realtime_from_fixture(
+    payload: serde_json::Value,
+    now: DateTime<Utc>,
+) -> anyhow::Result<(Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>)> {
+    let response = serde_json::from_value::<HeliumTripsResponse>(payload)?;
+    Ok(build_realtime_from_response(response, now))
+}
+
+fn build_realtime_from_response(
+    response: HeliumTripsResponse,
+    now: DateTime<Utc>,
+) -> (Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>) {
+    let mut trips = Vec::new();
+    let mut positions = Vec::new();
+
+    for helium_trip in response.trips {
+        let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
+            warn!(
+                direction = helium_trip.direction,
+                trip_id = helium_trip.trip_id,
+                "Unknown direction"
+            );
+            continue;
+        };
+
+        let created_at = parse_created_at_from_trip_id(&helium_trip.trip_id, now).unwrap_or(now);
+
+        let updated_at_raw = helium_trip
+            .updated_at
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .unwrap_or(now);
+
+        let updated_at = if !helium_trip.is_assigned {
+            now
+        } else {
+            updated_at_raw
+        };
+
+        let trip_id = Uuid::now_v7();
+
+        let consist = helium_trip.consist.as_ref().map(|c| Consist {
+            car_count: c.car_count,
+            car_length_feet: c.car_length_feet,
+        });
+
+        let trip = Trip {
+            id: trip_id,
+            original_id: helium_trip.trip_id.clone(),
+            route_id: helium_trip.route_id.clone(),
+            shape_ids: helium_trip.shape_segment_ids.clone(),
+            direction,
+            created_at,
+            vehicle_id: helium_trip.trip_id.clone(),
+            updated_at,
+            data: TripData::MtaSubway(MtaSubwayTripData {
+                consist,
+                consist_cars: helium_trip
+                    .consist_cars
+                    .into_iter()
+                    .map(|c| crate::models::trip::ConsistCar {
+                        number: c.number,
+                        car_type: c.car_type,
+                    })
+                    .collect(),
+            }),
+        };
+
+        let stop_times = helium_trip
+            .stops
+            .iter()
+            .filter_map(|stop| {
+                let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
+                Some(StopTime {
+                    trip_id,
+                    stop_id: stop.station_id.to_string(),
+                    arrival,
+                    departure: arrival,
+                    data: StopTimeData::MtaSubway(MtaSubwayStopTimeData {
+                        scheduled_track: None,
+                        actual_track: None,
+                        platform_edges: stop.platform_edges.clone(),
+                    }),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let current_stop = helium_trip
+            .stops
+            .iter()
+            .find(|s| s.stop_status == "EN_ROUTE" || s.stop_status == "AT_STOP");
+
+        if let Some(stop) = current_stop {
+            let geom = match (
+                helium_trip.estimated_longitude,
+                helium_trip.estimated_latitude,
+            ) {
+                (Some(lon), Some(lat)) => Some(geo::Point::new(lon, lat)),
+                _ => None,
+            };
+
+            positions.push(VehiclePosition {
+                vehicle_id: helium_trip.trip_id.clone(),
+                trip_id: Some(trip_id),
+                stop_id: Some(stop.station_id.to_string()),
+                updated_at,
+                geom: geom.map(|g| g.into()),
+                data: PositionData::MtaSubway(MtaSubwayPositionData {
+                    assigned: helium_trip.is_assigned,
+                    status: Some(stop.stop_status.clone()),
+                }),
+            });
+        }
+
+        trips.push((trip, stop_times));
+    }
+
+    (trips, positions)
+}
+
 #[async_trait]
 impl RealtimeAdapter for MtaSubwayRealtime {
     fn source(&self) -> Source {
@@ -110,147 +247,10 @@ impl RealtimeAdapter for MtaSubwayRealtime {
             response.trips.len()
         );
 
-        let now = Utc::now();
-
-        let mut trips = Vec::new();
-        let mut all_stop_times = Vec::new();
-        let mut positions = Vec::new();
-
-        for helium_trip in response.trips {
-            let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
-                warn!(
-                    direction = helium_trip.direction,
-                    trip_id = helium_trip.trip_id,
-                    "Unknown direction"
-                );
-                continue;
-            };
-
-            // Parse the trip_id to extract created_at from origin time
-            let created_at =
-                parse_created_at_from_trip_id(&helium_trip.trip_id, now).unwrap_or(now);
-
-            let updated_at_raw = helium_trip
-                .updated_at
-                .and_then(|ts| DateTime::from_timestamp(ts, 0))
-                .unwrap_or(now);
-
-            let updated_at = if !helium_trip.is_assigned {
-                // Scheduled but unassigned trips have a really old updated_at for some reason
-                // We use `now` to keep them active in the DB and prevent them from being dropped
-                // by the 5-minute freshness filter.
-                now
-            } else {
-                // For assigned trips, we use their actual updated_at so that stuck trains
-                // drop out after 5 minutes.
-                updated_at_raw
-            };
-
-            let trip_id = Uuid::now_v7();
-
-            let consist = helium_trip.consist.as_ref().map(|c| Consist {
-                car_count: c.car_count,
-                car_length_feet: c.car_length_feet,
-            });
-
-            let trip = Trip {
-                id: trip_id,
-                original_id: helium_trip.trip_id.clone(),
-                route_id: helium_trip.route_id.clone(),
-                shape_ids: helium_trip.shape_segment_ids.clone(),
-                direction,
-                created_at,
-                // TODO: generate vehicle id from consist information
-                vehicle_id: helium_trip.trip_id.clone(), // Helium doesn't have a separate vehicle_id
-                updated_at,
-                data: TripData::MtaSubway(MtaSubwayTripData {
-                    consist,
-                    consist_cars: helium_trip
-                        .consist_cars
-                        .into_iter()
-                        .map(|c| crate::models::trip::ConsistCar {
-                            number: c.number,
-                            car_type: c.car_type,
-                        })
-                        .collect(),
-                }),
-            };
-
-            // Process stop times
-            let stop_times: Vec<StopTime> = helium_trip
-                .stops
-                .iter()
-                .filter_map(|stop| {
-                    let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
-                    Some(StopTime {
-                        trip_id,
-                        stop_id: stop.station_id.to_string(),
-                        arrival,
-                        departure: arrival, // Helium only provides est_arrive_at (but in gtfs they were always identical anyway)
-                        data: StopTimeData::MtaSubway(MtaSubwayStopTimeData {
-                            // TODO: remove track fields since helium uses platform edges instead
-                            scheduled_track: None,
-                            actual_track: None,
-                            platform_edges: stop.platform_edges.clone(),
-                        }),
-                    })
-                })
-                .collect();
-
-            // Create vehicle position from the first EN_ROUTE or AT_STOP stop
-            let current_stop = helium_trip
-                .stops
-                .iter()
-                .find(|s| s.stop_status == "EN_ROUTE" || s.stop_status == "AT_STOP");
-
-            if let Some(stop) = current_stop {
-                // let status = match stop.stop_status.as_str() {
-                //     "EN_ROUTE" => Some("in_transit_to".to_string()),
-                //     "AT_STOP" => Some("at_stop".to_string()),
-                //     _ => None,
-                // };
-
-                let geom = match (
-                    helium_trip.estimated_longitude,
-                    helium_trip.estimated_latitude,
-                ) {
-                    (Some(lon), Some(lat)) => Some(geo::Point::new(lon, lat)),
-                    _ => None,
-                };
-
-                positions.push(VehiclePosition {
-                    vehicle_id: helium_trip.trip_id.clone(),
-                    trip_id: Some(trip_id),
-                    stop_id: Some(stop.station_id.to_string()),
-                    updated_at,
-                    geom: geom.map(|g| g.into()),
-                    data: PositionData::MtaSubway(MtaSubwayPositionData {
-                        assigned: helium_trip.is_assigned,
-                        // TODO: add other status fields (delayed, headsign, etc)
-                        status: Some(stop.stop_status.clone()),
-                    }),
-                });
-            }
-
-            trips.push(trip);
-            all_stop_times.extend(stop_times);
-        }
+        let (trip_stop_pairs, mut positions) = build_realtime_from_response(response, Utc::now());
 
         // Save trips and stop times
-        let id_map = if !trips.is_empty() {
-            let trip_stop_pairs: Vec<_> = trips
-                .into_iter()
-                .map(|t| {
-                    let trip_id = t.id;
-                    let stop_times: Vec<_> = all_stop_times
-                        .iter()
-                        .filter(|st| st.trip_id == trip_id)
-                        .cloned()
-                        .collect();
-                    (t, stop_times)
-                })
-                .collect();
-
+        let id_map = if !trip_stop_pairs.is_empty() {
             trip_store
                 .save_all(Source::MtaSubway, &trip_stop_pairs)
                 .await?

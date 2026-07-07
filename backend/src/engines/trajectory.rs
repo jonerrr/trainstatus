@@ -34,7 +34,7 @@ pub async fn run(
                 if let Err(e) =
                     refresh_source(source, &trip_store, &position_store, &engine, &cache).await
                 {
-                    error!("Trajectory refresh error for {:?}: {:#}", source, e);
+                    error!(source = %source, error = %e, "Trajectory refresh error");
                 }
                 tokio::time::sleep(REFRESH_INTERVAL).await;
             }
@@ -70,7 +70,10 @@ async fn refresh_source(
         .collect();
 
     if let Err(e) = trip_store.update_resolved_shapes(&shapes_to_cache).await {
-        error!("Failed to update resolved shape IDs for {:?}: {:#}", source, e);
+        error!(
+            "Failed to update resolved shape IDs for {:?}: {:#}",
+            source, e
+        );
     }
 
     let mut trip_rows: HashMap<uuid::Uuid, Vec<_>> = HashMap::new();

@@ -433,7 +433,7 @@ impl StopStore {
 
         for s in sources {
             if let Err(e) = self.populate_cache(s).await {
-                tracing::error!("Failed to repopulate cache for {:?}: {:#}", s, e);
+                tracing::error!(source = %s, error = %e, "Failed to repopulate cache");
             }
         }
 

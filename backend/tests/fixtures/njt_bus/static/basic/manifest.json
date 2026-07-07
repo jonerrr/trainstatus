@@ -1,0 +1,23 @@
+{
+  "source": "njt_bus",
+  "kind": "static",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "bus_routes",
+      "path": "raw/bus_routes.json",
+      "format": "json"
+    },
+    {
+      "name": "gtfs",
+      "path": "raw/gtfs.zip",
+      "format": "zip"
+    },
+    {
+      "name": "route_geometries",
+      "path": "raw/route_geometries.geojson",
+      "format": "geojson"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}
