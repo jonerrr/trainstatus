@@ -50,7 +50,7 @@ RUN valhalla_build_extract -c valhalla.json -v
 # (Optional) Delete the raw tiles directory to save space in the builder stage
 # RUN rm -rf /build/valhalla_tiles
 
-FROM ghcr.io/onthegomap/planetiler:latest@sha256:61eebbcf6a37339eaf6be9b8ca5b5b54e0cf8db47e6cdd5d718b7754b78cd5e5 AS planetiler-builder
+FROM ghcr.io/onthegomap/planetiler:latest@sha256:e75cbca4f392e02fafa3a403c8b9783283de73b3f4ae4e2dd59e1d92811e44f6 AS planetiler-builder
 
 WORKDIR /data
 COPY --from=osm-data /build/merged.osm.pbf /data/merged.osm.pbf
