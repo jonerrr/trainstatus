@@ -10,6 +10,7 @@ spec:
       args:
         - --api.insecure=true # REMOVE IN PROD!!!!!!!!!!
         - --entrypoints.web.address=:80
+        - --entrypoints.web.forwardedheaders.insecure=true # trust X-Forwarded-* from the cloudflared tunnel; scope to trustedIPs in prod
         - --providers.file.filename=/etc/traefik/dynamic.yml
         - --providers.file.watch=true
       ports:
@@ -106,7 +107,7 @@ spec:
           hostPort: 5432
       volumeMounts:
         - name: trainstatus-db-demo
-          mountPath: /var/lib/postgresql/data
+          mountPath: /var/lib/postgresql
       resources:
         requests:
           cpu: "250m"
@@ -246,9 +247,7 @@ data:
 
     styles:
       sources:
-        dark-matter: /assets/styles/dark-matter.localhost-5173.json
-        # For hosted environments, switch to:
-        # dark-matter: /assets/styles/dark-matter.trainstat-us.json
+        dark-matter: /assets/styles/dark-matter.json
 
     fonts:
       paths:

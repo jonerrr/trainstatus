@@ -1,34 +1,5 @@
-FROM alpine:latest@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS builder
-
-ARG STYLE_BASE_URLS=http://localhost:5173,https://trainstat.us
-
-WORKDIR /work
-
-COPY fonts /assets/fonts
-COPY sprites /assets/sprites
-COPY styles /work/styles
-
-RUN set -eux; \
-    mkdir -p /assets/styles; \
-    for style in /work/styles/*.json; do \
-    [ -f "${style}" ] || continue; \
-    cp "${style}" /assets/styles/; \
-    done; \
-    IFS=','; \
-    for raw_url in ${STYLE_BASE_URLS}; do \
-    base_url="$(printf '%s' "${raw_url}" | sed 's:/*$::')"; \
-    [ -n "${base_url}" ] || continue; \
-    slug="$(printf '%s' "${base_url}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#[^a-zA-Z0-9]+#-#g; s#^-+##; s#-+$##' | tr '[:upper:]' '[:lower:]')"; \
-    [ -n "${slug}" ] || slug=default; \
-    for template in /work/styles/*.json; do \
-    [ -f "${template}" ] || continue; \
-    style_name="$(basename "${template}" .json)"; \
-    sed "s|__BASE_URL__|${base_url}|g" "${template}" > "/assets/styles/${style_name}.${slug}.json"; \
-    done; \
-    done
-
 FROM scratch
 
-COPY --from=builder /assets/fonts /fonts
-COPY --from=builder /assets/sprites /sprites
-COPY --from=builder /assets/styles /styles
+COPY fonts /fonts
+COPY sprites /sprites
+COPY styles /styles

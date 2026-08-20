@@ -5,12 +5,12 @@
   "sources": {
     "martin": {
       "type": "vector",
-      "url": "__BASE_URL__/martin/basemap",
+      "url": "/basemap",
       "encoding": "mlt"
     }
   },
-  "sprite": "__BASE_URL__/martin/sprite/dark-matter",
-  "glyphs": "__BASE_URL__/martin/font/{fontstack}/{range}",
+  "sprite": "/sprite/dark-matter",
+  "glyphs": "/font/{fontstack}/{range}",
   "layers": [
     {
       "id": "background",

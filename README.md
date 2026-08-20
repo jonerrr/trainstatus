@@ -53,13 +53,10 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 ### Production Setup
 
 1. Review and set the required environment variables listed in `backend/README.md` and `frontend/README.md`.
-2. Geo styles are generated from `geo/styles/*.json` during the geo-assets image build. Unless you are using `http://localhost:5173`, you will need to build your own image with the correct domain.
-   1. Set the `STYLE_BASE_URLS` arg when building `geo/Dockerfile.assets` to include your host URL(s) (comma-separated).
-   2. Run `mise //geo:build:assets` to build the asset image.
+2. Geo styles in `geo/styles/*.json` use relative URLs. Martin reads the `X-Forwarded-Host`/`X-Forwarded-Proto` headers to resolve the public URL, so make sure your reverse proxy forwards them (see the `traefik` service in `demo.pod.yml`).
 3. See `demo.pod.yml` for an example deployment with traefik.
 4. Copy `demo.configmap.yml.example` to `demo.configmap.yml` and fill in the required values.
-5. In `demo.pod.yml`, set `martin.yml -> styles.sources.dark-matter` to the matching generated filename (for example `dark-matter.example-com.json`).
-6. Launch it with `mise demo`.
+5. Launch it with `mise demo`.
 
 ### Local Development Setup
 

@@ -18,7 +18,7 @@ spec:
           hostPort: 5432
       volumeMounts:
         - name: trainstatus-db-dev
-          mountPath: /var/lib/postgresql/data
+          mountPath: /var/lib/postgresql
         - name: postgresql-config
           mountPath: /etc/postgresql/postgresql.conf
           subPath: postgresql.conf
@@ -151,6 +151,7 @@ data:
     postgres:
       # The connection URL will be read from DATABASE_URL env var
       connection_string: $DATABASE_URL
+      reload_interval: 30s
 
       auto_publish:
         tables:
@@ -169,9 +170,7 @@ data:
 
     styles:
       sources:
-        dark-matter: /assets/styles/dark-matter.localhost-5173.json
-        # If STYLE_BASE_URLS contains additional URLs when building geo-assets,
-        # point this to the matching generated file (for example: dark-matter.example-com.json).
+        dark-matter: /assets/styles/dark-matter.json
 
     fonts:
       paths:
