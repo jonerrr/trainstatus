@@ -249,7 +249,9 @@ fn spawn_import(
                 crate::trajectory::bump_platform_static_version();
             }
         } else if let Err(e) = &result {
-            error!(source = %adapter_clone.source(), error = %e, "Import failed");
+            // `{:#}` prints the full anyhow context chain (e.g. the underlying DB
+            // error), not just the outermost "Failed to persist ..." wrapper.
+            error!(source = %adapter_clone.source(), error = %format!("{e:#}"), "Import failed");
         }
 
         let _ = import_tx_clone.send(result).await;

@@ -14,7 +14,7 @@ pub mod types;
 mod tests;
 
 pub use arrow::encode_render_units;
-pub use builder::{TrajectoryBuilder, collapse_backtracking_knots, validate_knots};
+pub use builder::{TrajectoryBuilder, collapse_backtracking_knots_with_stats, validate_knots};
 pub use cache::{TrajectoryCache, bump_platform_static_version};
 pub use continuity::ContinuityDiscardReason;
 pub use engine::{TrajectoryEngine, compute_trajectory, compute_trajectory_async};

@@ -23,8 +23,6 @@ pub trait RealtimeAdapter: Send + Sync {
 
     async fn run(
         &self,
-        // TODO: prob remove pool since stores have it
-        // pool: &PgPool,
         static_controller: &StaticController,
         static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,

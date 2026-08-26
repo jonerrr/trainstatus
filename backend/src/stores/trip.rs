@@ -168,8 +168,9 @@ impl TripStore {
                     ft.car_length_feet,
                     r.color AS route_color,
                     r.source AS route_source,
+                    COALESCE(array_length(ft.shape_ids, 1), 0) > 0 AS has_own_shape_ids,
                     CASE
-                        WHEN array_length(ft.shape_ids, 1) > 0
+                        WHEN COALESCE(array_length(ft.shape_ids, 1), 0) > 0
                             THEN ft.shape_ids
                         ELSE
                             ARRAY(
@@ -179,11 +180,93 @@ impl TripStore {
                 FROM filtered_trips ft
                 JOIN static.route r ON r.id = ft.route_id AND r.source = ft.source
             ),
-            -- For trips with a single explicit shape_id list (subway), just merge them.
-            -- For trips using route-level shapes, score each candidate shape by average
-            -- ST_Distance from the trip's upcoming stops and pick the best one.
-            best_shape AS (
+            -- Trips with their own shape_ids (subway) report one segment per
+            -- station-to-station leg, in travel order
+            merged_shape AS (
+                SELECT
+                    tsc.trip_id,
+                    tsc.route_id,
+                    tsc.direction,
+                    tsc.car_count,
+                    tsc.car_length_feet,
+                    tsc.route_color,
+                    array_to_string(tsc.effective_shape_ids, ',') AS shape_id,
+                    ST_MakeLine(sh.geom ORDER BY sid.ord) AS shape_geom
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) WITH ORDINALITY AS sid(id, ord) ON TRUE
+                JOIN static.shape sh ON sh.id = sid.id AND sh.source = tsc.route_source
+                WHERE tsc.has_own_shape_ids
+                GROUP BY tsc.trip_id, tsc.route_id, tsc.direction, tsc.car_count,
+                         tsc.car_length_feet, tsc.route_color, tsc.effective_shape_ids
+            ),
+            -- Trips using route-level shapes (no shape_ids of their own, e.g. bus) have
+            -- several candidate whole-route shapes and no realtime signal for which one
+            -- they're on. For each candidate, count how many of the trip's actual stops
+            -- Helium's static data says that shape serves (static.route_stop.data) — an
+            -- exact identity signal, not a geometric guess.
+            candidate_shape_hits AS (
+                SELECT
+                    tsc.trip_id,
+                    sid AS shape_id,
+                    count(*) AS hits
+                FROM trip_shape_candidates tsc
+                JOIN realtime.stop_time st
+                    ON st.trip_id = tsc.trip_id AND st.source = tsc.route_source
+                JOIN static.route_stop rs
+                    ON rs.route_id = tsc.route_id AND rs.stop_id = st.stop_id AND rs.source = tsc.route_source
+                CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(rs.data->'shape_ids', '[]'::jsonb)) AS sid
+                WHERE NOT tsc.has_own_shape_ids
+                GROUP BY tsc.trip_id, sid
+            ),
+            -- Score every candidate whole-route shape by its confirmed stop-membership
+            -- hit count (0 when the shape serves none of the trip's stops).
+            shape_candidate_scores AS (
+                SELECT
+                    tsc.trip_id,
+                    sid AS shape_id,
+                    COALESCE(csh.hits, 0) AS hits
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
+                LEFT JOIN candidate_shape_hits csh
+                    ON csh.trip_id = tsc.trip_id AND csh.shape_id = sid
+                WHERE NOT tsc.has_own_shape_ids
+            ),
+            -- Primary selector: the candidate with the most stop-membership hits,
+            -- ties broken deterministically by shape_id. This is cheap — no geometry.
+            hit_best_shape AS (
+                SELECT DISTINCT ON (trip_id)
+                    trip_id, shape_id, hits
+                FROM shape_candidate_scores
+                ORDER BY trip_id, hits DESC, shape_id
+            ),
+            -- Geometric fallback for the rare trip whose stops give no hit signal at
+            -- all (e.g. stops/routes predating the route_stop shape data). Only these
+            -- trips pay the ST_Distance cost, so a cold cache no longer computes
+            -- distances over full-route linestrings for every candidate of every trip
+            -- (which took minutes and could OOM the DB). Planar distance is fine here —
+            -- it is only a relative tie-break, not a reported metric.
+            dist_best_shape AS (
                 SELECT DISTINCT ON (tsc.trip_id)
+                    tsc.trip_id, sh.id AS shape_id
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
+                JOIN static.shape sh ON sh.id = sid AND sh.source = tsc.route_source
+                JOIN realtime.stop_time st
+                    ON st.trip_id = tsc.trip_id AND st.source = tsc.route_source
+                JOIN static.stop s ON s.id = st.stop_id AND s.source = tsc.route_source
+                WHERE NOT tsc.has_own_shape_ids
+                  AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                  AND tsc.trip_id IN (SELECT trip_id FROM hit_best_shape WHERE hits = 0)
+                GROUP BY tsc.trip_id, sh.id
+                ORDER BY tsc.trip_id, AVG(ST_Distance(sh.geom, s.geom)) ASC
+            ),
+            chosen_shape AS (
+                SELECT trip_id, shape_id FROM hit_best_shape WHERE hits > 0
+                UNION ALL
+                SELECT trip_id, shape_id FROM dist_best_shape
+            ),
+            best_shape AS (
+                SELECT
                     tsc.trip_id,
                     tsc.route_id,
                     tsc.direction,
@@ -191,32 +274,24 @@ impl TripStore {
                     tsc.car_length_feet,
                     tsc.route_color,
                     sh.id AS shape_id,
-                    sh.geom AS shape_geom,
-                    AVG(ST_Distance(sh.geom::geography, s.geom::geography)) AS avg_stop_dist_m
-                FROM trip_shape_candidates tsc
-                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
-                JOIN static.shape sh ON sh.id = sid AND sh.source = tsc.route_source
-                JOIN realtime.stop_time st ON st.trip_id = tsc.trip_id
-                JOIN static.stop s ON s.id = st.stop_id AND s.source = tsc.route_source
-                WHERE st.source = tsc.route_source
-                  AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
-                GROUP BY tsc.trip_id, tsc.route_id, tsc.direction, tsc.car_count,
-                         tsc.car_length_feet, tsc.route_color, sh.id, sh.geom
-                ORDER BY tsc.trip_id, avg_stop_dist_m ASC
+                    sh.geom AS shape_geom
+                FROM chosen_shape cs
+                JOIN trip_shape_candidates tsc ON tsc.trip_id = cs.trip_id
+                JOIN static.shape sh ON sh.id = cs.shape_id AND sh.source = tsc.route_source
+                WHERE NOT tsc.has_own_shape_ids
             ),
             trip_lines AS (
-                SELECT
-                    bs.trip_id,
-                    bs.route_id,
-                    bs.direction,
-                    bs.car_count,
-                    bs.car_length_feet,
-                    bs.route_color,
-                    bs.shape_id,
-                    bs.shape_geom AS trip_geom
-                FROM best_shape bs
-                WHERE GeometryType(bs.shape_geom) = 'LINESTRING'
-                  AND ST_NPoints(bs.shape_geom) >= 2
+                SELECT trip_id, route_id, direction, car_count, car_length_feet,
+                       route_color, shape_id, shape_geom AS trip_geom
+                FROM merged_shape
+                WHERE GeometryType(shape_geom) = 'LINESTRING'
+                  AND ST_NPoints(shape_geom) >= 2
+                UNION ALL
+                SELECT trip_id, route_id, direction, car_count, car_length_feet,
+                       route_color, shape_id, shape_geom AS trip_geom
+                FROM best_shape
+                WHERE GeometryType(shape_geom) = 'LINESTRING'
+                  AND ST_NPoints(shape_geom) >= 2
             )
             SELECT
                 tl.trip_id,

@@ -1,6 +1,7 @@
 import { page } from '$app/state';
 
 import type { Source } from '$lib/client';
+import { COMPASS_DIRECTION_OPTIONS } from '$lib/compassDirections';
 
 import maplibregl from 'maplibre-gl';
 
@@ -54,7 +55,7 @@ const stop_filter_defs = {
 		direction: {
 			type: 'enum',
 			label: 'Direction',
-			options: ['s_w', 's', 's_e', 'e', 'w', 'n_e', 'n_w', 'n', 'unknown'] as const
+			options: COMPASS_DIRECTION_OPTIONS
 		} as FilterFieldDef
 	} as const,
 	njt_bus: {

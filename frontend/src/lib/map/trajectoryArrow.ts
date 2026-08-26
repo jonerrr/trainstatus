@@ -162,9 +162,6 @@ export function buildActiveVehiclesAtTime(
 export function normalizeBearingForIcon(bearing: number): number {
 	if (!Number.isFinite(bearing)) return 0;
 
-	// TODO: can we make it so we don't have to do this weird mirroring.
-	// Our sprite atlas is authored so that mirroring the compass bearing around a
-	// full turn produces the correct on-map rotation.
 	return wrapDegrees(360 - bearing);
 }
 
@@ -283,11 +280,7 @@ function readRgb(colors: Vector, index: number): [number, number, number] {
 
 	if (isVector(rgb)) {
 		if (rgb.length < 3) return [128, 128, 128];
-		return [
-			Number(rgb.get(0) ?? 128),
-			Number(rgb.get(1) ?? 128),
-			Number(rgb.get(2) ?? 128)
-		];
+		return [Number(rgb.get(0) ?? 128), Number(rgb.get(1) ?? 128), Number(rgb.get(2) ?? 128)];
 	}
 
 	if (Array.isArray(rgb) && rgb.length >= 3) {

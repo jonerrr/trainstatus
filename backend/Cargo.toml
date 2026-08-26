@@ -28,7 +28,7 @@ gtfs-structures = "0.47.0"
 headers = "0.4.1"
 http = "1.2.0"
 indicatif = "0.18.0"
-moka = { version = "0.12.15", features = ["future"] }
+moka = { version = "0.12.15", features = ["future", "sync"] }
 polyline = "0.11.0"
 proj4rs = { version = "0.1.9", features = ["crs-definitions", "geo-types"] }
 prost = "0.14.1"
@@ -50,6 +50,7 @@ utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
+valhalla = "0.6.43"
 
 [dev-dependencies]
 axum-test = "=20.0.0"
@@ -58,6 +59,9 @@ tokio-test = "=0.4.5"
 
 [build-dependencies]
 prost-build = "0.14.1"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.6", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 
 [features]
 fixture-capture = []

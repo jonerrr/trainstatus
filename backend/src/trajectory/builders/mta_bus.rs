@@ -14,6 +14,11 @@ use super::super::types::{
 /// same direction, treat the knots as co-located and do not drop them.
 const ANCHOR_DISTANCE_TOLERANCE_M: f64 = 1.0;
 
+/// Slack allowed above the reported next-stop distance when truncating the
+/// schedule ahead of the live feed. Keeps the arrival/departure dwell knots
+/// (which sit exactly at the stop distance) from being trimmed by rounding.
+const NEXT_STOP_CEILING_TOLERANCE_M: f64 = 1.0;
+
 #[derive(Debug, Clone, Copy)]
 struct BusKinematicsConfig {
     /// Acceleration out of a stop (m/s²).
@@ -65,9 +70,17 @@ impl MtaBusBuilder {
         let s_approach = f64::max(0.0, s_stop - d);
         let s_depart = f64::min(trip.shape_length_m, s_stop + d);
 
+        // Ramp distances, clamped non-negative. `s_depart` is capped at the shape
+        // length, so a stop whose distance already sits at (or past) the end of the
+        // shape yields `s_depart <= s_stop`; without the clamp the departure ramp
+        // would be `sqrt(negative) = NaN`, which propagates into `t_clear` and later
+        // panics the sampler's `clamp(t0, t_max)`. Mirrors the subway builder.
+        let d_decel = f64::max(0.0, s_stop - s_approach);
+        let d_accel = f64::max(0.0, s_depart - s_stop);
+
         // Time to decelerate / accelerate over the approach distance at constant decel/accel.
-        let dt_decel_s = (2.0 * (s_stop - s_approach) / kinematics.decel_mps2).sqrt();
-        let dt_accel_s = (2.0 * (s_depart - s_stop) / kinematics.accel_mps2).sqrt();
+        let dt_decel_s = (2.0 * d_decel / kinematics.decel_mps2).sqrt();
+        let dt_accel_s = (2.0 * d_accel / kinematics.accel_mps2).sqrt();
 
         let t_arrive = stop.arrival_unix;
         // arrival == departure in the current GTFS feed; hardcode 30 s dwell.
@@ -119,6 +132,26 @@ impl MtaBusBuilder {
             projected_s.clamp(0.0, trip.shape_length_m),
             v_clamp,
         ))
+    }
+
+    /// Along-shape distance of the stop the live feed says the bus is still
+    /// heading toward (GTFS-RT `VehiclePosition.stop_id`, remapped to a canonical
+    /// static stop id during import).
+    ///
+    /// The bus has not passed this stop yet, so the animated marker must not be
+    /// rendered beyond it — regardless of how optimistic the realtime *schedule*
+    /// predictions for downstream stops are. Those predictions are noisy (MTA
+    /// keeps pushing them later), and letting the interpolation race ahead to an
+    /// early-predicted arrival is what makes buses overshoot the stop they are
+    /// actually approaching. Uses the same position the live anchor is taken from
+    /// so the ceiling and anchor stay consistent.
+    fn reported_next_stop_distance(trip: &TripSnapshot) -> Option<f64> {
+        let position = trip.positions.iter().find(|p| p.geom.is_some())?;
+        let stop_id = position.stop_id.as_deref()?;
+        trip.stops
+            .iter()
+            .find(|s| s.stop_id == stop_id)
+            .map(|s| s.stop_distance_m)
     }
 }
 
@@ -176,6 +209,19 @@ impl TrajectoryBuilder for MtaBusBuilder {
                     .partial_cmp(&b.t_event)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
+
+            // Clamp the schedule to the stop the live feed says the bus is still
+            // approaching: drop every knot beyond it so the marker holds at that
+            // stop instead of overshooting on stale/optimistic predictions. Only
+            // applied when the reported stop is genuinely ahead of the live fix
+            // (`> anchor_s`); if the GPS already projects past its own reported
+            // stop the feed is inconsistent, so we trust the fix and skip the
+            // clamp rather than risk trimming away every forward knot.
+            if let Some(ceiling) = Self::reported_next_stop_distance(trip)
+                && ceiling > anchor_s
+            {
+                all_knots.retain(|k| k.s_m <= ceiling + NEXT_STOP_CEILING_TOLERANCE_M);
+            }
         }
 
         let (knots, backtracking_knots_removed) =
@@ -267,6 +313,87 @@ mod tests {
         assert!(
             (dwell - 30.0).abs() < 1e-6,
             "dwell should be 30s, got {dwell}"
+        );
+    }
+
+    #[test]
+    fn stop_beyond_shape_length_yields_finite_knots() {
+        // Regression: a stop whose distance sits at/past the end of the shape used
+        // to make `s_depart < s_stop`, so `sqrt(s_depart - s_stop)` was NaN and the
+        // clear knot's `t_event` was NaN — which slipped past `validate_knots` and
+        // panicked the sampler's `clamp(t0, t_max)`.
+        let shape_length = 500.0;
+        let stops = vec![make_stop("A", 1000.0, shape_length + 25.0)];
+        let trip = make_trip(stops, shape_length);
+        let kinematics = BusKinematicsConfig::default();
+        let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
+
+        for (i, k) in knots.iter().enumerate() {
+            assert!(
+                k.t_event.is_finite() && k.s_m.is_finite(),
+                "knot {i} must be finite: t_event={}, s_m={}",
+                k.t_event,
+                k.s_m
+            );
+        }
+    }
+
+    fn make_position(
+        stop_id: &str,
+        lon: f64,
+        lat: f64,
+    ) -> crate::models::position::VehiclePosition {
+        use crate::models::position::{MtaBusPositionData, PositionData, VehiclePosition};
+        VehiclePosition {
+            vehicle_id: "v1".to_string(),
+            trip_id: None,
+            stop_id: Some(stop_id.to_string()),
+            updated_at: chrono::Utc::now(),
+            data: PositionData::MtaBus(MtaBusPositionData {
+                bearing: 0.0,
+                passengers: None,
+                capacity: None,
+                status: None,
+                phase: None,
+            }),
+            geom: Some(geo::Geometry::Point(geo::Point::new(lon, lat)).into()),
+        }
+    }
+
+    #[test]
+    fn does_not_overshoot_reported_next_stop() {
+        // Bus is near the start of the shape and the live feed says its next stop
+        // is A (s≈100). Downstream stops B/C carry optimistic (early) predicted
+        // arrivals that would otherwise let PCHIP race the marker past A. The
+        // reported-next-stop clamp must trim every knot beyond A.
+        let now = chrono::Utc::now().timestamp() as f64;
+        let stops = vec![
+            make_stop("A", now + 20.0, 100.0),
+            make_stop("B", now + 25.0, 300.0), // absurdly early -> would overshoot
+            make_stop("C", now + 30.0, 500.0),
+        ];
+        let mut trip = make_trip(stops, 600.0);
+        trip.as_of = chrono::Utc::now();
+        // Project near the very start of the shape (well behind stop A).
+        trip.positions = vec![make_position("A", -74.0, 40.7)];
+
+        let builder = MtaBusBuilder;
+        let cache = crate::trajectory::TrajectoryCache::new();
+        use crate::trajectory::geometry::build_shape_geometry;
+        let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
+
+        let result = builder
+            .generate_knots(&trip, None, &shape_geom, &cache)
+            .unwrap();
+
+        let max_s = result
+            .knots
+            .iter()
+            .map(|k| k.s_m)
+            .fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            max_s <= 100.0 + NEXT_STOP_CEILING_TOLERANCE_M + 1e-6,
+            "no knot should sit past reported next stop A (s=100); got max s_m={max_s}"
         );
     }
 

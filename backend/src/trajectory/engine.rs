@@ -53,6 +53,10 @@ impl Default for TrajectoryEngine {
     }
 }
 
+// Split into two: `compute_trajectory` is the pure, synchronous core (no I/O, so
+// it's cheap to unit-test), while `compute_trajectory_async` below is the thin
+// async wrapper that resolves the builder and awaits the cached shape geometry
+// before delegating here.
 pub fn compute_trajectory(
     builder: &dyn TrajectoryBuilder,
     trip: &TripSnapshot,

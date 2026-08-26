@@ -38,3 +38,11 @@ CREATE TABLE IF NOT EXISTS static.route_stop (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stop_geom ON static.stop USING GIST (geom);
+
+-- The route_stop primary key is (route_id, source, stop_id), which cannot serve
+-- lookups keyed on stop_id. Several hot queries filter route_stop by
+-- (stop_id, source): the stops read-through query's `routes` aggregate, the
+-- proximity-transfer `stop_direction` CTE, and its `opposite_stop_id` EXISTS
+-- checks. Without this index those degrade to sequential scans, which made the
+-- proximity computation time out once NJT bus added ~16k stops / ~29k route_stops.
+CREATE INDEX IF NOT EXISTS idx_route_stop_stop ON static.route_stop (stop_id, source);

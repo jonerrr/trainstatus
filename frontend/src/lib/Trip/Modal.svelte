@@ -11,10 +11,12 @@
 	import Transfers from '$lib/Trip/Transfers.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
 	import type { StopTime, Trip } from '$lib/client';
+	import { source_info } from '$lib/resources/index.svelte';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
+	import { bus_headsign } from '$lib/util.svelte';
 
 	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
@@ -32,6 +34,19 @@
 	const all_stop_times = stop_time_context.get();
 
 	const source_stop_times = $derived(all_stop_times[trip.data.source]);
+
+	// For sources that filter stop times by route (mta_bus, njt_bus), the trip's
+	// stop times are only fetched once its route is on the monitor list. Opening a
+	// trip modal directly — e.g. clicking a bus vehicle on the map — bypasses the
+	// Stop modal that would otherwise register the route, so without this the
+	// destination and stop list stay empty and `last_stop` shows "Unknown".
+	$effect(() => {
+		if (source_stop_times && source_info[trip.data.source]?.monitor_routes) {
+			const route_id = trip.route_id;
+			source_stop_times.add_route(route_id);
+			return () => source_stop_times.remove_route(route_id);
+		}
+	});
 
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
 
@@ -53,11 +68,10 @@
 
 		switch (trip.data.source) {
 			case 'mta_bus':
-				const stop = page.data.stops_by_id[trip.data.source]?.[stop_times[0].stop_id];
-				const routeStop = stop?.routes.find((r) => r.route_id === trip.route_id);
-				if (!routeStop) return 'Unknown';
-				// this shouldn't be necessary since we should only be looking at bus routes, but just in case (and also to satisfy type checker)
-				return routeStop.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
+				return (
+					bus_headsign(page.data.routes_by_id[trip.data.source]?.[trip.route_id], trip.direction) ??
+					'Unknown'
+				);
 			case 'mta_subway':
 				const last_st = stop_times[stop_times.length - 1];
 				return page.data.stops_by_id[trip.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';

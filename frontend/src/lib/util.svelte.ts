@@ -1,5 +1,21 @@
-import type { RouteStop, Stop } from '$lib/client';
-import { calculateTextHeight } from '$lib/text-measurement';
+import type { Route, RouteStop, Stop } from '$lib/client';
+import { calculateTextHeight } from '$lib/text_measurement';
+
+/**
+ * Destination shown on an MTA bus for a given trip direction.
+ *
+ * The upstream feed maps headsigns to directions at the route level, not to
+ * individual stops, so `RouteStop.data.headsign` is always empty for buses.
+ * Resolve from the route's directions using the trip's `direction` instead.
+ */
+export function bus_headsign(route: Route | undefined, direction: number): string | undefined {
+	if (route?.data.source !== 'mta_bus') return undefined;
+
+	const match = route.data.directions?.find((d) => d.direction_id === direction);
+	if (!match) return undefined;
+
+	return match.via?.length ? `${match.destination} via ${match.via.join('/')}` : match.destination;
+}
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -65,7 +81,12 @@ export function calculate_stop_height(item: Stop) {
 	let height = 16;
 
 	// Stop name — may wrap on narrow screens
-	height += calculateTextHeight(item.name, STOP_NAME_FONT, STOP_NAME_MAX_WIDTH, STOP_NAME_LINE_HEIGHT);
+	height += calculateTextHeight(
+		item.name,
+		STOP_NAME_FONT,
+		STOP_NAME_MAX_WIDTH,
+		STOP_NAME_LINE_HEIGHT
+	);
 
 	if (item.data.source === 'mta_bus' || item.data.source === 'njt_bus') {
 		// Each bus route row: icon (20px) + headsign text + ETAs line ≈ 56px fixed

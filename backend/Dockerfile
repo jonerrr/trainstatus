@@ -1,21 +1,37 @@
-FROM rust:slim@sha256:c03ea1587a8e4474ae1a3f4a377cbb35ad53d2eb5c27f0bdf1ca8986025e322f AS build
+FROM rust:1-trixie AS build
 
 ARG MTA_API_URL
 ENV MTA_API_URL=${MTA_API_URL}
+ENV PROTOC=/usr/bin/protoc
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install --yes --no-install-recommends protobuf-compiler;
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    clang \
+    libboost-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
+    zlib1g-dev; \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /src
 COPY . .
+
 ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM ghcr.io/valhalla/valhalla:3.6.3@sha256:2b19ea46551a9687b245022551183829d817fdee9b58c5e7b2adb6e422749c43
+FROM debian:trixie-slim
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libprotobuf-lite32t64 \
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --chown=ubuntu:ubuntu --from=build /app/target/release/backend /backend
-USER ubuntu
-# EXPOSE 3055
+COPY --from=build /src/target/release/backend /backend
+
 ENTRYPOINT [ "/backend" ]

@@ -80,8 +80,16 @@ impl RouteStore {
         let sources: Vec<_> = routes.iter().map(|_| source).collect();
         let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
         let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
-        let colors: Vec<_> = routes.iter().map(|r| &r.color).collect();
-        let text_colors: Vec<_> = routes.iter().map(|r| &r.text_color).collect();
+        // Canonicalise colours to `#RRGGBB` here, the single write path for every
+        // source, so the map and DOM never have to reconcile bare vs prefixed hex.
+        let colors: Vec<_> = routes
+            .iter()
+            .map(|r| crate::utils::color::normalize_hex_color(&r.color))
+            .collect();
+        let text_colors: Vec<_> = routes
+            .iter()
+            .map(|r| crate::utils::color::normalize_hex_color(&r.text_color))
+            .collect();
         let datas: Vec<_> = routes
             .iter()
             .map(|r| serde_json::to_value(&r.data).unwrap())

@@ -62,7 +62,7 @@ pub fn distance_to_coord(
     cum_dist: &[f64],
 ) -> Option<Coord<f64>> {
     let coords = &line.0;
-    if coords.is_empty() || cum_dist.is_empty() {
+    if coords.is_empty() || cum_dist.is_empty() || distance_m.is_nan() {
         return None;
     }
     let total = *cum_dist.last().unwrap();
@@ -185,13 +185,17 @@ pub fn project_wgs84_point_to_epsg(point: &Point<f64>, epsg_code: u16) -> Option
     project_point_wgs84_to_epsg(point, &proj_wgs84, &proj_target)
 }
 
-fn project_point_wgs84_to_epsg(point: &Point<f64>, from: &Proj, to: &Proj) -> Option<Point<f64>> {
+pub fn project_point_wgs84_to_epsg(
+    point: &Point<f64>,
+    from: &Proj,
+    to: &Proj,
+) -> Option<Point<f64>> {
     let mut projected = Point::new(point.x().to_radians(), point.y().to_radians());
     transform(from, to, &mut projected).ok()?;
     Some(projected)
 }
 
-fn project_linestring_wgs84_to_epsg(
+pub fn project_linestring_wgs84_to_epsg(
     line: &LineString,
     from: &Proj,
     to: &Proj,

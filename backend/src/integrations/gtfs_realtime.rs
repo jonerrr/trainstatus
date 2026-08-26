@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
 use crate::models::{
     position::VehiclePosition as VehiclePositionModel,
@@ -13,7 +15,7 @@ use prost::Message;
 use prost::bytes;
 use std::collections::HashMap;
 use tokio::fs::{create_dir_all, write};
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 /// A future that fetches a GTFS-RT feed and returns the raw protobuf bytes.
 pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
@@ -158,8 +160,43 @@ pub async fn run_pipeline<T: GtfsSource>(
         adapter.source()
     );
 
-    // Save trips first to get the actual IDs
-    let id_map = trip_store.save_all(adapter.source(), &data).await?;
+    remap_realtime_stop_ids(
+        adapter.source(),
+        static_cache_store,
+        &mut data,
+        &mut positions,
+    );
+
+    // Save trips first to get the actual IDs.
+    // A foreign-key violation (Postgres 23503) means the realtime feed references
+    // static rows (e.g. a stop_id) we don't have yet — usually because the static
+    // import is stale. Force a re-import and retry once, mirroring the MTA bus source.
+    let mut attempts = 0;
+    let id_map = loop {
+        match trip_store.save_all(adapter.source(), &data).await {
+            Ok(map) => break map,
+            Err(e) => {
+                let is_fk_violation = e
+                    .downcast_ref::<sqlx::Error>()
+                    .and_then(|x| x.as_database_error())
+                    .and_then(|db_err| db_err.code().map(|c| c.into_owned()))
+                    .as_deref()
+                    == Some("23503");
+
+                if is_fk_violation && attempts < 1 {
+                    warn!(
+                        source = %adapter.source(),
+                        "Missing static data for realtime feed; forcing static re-import and retrying"
+                    );
+                    static_controller.force_update(adapter.source()).await?;
+                    attempts += 1;
+                    continue;
+                }
+
+                return Err(e);
+            }
+        }
+    };
 
     // Link positions to trips via vehicle_id
     // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
@@ -177,4 +214,33 @@ pub async fn run_pipeline<T: GtfsSource>(
         .await?;
 
     Ok(())
+}
+
+/// Rewrite realtime stop ids to their canonical static stop id.
+///
+/// Sources that collapse parent/child stops (e.g. NJT bus gates) publish a
+/// `child_stop_id -> canonical_id` remap during static import; every other
+/// source resolves to identity at no cost. This keeps the
+/// `stop_id -> static.stop` foreign keys satisfied when child stops have been
+/// collapsed away.
+pub fn remap_realtime_stop_ids(
+    source: Source,
+    static_cache_store: &StaticCacheStore,
+    data: &mut [(Trip, Vec<StopTime>)],
+    positions: &mut [VehiclePositionModel],
+) {
+    for (_trip, stop_times) in data.iter_mut() {
+        for st in stop_times.iter_mut() {
+            if let Cow::Owned(canonical) = static_cache_store.resolve_stop_id(source, &st.stop_id) {
+                st.stop_id = canonical;
+            }
+        }
+    }
+    for position in positions.iter_mut() {
+        if let Some(stop_id) = &position.stop_id
+            && let Cow::Owned(canonical) = static_cache_store.resolve_stop_id(source, stop_id)
+        {
+            position.stop_id = Some(canonical);
+        }
+    }
 }

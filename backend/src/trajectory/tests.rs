@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod collapse_tests {
-    use super::super::builder::collapse_backtracking_knots;
+    use super::super::builder::collapse_backtracking_knots_with_stats;
     use super::super::types::TrajectoryKnot;
 
     #[test]
@@ -12,7 +12,7 @@ mod collapse_tests {
             TrajectoryKnot::new(50.0, 50.0, None),
             TrajectoryKnot::new(60.0, 120.0, None),
         ];
-        let out = collapse_backtracking_knots(&knots);
+        let (out, _removed) = collapse_backtracking_knots_with_stats(&knots);
         assert_eq!(out.len(), 4);
         assert_eq!(out[0].t_event, 0.0);
         assert_eq!(out[1].t_event, 10.0);

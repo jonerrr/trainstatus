@@ -20,10 +20,9 @@ pub trait TrajectoryBuilder: Send + Sync {
 }
 
 /// Drop spatial backtracking knots while preserving flat dwell plateaus.
-pub fn collapse_backtracking_knots(knots: &[TrajectoryKnot]) -> Vec<TrajectoryKnot> {
-    collapse_backtracking_knots_with_stats(knots).0
-}
-
+///
+/// Returns the collapsed knots along with the number of knots removed (callers
+/// that don't care about the count can ignore the second tuple element).
 pub fn collapse_backtracking_knots_with_stats(
     knots: &[TrajectoryKnot],
 ) -> (Vec<TrajectoryKnot>, u32) {
@@ -44,6 +43,20 @@ pub fn collapse_backtracking_knots_with_stats(
 pub fn validate_knots(knots: &[TrajectoryKnot]) -> anyhow::Result<()> {
     if knots.is_empty() {
         return Err(anyhow::anyhow!("Cannot validate empty knot sequence"));
+    }
+    // Reject non-finite values up front. The monotonicity checks below use `<=`
+    // and `<`, both of which are always false when either operand is NaN, so a
+    // NaN `t_event`/`s_m` would slip through and later panic `f64::clamp` in the
+    // sampler (`min > max, or either was NaN`). Guarding here keeps a single bad
+    // trip from turning into a panic that kills the whole refresh batch.
+    for (i, knot) in knots.iter().enumerate() {
+        if !knot.t_event.is_finite() || !knot.s_m.is_finite() {
+            return Err(anyhow::anyhow!(
+                "Non-finite knot at index {i}: t_event={}, s_m={}",
+                knot.t_event,
+                knot.s_m
+            ));
+        }
     }
     for i in 1..knots.len() {
         let prev = knots[i - 1];

@@ -69,10 +69,11 @@ pub fn mta_oba_api_key() -> &'static str {
     API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").expect("MTA_OBA_API_KEY must be set"))
 }
 
-pub fn valhalla_config() -> &'static str {
-    static VALHALLA_CONFIG: OnceLock<String> = OnceLock::new();
-    VALHALLA_CONFIG
-        .get_or_init(|| var("VALHALLA_CONFIG").unwrap_or_else(|_| "/data/valhalla.json".into()))
+pub fn valhalla_tile_extract() -> &'static str {
+    static VALHALLA_TILE_EXTRACT: OnceLock<String> = OnceLock::new();
+    VALHALLA_TILE_EXTRACT.get_or_init(|| {
+        var("VALHALLA_TILE_EXTRACT").unwrap_or_else(|_| "/data/valhalla_tiles.tar".into())
+    })
 }
 
 pub fn debug_rt_data() -> &'static bool {

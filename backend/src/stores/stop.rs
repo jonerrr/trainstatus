@@ -143,43 +143,16 @@ impl StopStore {
         source: Source,
         route_stops: &[RouteStop],
     ) -> anyhow::Result<()> {
-        // Before performing the SQL bulk insert, remove any duplicates that share the
-        // same (route_id, stop_id) once the values are uppercased.  The database
-        // enforces a unique constraint on that pair, so duplicates would trigger the
-        // "ON CONFLICT DO UPDATE command cannot affect row a second time" error when
-        // a single query batch contains more than one entry for the same key.
-        //
-        // We choose to keep the entry with the lowest `stop_sequence` (which is
-        // typically the first appearance in GTFS), but any deterministic rule would
-        // suffice.  Doing this in the store makes the behavior source‑agnostic, so
-        // adapters no longer need to dedupe themselves.
-        // TODO: maybe just move this to njt_bus since thats where the issue was.
-        // let mut unique_map: HashMap<(String, String), RouteStop> = HashMap::new();
-        // for rs in route_stops.iter() {
-        //     let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-        //     unique_map
-        //         .entry(key)
-        //         .and_modify(|existing| {
-        //             if rs.stop_sequence < existing.stop_sequence {
-        //                 *existing = rs.clone();
-        //             }
-        //         })
-        //         .or_insert_with(|| rs.clone());
-        // }
-
-        // if unique_map.len() != route_stops.len() {
-        //     tracing::info!(
-        //         "[store] removed {} duplicate route_stops before insert",
-        //         route_stops.len() - unique_map.len()
-        //     );
-        // }
-
-        // let deduped: Vec<RouteStop> = unique_map.into_values().collect();
-
+        // Each source is responsible for emitting at most one row per
+        // (route_id, stop_id) — they collapse their directional entries as part of
+        // building `route_stops` (njt_bus/gtfs_static dedupe explicitly, mta_bus
+        // keys its map on the pair). The `ON CONFLICT DO UPDATE` below therefore
+        // only reconciles against rows already committed by an earlier import; a
+        // duplicate *within* this batch would still trip Postgres with "ON CONFLICT
+        // DO UPDATE command cannot affect row a second time", so warn loudly in
+        // debug if an adapter ever regresses.
         #[cfg(debug_assertions)]
         {
-            // still warn if there were duplicates in the original slice, to help
-            // debug faulty adapters
             let mut seen: HashMap<(String, String), usize> = HashMap::new();
             for rs in route_stops {
                 let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
@@ -188,10 +161,11 @@ impl StopStore {
             for ((rid, sid), count) in seen {
                 if count > 1 {
                     tracing::warn!(
-                        "[store] normalized route_stop appears {} times for route_id={} stop_id={}",
+                        source = %source,
+                        route_id = %rid,
+                        stop_id = %sid,
                         count,
-                        rid,
-                        sid
+                        "route_stops batch has a duplicate (route_id, stop_id) after uppercasing; the adapter should collapse these"
                     );
                 }
             }
@@ -343,12 +317,6 @@ impl StopStore {
             sqlx::query_as::<_, (String, Source, String, Source)>(
                 r#"
                 WITH
-                -- Pre-compute the projected geometry once per stop to avoid
-                -- redundant ST_Transform calls during the pairwise join.
-                projected AS (
-                    SELECT id, source, geom, ST_Transform(geom, 6538) AS geom_m
-                    FROM static.stop
-                ),
                 stop_direction AS (
                     SELECT
                         stop_id,
@@ -364,12 +332,12 @@ impl StopStore {
                         a.source AS from_source,
                         b.id   AS to_id,
                         b.source AS to_source
-                    FROM projected a
+                    FROM static.stop a
                     LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source
-                    JOIN projected b
+                    JOIN static.stop b
                         ON (a.id, a.source) != (b.id, b.source)
                         AND a.geom && ST_Expand(b.geom, 0.002)
-                        AND ST_DWithin(a.geom_m, b.geom_m, 150.0)
+                        AND ST_DWithin(ST_Transform(a.geom, 6538), ST_Transform(b.geom, 6538), 150.0)
                     LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source
                     WHERE
                         a.source = $1
@@ -436,10 +404,6 @@ impl StopStore {
             sqlx::query_as::<_, (String, Source, String, Source)>(
                 r#"
                 WITH
-                projected AS (
-                    SELECT id, source, geom, ST_Transform(geom, 6538) AS geom_m
-                    FROM static.stop
-                ),
                 stop_direction AS (
                     SELECT
                         stop_id,
@@ -453,12 +417,12 @@ impl StopStore {
                     a.source AS from_source,
                     b.id   AS to_id,
                     b.source AS to_source
-                FROM projected a
+                FROM static.stop a
                 LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source
-                JOIN projected b
+                JOIN static.stop b
                     ON (a.id, a.source) != (b.id, b.source)
                     AND a.geom && ST_Expand(b.geom, 0.002)
-                    AND ST_DWithin(a.geom_m, b.geom_m, 150.0)
+                    AND ST_DWithin(ST_Transform(a.geom, 6538), ST_Transform(b.geom, 6538), 150.0)
                 LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source
                 WHERE
                     NOT EXISTS (

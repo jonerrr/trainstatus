@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -65,7 +64,7 @@ pub struct TrajectoryCache {
     historical: Cache<HistKey, HotSnapshot>,
     shape_geom: Cache<ShapeKey, Arc<ShapeGeometry>>,
     stop_proj: Cache<StopProjKey, f64>,
-    platform_match: RwLock<std::collections::HashMap<PlatformMatchKey, PlatformMatch>>,
+    platform_match: moka::sync::Cache<PlatformMatchKey, PlatformMatch>,
 }
 
 impl TrajectoryCache {
@@ -86,7 +85,10 @@ impl TrajectoryCache {
                 .max_capacity(100_000)
                 .time_to_live(Duration::from_secs(48 * 3600))
                 .build(),
-            platform_match: RwLock::new(std::collections::HashMap::new()),
+            platform_match: moka::sync::Cache::builder()
+                .max_capacity(100_000)
+                .time_to_live(Duration::from_secs(48 * 3600))
+                .build(),
         }
     }
 
@@ -173,22 +175,9 @@ impl TrajectoryCache {
         key: PlatformMatchKey,
         compute: impl FnOnce() -> Option<PlatformMatch>,
     ) -> Option<PlatformMatch> {
-        if let Ok(cache) = self.platform_match.read() {
-            if let Some(m) = cache.get(&key) {
-                return Some(m.clone());
-            }
-        }
-
-        if let Ok(mut cache) = self.platform_match.write() {
-            if let Some(m) = cache.get(&key) {
-                return Some(m.clone());
-            }
-            if let Some(computed) = compute() {
-                cache.insert(key, computed.clone());
-                return Some(computed);
-            }
-        }
-        None
+        // `optionally_get_with` caches only `Some` results and dedupes concurrent
+        // computes for the same key, matching the previous read-then-write behavior.
+        self.platform_match.optionally_get_with(key, compute)
     }
 
     pub fn platform_match_key(

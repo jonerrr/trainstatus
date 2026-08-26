@@ -1,4 +1,3 @@
-// Singleton canvas context — avoids memory leaks and DOM overhead.
 let measureCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
 
 function getContext() {

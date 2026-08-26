@@ -36,7 +36,7 @@ pub async fn run(
                     )
                     .await
                 {
-                    error!(source = %source, error = %e, "Realtime pipeline error");
+                    error!(source = %source, error = %format!("{e:#}"), "Realtime pipeline error");
                 }
                 // TODO: use stop time store to save stop times (instead of trip store)
                 // then we don't have to add this separate cache population step just for stop times

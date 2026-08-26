@@ -62,6 +62,15 @@ impl StaticDataset {
                 .await?;
         }
 
+        // Refresh the stops read-through cache immediately from the freshly
+        // persisted rows. Proximity transfers are recomputed asynchronously after
+        // this (and repopulate the cache again with transfer data), but that step
+        // is slow and best-effort — we must not leave stops invisible to the API
+        // if it is delayed or fails. Non-fatal: a cache miss just falls back to DB.
+        if let Err(e) = stop_store.populate_cache(self.source).await {
+            tracing::error!(source = %self.source, error = %e, "Failed to populate stops cache after import");
+        }
+
         Ok(())
     }
 }

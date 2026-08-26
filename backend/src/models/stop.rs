@@ -181,6 +181,12 @@ pub enum RouteStopData {
         // TODO: check if there are any stops where route stops each have a different opposite stop id. If not, we can move this field to the stop level (e.g. in transfers vec)
         /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
         opposite_stop_id: Option<String>,
+        /// Helium shape_ids (across all service types) known to pass through this stop
+        /// for this route. Used to deterministically resolve which of a route's several
+        /// candidate shapes a realtime trip is following, by counting how many of the
+        /// trip's actual stops each candidate is known to serve.
+        #[serde(default)]
+        shape_ids: Vec<String>,
     },
     NjtBus {
         headsign: String,
@@ -207,7 +213,7 @@ pub enum StopType {
     Unknown,
 }
 
-#[derive(sqlx::Type, Serialize, Deserialize, ToSchema, Debug)]
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy, ToSchema, Debug, PartialEq, Eq)]
 // #[sqlx(type_name = "static.borough", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum Borough {
@@ -218,10 +224,27 @@ pub enum Borough {
     Manhattan,
 }
 
-/// Direction of the stop. Currently only for bus stops
-#[derive(sqlx::Type, Serialize, Deserialize, Clone, ToSchema, Debug)]
+impl Borough {
+    /// Parse the SCREAMING_SNAKE_CASE borough names the Helium feed uses.
+    /// Returns `None` for values the feed leaves unset or we don't recognize.
+    pub fn from_feed_name(value: &str) -> Option<Self> {
+        match value {
+            "BROOKLYN" => Some(Self::Brooklyn),
+            "QUEENS" => Some(Self::Queens),
+            "BRONX" => Some(Self::Bronx),
+            "STATEN_ISLAND" => Some(Self::StatenIsland),
+            "MANHATTAN" => Some(Self::Manhattan),
+            _ => None,
+        }
+    }
+}
+
+/// Direction a bus travels through the stop, bucketed into eight compass sectors.
+/// Currently only for bus stops.
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy, ToSchema, Debug, PartialEq, Eq)]
 // #[sqlx(type_name = "static.compass_direction", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
+// lowercase, not snake_case — the latter renders `NW` as `n_w`.
+#[serde(rename_all = "lowercase")]
 pub enum CompassDirection {
     SW,
     S,
@@ -232,6 +255,28 @@ pub enum CompassDirection {
     NW,
     N,
     Unknown,
+}
+
+impl CompassDirection {
+    /// Bucket a compass bearing (0 = north, increasing clockwise) into one of the
+    /// eight 45°-wide sectors. Accepts the `[-180, 180]` range the Helium feed
+    /// uses as well as `[0, 360)`.
+    pub fn from_bearing(bearing: f64) -> Self {
+        if !bearing.is_finite() {
+            return Self::Unknown;
+        }
+        // Shift by half a sector so each sector maps to a whole index.
+        match ((bearing.rem_euclid(360.0) + 22.5) / 45.0) as u8 % 8 {
+            0 => Self::N,
+            1 => Self::NE,
+            2 => Self::E,
+            3 => Self::SE,
+            4 => Self::S,
+            5 => Self::SW,
+            6 => Self::W,
+            _ => Self::NW,
+        }
+    }
 }
 
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)

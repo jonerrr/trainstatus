@@ -1,6 +1,3 @@
-# [tasks.start-containers]
-# run = "podman compose up -d"
-
 [tasks.csp]
 run = "cargo sqlx prepare"
 
@@ -23,18 +20,36 @@ run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t
 
 [tasks.test]
 env = { SQLX_OFFLINE = "true", DATABASE_URL = "postgres://trains:trains@localhost:5432/trains" }
-run = "cargo test"
+run = "cargo test --features fixture-capture"
 
 [tasks.reset-db]
 confirm = "Are you sure?"
 run = """
-podman kube down ../dev.pod.yml --force
+podman kube down ../dev.pod.yml --force || true
 podman kube play --replace ../dev.pod.yml
 echo "Run DB migrations after the database is ready."
 """
-# TODO: make kube play block until the db is ready, then run the migration automatically.
-# depends_post = ["//backend:migrate"]
 
 [env]
-VALHALLA_CONFIG = "../geo/data/valhalla.json"
-# RUST_LOG = "backend=debug"
+VALHALLA_TILE_EXTRACT = "../geo/data/valhalla_tiles.tar"
+
+# Host deps for compiling the valhalla crate (vendored C++).
+# Install with: mise bootstrap packages apply
+[bootstrap.packages]
+"apt:build-essential" = "latest"
+"apt:cmake" = "latest"
+"apt:pkg-config" = "latest"
+"apt:clang" = "latest"
+"apt:libboost-dev" = "latest"
+"apt:libprotobuf-dev" = "latest"
+"apt:protobuf-compiler" = "latest"
+"apt:zlib1g-dev" = "latest"
+
+"dnf:cmake" = "latest"
+"dnf:pkgconf-pkg-config" = "latest"
+"dnf:clang" = "latest"
+"dnf:clang-devel" = "latest"
+"dnf:boost-devel" = "latest"
+"dnf:protobuf-devel" = "latest"
+"dnf:protobuf-compiler" = "latest"
+"dnf:zlib-ng-compat-devel" = "latest"

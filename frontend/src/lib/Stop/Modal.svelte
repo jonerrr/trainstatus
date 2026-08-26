@@ -20,7 +20,7 @@
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { LocalStorage } from '$lib/storage.svelte';
 	import { current_time } from '$lib/url_params.svelte';
-	import { main_route_stops } from '$lib/util.svelte';
+	import { bus_headsign, main_route_stops } from '$lib/util.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
 
@@ -178,10 +178,12 @@
 							{#if last_stop_time}
 								{page.data.stops_by_id['mta_subway']?.[last_stop_time.stop_id]?.name}
 							{/if}
-						{:else if stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus'}
+						{:else if stop.data.source === 'mta_bus'}
+							{bus_headsign(route, st.trip.direction) ?? ''}
+						{:else if stop.data.source === 'njt_bus'}
 							{@const route_stop = stop.routes.find((r) => r.route_id === st.trip.route_id)}
 							{#if route_stop?.data && 'headsign' in route_stop.data}
-								{(route_stop.data as any).headsign}
+								{route_stop.data.headsign}
 							{/if}
 						{/if}
 					</div>

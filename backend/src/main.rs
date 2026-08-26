@@ -29,8 +29,14 @@ use backend::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
         njt_bus::realtime::NjtBusRealtime,
     },
-    stores, valhalla_config,
+    stores, valhalla_tile_extract,
 };
+
+// Use jemalloc instead of the system allocator to curb RSS growth from glibc
+// malloc arena retention/fragmentation under our threaded, bursty workload.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main]
 async fn main() {
@@ -82,13 +88,13 @@ async fn main() {
     let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
     let valhalla_manager = engines::valhalla::ValhallaManager::new(
-        engines::valhalla::ValhallaConfig::from_config_path(valhalla_config().to_owned()),
+        engines::valhalla::ValhallaConfig::from_tile_extract(valhalla_tile_extract().to_owned()),
     );
 
     let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
         Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
         Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
-            valhalla_manager.clone(),
+            valhalla_manager,
         )),
         Arc::new(sources::njt_bus::static_data::NjtBusStatic),
     ];

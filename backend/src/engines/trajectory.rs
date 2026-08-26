@@ -31,10 +31,16 @@ pub async fn run(
 
         tokio::spawn(async move {
             loop {
+                // A single malformed trip can't kill this loop: refresh_source
+                // returns a Result and each per-trip computation isolates its own
+                // failures. Non-finite knots (the one path that used to panic in
+                // the sampler's `f64::clamp`) are rejected up front by
+                // `validate_knots`, so a bad trip surfaces as an error here rather
+                // than unwinding the task.
                 if let Err(e) =
                     refresh_source(source, &trip_store, &position_store, &engine, &cache).await
                 {
-                    error!(source = %source, error = %e, "Trajectory refresh error");
+                    error!(source = %source, error = %format!("{e:#}"), "Trajectory refresh error");
                 }
                 tokio::time::sleep(REFRESH_INTERVAL).await;
             }

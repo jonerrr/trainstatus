@@ -65,11 +65,21 @@ export type ApiAlertTranslation = {
     text: string;
 };
 
+export type Borough = 'brooklyn' | 'queens' | 'bronx' | 'staten_island' | 'manhattan';
+
 /**
  * Represents a marker on the platform that indicates where a consist will stop.
+ * For example if we have "marked_as: "S", direction: North, position_ft: 13",
+ * That means this marker is for northbound trains which will arrive from the south and stop 13 feet from the north end of the platform.
  */
 export type CarMarker = {
+    /**
+     * Length of the consist in feet that this marker is meant to accommodate
+     */
     consist_length_ft?: number | null;
+    /**
+     * Direction of the trips that the marker is for.
+     */
     direction: PlatformDirection;
     /**
      * One-person operations
@@ -77,18 +87,21 @@ export type CarMarker = {
     is_opto: boolean;
     /**
      * The label on the platform. Usually is a number representing the amount of cars in the consist.
+     * Sometimes its "S" or "OPTO S", which seems to be short for the motorman's stop board.
      */
     marked_as: string;
     /**
-     * Position of the marker on the platform in feet from a reference point
+     * Position of the marker on the platform in feet starting from the railway north end of the platform
+     * The value can be between 0 and the length of the platform edge.
      */
     position_ft: number;
 };
 
 /**
- * Direction of the stop. Currently only for bus stops
+ * Direction a bus travels through the stop, bucketed into eight compass sectors.
+ * Currently only for bus stops.
  */
-export type CompassDirection = 's_w' | 's' | 's_e' | 'e' | 'w' | 'n_e' | 'n_w' | 'n' | 'unknown';
+export type CompassDirection = 'sw' | 's' | 'se' | 'e' | 'w' | 'ne' | 'nw' | 'n' | 'unknown';
 
 export type Consist = {
     car_count: number;
@@ -112,10 +125,6 @@ export type EgressPoint = {
 
 export type EgressType = 'STAIRCASE' | 'ELEVATOR' | 'ESCALATOR' | 'FARE_CONTROL' | 'DOOR' | 'EXIT' | 'RAMP' | 'UNKNOWN';
 
-export type Geom = {
-    [key: string]: unknown;
-};
-
 export type MtaAlertData = {
     alert_type: string;
     /**
@@ -133,6 +142,21 @@ export type MtaBusData = {
     deviation?: number | null;
 };
 
+/**
+ * One of a bus route's two terminals, as printed on the bus's headsign.
+ */
+export type MtaBusDirection = {
+    destination: string;
+    /**
+     * Matches `Trip.direction` for trips on this route.
+     */
+    direction_id: number;
+    /**
+     * Intermediate streets the MTA prints under the destination, e.g. `["Av U"]`.
+     */
+    via?: Array<string>;
+};
+
 export type MtaBusPositionData = {
     bearing: number;
     capacity?: number | null;
@@ -142,7 +166,32 @@ export type MtaBusPositionData = {
 };
 
 export type MtaBusRouteData = {
+    borough?: null | Borough;
+    /**
+     * Destination headsigns, ordered by `direction_id`.
+     *
+     * Headsigns live here rather than on `RouteStop` because the upstream feed
+     * exposes no stop-to-direction mapping — a stop's route entry carries only
+     * shape IDs. Consumers resolve a trip's headsign from its `direction`.
+     */
+    directions?: Array<MtaBusDirection>;
+    name_number: number;
+    /**
+     * Letter prefix of the route name, e.g. `Bx` in `Bx12`. Normalized to the
+     * casing used in the route name, since the upstream feed mixes `BX` and `Bx`.
+     */
+    name_prefix: string;
+    /**
+     * Variant suffix, e.g. `-SBS` in `M15-SBS` or `A` in `Bx18A`.
+     */
+    name_suffix?: string | null;
     service_types: Array<string>;
+    /**
+     * All shape IDs associated with this route (from Helium infra, via stop-route data).
+     * Used at realtime to pick the best-fitting shape for a trip when GTFS-RT
+     * does not provide shape_id directly.
+     */
+    shape_ids?: Array<string>;
     sort_key: number;
 };
 
@@ -165,6 +214,7 @@ export type MtaSubwayStopData = {
     north_headsign: string;
     platform_edges: Array<PlatformEdge>;
     south_headsign: string;
+    station_group_id: string;
 };
 
 export type MtaSubwayStopTimeData = {
@@ -268,6 +318,13 @@ export type RouteStopData = {
      * Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
      */
     opposite_stop_id?: string | null;
+    /**
+     * Helium shape_ids (across all service types) known to pass through this stop
+     * for this route. Used to deterministically resolve which of a route's several
+     * candidate shapes a realtime trip is following, by counting how many of the
+     * trip's actual stops each candidate is known to serve.
+     */
+    shape_ids?: Array<string>;
     source: 'mta_bus';
 } | {
     /**
@@ -280,13 +337,6 @@ export type RouteStopData = {
      */
     opposite_stop_id?: string | null;
     source: 'njt_bus';
-};
-
-export type Shape = {
-    data: unknown;
-    geom: Geom;
-    id: string;
-    source: Source;
 };
 
 export type Source = 'mta_subway' | 'mta_bus' | 'njt_bus';
@@ -337,35 +387,6 @@ export type StopTimeData = (MtaSubwayStopTimeData & {
 };
 
 export type StopType = 'full_time' | 'part_time' | 'late_night' | 'rush_hour_one_direction' | 'rush_hour' | 'weekday_only' | 'nights_weekends_only' | 'unknown';
-
-/**
- * Response format for the trajectories endpoint.
- * A flat array of trajectory objects suitable for map animation renderers.
- */
-export type TrajectoriesResponse = {
-    trajectories: Array<Trajectory>;
-};
-
-/**
- * A single trajectory: a sequence of (lon, lat, timestamp) samples
- * suitable for time-based map marker interpolation and rendering.
- */
-export type Trajectory = {
-    /**
-     * RGB color from the route, e.g. [238, 53, 46]
-     */
-    color: Array<number>;
-    /**
-     * Sampled coordinates along the route: [[lon, lat], ...]
-     */
-    path: Array<Array<number>>;
-    route_id: string;
-    /**
-     * Unix timestamps (seconds) corresponding to each path coordinate
-     */
-    timestamps: Array<number>;
-    trip_id: string;
-};
 
 export type Transfer = {
     min_transfer_time?: number | null;
@@ -559,15 +580,16 @@ export type TrajectoriesHandlerData = {
     body?: never;
     path: {
         /**
-         * Data source (currently only mta_subway)
+         * Data source
          */
         source: Source;
     };
     query?: {
-        /**
-         * Comma-separated list of route IDs to filter by.
-         */
         route_ids?: Array<string>;
+        /**
+         * Viewport bounds: min_lon,min_lat,max_lon,max_lat
+         */
+        bbox?: string | null;
         /**
          * Unix timestamp to use as the current time. If not specified, the current time is used.
          */
@@ -576,14 +598,19 @@ export type TrajectoriesHandlerData = {
     url: '/api/v1/trajectories/{source}';
 };
 
-export type TrajectoriesHandlerResponses = {
+export type TrajectoriesHandlerErrors = {
     /**
-     * Interpolated trip trajectories
+     * Invalid bbox parameter
      */
-    200: TrajectoriesResponse;
+    400: unknown;
 };
 
-export type TrajectoriesHandlerResponse = TrajectoriesHandlerResponses[keyof TrajectoriesHandlerResponses];
+export type TrajectoriesHandlerResponses = {
+    /**
+     * Arrow IPC stream of trajectories
+     */
+    200: unknown;
+};
 
 export type TripsHandlerData = {
     body?: never;

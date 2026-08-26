@@ -108,26 +108,9 @@ impl PchipInterpolator {
             }
         }
 
-        // End-point derivatives: use the "not-a-knot" one-sided formula from SciPy
+        // End-point derivatives: use the "not-a-knot" one-sided formula from SciPy.
         d[0] = Self::end_derivative(h[0], h[1], dk[0], dk[1]);
         d[n - 1] = Self::end_derivative(h[n - 2], h[n - 3], dk[n - 2], dk[n - 3]);
-
-        // Enforce monotonicity at endpoints
-        if d[0].signum() != dk[0].signum() {
-            d[0] = 0.0;
-        } else if dk[0].signum() != dk[1].signum() && d[0].abs() > 3.0 * dk[0].abs() {
-            d[0] = 3.0 * dk[0];
-        }
-
-        let last = n - 1;
-        let last_seg = n - 2;
-        if d[last].signum() != dk[last_seg].signum() {
-            d[last] = 0.0;
-        } else if dk[last_seg].signum() != dk[last_seg - 1].signum()
-            && d[last].abs() > 3.0 * dk[last_seg].abs()
-        {
-            d[last] = 3.0 * dk[last_seg];
-        }
 
         d
     }
@@ -155,6 +138,9 @@ impl PchipInterpolator {
     ///
     /// Returns `None` if `x_eval` is outside the interpolation domain.
     pub fn evaluate(&self, x_eval: f64) -> Option<f64> {
+        if x_eval.is_nan() {
+            return None;
+        }
         let n = self.x.len();
 
         // Handle exact boundaries
@@ -206,6 +192,9 @@ impl PchipInterpolator {
     ///
     /// Returns `None` if `x_eval` is outside the interpolation domain.
     pub fn evaluate_derivative(&self, x_eval: f64) -> Option<f64> {
+        if x_eval.is_nan() {
+            return None;
+        }
         let n = self.x.len();
 
         // Handle exact boundaries

@@ -40,47 +40,8 @@ struct BusRoute {
 
 // TODO: retest using valhalla to snap routes since I think they fixed some issues with overlapping roads in the latest version of valhalla
 pub struct NjtBusStatic;
-// pub struct NjtBusStatic {
-//     valhalla: Arc<ValhallaManager>,
-// }
 
 // TODO: setup shape insertion
-// TODO: fix parent stop handling
-impl NjtBusStatic {
-    // pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
-    //     Self { valhalla }
-    // }
-
-    // Valhalla kept having issues snapping some routes. So disabling for now.
-    // async fn snap_route_geometries(&self, route_geometries: &mut HashMap<String, MultiLineString>) {
-    //     for (route_id, geometry) in route_geometries.iter_mut() {
-    //         let mut snapped_lines = Vec::with_capacity(geometry.0.len());
-
-    //         for (line_index, line) in geometry.0.iter().enumerate() {
-    //             if line.0.len() < 2 {
-    //                 snapped_lines.push(line.clone());
-    //                 continue;
-    //             }
-
-    //             match self.valhalla.trace_route(line).await {
-    //                 Ok(snapped_line) => snapped_lines.push(snapped_line),
-    //                 Err(err) => {
-    //                     tracing::warn!(
-    //                         route_id,
-    //                         line_index,
-    //                         error = %err,
-    //                         "NJT bus route snapping failed; preserving original linestring"
-    //                     );
-    //                     snapped_lines.push(line.clone());
-    //                 }
-    //             }
-    //         }
-
-    //         *geometry = MultiLineString::new(snapped_lines);
-    //     }
-    // }
-}
-
 #[async_trait]
 impl StaticAdapter for NjtBusStatic {
     fn source(&self) -> Source {
@@ -113,7 +74,22 @@ impl StaticAdapter for NjtBusStatic {
         .context("GTFS parse task panicked")?
         .context("Failed to parse NJT GTFS")?;
 
-        let cached_trips = expand_gtfs(Source::NjtBus, &gtfs);
+        let mut cached_trips = expand_gtfs(Source::NjtBus, &gtfs);
+
+        // Collapse parent/child gate stops that share a public `stop_code` into a
+        // single canonical stop, and build the `child_stop_id -> canonical_id`
+        // remap used to rewrite route_stops, cached trips, and realtime feeds.
+        let (stops, stop_remap) = collapse_stops(&gtfs);
+
+        // Rewrite cached trip stop ids so any consumer joining to `static.stop`
+        // resolves to the canonical (collapsed) stop.
+        for trip in cached_trips.iter_mut() {
+            for st in trip.stop_times.iter_mut() {
+                if let Some(canonical) = stop_remap.get(&st.stop_id) {
+                    st.stop_id = canonical.clone();
+                }
+            }
+        }
 
         let bus_routes_token = super::get_token(NjtApi::BusDv2)
             .await
@@ -123,26 +99,12 @@ impl StaticAdapter for NjtBusStatic {
             .await
             .context("Failed to fetch BUSDV2 route metadata")?;
 
-        // TODO: either fix or remove valhalla route snapping for njt bus
         let route_geom_map = fetch_route_geometries(&bus_routes, &gtfs)
             .await
             .context("Failed to fetch NJT route geometries")?;
 
-        // Keep Valhalla warm while this import's snapping pass is active.
-        // let _import_snap_usage = match self.valhalla.acquire_usage().await {
-        //     Ok(lease) => Some(lease),
-        //     Err(err) => {
-        //         tracing::warn!(
-        //             error = %err,
-        //             "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
-        //         );
-        //         None
-        //     }
-        // };
-
-        // self.snap_route_geometries(&mut route_geom_map).await;
-
-        let dataset = build_static_dataset(&gtfs, &route_geom_map, cached_trips);
+        let dataset =
+            build_static_dataset(&gtfs, &route_geom_map, cached_trips, stops, &stop_remap);
 
         // TODO: move this to a standardized print method in StaticDataset
         #[cfg(debug_assertions)]
@@ -169,6 +131,10 @@ impl StaticAdapter for NjtBusStatic {
             .persist(route_store, stop_store, static_cache_store)
             .await
             .context("Failed to persist NJT static dataset")?;
+
+        // Publish the remap only after the canonical stops are persisted, so the
+        // realtime pipeline never remaps to a stop that isn't in the DB yet.
+        static_cache_store.set_stop_remap(Source::NjtBus, stop_remap);
 
         Ok(())
     }
@@ -439,18 +405,18 @@ fn build_routes(
         .collect()
 }
 
-// TODO: why is this function necessary?
-// the only thing i can see it being useful for is for fixture generation
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
     route_geom_map: &HashMap<String, MultiLineString>,
     cached_trips: Vec<crate::models::static_cache::CachedTrip>,
+    stops: Vec<Stop>,
+    stop_remap: &HashMap<String, String>,
 ) -> StaticDataset {
     StaticDataset {
         source: Source::NjtBus,
         routes: build_routes(gtfs, route_geom_map),
-        stops: build_stops(gtfs),
-        route_stops: build_route_stops(gtfs),
+        stops,
+        route_stops: build_route_stops(gtfs, stop_remap),
         shapes: vec![],
         cached_trips,
     }
@@ -458,27 +424,108 @@ fn build_static_dataset(
 
 // ── Build stops ───────────────────────────────────────────────────────────────
 
-fn build_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<Stop> {
-    gtfs.stops
-        .values()
-        .filter_map(|s| {
-            let lat = s.latitude?;
-            let lon = s.longitude?;
-            let stop_code = s.code.clone().unwrap_or_else(|| s.id.clone());
-            let raw_name = s.name.as_deref().unwrap_or(&s.id);
-            let name = normalize_title(raw_name);
+/// Collapse the NJT parent/child stop family (a parent station of
+/// `location_type=1`, its gate children of `location_type=0`, and a "no-gate"
+/// child) into a single canonical stop per public `stop_code`.
+///
+/// `stop_times.txt` (and the realtime feed) only ever reference the
+/// `location_type=0` children, never the parent station, so we pick a
+/// representative id per group and remap every other member to it. Returns the
+/// canonical stops plus a `child_stop_id -> representative_id` remap (identity
+/// members are omitted).
+fn collapse_stops(gtfs: &gtfs_structures::Gtfs) -> (Vec<Stop>, HashMap<String, String>) {
+    // Group members by public stop_code (fall back to id, matching legacy behavior).
+    let mut groups: HashMap<String, Vec<&gtfs_structures::Stop>> = HashMap::new();
+    for s in gtfs.stops.values() {
+        let code = s.code.clone().unwrap_or_else(|| s.id.clone());
+        groups.entry(code).or_default().push(s.as_ref());
+    }
 
-            Some(Stop {
-                id: s.id.clone(),
-                name,
-                geom: Point::new(lon, lat).into(),
-                // parent_station_id: None,
-                transfers: vec![],
-                routes: vec![],
-                data: StopData::NjtBus(NjtBusStopData { stop_code }),
-            })
-        })
-        .collect()
+    let mut stops: Vec<Stop> = Vec::with_capacity(groups.len());
+    let mut remap: HashMap<String, String> = HashMap::new();
+
+    for (stop_code, members) in groups {
+        let rep = choose_representative(&members);
+
+        // All members of a group share coordinates, but the representative (or a
+        // parent station) can occasionally lack them; fall back to any member.
+        let coords = rep
+            .longitude
+            .zip(rep.latitude)
+            .or_else(|| members.iter().find_map(|m| m.longitude.zip(m.latitude)));
+        let Some((lon, lat)) = coords else {
+            // No geometry anywhere in the group — skip (matches legacy filter_map).
+            continue;
+        };
+
+        let raw_name = rep.name.as_deref().unwrap_or(&rep.id);
+        let name = normalize_title(raw_name);
+
+        for m in &members {
+            if m.id != rep.id {
+                remap.insert(m.id.clone(), rep.id.clone());
+            }
+        }
+
+        stops.push(Stop {
+            id: rep.id.clone(),
+            name,
+            geom: Point::new(lon, lat).into(),
+            transfers: vec![],
+            routes: vec![],
+            data: StopData::NjtBus(NjtBusStopData { stop_code }),
+        });
+    }
+
+    // Defensive: the validator and `StopStore::save_all` key stops on the
+    // uppercased id, so a case-insensitive collision would bail the whole import.
+    // Drop such duplicates here (keep the first) rather than crash.
+    let mut seen: HashSet<String> = HashSet::new();
+    stops.retain(|s| {
+        if seen.insert(s.id.to_uppercase()) {
+            true
+        } else {
+            warn!(stop_id = %s.id, "Dropping NJT stop with case-insensitive duplicate id");
+            false
+        }
+    });
+
+    (stops, remap)
+}
+
+/// Pick the canonical member of a `stop_code` group:
+/// 1. the `location_type=1` parent station, if present;
+/// 2. otherwise, among plain stops with no `parent_station`, the smallest id;
+/// 3. otherwise the smallest id overall.
+fn choose_representative<'a>(members: &[&'a gtfs_structures::Stop]) -> &'a gtfs_structures::Stop {
+    if let Some(parent) = members
+        .iter()
+        .copied()
+        .find(|m| m.location_type == gtfs_structures::LocationType::StopArea)
+    {
+        return parent;
+    }
+
+    let no_parent: Vec<&'a gtfs_structures::Stop> = members
+        .iter()
+        .copied()
+        .filter(|m| m.parent_station.is_none())
+        .collect();
+    let pool = if no_parent.is_empty() {
+        members.to_vec()
+    } else {
+        no_parent
+    };
+
+    pool.into_iter()
+        .min_by(|a, b| stop_id_sort_key(&a.id).cmp(&stop_id_sort_key(&b.id)))
+        .expect("stop_code group always has at least one member")
+}
+
+/// Deterministic, numeric-aware ordering for stop ids (NJT ids are usually
+/// numeric; non-numeric ids sort last, tie-broken lexicographically).
+fn stop_id_sort_key(id: &str) -> (u64, &str) {
+    (id.parse::<u64>().unwrap_or(u64::MAX), id)
 }
 
 // ── Build route_stops ─────────────────────────────────────────────────────────
@@ -492,11 +539,23 @@ struct Accumulator {
     headsign_counts: HashMap<String, usize>,
 }
 
-fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
+fn build_route_stops(
+    gtfs: &gtfs_structures::Gtfs,
+    stop_remap: &HashMap<String, String>,
+) -> Vec<RouteStop> {
+    // Resolve a raw GTFS stop id to its canonical (collapsed) stop id.
+    let canonical = |id: &str| -> String {
+        stop_remap
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| id.to_string())
+    };
+
     let proj_wgs84 = Proj::from_epsg_code(4326).expect("Failed to create WGS84 proj");
     let proj_ny = Proj::from_epsg_code(6538).expect("Failed to create NY proj");
 
-    // Build a map of stop_id -> projected Point
+    // Build a map of canonical stop_id -> projected Point. Members of a collapsed
+    // group share coordinates, so keying by canonical id is unambiguous.
     let stop_geom_map: HashMap<String, Point<f64>> = gtfs
         .stops
         .values()
@@ -505,7 +564,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
             let lon = s.longitude?;
             let mut point = Point::new(lon.to_radians(), lat.to_radians());
             transform(&proj_wgs84, &proj_ny, &mut point).ok()?;
-            Some((s.id.clone(), point))
+            Some((canonical(&s.id), point))
         })
         .collect();
 
@@ -522,13 +581,15 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
             .or_insert_with(|| (Vec::new(), Vec::new()));
 
         for st in &trip.stop_times {
+            let stop_id = canonical(&st.stop.id);
+
             // Collect stops for opposite-stop matching
             if direction == 0 {
-                if !dir0.contains(&st.stop.id) {
-                    dir0.push(st.stop.id.clone());
+                if !dir0.contains(&stop_id) {
+                    dir0.push(stop_id.clone());
                 }
-            } else if direction == 1 && !dir1.contains(&st.stop.id) {
-                dir1.push(st.stop.id.clone());
+            } else if direction == 1 && !dir1.contains(&stop_id) {
+                dir1.push(stop_id.clone());
             }
 
             // Prefer per-stop headsign, fall back to trip headsign
@@ -539,7 +600,7 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
                 .unwrap_or(trip_headsign);
             let headsign = normalize_headsign(&trip.route_id, raw_headsign);
 
-            let key: RouteStopKey = (trip.route_id.clone(), st.stop.id.clone(), direction);
+            let key: RouteStopKey = (trip.route_id.clone(), stop_id, direction);
             let sequence = st.stop_sequence as i16;
 
             let entry = accum.entry(key).or_insert_with(|| Accumulator {
@@ -595,42 +656,24 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
     // TODO: figure out what to do about bus stops where the same route id but different direction have the same stop_id
     // for example route_id=605 stop_id=15142 count=2 examples=["(route_id=605, stop_id=15142, direction=1, headsign=Quaker Br Mall via Griggs Frm)", "(route_id=605, stop_id=15142, direction=0, headsign=Princeton Montgomery Twp via Griggs Frm)"]
 
-    // TODO: remove this after testing route stop directions are working
+    // A route serving the same stop in both directions produces two entries that
+    // differ only by `direction`; the dedup below collapses them. This is normal
+    // and expected, so just tally how many pairs get collapsed (one summary line)
+    // rather than emitting a WARN per pair — which floods the terminal on a feed
+    // the size of NJT's.
     #[cfg(debug_assertions)]
     {
-        let mut norm_map: HashMap<(String, String), Vec<&RouteStop>> = HashMap::new();
+        let mut counts: HashMap<(String, String), usize> = HashMap::new();
         for rs in &result {
             let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-            norm_map.entry(key).or_default().push(rs);
+            *counts.entry(key).or_insert(0) += 1;
         }
-        for ((rid, sid), list) in norm_map {
-            if list.len() > 1 {
-                let examples: Vec<_> = list
-                    .iter()
-                    .take(5)
-                    .map(|rs| match &rs.data {
-                        RouteStopData::NjtBus {
-                            headsign,
-                            direction,
-                            ..
-                        } => format!(
-                            "(route_id={}, stop_id={}, direction={}, headsign={})",
-                            rs.route_id, rs.stop_id, direction, headsign
-                        ),
-                        other => format!(
-                            "(route_id={}, stop_id={}, data={:?})",
-                            rs.route_id, rs.stop_id, other
-                        ),
-                    })
-                    .collect();
-                tracing::warn!(
-                    "duplicate route_stop after uppercase normalization: route_id={} stop_id={} count={} examples={:?}",
-                    rid,
-                    sid,
-                    list.len(),
-                    examples
-                );
-            }
+        let collapsed = counts.values().filter(|&&c| c > 1).count();
+        if collapsed > 0 {
+            tracing::debug!(
+                collapsed_pairs = collapsed,
+                "njt_bus route_stops with the same (route_id, stop_id) across directions; collapsing to one row each"
+            );
         }
     }
 
@@ -641,7 +684,6 @@ fn build_route_stops(gtfs: &gtfs_structures::Gtfs) -> Vec<RouteStop> {
     //
     // The debug check above will still warn about duplicates, but this step
     // prevents the insertion error when running the importer.
-    // TODO: remove this once we take into account the parent stop
     // perform deduplication in-place to avoid large allocations
     let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
     for rs in result.into_iter() {
@@ -744,4 +786,149 @@ fn strip_route_id_prefix<'a>(route_id: &str, headsign: &'a str) -> &'a str {
     trimmed[first_token_end..]
         .trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '-' | ':' | '/' | '.'))
         .trim()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::stop::StopData;
+    use gtfs_structures::{Gtfs, LocationType, Stop as GtfsStop};
+    use std::sync::Arc;
+
+    fn make_stop(
+        id: &str,
+        code: &str,
+        location_type: LocationType,
+        parent: Option<&str>,
+    ) -> GtfsStop {
+        GtfsStop {
+            id: id.to_string(),
+            code: Some(code.to_string()),
+            name: Some(format!("STOP {id}")),
+            location_type,
+            parent_station: parent.map(str::to_string),
+            longitude: Some(-73.9392),
+            latitude: Some(40.84899),
+            ..Default::default()
+        }
+    }
+
+    fn gtfs_with(stops: Vec<GtfsStop>) -> Gtfs {
+        let mut gtfs = Gtfs::default();
+        for s in stops {
+            gtfs.stops.insert(s.id.clone(), Arc::new(s));
+        }
+        gtfs
+    }
+
+    fn stop_code_of(stop: &Stop) -> &str {
+        match &stop.data {
+            StopData::NjtBus(d) => &d.stop_code,
+            other => panic!("expected NjtBus stop data, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collapses_parent_child_family_to_representative_parent() {
+        // GW Bridge terminal: parent station + a gate child + a "no-gate" child,
+        // all sharing stop_code 32640.
+        let gtfs = gtfs_with(vec![
+            make_stop("16339", "32640", LocationType::StopArea, None),
+            make_stop("16957", "32640", LocationType::StopPoint, Some("16339")),
+            make_stop("16969", "32640", LocationType::StopPoint, None),
+        ]);
+
+        let (stops, remap) = collapse_stops(&gtfs);
+
+        assert_eq!(stops.len(), 1, "family collapses to a single stop");
+        assert_eq!(stops[0].id, "16339", "representative is the parent station");
+        assert_eq!(stop_code_of(&stops[0]), "32640");
+        // Both children remap to the parent; realtime feeds reference these.
+        assert_eq!(remap.get("16957"), Some(&"16339".to_string()));
+        assert_eq!(remap.get("16969"), Some(&"16339".to_string()));
+        // The representative itself is identity (absent from the remap).
+        assert!(remap.get("16339").is_none());
+    }
+
+    #[test]
+    fn collapses_parentless_group_to_smallest_numeric_id() {
+        // Two plain stops (no parent station) sharing a stop_code.
+        let gtfs = gtfs_with(vec![
+            make_stop("15372", "30539", LocationType::StopPoint, None),
+            make_stop("1", "30539", LocationType::StopPoint, None),
+        ]);
+
+        let (stops, remap) = collapse_stops(&gtfs);
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(stops[0].id, "1", "smallest numeric id wins");
+        assert_eq!(remap.get("15372"), Some(&"1".to_string()));
+    }
+
+    #[test]
+    fn single_id_stop_is_untouched_and_absent_from_remap() {
+        let gtfs = gtfs_with(vec![make_stop(
+            "500",
+            "40000",
+            LocationType::StopPoint,
+            None,
+        )]);
+
+        let (stops, remap) = collapse_stops(&gtfs);
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(stops[0].id, "500");
+        assert!(remap.is_empty(), "1:1 stops need no remap entry");
+    }
+
+    #[test]
+    fn stop_id_sort_key_orders_numerically() {
+        assert!(stop_id_sort_key("2") < stop_id_sort_key("10"));
+        // Non-numeric ids sort after numeric ones.
+        assert!(stop_id_sort_key("999999") < stop_id_sort_key("A1"));
+    }
+
+    /// End-to-end against the captured NJT GTFS feed. Ignored by default because
+    /// it parses a ~55MB zip; run with `cargo test -- --ignored njt_fixture`.
+    #[test]
+    #[ignore]
+    fn collapse_and_route_stops_against_real_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/njt_bus/static/basic/raw/gtfs.zip"
+        );
+        let gtfs = Gtfs::from_path(path).expect("parse fixture gtfs");
+
+        let (stops, remap) = collapse_stops(&gtfs);
+
+        // Every collapsed stop id is unique (no duplicate crash).
+        let stop_ids: HashSet<&str> = stops.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(stop_ids.len(), stops.len(), "canonical stop ids are unique");
+
+        // The GW Bridge terminal family (stop_code 32640) collapses to a single stop.
+        let gw: Vec<&Stop> = stops
+            .iter()
+            .filter(|s| stop_code_of(s) == "32640")
+            .collect();
+        assert_eq!(gw.len(), 1, "stop_code 32640 collapses to one stop");
+        assert_eq!(gw[0].id, "16339", "representative is the parent station");
+        assert_eq!(remap.get("16957"), Some(&"16339".to_string()));
+
+        // Key invariant: every route_stop references a canonical stop that exists
+        // (the old importer left parent stations orphaned / referenced raw children).
+        let route_stops = build_route_stops(&gtfs, &remap);
+        assert!(!route_stops.is_empty());
+        for rs in &route_stops {
+            assert!(
+                stop_ids.contains(rs.stop_id.as_str()),
+                "route_stop references unknown stop {}",
+                rs.stop_id
+            );
+        }
+        // The collapsed GW terminal now carries routes (it previously had none).
+        assert!(
+            route_stops.iter().any(|rs| rs.stop_id == "16339"),
+            "collapsed GW terminal should have route_stops"
+        );
+    }
 }

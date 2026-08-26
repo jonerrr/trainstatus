@@ -36,6 +36,7 @@ fn parse_bbox(s: &str) -> Option<[f64; 4]> {
 }
 
 // TODO: probably remove filters since its technically already filtered by source
+// is this even used anymore?
 fn filter_render_units<'a>(
     render_units: impl Iterator<Item = &'a RenderUnit>,
     route_ids: &[String],

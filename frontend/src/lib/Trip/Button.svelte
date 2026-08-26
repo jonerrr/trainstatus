@@ -7,6 +7,7 @@
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { current_time } from '$lib/url_params.svelte';
+	import { bus_headsign } from '$lib/util.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';
 
@@ -38,9 +39,7 @@
 
 		switch (data.data.source) {
 			case 'mta_bus':
-				const stop = page.data.stops_by_id?.[data.data.source]?.[stop_times[0].stop_id];
-				const routeStop = stop?.routes.find((r) => r.route_id === data.route_id);
-				return routeStop?.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
+				return bus_headsign(route, data.direction) ?? 'Unknown';
 			case 'mta_subway':
 				const last_st = stop_times[stop_times.length - 1];
 				return page.data.stops_by_id?.[data.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';

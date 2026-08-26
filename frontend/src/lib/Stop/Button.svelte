@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { SvelteMap } from 'svelte/reactivity';
+
 	import { page } from '$app/state';
 
 	import Icon from '$lib/Icon.svelte';
@@ -8,10 +10,10 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
-	import { main_route_stops } from '$lib/util.svelte';
+	import { bus_headsign, main_route_stops } from '$lib/util.svelte';
 
 	type StopTimeWithETA = StopTime & { eta: number };
-	type StopTimesByRoute = Map<string, StopTimeWithETA[]>;
+	type StopTimesByRoute = SvelteMap<string, StopTimeWithETA[]>;
 
 	interface Props {
 		data: Stop;
@@ -47,11 +49,11 @@
 	const main_rs = $derived(main_route_stops(stop.routes));
 
 	const stop_times_by_direction = $derived.by(() => {
-		const stop_times_by_direction = new Map<number, StopTimesByRoute>();
+		const stop_times_by_direction = new SvelteMap<number, StopTimesByRoute>();
 
 		if (stop.data.source === 'mta_subway') {
 			for (const direction of [1, 3]) {
-				const route_map: StopTimesByRoute = new Map();
+				const route_map: StopTimesByRoute = new SvelteMap();
 				for (const route of main_rs) {
 					route_map.set(route.route_id, []);
 				}
@@ -67,7 +69,7 @@
 			const route_id = trip.route_id;
 
 			if (!stop_times_by_direction.has(trip.direction)) {
-				stop_times_by_direction.set(trip.direction, new Map());
+				stop_times_by_direction.set(trip.direction, new SvelteMap());
 			}
 
 			const target_map = stop_times_by_direction.get(trip.direction)!;
@@ -86,6 +88,28 @@
 	const default_stop_routes = $derived(
 		main_rs.map((r) => routes[r.route_id]).filter((r) => r !== undefined)
 	);
+
+	// A bus stop sits on one side of the street, so it almost always serves a
+	// single direction of a route (only ~63 of ~20k route/stop pairs see both).
+	// Pick the direction of the next arrival so headsign and ETAs agree, rather
+	// than mixing both directions into one row.
+	function next_direction(route_id: string) {
+		let best: { direction: number; times: StopTimeWithETA[] } | undefined;
+		let best_eta = Infinity;
+
+		for (const [direction, by_route] of stop_times_by_direction) {
+			const times = by_route.get(route_id);
+			if (!times?.length) continue;
+
+			const soonest = Math.min(...times.map((st) => st.eta));
+			if (soonest < best_eta) {
+				best_eta = soonest;
+				best = { direction, times };
+			}
+		}
+
+		return best;
+	}
 </script>
 
 {#snippet eta(n: number)}
@@ -165,22 +189,19 @@
 		<div class="flex flex-col">
 			{#each stop.routes as route_stop (route_stop.route_id)}
 				{@const route = routes[route_stop.route_id]}
-				{@const route_stop_times = [...stop_times_by_direction.values()].flatMap(
-					(m) => m.get(route_stop.route_id) ?? []
-				)}
-				{#if !route}
-					{@debug stop}
-				{/if}
+				{@const next = next_direction(route_stop.route_id)}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">
 						<div>
-							{#if 'headsign' in route_stop.data}
+							{#if next}
+								{bus_headsign(route, next.direction) ?? ''}
+							{:else if 'headsign' in route_stop.data}
 								{route_stop.data.headsign}
 							{/if}
 						</div>
 						<div class="flex gap-2 pr-1">
-							{@render eta_or_loading(route_stop_times)}
+							{@render eta_or_loading(next?.times ?? [])}
 						</div>
 					</div>
 				</div>

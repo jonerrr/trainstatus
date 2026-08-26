@@ -10,7 +10,8 @@ config_roots = ["backend", "frontend", "geo", "science"]
 "aqua:pnpm/pnpm" = "latest"
 "pipx:pyvalhalla" = { version = "latest", uvx = true }
 "cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres", default-features = false }
-# installing with mise caused the rust vscode extension not to work
+# installing with mise caused the rust vscode extension not to work, and a
+# newer mise protoc breaks Valhalla's CMake (mismatched vs system libprotobuf)
 # protoc = "latest"
 
 [env]
@@ -25,6 +26,13 @@ run = "podman kube play dev.pod.yml --replace"
 # broken since it the sqlx mig fails because the database isn't ready yet. need to add a wait-for step or something.
 # depends = ["start-containers"]
 run = { tasks = ["//backend:dev", "//frontend:dev"] }
+
+[tasks.reset-db]
+confirm = "Are you sure?"
+run = """
+podman kube down dev.pod.yml --force || true
+podman kube play --replace dev.pod.yml
+"""
 
 [tasks.build]
 run = { tasks = ["//backend:build", "//frontend:build"] }
