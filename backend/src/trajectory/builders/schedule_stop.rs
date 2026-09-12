@@ -5,7 +5,7 @@ use super::super::builder::TrajectoryBuilder;
 use super::super::cache::TrajectoryCache;
 use super::super::geometry::ShapeGeometry;
 use super::super::types::{GeneratedKnots, TrajectoryKnot, TrajectoryState, TripSnapshot};
-
+// TODO: why do we have this builder? it seems like it is only used for njt_bus and mta_bus, but those have their own builders. maybe we can remove this and just use the other builders instead of this one.
 pub struct ScheduleStopBuilder {
     source: Source,
 }

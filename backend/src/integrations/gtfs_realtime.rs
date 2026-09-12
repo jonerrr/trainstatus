@@ -152,6 +152,16 @@ pub async fn run_pipeline<T: GtfsSource>(
             }
         }
     }
+    let matched = data
+        .iter()
+        .filter(|(trip, _)| !trip.shape_ids.is_empty())
+        .count();
+    info!(
+        source = ?adapter.source(),
+        matched_trips = matched,
+        unmatched_trips = data.len() - matched,
+        "realtime pattern coverage"
+    );
 
     info!(
         "Fetched {} trips, {} positions for {:?}",

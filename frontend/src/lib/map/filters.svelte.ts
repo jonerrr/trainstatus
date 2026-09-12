@@ -2,6 +2,7 @@ import { page } from '$app/state';
 
 import type { Source } from '$lib/client';
 import { COMPASS_DIRECTION_OPTIONS } from '$lib/compassDirections';
+import { all_sources } from '$lib/resources/index.svelte';
 
 import maplibregl from 'maplibre-gl';
 
@@ -18,7 +19,7 @@ export const layer_data = {
 	}
 } as const;
 
-type LayerKey = keyof typeof layer_data;
+export type LayerKey = keyof typeof layer_data;
 
 export type FilterFieldType = 'boolean' | 'enum' | 'string' | 'number';
 
@@ -107,28 +108,71 @@ export function getFilterDefsForLayer(
 
 export type FilterValue = boolean | string | string[] | [number, number] | undefined;
 
+type PropertyFilterMap = Partial<Record<Source, Record<string, FilterValue>>>;
+
+function hasFilterValue(value: FilterValue, fieldDef?: FilterFieldDef) {
+	if (value === undefined) return false;
+	if (typeof value === 'string') return value.length > 0;
+	if (Array.isArray(value)) {
+		if (fieldDef?.type === 'enum' && fieldDef.options && value.length === fieldDef.options.length)
+			return false;
+		return value.length > 0;
+	}
+	return true;
+}
+
+export function countActiveFilters({
+	initialSources,
+	sources,
+	layers,
+	propertyFilters
+}: {
+	initialSources: readonly Source[];
+	sources: readonly Source[];
+	layers: Record<LayerKey, boolean>;
+	propertyFilters: readonly { layer: LayerKey; filters: PropertyFilterMap }[];
+}) {
+	const sameSources =
+		initialSources.length === sources.length &&
+		initialSources.every((source) => sources.includes(source));
+	let count = sameSources ? 0 : 1;
+	count += Object.values(layers).filter((enabled) => !enabled).length;
+
+	for (const group of propertyFilters) {
+		const groupDefinitions = layer_filter_defs[group.layer] as Record<
+			Source,
+			Record<string, FilterFieldDef>
+		>;
+		for (const [source, sourceFilters] of Object.entries(group.filters)) {
+			for (const [property, value] of Object.entries(sourceFilters ?? {})) {
+				const fieldDef = groupDefinitions[source as Source]?.[property];
+				if (hasFilterValue(value, fieldDef)) count += 1;
+			}
+		}
+	}
+
+	return count;
+}
+
+function emptyPropertyFilters(): Record<Source, Record<string, FilterValue>> {
+	return Object.fromEntries(all_sources.map((source) => [source, {}])) as Record<
+		Source,
+		Record<string, FilterValue>
+	>;
+}
+
 export class MapFilters {
+	readonly initialSources = [...(page.data.selected_sources ?? [])];
+
 	// Source selection state
-	sources = $state<Source[]>(page.data.selected_sources ?? []);
+	sources = $state<Source[]>([...this.initialSources]);
 
 	// Property filter state: Record<Source, Record<PropertyName, FilterValue>>
-	stop_filters = $state<Record<Source, Record<string, FilterValue>>>({
-		mta_subway: {},
-		mta_bus: {},
-		njt_bus: {}
-	});
+	stop_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
-	route_filters = $state<Record<Source, Record<string, FilterValue>>>({
-		mta_subway: {},
-		mta_bus: {},
-		njt_bus: {}
-	});
+	route_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
-	trip_filters = $state<Record<Source, Record<string, FilterValue>>>({
-		mta_subway: {},
-		mta_bus: {},
-		njt_bus: {}
-	});
+	trip_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
 	// Layers enabled/disabled
 	layers = $state(
@@ -251,4 +295,35 @@ export class MapFilters {
 	trip: maplibregl.FilterSpecification = $derived.by(() => {
 		return this.#buildLayerFilter('trip', this.trip_filters);
 	});
+
+	activeFilterCount = $derived(
+		countActiveFilters({
+			initialSources: this.initialSources,
+			sources: this.sources,
+			layers: this.layers,
+			propertyFilters: [
+				{ layer: 'stop', filters: this.stop_filters },
+				{ layer: 'route', filters: this.route_filters },
+				{ layer: 'trip', filters: this.trip_filters }
+			]
+		})
+	);
+
+	isSourceEnabled(source: Source): boolean {
+		return this.sources.includes(source);
+	}
+
+	toggleSource(source: Source) {
+		this.sources = this.isSourceEnabled(source)
+			? this.sources.filter((s) => s !== source)
+			: [...this.sources, source];
+	}
+
+	reset() {
+		this.sources = [...this.initialSources];
+		this.layers = { route: true, stop: true, trip: true };
+		this.stop_filters = emptyPropertyFilters();
+		this.route_filters = emptyPropertyFilters();
+		this.trip_filters = emptyPropertyFilters();
+	}
 }

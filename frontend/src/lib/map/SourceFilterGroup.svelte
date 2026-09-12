@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { slide } from 'svelte/transition';
-
 	import type { Source } from '$lib/client';
 	import FilterField from '$lib/map/FilterField.svelte';
 	import {
@@ -27,13 +25,13 @@
 
 {#if entries.length > 0}
 	<div
-		class="flex flex-col gap-2 p-2 rounded border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900"
+		class="flex flex-col gap-1.5 rounded border border-neutral-300 bg-neutral-50 p-1.5 dark:border-neutral-600 dark:bg-neutral-900"
 	>
-		<div class="flex items-center justify-between gap-2">
+		<div class="flex min-h-10 items-center justify-between gap-2">
 			<div class="text-sm font-semibold capitalize">{sourceLabel}</div>
 			<button
 				type="button"
-				class="text-xs underline text-blue-500 hover:text-blue-700"
+				class="min-h-10 rounded px-1.5 text-xs text-blue-500 underline hover:text-blue-700"
 				onclick={() => {
 					groupOpen = !groupOpen;
 				}}
@@ -43,7 +41,7 @@
 		</div>
 
 		{#if groupOpen}
-			<div class="flex flex-col gap-2" transition:slide>
+			<div class="flex flex-col gap-1.5">
 				{#each entries as [property, fieldDef] (property)}
 					<FilterField
 						label={fieldDef.label}

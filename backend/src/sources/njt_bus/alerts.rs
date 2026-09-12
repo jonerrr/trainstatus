@@ -21,13 +21,13 @@ use crate::{
     stores::alert::AlertStore,
 };
 
-use super::{NJT_ALERTS_URL, NjtApi, get_token, njt_post_future};
+use super::{NJT_ALERTS_URL, get_token, njt_post_future};
 
 pub struct NjtBusAlerts;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let token = get_token(NjtApi::GtfsG2).await?;
+    let token = get_token().await?;
     let bytes = njt_post_future(NJT_ALERTS_URL, token).await?;
 
     let mut fixtures = BTreeMap::new();
@@ -42,7 +42,7 @@ impl GtfsAlertSource for NjtBusAlerts {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token(NjtApi::GtfsG2).await {
+        let token = match get_token().await {
             Ok(t) => t,
             Err(e) => {
                 tracing::error!(error = %e, "NJT auth failed for alerts");

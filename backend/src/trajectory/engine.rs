@@ -5,7 +5,7 @@ use crate::models::source::Source;
 
 use super::builder::{TrajectoryBuilder, validate_knots};
 use super::builders::{
-    mta_bus::MtaBusBuilder, mta_subway::MtaSubwayBuilder, schedule_stop::ScheduleStopBuilder,
+    mta_bus::MtaBusBuilder, mta_subway::MtaSubwayBuilder, njt_bus::NjtBusBuilder,
 };
 use super::cache::TrajectoryCache;
 use super::continuity;
@@ -34,7 +34,7 @@ impl TrajectoryEngine {
         );
         builders.insert(
             Source::NjtBus,
-            Arc::new(ScheduleStopBuilder::njt_bus()) as Arc<dyn TrajectoryBuilder>,
+            Arc::new(NjtBusBuilder) as Arc<dyn TrajectoryBuilder>,
         );
         Self {
             builders,

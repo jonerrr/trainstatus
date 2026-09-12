@@ -20,13 +20,13 @@ use crate::{
     stores::{position::PositionStore, static_cache::StaticCacheStore, trip::TripStore},
 };
 
-use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, NjtApi, get_token, njt_post_future};
+use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
 pub struct NjtBusRealtime;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let token = get_token(NjtApi::GtfsG2).await?;
+    let token = get_token().await?;
     let trip_updates = njt_post_future(NJT_TRIP_UPDATES_URL, token.clone()).await?;
     let vehicle_positions = njt_post_future(NJT_VEHICLE_POSITIONS_URL, token).await?;
 
@@ -46,7 +46,7 @@ impl GtfsSource for NjtBusRealtime {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token(NjtApi::GtfsG2).await {
+        let token = match get_token().await {
             Ok(t) => t,
             Err(e) => {
                 error!(error = %e, "NJT auth failed");
@@ -79,6 +79,17 @@ impl GtfsSource for NjtBusRealtime {
             None => return (None, vec![]),
         };
 
+        let pattern = match static_cache_store
+            .get_trip_pattern(Source::NjtBus, &trip_id)
+            .await
+        {
+            Ok(pattern) => pattern,
+            Err(error) => {
+                warn!(%error, "Unable to resolve NJT trip pattern");
+                None
+            }
+        };
+
         // Try to get from static cache to fill in missing fields
         // We guess start_date as today if not present
         // TODO: stop guessing start_date, it will cause issues near midnight.
@@ -97,6 +108,7 @@ impl GtfsSource for NjtBusRealtime {
         let route_id = trip_desc
             .route_id
             .or_else(|| cached_trip.as_ref().map(|ct| ct.route_id.clone()))
+            .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
                     trip_id,
@@ -113,6 +125,7 @@ impl GtfsSource for NjtBusRealtime {
             .direction_id
             .map(|d| d as i16)
             .or_else(|| cached_trip.as_ref().map(|ct| ct.direction_id))
+            .or_else(|| pattern.as_ref().map(|p| p.direction))
             .unwrap_or(0);
 
         let start_date = match NaiveDate::parse_from_str(&start_date_str, "%Y%m%d") {
@@ -166,11 +179,17 @@ impl GtfsSource for NjtBusRealtime {
             return (None, vec![]);
         };
 
+        let shape_ids = pattern
+            .filter(|p| p.route_id.eq_ignore_ascii_case(&route_id) && p.direction == direction)
+            .and_then(|p| p.shape_id)
+            .map(|id| vec![id])
+            .unwrap_or_default();
+
         let trip = Trip {
             id: Uuid::now_v7(),
             original_id: trip_id,
             route_id,
-            shape_ids: vec![], // TODO: add these
+            shape_ids,
             direction,
             created_at,
             vehicle_id,

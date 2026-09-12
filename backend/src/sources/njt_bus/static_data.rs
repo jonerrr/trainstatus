@@ -12,36 +12,26 @@ use crate::{
         stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     sources::{StaticAdapter, normalize_title, normalize_whitespace},
-    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
+    stores::{
+        route::RouteStore,
+        static_cache::{StaticCacheStore, TripPatternRevision},
+        stop::StopStore,
+    },
     utils::static_cache::expand_gtfs,
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
-use geojson::GeoJson;
+use geo::{Distance, Euclidean, Point};
 use proj4rs::{Proj, transform::transform};
-use tracing::{info, warn};
+use tracing::warn;
 
-use super::{NJT_BUS_ROUTES_URL, NjtApi};
+use super::patterns::{self, PatternDataset, PatternFeature};
 
-// TODO: use the per-service dataset instead since we are now storing route geometries as shapes
 const NJT_DEFAULT_COLOR: &str = "1A2B57";
 const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
-const NJT_ARCGIS_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Lines_of_NJ_Transit/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=geojson";
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-struct BusRoute {
-    #[serde(rename = "BusRouteID")]
-    bus_route_id: String,
-    #[serde(rename = "BusRouteDescription")]
-    bus_route_description: String,
-}
-
-// TODO: retest using valhalla to snap routes since I think they fixed some issues with overlapping roads in the latest version of valhalla
 pub struct NjtBusStatic;
 
-// TODO: setup shape insertion
 #[async_trait]
 impl StaticAdapter for NjtBusStatic {
     fn source(&self) -> Source {
@@ -58,7 +48,7 @@ impl StaticAdapter for NjtBusStatic {
         stop_store: &StopStore,
         static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
-        let token = super::get_token(NjtApi::GtfsG2)
+        let token = super::get_token()
             .await
             .context("NJT authentication failed")?;
 
@@ -68,7 +58,13 @@ impl StaticAdapter for NjtBusStatic {
 
         // Parse GTFS in a blocking task
         let gtfs = tokio::task::spawn_blocking(move || {
-            gtfs_structures::Gtfs::from_reader(Cursor::new(gtfs_bytes))
+            // GIS supplies geometry; retain trip shape IDs without parsing the
+            // large, unused GTFS shapes.txt coordinate table.
+            gtfs_structures::GtfsReader::default()
+                .read_shapes(false)
+                .raw()
+                .read_from_reader(Cursor::new(gtfs_bytes))
+                .and_then(gtfs_structures::Gtfs::try_from)
         })
         .await
         .context("GTFS parse task panicked")?
@@ -91,20 +87,21 @@ impl StaticAdapter for NjtBusStatic {
             }
         }
 
-        let bus_routes_token = super::get_token(NjtApi::BusDv2)
+        let features = patterns::fetch_patterns()
             .await
-            .context("NJT BUSDV2 authentication failed")?;
-
-        let bus_routes = fetch_bus_routes(&bus_routes_token)
-            .await
-            .context("Failed to fetch BUSDV2 route metadata")?;
-
-        let route_geom_map = fetch_route_geometries(&bus_routes, &gtfs)
-            .await
-            .context("Failed to fetch NJT route geometries")?;
-
-        let dataset =
-            build_static_dataset(&gtfs, &route_geom_map, cached_trips, stops, &stop_remap);
+            .context("Failed to fetch NJT operating patterns")?;
+        let (gtfs, patterns) = tokio::task::spawn_blocking(move || {
+            let patterns = patterns::build_patterns(&gtfs, features);
+            (gtfs, patterns)
+        })
+        .await
+        .context("NJT pattern matching task panicked")?;
+        anyhow::ensure!(
+            !patterns.shapes.is_empty(),
+            "No valid NJT operating patterns; retaining previous import"
+        );
+        let trip_patterns = patterns.trips.clone();
+        let dataset = build_static_dataset(&gtfs, patterns, cached_trips, stops, &stop_remap);
 
         // TODO: move this to a standardized print method in StaticDataset
         #[cfg(debug_assertions)]
@@ -134,7 +131,16 @@ impl StaticAdapter for NjtBusStatic {
 
         // Publish the remap only after the canonical stops are persisted, so the
         // realtime pipeline never remaps to a stop that isn't in the DB yet.
-        static_cache_store.set_stop_remap(Source::NjtBus, stop_remap);
+        static_cache_store
+            .publish_trip_patterns(
+                Source::NjtBus,
+                TripPatternRevision {
+                    patterns: trip_patterns,
+                    stop_remap,
+                },
+            )
+            .await
+            .context("Failed to publish NJT trip patterns")?;
 
         Ok(())
     }
@@ -157,225 +163,45 @@ async fn download_gtfs(token: &str) -> anyhow::Result<Vec<u8>> {
     Ok(bytes.to_vec())
 }
 
-async fn fetch_bus_routes(token: &str) -> anyhow::Result<Vec<BusRoute>> {
-    let form = reqwest::multipart::Form::new()
-        .text("token", token.to_owned())
-        .text("mode", "ALL");
-
-    let routes = reqwest::Client::new()
-        .post(NJT_BUS_ROUTES_URL)
-        .multipart(form)
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<Vec<BusRoute>>()
-        .await?;
-
-    Ok(routes)
-}
-
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<std::collections::BTreeMap<String, Vec<u8>>> {
-    let gtfs_token = super::get_token(NjtApi::GtfsG2)
-        .await
-        .context("NJT GTFS authentication failed")?;
-    let bus_routes_token = super::get_token(NjtApi::BusDv2)
-        .await
-        .context("NJT BUSDV2 authentication failed")?;
-
-    let gtfs_zip = download_gtfs(&gtfs_token).await?;
-    let bus_routes = fetch_bus_routes(&bus_routes_token).await?;
-    let route_geometries = reqwest::Client::new()
-        .get(NJT_ARCGIS_URL)
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
-
-    let mut fixtures = std::collections::BTreeMap::new();
-    fixtures.insert("gtfs.zip".to_string(), gtfs_zip);
-    fixtures.insert(
-        "bus_routes.json".to_string(),
-        serde_json::to_vec_pretty(&bus_routes)?,
-    );
-    fixtures.insert(
-        "route_geometries.geojson".to_string(),
-        route_geometries.to_vec(),
-    );
-    Ok(fixtures)
+    let token = super::get_token().await?;
+    let gtfs_zip = download_gtfs(&token).await?;
+    let patterns = patterns::fetch_patterns().await?;
+    Ok(std::collections::BTreeMap::from([
+        ("gtfs.zip".to_string(), gtfs_zip),
+        (
+            "operating_patterns.json".to_string(),
+            serde_json::to_vec(&patterns)?,
+        ),
+    ]))
 }
 
-// ── Route geometry (ArcGIS) ───────────────────────────────────────────────────
+pub struct PatternStaticBuild {
+    pub dataset: StaticDataset,
+    pub revision: TripPatternRevision,
+}
 
-/// Fetch GeoJSON from NJT ArcGIS and return a map of route_id → MultiLineString.
-async fn fetch_route_geometries(
-    bus_routes: &[BusRoute],
+/// Pure fixture seam shared with the production import.
+pub fn build_static_dataset_from_patterns(
     gtfs: &gtfs_structures::Gtfs,
-) -> anyhow::Result<HashMap<String, MultiLineString>> {
-    let text = reqwest::Client::new()
-        .get(NJT_ARCGIS_URL)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-
-    let geojson: GeoJson = text.parse().context("Failed to parse ArcGIS GeoJSON")?;
-
-    let fc = match geojson {
-        GeoJson::FeatureCollection(fc) => fc,
-        _ => anyhow::bail!("Expected a GeoJSON FeatureCollection from ArcGIS"),
-    };
-
-    // Group line segments by route_id (LINE_STRING property)
-    let mut route_lines: HashMap<String, Vec<LineString>> = HashMap::new();
-
-    let bus_route_by_id: HashMap<String, String> = bus_routes
-        .iter()
-        .map(|route| {
-            (
-                route.bus_route_id.clone(),
-                route.bus_route_description.clone(),
-            )
-        })
-        .collect();
-
-    let gtfs_route_ids: HashSet<String> =
-        gtfs.routes.values().map(|route| route.id.clone()).collect();
-
-    let mut gtfs_route_ids_by_long_name: HashMap<String, Vec<String>> = HashMap::new();
-    for route in gtfs.routes.values() {
-        let Some(long_name) = route.long_name.as_deref() else {
-            continue;
-        };
-
-        gtfs_route_ids_by_long_name
-            .entry(route_name_key(long_name))
-            .or_default()
-            .push(route.id.clone());
+    features: Vec<PatternFeature>,
+) -> PatternStaticBuild {
+    let patterns = patterns::build_patterns(gtfs, features);
+    let trips = patterns.trips.clone();
+    let (stops, remap) = collapse_stops(gtfs);
+    PatternStaticBuild {
+        dataset: build_static_dataset(gtfs, patterns, vec![], stops, &remap),
+        revision: TripPatternRevision {
+            patterns: trips,
+            stop_remap: remap,
+        },
     }
-
-    let mut mapped_via_bus_api = 0usize;
-    let mut unresolved_line_string_ids = 0usize;
-
-    for feature in fc.features {
-        let Some(props) = &feature.properties else {
-            continue;
-        };
-        let Some(val) = props.get("LINE") else {
-            continue;
-        };
-
-        let Some(line_string_id) = val.as_u64().map(|v| v.to_string()) else {
-            warn!(value = ?val, "Unexpected non-string LINE property in ArcGIS feature; skipping");
-            continue;
-        };
-
-        // this seems to get most of the routes (newark light rail, etc). but theres still a couple gtfs routes that don't have matching geometry
-        let route_id = match map_arcgis_route_id_to_gtfs_route_id(
-            &line_string_id,
-            &bus_route_by_id,
-            &gtfs_route_ids_by_long_name,
-            &gtfs_route_ids,
-        ) {
-            Some(gtfs_route_id) => {
-                if gtfs_route_id != line_string_id {
-                    mapped_via_bus_api += 1;
-                }
-                gtfs_route_id
-            }
-            None => {
-                unresolved_line_string_ids += 1;
-                line_string_id
-            }
-        };
-
-        let Some(ref geom) = feature.geometry else {
-            continue;
-        };
-
-        match &geom.value {
-            geojson::GeometryValue::LineString { coordinates } => {
-                route_lines
-                    .entry(route_id)
-                    .or_default()
-                    .push(positions_to_linestring(coordinates));
-            }
-            geojson::GeometryValue::MultiLineString { coordinates: multi } => {
-                let lines = route_lines.entry(route_id).or_default();
-                for positions in multi {
-                    lines.push(positions_to_linestring(positions));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    if mapped_via_bus_api > 0 {
-        info!(
-            mapped_via_bus_api,
-            "Mapped ArcGIS LINE_STRING IDs to GTFS route IDs using BUSDV2 route descriptions"
-        );
-    }
-
-    if unresolved_line_string_ids > 0 {
-        warn!(
-            unresolved_line_string_ids,
-            "ArcGIS features could not be mapped via BUSDV2 metadata; keeping original LINE_STRING value"
-        );
-    }
-
-    Ok(route_lines
-        .into_iter()
-        .map(|(id, lines)| (id, MultiLineString::new(lines)))
-        .collect())
-}
-
-fn map_arcgis_route_id_to_gtfs_route_id(
-    line_string_id: &str,
-    bus_route_by_id: &HashMap<String, String>,
-    gtfs_route_ids_by_long_name: &HashMap<String, Vec<String>>,
-    gtfs_route_ids: &HashSet<String>,
-) -> Option<String> {
-    if gtfs_route_ids.contains(line_string_id) {
-        return Some(line_string_id.into());
-    }
-
-    let description = bus_route_by_id.get(line_string_id)?;
-    let candidates = gtfs_route_ids_by_long_name.get(&route_name_key(description))?;
-
-    if candidates.len() == 1 {
-        return candidates.first().cloned();
-    }
-
-    // TODO: check if this actually happens
-    candidates
-        .iter()
-        .find(|route_id| route_id.eq_ignore_ascii_case(line_string_id))
-        .cloned()
-        .or_else(|| candidates.first().cloned())
-}
-
-fn route_name_key(value: &str) -> String {
-    normalize_whitespace(value).to_ascii_lowercase()
-}
-
-fn positions_to_linestring(positions: &[geojson::Position]) -> LineString {
-    LineString::new(
-        positions
-            .iter()
-            .map(|p| geo::Coord { x: p[0], y: p[1] })
-            .collect(),
-    )
 }
 
 // ── Build routes ──────────────────────────────────────────────────────────────
 
-fn build_routes(
-    gtfs: &gtfs_structures::Gtfs,
-    _geom_map: &HashMap<String, MultiLineString>,
-) -> Vec<Route> {
+fn build_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
     gtfs.routes
         .values()
         .map(|r| {
@@ -407,17 +233,21 @@ fn build_routes(
 
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
-    route_geom_map: &HashMap<String, MultiLineString>,
-    cached_trips: Vec<crate::models::static_cache::CachedTrip>,
+    patterns: PatternDataset,
+    mut cached_trips: Vec<crate::models::static_cache::CachedTrip>,
     stops: Vec<Stop>,
     stop_remap: &HashMap<String, String>,
 ) -> StaticDataset {
+    for trip in &mut cached_trips {
+        trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
+    }
+
     StaticDataset {
         source: Source::NjtBus,
-        routes: build_routes(gtfs, route_geom_map),
+        routes: build_routes(gtfs),
         stops,
         route_stops: build_route_stops(gtfs, stop_remap),
-        shapes: vec![],
+        shapes: patterns.shapes,
         cached_trips,
     }
 }
@@ -879,6 +709,31 @@ mod tests {
         assert_eq!(stops.len(), 1);
         assert_eq!(stops[0].id, "500");
         assert!(remap.is_empty(), "1:1 stops need no remap entry");
+    }
+
+    #[test]
+    fn njt_static_geometry_is_not_discarded() {
+        let gtfs = Gtfs::from_path(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/njt_bus/static/basic/raw/patterns_gtfs.zip"
+        ))
+        .unwrap();
+        let (stops, remap) = collapse_stops(&gtfs);
+        let features: Vec<PatternFeature> = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/njt_bus/static/basic/raw/operating_patterns.json"
+        ))
+        .unwrap();
+        let dataset = build_static_dataset(
+            &gtfs,
+            patterns::build_patterns(&gtfs, features),
+            vec![],
+            stops,
+            &remap,
+        );
+        assert!(
+            !dataset.shapes.is_empty(),
+            "NJT route geometry must reach static.shape"
+        );
     }
 
     #[test]

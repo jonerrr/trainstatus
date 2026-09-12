@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type ComponentProps, onDestroy, untrack } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 
 	import { SvelteMap } from 'svelte/reactivity';
 
@@ -7,6 +7,7 @@
 
 	import type { Source } from '$lib/client';
 	import type { MapHover } from '$lib/map/hover.svelte';
+	import type { VehiclePicker } from '$lib/map/interactions';
 	import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from '$lib/map/mapTheme';
 	import {
 		type ActiveVehicle,
@@ -21,31 +22,39 @@
 		type VehicleIconRole,
 		shapeForIconKey
 	} from '$lib/map/vehicleIcons';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
 
 	import type { PickingInfo } from '@deck.gl/core';
 	import { IconLayer } from '@deck.gl/layers';
-	import { DeckGLOverlay } from '@svelte-maplibre-gl/deckgl';
+	import { MapboxOverlay } from '@deck.gl/mapbox';
+	import maplibregl from 'maplibre-gl';
+	import { getMapContext } from 'svelte-maplibre-gl';
 
 	let {
 		sources = ['mta_subway'],
-		zoom = 12,
 		hover,
 		refreshInterval = 30_000,
-		enabled = true
+		enabled = true,
+		paused = false,
+		railDetail = false,
+		busDetail = false,
+		pixelRatio = 1,
+		onPickerReady
 	}: {
 		sources?: Source[];
-		zoom?: number;
 		hover: MapHover;
 		refreshInterval?: number;
 		enabled?: boolean;
+		paused?: boolean;
+		railDetail?: boolean;
+		busDetail?: boolean;
+		pixelRatio?: number;
+		onPickerReady?: (picker: VehiclePicker | null) => void;
 	} = $props();
 
 	/**
-	 * Each vehicle has two representations, and the zoom at which we swap is the
-	 * zoom at which they happen to be the same size on screen — so the switch
-	 * reads as the shape gaining detail rather than as a pop.
+	 * Each vehicle has two size-matched representations. The parent selects the
+	 * detail mode only after a zoom gesture settles, avoiding deck attribute
+	 * invalidation for every fractional zoom value.
 	 *
 	 *  - A constant-pixel "puck": one per *trip*, with a directional nose.
 	 *  - The true-scale form: `sizeUnits: 'meters'`, one icon per render unit,
@@ -59,11 +68,9 @@
 	 * A 10-car consist is ~183m, which matches the 22px rail puck at about z14.
 	 * A 12m bus matches its 15px puck much later, at about z16.7.
 	 */
-	const RAIL_BAND = { lo: 13.6, hi: 14.6 };
-	const BUS_BAND = { lo: 16.2, hi: 17.2 };
-
 	const RAIL_PUCK_PX = 22;
 	const BUS_PUCK_PX = 15;
+	const FRAME_INTERVAL_MS = 1000 / 30;
 
 	/** Alpha applied to vehicles that are not the hovered one. */
 	const DIMMED = 0.5;
@@ -75,8 +82,6 @@
 		const parsed = Number(atParam);
 		return Number.isFinite(parsed) ? parsed : null;
 	});
-
-	const tripResources = trip_context.get();
 
 	let renderUnitsBySource = new SvelteMap<Source, RenderUnitTable>();
 
@@ -91,10 +96,10 @@
 	 * icons and sizes were regenerated 60x/second along with positions. Now only
 	 * position and angle are per-frame.
 	 *
-	 * Deliberately a plain Map, not a SvelteMap: reading it must not make the
-	 * partition derivation re-run on every frame.
+	 * A SvelteMap is safe here because animation frames mutate pooled vehicle
+	 * objects, not the map itself. Its structure changes only when sources change.
 	 */
-	const vehiclePools = new Map<Source, ActiveVehicle[]>();
+	const vehiclePools = new SvelteMap<Source, ActiveVehicle[]>();
 
 	let activeVehicleCount = $state(0);
 	/** Bumped every animation frame — positions and bearings moved. */
@@ -103,23 +108,10 @@
 	let dataVersion = $state(0);
 	let animationId: number | undefined;
 	let fetchTimer: ReturnType<typeof setInterval> | undefined;
-
-	/** Quantised so a zoom gesture rebuilds colors ~10x per level, not per frame. */
-	const zoomKey = $derived(Math.round(zoom * 10));
-
-	function smoothstep(lo: number, hi: number, x: number) {
-		const t = Math.min(1, Math.max(0, (x - lo) / (hi - lo)));
-		return t * t * (3 - 2 * t);
-	}
+	let lastAnimationAt = 0;
 
 	function isRailVehicle(vehicle: ActiveVehicle) {
 		return vehicle.iconKey === 'rail_head' || vehicle.iconKey === 'rail_car';
-	}
-
-	/** 0 = draw as a puck, 1 = draw at true scale, in between = cross-fading. */
-	function detailFraction(vehicle: ActiveVehicle, atZoom: number) {
-		const band = isRailVehicle(vehicle) ? RAIL_BAND : BUS_BAND;
-		return smoothstep(band.lo, band.hi, atZoom);
 	}
 
 	/** One puck per trip: rail consists collapse onto their head car. */
@@ -129,14 +121,15 @@
 
 	/**
 	 * Which vehicles are drawn in which representation. Rebuilt only when the
-	 * vehicle set changes or the zoom crosses into/through a fade band — never
-	 * per frame, since the pooled objects mutate in place.
+	 * vehicle set or one of the two boolean detail modes changes — never per
+	 * animation frame, since the pooled objects mutate in place.
 	 */
 	const partitions = $derived.by(() => {
-		// Tracked dependencies: a new table, a zoom change, or a source toggle.
+		// Tracked dependencies: a new table, detail mode, or source toggle.
 		const version = dataVersion;
-		const currentZoom = zoom;
 		const currentSources = sources;
+		const currentRailDetail = railDetail;
+		const currentBusDetail = busDetail;
 
 		const detail: ActiveVehicle[] = [];
 		const puck: ActiveVehicle[] = [];
@@ -146,59 +139,42 @@
 			if (!pool) continue;
 
 			for (const vehicle of pool) {
-				const fraction = detailFraction(vehicle, currentZoom);
-				if (fraction > 0) detail.push(vehicle);
-				if (fraction < 1 && isLeadUnit(vehicle)) puck.push(vehicle);
+				const detailed = isRailVehicle(vehicle) ? currentRailDetail : currentBusDetail;
+				if (detailed) detail.push(vehicle);
+				else if (isLeadUnit(vehicle)) puck.push(vehicle);
 			}
 		}
 
 		return { detail, puck, version };
 	});
 
-	function alphaFor(vehicle: ActiveVehicle, base: number, detailPass: boolean) {
-		const fraction = detailFraction(vehicle, zoom);
-		const fade = detailPass ? fraction : 1 - fraction;
+	function alphaFor(vehicle: ActiveVehicle, base: number) {
 		const dim = hover.tripId && vehicle.tripId !== hover.tripId ? DIMMED : 1;
-		return Math.round(base * fade * dim);
+		return Math.round(base * dim);
 	}
 
-	function bodyColor(
-		vehicle: ActiveVehicle,
-		detailPass: boolean
-	): [number, number, number, number] {
+	function bodyColor(vehicle: ActiveVehicle): [number, number, number, number] {
 		// Buses keep a light body too: filling them with the route colour made them
 		// disappear into the identically coloured route line they sit on.
 		const rgb = vehicle.isHead ? BODY_HEAD_RGB : BODY_RGB;
-		return [rgb[0], rgb[1], rgb[2], alphaFor(vehicle, 245, detailPass)];
+		return [rgb[0], rgb[1], rgb[2], alphaFor(vehicle, 245)];
 	}
 
-	function ringColor(
-		vehicle: ActiveVehicle,
-		detailPass: boolean
-	): [number, number, number, number] {
-		return [
-			vehicle.color[0],
-			vehicle.color[1],
-			vehicle.color[2],
-			alphaFor(vehicle, 255, detailPass)
-		];
+	function ringColor(vehicle: ActiveVehicle): [number, number, number, number] {
+		return [vehicle.color[0], vehicle.color[1], vehicle.color[2], alphaFor(vehicle, 255)];
 	}
 
-	function casingColor(
-		vehicle: ActiveVehicle,
-		detailPass: boolean
-	): [number, number, number, number] {
-		return [CASING_RGB[0], CASING_RGB[1], CASING_RGB[2], alphaFor(vehicle, 235, detailPass)];
+	function casingColor(vehicle: ActiveVehicle): [number, number, number, number] {
+		return [CASING_RGB[0], CASING_RGB[1], CASING_RGB[2], alphaFor(vehicle, 235)];
 	}
 
 	function colorFor(
 		vehicle: ActiveVehicle,
-		role: VehicleIconRole,
-		detailPass: boolean
+		role: VehicleIconRole
 	): [number, number, number, number] {
-		if (role === 'casing') return casingColor(vehicle, detailPass);
-		if (role === 'ring') return ringColor(vehicle, detailPass);
-		return bodyColor(vehicle, detailPass);
+		if (role === 'casing') return casingColor(vehicle);
+		if (role === 'ring') return ringColor(vehicle);
+		return bodyColor(vehicle);
 	}
 
 	/**
@@ -211,7 +187,6 @@
 	function iconLayers(
 		idPrefix: string,
 		data: ActiveVehicle[],
-		detailPass: boolean,
 		getSize: (vehicle: ActiveVehicle) => number,
 		sizeUnits: 'meters' | 'pixels',
 		puckShape: boolean
@@ -225,7 +200,7 @@
 					iconMapping: VEHICLE_ICON_MAPPING,
 					getIcon: (vehicle) => `${puckShape ? 'puck' : shapeForIconKey(vehicle.iconKey)}_${role}`,
 					getPosition: (vehicle) => vehicle.position,
-					getColor: (vehicle) => colorFor(vehicle, role, detailPass),
+					getColor: (vehicle) => colorFor(vehicle, role),
 					getAngle: (vehicle) => normalizeBearingForIcon(vehicle.bearing),
 					getSize,
 					sizeUnits,
@@ -239,8 +214,8 @@
 						getPosition: frameVersion,
 						getAngle: frameVersion,
 						getIcon: dataVersion,
-						getColor: [dataVersion, zoomKey, hover.tripId],
-						getSize: [dataVersion, zoomKey, hover.tripId]
+						getColor: [dataVersion, hover.tripId],
+						getSize: [dataVersion, hover.tripId]
 					}
 				})
 		);
@@ -257,7 +232,6 @@
 				...iconLayers(
 					'trip-markers-puck',
 					puck,
-					false,
 					(vehicle) => {
 						const base = isRailVehicle(vehicle) ? RAIL_PUCK_PX : BUS_PUCK_PX;
 						return vehicle.tripId === hover.tripId ? base * HOVER_SCALE : base;
@@ -273,7 +247,6 @@
 				...iconLayers(
 					'trip-markers-detail',
 					detail,
-					true,
 					(vehicle) =>
 						vehicle.tripId === hover.tripId ? vehicle.lengthM * HOVER_SCALE : vehicle.lengthM,
 					'meters',
@@ -348,42 +321,11 @@
 		hover.setVehicle(null);
 	}
 
-	async function openTripModal(tripId: string, source: Source) {
-		const tripResource = tripResources[source];
-		if (!tripResource) return;
-
-		const trip = tripResource.current?.get(tripId);
-		if (trip) {
-			open_modal({ type: 'trip', ...trip });
+	function handleDeckHover(info: PickingInfo) {
+		if (paused) {
+			hover.setVehicle(null);
 			return;
 		}
-
-		try {
-			const trips = await tripResource.whenReady();
-			const readyTrip = trips.get(tripId);
-			if (readyTrip) {
-				open_modal({ type: 'trip', ...readyTrip });
-			}
-		} catch (err) {
-			console.error('Unable to resolve trip for marker click:', err);
-		}
-	}
-
-	type DeckGLOnClick = ComponentProps<typeof DeckGLOverlay>['onClick'];
-	type DeckGLClickArgs = Parameters<NonNullable<DeckGLOnClick>>;
-	type DeckGLClickEvent = DeckGLClickArgs[1];
-
-	function handleDeckClick(info: PickingInfo, event: DeckGLClickEvent) {
-		const vehicle = info.object as ActiveVehicle | undefined;
-		if (!vehicle?.tripId) return;
-
-		event.preventDefault();
-		event.stopPropagation();
-
-		void openTripModal(vehicle.tripId, vehicle.source as Source);
-	}
-
-	function handleDeckHover(info: PickingInfo) {
 		const vehicle = info.object as ActiveVehicle | undefined;
 
 		if (vehicle?.tripId) {
@@ -441,19 +383,23 @@
 
 	let isRunning = false;
 
-	function animate() {
-		if (!enabled || renderUnitsBySource.size === 0 || fixedAt !== null) {
+	function animate(now: number) {
+		if (!enabled || paused || renderUnitsBySource.size === 0 || fixedAt !== null) {
 			isRunning = false;
 			animationId = undefined;
 			return;
 		}
-		updateAllVehiclesAtTime(Date.now() / 1000);
+		if (now - lastAnimationAt >= FRAME_INTERVAL_MS) {
+			updateAllVehiclesAtTime(Date.now() / 1000);
+			lastAnimationAt = now;
+		}
 		animationId = requestAnimationFrame(animate);
 	}
 
 	function startAnimation() {
-		if (!isRunning && enabled && renderUnitsBySource.size > 0 && fixedAt === null) {
+		if (!isRunning && enabled && !paused && renderUnitsBySource.size > 0 && fixedAt === null) {
 			isRunning = true;
+			lastAnimationAt = performance.now();
 			animationId = requestAnimationFrame(animate);
 		}
 	}
@@ -470,10 +416,12 @@
 
 	$effect(() => {
 		const currentEnabled = enabled;
+		const currentPaused = paused;
 		const hasRenderUnits = renderUnitsBySource.size > 0;
 		const currentFixedAt = fixedAt;
 
-		if (currentEnabled && hasRenderUnits && currentFixedAt === null) {
+		if (currentEnabled && !currentPaused && hasRenderUnits && currentFixedAt === null) {
+			untrack(() => updateAllVehiclesAtTime(Date.now() / 1000));
 			startAnimation();
 		} else {
 			stopAnimation();
@@ -546,18 +494,58 @@
 			}
 		};
 	});
+	// TODO: why not use deckgloverlay component from maplibre svelte?
+	// if not, then maybe make a copy with the fixes we need and use that to clean up the code
+	const mapCtx = getMapContext();
+	if (!mapCtx.map) throw new Error('Map instance is not initialized.');
+
+	let deckOverlay = $state<MapboxOverlay>();
+	const picker: VehiclePicker = {
+		pick(point, radius = 8) {
+			if (!deckOverlay || !enabled) return [];
+
+			const vehicles: ActiveVehicle[] = [];
+			for (const info of deckOverlay.pickMultipleObjects({ ...point, radius, depth: 20 })) {
+				const vehicle = info.object as ActiveVehicle | undefined;
+				if (!vehicle?.tripId) continue;
+				const key = `${vehicle.source}:${vehicle.tripId}`;
+				if (vehicles.some((candidate) => `${candidate.source}:${candidate.tripId}` === key))
+					continue;
+				vehicles.push(vehicle);
+			}
+			return vehicles;
+		}
+	};
+
+	onMount(() => {
+		deckOverlay = new MapboxOverlay({
+			interleaved: true,
+			layers: deckLayers,
+			onHover: handleDeckHover,
+			useDevicePixels: pixelRatio,
+			_pickable: enabled && !paused
+		});
+		mapCtx.map?.addControl(deckOverlay as maplibregl.IControl);
+		onPickerReady?.(picker);
+	});
+
+	$effect(() => {
+		const overlay = deckOverlay;
+		if (!overlay) return;
+		overlay.setProps({
+			layers: deckLayers,
+			onHover: handleDeckHover,
+			useDevicePixels: pixelRatio,
+			_pickable: enabled && !paused
+		});
+	});
 
 	onDestroy(() => {
 		stopAnimation();
 		if (fetchTimer !== undefined) clearInterval(fetchTimer);
+		onPickerReady?.(null);
+		if (deckOverlay && mapCtx.map?.hasControl(deckOverlay as maplibregl.IControl)) {
+			mapCtx.map.removeControl(deckOverlay as maplibregl.IControl);
+		}
 	});
 </script>
-
-{#if enabled}
-	<DeckGLOverlay
-		interleaved
-		layers={deckLayers}
-		onClick={handleDeckClick}
-		onHover={handleDeckHover}
-	/>
-{/if}

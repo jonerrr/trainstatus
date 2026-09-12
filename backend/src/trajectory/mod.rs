@@ -1,3 +1,5 @@
+// TODO: review the structure of this module and consider if it can be simplified or reorganized.
+
 pub mod arrow;
 pub mod builder;
 pub mod builders;

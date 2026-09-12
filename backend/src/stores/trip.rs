@@ -116,14 +116,10 @@ impl TripStore {
 
     /// Return PostGIS-prepared trajectory inputs for active trips.
     ///
-    /// This pushes per-trip shape assembly and stop projection to SQL so the
-    /// handler can focus on interpolation and response shaping.
-    ///
-    /// For sources where GTFS-RT provides `shape_ids` on the trip (e.g. MTA Subway),
-    /// those are used directly. For sources that do not (e.g. MTA Bus), we fall back
-    /// to picking the best-fitting shape from the route's stored shape_ids
-    /// (populated at static import time from the Helium infrastructure API).
-    /// "Best" = the shape with the smallest average ST_Distance to the trip's stops.
+    /// Shape binding is data-driven (no per-source flags):
+    /// - nonempty `trip.shape_ids` → merge those geometries in order
+    /// - else nonempty `route.data.shape_ids` → score via stop membership / distance
+    /// - else → no geometry
     pub async fn get_trajectory_inputs(
         &self,
         source: Source,
@@ -132,7 +128,6 @@ impl TripStore {
     ) -> anyhow::Result<Vec<TrajectoryInputRow>> {
         let route_ids_vec: Vec<String> = route_ids.map(|r| r.to_vec()).unwrap_or_default();
         let has_route_filter = !route_ids_vec.is_empty();
-
         Ok(sqlx::query_as::<_, TrajectoryInputRow>(
             r#"
             WITH filtered_trips AS (
@@ -156,9 +151,7 @@ impl TripStore {
                     )
                     AND ($4 = false OR t.route_id = ANY($3))
             ),
-            -- Determine effective shape_ids per trip:
-            -- If the trip itself has shape_ids (e.g. subway), use those directly.
-            -- Otherwise fall back to the route-level shape_ids stored in static.route.data.
+            -- Trip shapes win; otherwise use route-level candidates when present.
             trip_shape_candidates AS (
                 SELECT
                     ft.id AS trip_id,
@@ -174,7 +167,13 @@ impl TripStore {
                             THEN ft.shape_ids
                         ELSE
                             ARRAY(
-                                SELECT jsonb_array_elements_text(r.data->'shape_ids')
+                                SELECT jsonb_array_elements_text(
+                                    CASE
+                                        WHEN jsonb_typeof(r.data->'shape_ids') = 'array'
+                                            THEN r.data->'shape_ids'
+                                        ELSE '[]'::jsonb
+                                    END
+                                )
                             )
                     END AS effective_shape_ids
                 FROM filtered_trips ft
@@ -405,7 +404,8 @@ impl TripStore {
         // matching on the unique constraint columns.
         // Note: shape_ids are passed as jsonb and converted to varchar[] in SQL
         // because UNNEST doesn't handle array-of-arrays well.
-        let records  = sqlx::query!(
+        // TODO: are mta bus trip shapes actually flakey? if not we can simplify the shape_ids update logic and just always use the incoming shape_ids if present.
+        let records = sqlx::query_as::<_, (Uuid, Uuid)>(
             r#"
             WITH input_rows AS (
                 SELECT
@@ -431,10 +431,23 @@ impl TripStore {
                  ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
                     data = EXCLUDED.data,
                     updated_at = EXCLUDED.updated_at,
+                    -- Nonempty incoming wins. Empty incoming clears unless the route
+                    -- publishes shape candidates (MTA bus), in which case keep the
+                    -- previously resolved trip shape across flaky empty updates.
                     shape_ids = CASE
-                        WHEN EXCLUDED.shape_ids IS NOT NULL AND array_length(EXCLUDED.shape_ids, 1) > 0
-                        THEN EXCLUDED.shape_ids
-                        ELSE realtime.trip.shape_ids
+                        WHEN EXCLUDED.shape_ids IS NOT NULL
+                             AND array_length(EXCLUDED.shape_ids, 1) > 0
+                            THEN EXCLUDED.shape_ids
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM static.route r
+                            WHERE r.id = EXCLUDED.route_id
+                              AND r.source = EXCLUDED.source
+                              AND jsonb_typeof(r.data->'shape_ids') = 'array'
+                              AND jsonb_array_length(r.data->'shape_ids') > 0
+                        )
+                            THEN realtime.trip.shape_ids
+                        ELSE EXCLUDED.shape_ids
                     END
                 RETURNING id, original_id, vehicle_id, created_at, direction
             )
@@ -448,24 +461,24 @@ impl TripStore {
                 inserted_rows.created_at = input_rows.created_at AND
                 inserted_rows.direction = input_rows.direction
             "#,
-            &input_ids,
-            &original_ids,
-            &vehicle_ids,
-            &route_ids,
-            &shape_ids_json,
-            &sources as &[Source],
-            &directions as &[i16],
-            &created_ats,
-            &updated_ats,
-            &trip_data
         )
+        .bind(&input_ids)
+        .bind(&original_ids)
+        .bind(&vehicle_ids)
+        .bind(&route_ids)
+        .bind(&shape_ids_json)
+        .bind(&sources)
+        .bind(&directions)
+        .bind(&created_ats)
+        .bind(&updated_ats)
+        .bind(&trip_data)
         .fetch_all(&self.pg_pool)
         .await?;
 
         // Create a map for quick lookup
         let id_map: HashMap<Uuid, Uuid> = records
             .into_iter()
-            .filter_map(|r| r.input_id.map(|id| (id, r.actual_id)))
+            .map(|(actual_id, input_id)| (input_id, actual_id))
             .collect();
 
         // Prepare stop times for bulk insert

@@ -1,3 +1,4 @@
+// TODO: move this to tests folder (or standardize how tests are stored in some other way)
 #[cfg(test)]
 mod collapse_tests {
     use super::super::builder::collapse_backtracking_knots_with_stats;

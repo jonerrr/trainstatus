@@ -64,6 +64,8 @@ export const source_info = {
 	}
 } as const;
 
+export const all_sources = Object.keys(source_info) as Source[];
+
 // =============================================================================
 // SOURCE-SPECIFIC DATA MAPS
 // Define the discriminated union mapping for each entity type

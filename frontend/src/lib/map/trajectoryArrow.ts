@@ -1,3 +1,5 @@
+import type { Source } from '$lib/client';
+
 import { type Table, type Vector, tableFromIPC } from 'apache-arrow';
 
 export interface RenderUnitTable {
@@ -20,7 +22,7 @@ export interface RenderUnitTable {
 
 export interface ActiveVehicle {
 	renderUnitId: string;
-	source: string;
+	source: Source;
 	tripId: string;
 	routeId: string;
 	iconKey: string;
@@ -114,11 +116,13 @@ export function buildActiveVehiclesAtTime(
 		const bearing = interpolateBearing(bearings, bounds.lower, bounds.upper, bounds.ratio);
 		if (!position || bearing === null) continue;
 
+		const source = renderUnits.source.get(row) satisfies Source;
+
 		let vehicle = target[count];
 		if (!vehicle) {
 			vehicle = {
 				renderUnitId: '',
-				source: '',
+				source: 'mta_subway',
 				tripId: '',
 				routeId: '',
 				iconKey: '',
@@ -135,7 +139,7 @@ export function buildActiveVehiclesAtTime(
 		}
 
 		vehicle.renderUnitId = String(renderUnits.renderUnitId.get(row) ?? '');
-		vehicle.source = String(renderUnits.source.get(row) ?? '');
+		vehicle.source = source;
 		vehicle.tripId = String(renderUnits.tripId.get(row) ?? '');
 		vehicle.routeId = String(renderUnits.routeId.get(row) ?? '');
 		vehicle.iconKey = String(renderUnits.iconKey.get(row) ?? '');

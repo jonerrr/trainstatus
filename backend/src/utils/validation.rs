@@ -280,17 +280,19 @@ fn missing_shape_references(dataset: &StaticDataset, shape_ids: &HashSet<String>
     dataset
         .routes
         .iter()
-        .flat_map(|route| match &route.data {
-            RouteData::MtaBus(data) => data
-                .shape_ids
-                .iter()
-                .filter_map(|shape_id| {
-                    let normalized = shape_id.to_uppercase();
-                    (!shape_ids.contains(&normalized))
-                        .then_some(format!("route:{} shape:{}", route.id, shape_id))
+        .flat_map(|route| {
+            let ids = match &route.data {
+                // Only MTA bus publishes route-level shape candidates for trajectory
+                // resolution. Subway/NJT bind shapes on the trip alone.
+                RouteData::MtaBus(data) => &data.shape_ids,
+                _ => return Vec::new(),
+            };
+            ids.iter()
+                .filter_map(|id| {
+                    (!shape_ids.contains(&id.to_uppercase()))
+                        .then_some(format!("route:{} shape:{}", route.id, id))
                 })
-                .collect::<Vec<_>>(),
-            _ => Vec::new(),
+                .collect::<Vec<_>>()
         })
         .collect()
 }

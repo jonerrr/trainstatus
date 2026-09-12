@@ -453,6 +453,7 @@ impl AlertStore {
             // Deduplicate affected entities by (alert_id, route_id, source, stop_id) - last one wins
             // This is needed because stop ID stripping (e.g. A01N/A01S -> A01) can produce duplicates
             let mut seen_entity_keys = std::collections::HashSet::new();
+            let mut duplicate_entity_count = 0;
             let deduped_entities: Vec<_> = affected_entities
                 .iter()
                 .filter(|ae| {
@@ -465,16 +466,21 @@ impl AlertStore {
                             ae.stop_id.as_ref().map(|s| s.to_uppercase()),
                         );
                         if !seen_entity_keys.insert(key) {
-                            tracing::warn!(
-                                "Duplicate affected entity key (alert_id={}, route_id={:?}, source={:?}, stop_id={:?}) - skipping",
-                                id, ae.route_id, ae.source, ae.stop_id
-                            );
+                            duplicate_entity_count += 1;
                             return false;
                         }
                     }
                     true
                 })
                 .collect();
+
+            if duplicate_entity_count > 0 {
+                tracing::warn!(
+                    source = %source,
+                    count = duplicate_entity_count,
+                    "Skipped duplicate affected entities"
+                );
+            }
 
             let alert_ids = deduped_entities
                 .iter()

@@ -52,6 +52,7 @@
 	"dependencies": {
 		"@deck.gl/core": "9.3.1",
 		"@deck.gl/layers": "9.3.1",
+		"@deck.gl/mapbox": "9.3.2",
 		"@fontsource/inter": "^5.2.8",
 		"@lucide/svelte": "^1.8.0",
 		"@tailwindcss/vite": "^4.2.4",

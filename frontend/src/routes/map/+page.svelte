@@ -1,11 +1,20 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	import { page } from '$app/state';
 
 	import type { Source } from '$lib/client';
+	import FeatureChooser from '$lib/map/FeatureChooser.svelte';
 	import Filters from '$lib/map/Filters.svelte';
 	import TripMarkersLoader from '$lib/map/TripMarkersLoader.svelte';
 	import { MapFilters } from '$lib/map/filters.svelte';
 	import { MapHover } from '$lib/map/hover.svelte';
+	import {
+		MapInteractionController,
+		type MapTarget,
+		type ScreenPoint,
+		type VehiclePicker
+	} from '$lib/map/interactions';
 	import {
 		BUS_SOURCE_FILTER,
 		BUS_STOP_FILL,
@@ -27,6 +36,8 @@
 		SUBWAY_SOURCE_FILTER,
 		normalizeRouteColor
 	} from '$lib/map/mapTheme';
+	import { source_info } from '$lib/resources/index.svelte';
+	import { trip_context } from '$lib/resources/trips.svelte';
 	import { open_modal } from '$lib/url_params.svelte';
 
 	import maplibregl from 'maplibre-gl';
@@ -36,12 +47,32 @@
 		GeolocateControl,
 		LineLayer,
 		MapLibre,
+		NavigationControl,
 		SymbolLayer,
 		VectorTileSource
 	} from 'svelte-maplibre-gl';
 
 	let map = $state<maplibregl.Map>();
 	let zoom = $state(12);
+	let bearing = $state(0);
+	let settledZoom = $state(12);
+	let pixelRatio = $state(1);
+	let cameraMoving = $state(false);
+
+	const HOME_CENTER: [number, number] = [-74.006, 40.7128];
+	// TODO: is this even needed? martin returns ETags for caching
+	const BASEMAP_STYLE_REVISION = 'transit-v2';
+	const RAIL_DETAIL_ZOOM = 14.1;
+	const BUS_DETAIL_ZOOM = 16.7;
+	const ROUTE_HIT_LAYERS = ['route-hit-layer'];
+	const STOP_HIT_LAYERS = ['stop-subway-hit-layer', 'stop-bus-hit-layer'];
+
+	const interactionController = new MapInteractionController();
+	const tripResources = trip_context.get();
+	const railDetail = $derived(settledZoom >= RAIL_DETAIL_ZOOM);
+	const busDetail = $derived(settledZoom >= BUS_DETAIL_ZOOM);
+
+	let chooser = $state<{ targets: MapTarget[]; point: ScreenPoint } | null>(null);
 
 	/**
 	 * Pointer affordance. MapLibre's own stylesheet puts `cursor: grab` on
@@ -56,11 +87,37 @@
 		container.classList.toggle('maplibregl-track-pointer', hover.cursor === 'pointer');
 	});
 
+	// TODO: why do we need a custom pixel ratio handler thing? maplibre already calculates pixel ratio internally
+	onMount(() => {
+		pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+	});
+
+	$effect(() => {
+		const currentMap = map;
+		if (!currentMap) return;
+		currentMap.touchZoomRotate.disableRotation();
+		currentMap.keyboard.disableRotation();
+	});
+
 	let filters = $state(new MapFilters());
 	const hover = new MapHover();
 
 	let viewportWidth = $state(0);
 	let viewportHeight = $state(0);
+
+	$effect(() => {
+		// Closing transient interaction state from one place prevents a hover or
+		// chooser from referring to layers that a filter just removed.
+		filters.sources;
+		filters.layers.route;
+		filters.layers.stop;
+		filters.layers.trip;
+		filters.route;
+		filters.stop;
+		filters.trip;
+		hover.clear();
+		chooser = null;
+	});
 
 	/**
 	 * Matches the route currently being emphasised. When nothing is hovered this
@@ -100,29 +157,65 @@
 
 	// Shared by both stop hit layers. Stops outrank routes in MapHover, so
 	// hovering a bead near a line clears the line's hover rather than fighting it.
-	function handleStopHover(e: { features?: maplibregl.MapGeoJSONFeature[] }) {
-		const feat = e.features?.[0]?.properties;
-		if (!feat || hover.stop?.stopId === feat.id) return;
-		hover.setStop({ kind: 'stop', stopId: feat.id, source: feat.source });
-	}
-
-	function handleStopClick(e: { features?: maplibregl.MapGeoJSONFeature[] }) {
-		// Deck.gl's vehicle layer and MapLibre's own layers are separate listeners
-		// on the same canvas click, so clicking a vehicle sitting on a stop also
-		// lands here. A vehicle hover — set by the last mousemove, which always
-		// precedes a click at the same point — takes priority, same as MapHover
-		// already enforces for hover state itself.
-		if (hover.vehicle) return;
+	function handleStopHover(e: maplibregl.MapLayerMouseEvent) {
+		if (cameraMoving) return;
 		const feat = e.features?.[0]?.properties;
 		if (!feat) return;
-		const stop = page.data.stops_by_id?.[feat.source as Source]?.[feat.id];
-		if (!stop) return;
-		open_modal({ type: 'stop', ...stop });
+		const source = feat.source as Source;
+		const stopId = String(feat.id);
+		const currentStop = hover.stop;
+		if (
+			currentStop &&
+			currentStop.stopId === stopId &&
+			currentStop.source === source &&
+			currentStop.x === e.point.x &&
+			currentStop.y === e.point.y
+		)
+			return;
+		hover.setStop({
+			kind: 'stop',
+			stopId,
+			source,
+			x: e.point.x,
+			y: e.point.y
+		});
+	}
+
+	function handleRouteHover(e: maplibregl.MapLayerMouseEvent) {
+		if (cameraMoving) return;
+		const feat = e.features?.[0]?.properties;
+		if (!feat) return;
+		const source = feat.source as Source;
+		const routeId = String(feat.id);
+		const currentRoute = hover.route;
+		if (
+			currentRoute &&
+			currentRoute.routeId === routeId &&
+			currentRoute.source === source &&
+			currentRoute.x === e.point.x &&
+			currentRoute.y === e.point.y
+		)
+			return;
+		hover.setRoute({
+			kind: 'route',
+			routeId,
+			source,
+			x: e.point.x,
+			y: e.point.y
+		});
 	}
 
 	const hoveredRoute = $derived(
-		hover.vehicle
-			? page.data.routes_by_id?.[hover.vehicle.source as Source]?.[hover.vehicle.routeId]
+		hover.active?.kind === 'vehicle'
+			? page.data.routes_by_id?.[hover.active.source]?.[hover.active.routeId]
+			: hover.active?.kind === 'route'
+				? page.data.routes_by_id?.[hover.active.source]?.[hover.active.routeId]
+				: undefined
+	);
+
+	const hoveredStop = $derived(
+		hover.active?.kind === 'stop'
+			? page.data.stops_by_id?.[hover.active.source]?.[hover.active.stopId]
 			: undefined
 	);
 
@@ -133,22 +226,122 @@
 	const TOOLTIP_GAP = 15;
 
 	const tooltipLeft = $derived.by(() => {
-		const x = hover.vehicle?.x ?? 0;
+		const x = hover.active?.x ?? 0;
 		return viewportWidth && x + TOOLTIP_GAP + TOOLTIP_WIDTH > viewportWidth
 			? Math.max(0, x - TOOLTIP_GAP - TOOLTIP_WIDTH)
 			: x + TOOLTIP_GAP;
 	});
 
 	const tooltipTop = $derived.by(() => {
-		const y = hover.vehicle?.y ?? 0;
+		const y = hover.active?.y ?? 0;
 		return viewportHeight && y + TOOLTIP_GAP + TOOLTIP_HEIGHT > viewportHeight
 			? Math.max(0, y - TOOLTIP_GAP - TOOLTIP_HEIGHT)
 			: y + TOOLTIP_GAP;
 	});
+
+	function targetsFromMap(point: ScreenPoint): MapTarget[] {
+		if (!map) return [];
+		const layerIds = [...STOP_HIT_LAYERS, ...ROUTE_HIT_LAYERS].filter((id) => map?.getLayer(id));
+		if (layerIds.length === 0) return [];
+
+		return map
+			.queryRenderedFeatures([point.x, point.y], { layers: layerIds })
+			.flatMap((feature): MapTarget[] => {
+				const id = String(feature.properties?.id ?? '');
+				const source = feature.properties?.source as Source;
+				if (!id) return [];
+
+				if (feature.layer.id.startsWith('stop-')) {
+					const stop = page.data.stops_by_id[source]?.[id];
+					if (!stop) return [];
+					return [
+						{
+							kind: 'stop',
+							id,
+							source,
+							label: stop.name,
+							subtitle: `${source_info[source].name} stop`
+						}
+					];
+				}
+
+				const route = page.data.routes_by_id[source]?.[id];
+				if (!route) return [];
+				return [
+					{
+						kind: 'route',
+						id,
+						source,
+						label: route.short_name || route.long_name,
+						subtitle: route.long_name
+					}
+				];
+			});
+	}
+
+	async function openTarget(target: MapTarget) {
+		chooser = null;
+
+		if (target.kind === 'stop') {
+			const stop = page.data.stops_by_id[target.source]?.[target.id];
+			if (stop) open_modal({ type: 'stop', ...stop });
+			return;
+		}
+
+		if (target.kind === 'route') {
+			const route = page.data.routes_by_id[target.source]?.[target.id];
+			if (route) open_modal({ type: 'route', ...route });
+			return;
+		}
+
+		const resource = tripResources[target.source];
+		if (!resource) return;
+		try {
+			const trip = resource.current?.get(target.id) ?? (await resource.whenReady()).get(target.id);
+			if (trip) open_modal({ type: 'trip', ...trip });
+		} catch (error) {
+			console.error('Unable to resolve trip for map selection:', error);
+		}
+	}
+
+	function handleMapClick(event: maplibregl.MapMouseEvent) {
+		const point = { x: event.point.x, y: event.point.y };
+		const resolution = interactionController.resolve(point, targetsFromMap(point));
+		if (resolution.kind === 'none') {
+			chooser = null;
+			return;
+		}
+		if (resolution.kind === 'open') {
+			void openTarget(resolution.target);
+			return;
+		}
+		chooser = { targets: resolution.targets, point };
+	}
+	// TODO: why so many custom handlers?
+	function handleMoveStart() {
+		cameraMoving = true;
+		hover.clear();
+		chooser = null;
+	}
+
+	function handleMoveEnd() {
+		settledZoom = map?.getZoom() ?? zoom;
+		cameraMoving = false;
+	}
+	// TODO: is this even being used?
+	function handleMapIdle() {
+		window.dispatchEvent(new Event('trainstatus:map-idle'));
+	}
+	// TODO: why is this being passed to tripmarkersloader?
+	function registerVehiclePicker(picker: VehiclePicker | null) {
+		interactionController.registerVehiclePicker(picker);
+	}
 </script>
 
 <div
 	class="relative flex w-full h-full"
+	data-map-zoom={zoom}
+	data-map-bearing={bearing}
 	bind:clientWidth={viewportWidth}
 	bind:clientHeight={viewportHeight}
 >
@@ -157,14 +350,27 @@
 	<MapLibre
 		bind:map
 		bind:zoom
-		center={[-74.006, 40.7128]}
+		bind:bearing
+		center={HOME_CENTER}
 		class="size-full"
 		autoloadGlobalCss={false}
-		style="{page.url.origin}/martin/style/dark-matter.json"
+		style={`${page.url.origin}/martin/style/dark-matter.json?v=${BASEMAP_STYLE_REVISION}`}
+		minZoom={7}
+		maxZoom={20}
+		maxPitch={0}
+		pitch={0}
+		dragRotate={false}
+		touchPitch={false}
+		renderWorldCopies={false}
+		{pixelRatio}
+		onclick={handleMapClick}
+		onidle={handleMapIdle}
+		onmovestart={handleMoveStart}
+		onmoveend={handleMoveEnd}
 	>
-		<!-- TODO: adjust bounds -->
+		<NavigationControl position="top-right" showCompass={false} visualizePitch={false} />
 		<GeolocateControl
-			position="bottom-left"
+			position="top-right"
 			trackUserLocation
 			showAccuracyCircle
 			showUserLocation
@@ -254,26 +460,8 @@
 						'line-width': ROUTE_HIT_WIDTH,
 						'line-opacity': 0
 					}}
-					onmousemove={(e) => {
-						const feat = e.features?.[0]?.properties;
-						if (!feat) return;
-						// Skip redundant writes: re-setting identical hover state on every
-						// mousemove would rebuild the paint expressions continuously.
-						if (hover.route?.routeId === feat.id && hover.route?.source === feat.source) return;
-						hover.setRoute({ kind: 'route', routeId: feat.id, source: feat.source });
-					}}
+					onmousemove={handleRouteHover}
 					onmouseleave={() => hover.clearRoute()}
-					onclick={(e) => {
-						// See handleStopClick: a vehicle sitting on this line receives the
-						// same native click via deck.gl's independent listener, so without
-						// this guard both the trip and route modals open off one click.
-						if (hover.vehicle) return;
-						const feat = e.features?.[0]?.properties;
-						if (!feat) return;
-						const route = page.data.routes_by_id?.[feat.source as Source]?.[feat.id];
-						if (!route) return;
-						open_modal({ type: 'route', ...route });
-					}}
 				/>
 			</VectorTileSource>
 		{/if}
@@ -338,7 +526,6 @@
 					paint={{ 'circle-radius': STOP_HIT_RADIUS, 'circle-opacity': 0 }}
 					onmousemove={handleStopHover}
 					onmouseleave={() => hover.setStop(null)}
-					onclick={handleStopClick}
 				/>
 
 				<CircleLayer
@@ -350,7 +537,6 @@
 					paint={{ 'circle-radius': BUS_STOP_HIT_RADIUS, 'circle-opacity': 0 }}
 					onmousemove={handleStopHover}
 					onmouseleave={() => hover.setStop(null)}
-					onclick={handleStopClick}
 				/>
 
 				<SymbolLayer
@@ -398,49 +584,100 @@
 		{/if}
 
 		{#if filters.layers['trip'] && filters.sources.length > 0}
-			<TripMarkersLoader sources={filters.sources} {zoom} {hover} enabled />
+			<!-- TODO: why are we pausing on camera move? -->
+			<TripMarkersLoader
+				sources={filters.sources}
+				{hover}
+				paused={cameraMoving}
+				{railDetail}
+				{busDetail}
+				{pixelRatio}
+				onPickerReady={registerVehiclePicker}
+				enabled
+			/>
 		{/if}
 	</MapLibre>
 
-	{#if hover.vehicle && hoveredRoute}
+	{#if chooser}
+		<FeatureChooser
+			targets={chooser.targets}
+			point={chooser.point}
+			{viewportWidth}
+			{viewportHeight}
+			onselect={(target) => void openTarget(target)}
+			ondismiss={() => (chooser = null)}
+		/>
+	{/if}
+
+	<!-- TODO: improve tooltip ui/ux -->
+	{#if hover.active && (hoveredRoute || hoveredStop)}
 		<div
 			class="pointer-events-none absolute z-9999 flex flex-col gap-1.5 rounded-lg border border-neutral-800 bg-neutral-950/90 p-3 text-xs text-white shadow-2xl backdrop-blur-md"
+			data-map-tooltip-kind={hover.active.kind}
 			style="left: {tooltipLeft}px; top: {tooltipTop}px; width: {TOOLTIP_WIDTH}px;"
 		>
-			<div class="flex items-center gap-2">
-				<!-- Route Pill/Badge -->
-				<div
-					class="flex size-6 shrink-0 items-center justify-center rounded-full text-center text-sm font-black text-white"
-					style="background-color: {normalizeRouteColor(hoveredRoute.color)};"
-				>
-					{hoveredRoute.short_name}
-				</div>
-				<div class="flex min-w-0 flex-col">
-					<span class="truncate font-semibold text-neutral-100">{hoveredRoute.long_name}</span>
-					<span class="text-[10px] text-neutral-400 capitalize">
-						{hover.vehicle.source.replace('_', ' ')}
+			{#if hoveredStop && hover.active.kind === 'stop'}
+				<div class="flex min-w-0 flex-col gap-0.5">
+					<span class="truncate font-semibold text-neutral-100">{hoveredStop.name}</span>
+					<span class="text-[10px] text-neutral-400">
+						{source_info[hover.active.source].name} stop · {hoveredStop.id}
 					</span>
 				</div>
-			</div>
-
-			<div class="h-px bg-neutral-800 my-0.5"></div>
-
-			<div class="flex flex-col gap-1 text-[11px] text-neutral-300">
-				<div class="truncate">
-					<span class="text-neutral-500">Trip ID:</span>
-					<code class="rounded bg-neutral-900 px-1 py-0.5 text-neutral-200">
-						{hover.vehicle.tripId}
-					</code>
-				</div>
-				{#if hover.vehicle.vehicle.passengers !== null && hover.vehicle.vehicle.passengers !== undefined}
-					<div>
-						<span class="text-neutral-500">Occupancy:</span>
-						<span class="text-neutral-200 font-medium">
-							{hover.vehicle.vehicle.passengers} pax
+			{:else if hoveredRoute}
+				<div class="flex items-center gap-2">
+					<div
+						class="flex size-6 shrink-0 items-center justify-center rounded-full text-center text-sm font-black text-white"
+						style="background-color: {normalizeRouteColor(hoveredRoute.color)};"
+					>
+						{hoveredRoute.short_name}
+					</div>
+					<div class="flex min-w-0 flex-col">
+						<span class="truncate font-semibold text-neutral-100">{hoveredRoute.long_name}</span>
+						<span class="text-[10px] text-neutral-400">
+							{source_info[hover.active.source].name}
+							{hover.active.kind === 'vehicle' ? 'vehicle' : 'route'}
 						</span>
 					</div>
+				</div>
+
+				{#if hover.active.kind === 'vehicle'}
+					<div class="my-0.5 h-px bg-neutral-800"></div>
+					<div class="flex flex-col gap-1 text-[11px] text-neutral-300">
+						<div class="truncate">
+							<span class="text-neutral-500">Trip ID:</span>
+							<code class="rounded bg-neutral-900 px-1 py-0.5 text-neutral-200">
+								{hover.active.tripId}
+							</code>
+						</div>
+						{#if hover.active.vehicle.passengers !== null && hover.active.vehicle.passengers !== undefined}
+							<div>
+								<span class="text-neutral-500">Occupancy:</span>
+								<span class="font-medium text-neutral-200">
+									{hover.active.vehicle.passengers} pax
+								</span>
+							</div>
+						{/if}
+					</div>
 				{/if}
-			</div>
+			{/if}
 		</div>
 	{/if}
 </div>
+
+<style>
+	:global(.maplibregl-ctrl-top-right) {
+		top: 0.375rem;
+		right: 0.375rem;
+	}
+
+	:global(.maplibregl-ctrl-top-right .maplibregl-ctrl) {
+		margin: 0 0 0.25rem;
+	}
+
+	:global(.maplibregl-ctrl-group) {
+		overflow: hidden;
+		border: 1px solid rgb(82 82 82 / 0.5);
+		border-radius: 0.4rem;
+		box-shadow: 0 3px 12px rgb(0 0 0 / 0.2);
+	}
+</style>

@@ -8,7 +8,7 @@ import type { ActiveVehicle } from '$lib/map/trajectoryArrow';
 export interface VehicleHover {
 	kind: 'vehicle';
 	routeId: string;
-	source: string;
+	source: Source;
 	tripId: string;
 	vehicle: ActiveVehicle;
 	x: number;
@@ -18,13 +18,17 @@ export interface VehicleHover {
 export interface StopHover {
 	kind: 'stop';
 	stopId: string;
-	source: string;
+	source: Source;
+	x: number;
+	y: number;
 }
 
 export interface RouteHover {
 	kind: 'route';
 	routeId: string;
-	source: string;
+	source: Source;
+	x: number;
+	y: number;
 }
 
 export type HoverTarget = VehicleHover | StopHover | RouteHover;
@@ -81,15 +85,20 @@ export class MapHover {
 		this.route = null;
 	}
 
+	clear() {
+		this.vehicle = null;
+		this.stop = null;
+		this.route = null;
+	}
+
 	/**
 	 * Drop any hover belonging to a source that is no longer selected. Without
 	 * this a hover latched onto a de-selected source can never be cleared, since
 	 * its layer stops receiving mouse events entirely.
 	 */
 	pruneSources(sources: readonly Source[]) {
-		const keep = (source: string) => sources.includes(source as Source);
-		if (this.vehicle && !keep(this.vehicle.source)) this.vehicle = null;
-		if (this.stop && !keep(this.stop.source)) this.stop = null;
-		if (this.route && !keep(this.route.source)) this.route = null;
+		if (this.vehicle && !sources.includes(this.vehicle.source)) this.vehicle = null;
+		if (this.stop && !sources.includes(this.stop.source)) this.stop = null;
+		if (this.route && !sources.includes(this.route.source)) this.route = null;
 	}
 }

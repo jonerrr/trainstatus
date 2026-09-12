@@ -201,12 +201,12 @@ export const BUS_STOP_HIT_RADIUS: maplibregl.ExpressionSpecification = [
  * slot instead of on top of everything.
  *
  * These are real layers in geo/styles/dark-matter.json, listed here in ascending
- * z-order: `waterway_label` (66) is the bottom of the basemap label stack,
- * `watername_ocean` (67) sits just above it, `place_hamlet` (71) above that.
+ * z-order: `waterway_label` is the bottom of the basemap label stack,
+ * `watername_ocean` sits just above it, and `place_hamlet` above that.
  * Anchoring to existing layers avoids having to mount invisible placeholders.
  */
 export const SLOT = {
-	/** Above roads and buildings, below every basemap label. */
+	/** Above roads, below every basemap label. */
 	routes: 'waterway_label',
 	/** Above the route lines. */
 	stops: 'watername_ocean',

@@ -1,4 +1,4 @@
-import type { Route, RouteStop, Stop } from '$lib/client';
+import type { Route, RouteStop, Stop, StopTime, Trip } from '$lib/client';
 import { calculateTextHeight } from '$lib/text_measurement';
 
 /**
@@ -15,6 +15,39 @@ export function bus_headsign(route: Route | undefined, direction: number): strin
 	if (!match) return undefined;
 
 	return match.via?.length ? `${match.destination} via ${match.via.join('/')}` : match.destination;
+}
+
+/** Resolve destinations identically in trip cards and stop arrivals. */
+export function trip_headsign(
+	trip: Trip,
+	route: Route | undefined,
+	stop_times: readonly StopTime[] = [],
+	stops: Record<string, Stop> = {}
+): string {
+	if (trip.data.source === 'mta_bus') {
+		return bus_headsign(route, trip.direction) || 'Unknown';
+	}
+
+	if (trip.data.source === 'njt_bus') {
+		const headsign = trip.data.headsign;
+		if (headsign) return headsign;
+
+		// Static route-stop labels may describe the opposite direction or a
+		// different branch. Only use labels on this trip in its own direction.
+		for (const st of stop_times) {
+			const route_stop = stops[st.stop_id]?.routes.find(
+				(rs) =>
+					rs.route_id === trip.route_id &&
+					rs.data.source === 'njt_bus' &&
+					rs.data.direction === trip.direction &&
+					rs.data.headsign
+			);
+			if (route_stop?.data.source === 'njt_bus') return route_stop.data.headsign;
+		}
+	}
+
+	const last_stop = stop_times[stop_times.length - 1];
+	return (last_stop && stops[last_stop.stop_id]?.name) || 'Unknown';
 }
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/

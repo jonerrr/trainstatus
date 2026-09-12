@@ -17,7 +17,17 @@
       "name": "route_geometries",
       "path": "raw/route_geometries.geojson",
       "format": "geojson"
+    },
+    {
+      "name": "operating_patterns",
+      "path": "raw/operating_patterns.json",
+      "format": "json"
+    },
+    {
+      "name": "patterns_gtfs",
+      "path": "raw/patterns_gtfs.zip",
+      "format": "zip"
     }
   ],
-  "notes": "Captured by backend fixture CLI."
+  "notes": "Original full GTFS capture plus three public operating patterns captured 2026-09-07 and a matching GTFS slice for fast geometry regression tests."
 }

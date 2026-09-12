@@ -140,6 +140,16 @@ async fn refresh_source(
         .collect();
 
     let results: Vec<_> = join_all(futures).await.into_iter().flatten().collect();
+    let gps_anchored = results
+        .iter()
+        .filter(|(item, _)| item.knot_stats.live_anchor_gap_m.is_some())
+        .count();
+    info!(
+        source = %source,
+        gps_anchored,
+        schedule_only = results.len() - gps_anchored,
+        "trajectory coverage"
+    );
 
     let mut render_units = HashMap::new();
     let mut prev_states = HashMap::new();

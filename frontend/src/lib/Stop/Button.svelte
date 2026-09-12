@@ -10,7 +10,7 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
-	import { bus_headsign, main_route_stops } from '$lib/util.svelte';
+	import { main_route_stops, trip_headsign } from '$lib/util.svelte';
 
 	type StopTimeWithETA = StopTime & { eta: number };
 	type StopTimesByRoute = SvelteMap<string, StopTimeWithETA[]>;
@@ -190,12 +190,20 @@
 			{#each stop.routes as route_stop (route_stop.route_id)}
 				{@const route = routes[route_stop.route_id]}
 				{@const next = next_direction(route_stop.route_id)}
+				<!-- TODO: simplify this -->
+				{@const next_st = next?.times.reduce((a, b) => (a.eta <= b.eta ? a : b))}
+				{@const next_trip = next_st && trips?.current?.get(next_st.trip_id)}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">
 						<div>
-							{#if next}
-								{bus_headsign(route, next.direction) ?? ''}
+							{#if next_trip}
+								{trip_headsign(
+									next_trip,
+									route,
+									stop_times?.current.by_trip_id.get(next_trip.id),
+									page.data.stops_by_id[stop.data.source]
+								)}
 							{:else if 'headsign' in route_stop.data}
 								{route_stop.data.headsign}
 							{/if}

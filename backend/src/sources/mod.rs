@@ -59,6 +59,12 @@ pub trait StaticAdapter: Send + Sync {
 
 ///// various utilities for parsing and normalizing static data
 
+/// Trim and uppercase an ID for case-insensitive feed matching.
+// TODO: probably use this in other sources, not just njt_bus
+pub fn normalize_id(id: &str) -> String {
+    id.trim().to_uppercase()
+}
+
 /// Trim leading/trailing whitespace and collapse internal whitespace runs.
 pub fn normalize_whitespace(value: &str) -> String {
     let mut normalized = String::with_capacity(value.len());

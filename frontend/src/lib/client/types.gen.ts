@@ -177,8 +177,9 @@ export type MtaBusRouteData = {
     directions?: Array<MtaBusDirection>;
     name_number: number;
     /**
-     * Letter prefix of the route name, e.g. `Bx` in `Bx12`. Normalized to the
-     * casing used in the route name, since the upstream feed mixes `BX` and `Bx`.
+     * Letter prefix of the route name, e.g. `Bx` in `Bx12`. Casing is whatever
+     * the feed uses for that route, which is not consistent across the Bronx
+     * routes (both `Bx` and `BX` appear), so compare case-insensitively.
      */
     name_prefix: string;
     /**

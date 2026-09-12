@@ -7,7 +7,7 @@
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { current_time } from '$lib/url_params.svelte';
-	import { bus_headsign } from '$lib/util.svelte';
+	import { trip_headsign } from '$lib/util.svelte';
 
 	import { ArrowBigRight } from '@lucide/svelte';
 
@@ -34,19 +34,9 @@
 
 	const route = $derived(page.data.routes_by_id?.[data.data.source]?.[data.route_id]);
 
-	const last_stop = $derived.by(() => {
-		if (!stop_times.length) return 'Unknown';
-
-		switch (data.data.source) {
-			case 'mta_bus':
-				return bus_headsign(route, data.direction) ?? 'Unknown';
-			case 'mta_subway':
-				const last_st = stop_times[stop_times.length - 1];
-				return page.data.stops_by_id?.[data.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';
-			default:
-				return 'Unknown';
-		}
-	});
+	const last_stop = $derived(
+		trip_headsign(data, route, all_trip_stop_times, page.data.stops_by_id?.[data.data.source])
+	);
 
 	const current_stop = $derived.by(() => {
 		const target_stop_id = position?.stop_id || stop_times[0]?.stop_id;

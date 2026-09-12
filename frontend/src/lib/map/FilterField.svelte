@@ -47,16 +47,16 @@
 	const isMultiSelect = $derived(fieldDef.type === 'enum' && (fieldDef.options?.length ?? 0) > 2);
 </script>
 
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-1.5">
 	<!-- TODO: add "undefined" option in checkbox -->
 	{#if fieldDef.type === 'boolean'}
-		<label class="grid grid-cols-[1fr_auto] items-center gap-2">
+		<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded px-1">
 			<span class="text-sm">{label}</span>
 			<input
 				type="checkbox"
 				checked={value === true}
 				onchange={(e) => handleBooleanChange(e.currentTarget.checked)}
-				class="cursor-pointer"
+				class="size-5 cursor-pointer"
 			/>
 		</label>
 	{:else if fieldDef.type === 'enum'}
@@ -64,20 +64,20 @@
 			<span class="text-sm">{label}</span>
 			{#if isMultiSelect}
 				<!-- Multi-select: checkboxes -->
-				<div class="flex flex-col gap-1 ml-2">
+				<div class="ml-1.5 flex flex-col gap-0.5">
 					{#each fieldDef.options ?? [] as option (option)}
 						{@const stringValues =
 							Array.isArray(value) && value.length > 0 && typeof value[0] === 'string'
 								? (value as string[])
 								: []}
 						{@const isChecked = stringValues.includes(option)}
-						<label class="grid grid-cols-[1fr_auto] items-center gap-2">
+						<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded px-1">
 							<span class="text-xs">{option}</span>
 							<input
 								type="checkbox"
 								checked={isChecked}
 								onchange={() => handleEnumChange(option, true)}
-								class="cursor-pointer"
+								class="size-5 cursor-pointer"
 							/>
 						</label>
 					{/each}
@@ -87,7 +87,7 @@
 				<select
 					value={typeof value === 'string' ? value : ''}
 					onchange={(e) => handleEnumChange(e.currentTarget.value, false)}
-					class="text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1"
+					class="min-h-10 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
 				>
 					<option value="">All</option>
 					{#each fieldDef.options ?? [] as option (option)}
@@ -104,13 +104,13 @@
 				value={typeof value === 'string' ? value : ''}
 				onchange={(e) => handleStringChange(e.currentTarget.value)}
 				placeholder="Search..."
-				class="text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1"
+				class="min-h-10 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
 			/>
 		</label>
 	{:else if fieldDef.type === 'number'}
 		<div class="flex flex-col gap-1">
 			<span class="text-sm">{label}</span>
-			<div class="flex gap-2">
+			<div class="flex gap-1.5">
 				<input
 					type="number"
 					min={fieldDef.min}
@@ -128,9 +128,9 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1 w-20"
+					class="min-h-10 w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
 				/>
-				<span class="text-sm self-center">to</span>
+				<span class="self-center text-sm">to</span>
 				<input
 					type="number"
 					min={fieldDef.min}
@@ -146,7 +146,7 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="text-sm rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1 w-20"
+					class="min-h-10 w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
 				/>
 			</div>
 		</div>

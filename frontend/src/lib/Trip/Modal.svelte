@@ -16,7 +16,7 @@
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
-	import { bus_headsign } from '$lib/util.svelte';
+	import { trip_headsign } from '$lib/util.svelte';
 
 	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
@@ -63,22 +63,9 @@
 		)
 	);
 
-	const last_stop = $derived.by(() => {
-		if (!stop_times.length) return 'Unknown';
-
-		switch (trip.data.source) {
-			case 'mta_bus':
-				return (
-					bus_headsign(page.data.routes_by_id[trip.data.source]?.[trip.route_id], trip.direction) ??
-					'Unknown'
-				);
-			case 'mta_subway':
-				const last_st = stop_times[stop_times.length - 1];
-				return page.data.stops_by_id[trip.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';
-			default:
-				return 'Unknown';
-		}
-	});
+	const last_stop = $derived(
+		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
+	);
 
 	type StopTransfers = Record<string, StopTime[]>;
 
