@@ -1,285 +1,222 @@
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
+
 use crate::engines::static_data::StaticController;
-use crate::integrations::gtfs_realtime;
 use crate::models::source::Source;
-use crate::models::stop::FAKE_STOP_IDS;
 use crate::models::{
     position::{MtaSubwayPositionData, PositionData, VehiclePosition},
-    trip::{MtaSubwayStopTimeData, StopTime, StopTimeData, Trip, TripData},
+    trip::{
+        Consist, MtaSubwayStopTimeData, MtaSubwayTripData, StopTime, StopTimeData, Trip, TripData,
+    },
 };
 use crate::sources::RealtimeAdapter;
 use crate::stores::position::PositionStore;
 use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::trip::TripStore;
-use crate::{
-    feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
-    integrations::gtfs_realtime::GtfsSource,
-};
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use tracing::{debug, warn};
+use chrono::{DateTime, NaiveTime, Utc};
+use serde::Deserialize;
+use tracing::{info, warn};
 use uuid::Uuid;
+
+const SUBWAY_TRIPS_URL: &str = concat!(env!("MTA_API_URL"), "/v1/subway/trips");
+
+// --- Helium trips response structs ---
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumTripsResponse {
+    trips: Vec<HeliumTrip>,
+    // not sure what this is for
+    // stale_route_ids: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumTrip {
+    route_id: String,
+    direction: String,
+    trip_id: String,
+    #[serde(default)]
+    shape_segment_ids: Vec<String>,
+    is_assigned: bool,
+    estimated_longitude: Option<f64>,
+    estimated_latitude: Option<f64>,
+    consist: Option<HeliumConsist>,
+    stops: Vec<HeliumTripStop>,
+    updated_at: Option<i64>,
+    #[serde(default)]
+    consist_cars: Vec<HeliumConsistCar>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumConsistCar {
+    number: String,
+    #[serde(rename = "type")]
+    car_type: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumConsist {
+    car_count: i32,
+    car_length_feet: i32,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumTripStop {
+    station_id: i32,
+    // bubble_id: String,
+    // section_id: String,
+    #[serde(default)]
+    platform_edges: Vec<String>,
+    est_arrive_at: i64,
+    stop_status: String,
+    // #[serde(default)]
+    // transfers: Vec<String>,
+    // #[serde(default)]
+    // rail_transfers: Vec<String>,
+}
 
 pub struct MtaSubwayRealtime;
 
-#[async_trait]
-impl GtfsSource for MtaSubwayRealtime {
-    fn source(&self) -> Source {
-        Source::MtaSubway
-    }
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let response = reqwest::Client::new()
+        .get(SUBWAY_TRIPS_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<serde_json::Value>()
+        .await?;
 
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        gtfs_realtime::fetch_feeds(vec![
-            (
-                "mta_subway-ace".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
-                ),
-            ),
-            (
-                "mta_subway-bdfm".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
-                ),
-            ),
-            (
-                "mta_subway-g".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g",
-                ),
-            ),
-            (
-                "mta_subway-jz".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz",
-                ),
-            ),
-            (
-                "mta_subway-nqrw".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw",
-                ),
-            ),
-            (
-                "mta_subway-l".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l",
-                ),
-            ),
-            (
-                "mta_subway-gtfs-1234567".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
-                ),
-            ), // 1234567
-            (
-                "mta_subway-si".into(),
-                gtfs_realtime::get_bytes(
-                    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si",
-                ),
-            ),
-        ])
-        .await
-    }
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert(
+        "trips.json".to_string(),
+        serde_json::to_vec_pretty(&response)?,
+    );
+    Ok(fixtures)
+}
 
-    async fn process_trip(
-        &self,
-        update: TripUpdate,
-        _static_cache_store: &StaticCacheStore,
-    ) -> (Option<Trip>, Vec<StopTime>) {
-        let trip_desc = update.trip;
+pub fn build_realtime_from_fixture(
+    payload: serde_json::Value,
+    now: DateTime<Utc>,
+) -> anyhow::Result<(Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>)> {
+    let response = serde_json::from_value::<HeliumTripsResponse>(payload)?;
+    Ok(build_realtime_from_response(response, now))
+}
 
-        let mta_id = match trip_desc.trip_id {
-            Some(id) => id,
-            None => return (None, vec![]),
-        };
-        let route_id = match trip_desc.route_id {
-            Some(id) => parse_route_id(id),
-            None => return (None, vec![]),
+fn build_realtime_from_response(
+    response: HeliumTripsResponse,
+    now: DateTime<Utc>,
+) -> (Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>) {
+    let mut trips = Vec::new();
+    let mut positions = Vec::new();
+
+    for helium_trip in response.trips {
+        let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
+            warn!(
+                direction = helium_trip.direction,
+                trip_id = helium_trip.trip_id,
+                "Unknown direction"
+            );
+            continue;
         };
 
-        let nyct_trip = match trip_desc.nyct_trip_descriptor {
-            Some(t) => t,
-            None => return (None, vec![]),
-        };
-        let train_id = match nyct_trip.train_id {
-            Some(id) => id,
-            None => return (None, vec![]),
+        let created_at = parse_created_at_from_trip_id(&helium_trip.trip_id, now).unwrap_or(now);
+
+        let updated_at_raw = helium_trip
+            .updated_at
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .unwrap_or(now);
+
+        let updated_at = if !helium_trip.is_assigned {
+            now
+        } else {
+            updated_at_raw
         };
 
-        // Direction Parsing
-        // MTA: 1=North, 3=South, East and West not used
-        let direction = match nyct_trip.direction {
-            Some(1) => Some(1),
-            Some(3) => Some(3),
-            None => {
-                match update.stop_time_update.first() {
-                    Some(s) => {
-                        let stop_id = s.stop_id.as_ref().unwrap();
-                        let direction = stop_id.chars().last();
-                        match direction {
-                            Some('N') => Some(1),
-                            Some('S') => Some(3),
-                            _ => None,
-                        }
-                    }
-                    None => {
-                        // this happens pretty often, so we don't need to log it
-                        debug!("No stop time update found for trip");
-                        None
-                    }
-                }
-            }
-            _ => {
-                warn!(
-                    "Unknown direction for trip {}: {:?}",
-                    mta_id, nyct_trip.direction
-                );
-                None
-            } // Or try to infer from stop_id (N/S)
-        };
+        let trip_id = Uuid::now_v7();
 
-        let direction = match direction {
-            Some(d) => d,
-            None => return (None, vec![]),
-        };
-
-        let start_date_str = match trip_desc.start_date {
-            Some(d) => d,
-            None => return (None, vec![]),
-        };
-        let start_date = match NaiveDate::parse_from_str(&start_date_str, "%Y%m%d") {
-            Ok(d) => d,
-            Err(_) => return (None, vec![]),
-        };
-
-        let start_time = match trip_desc.start_time {
-            Some(t) => match NaiveTime::parse_from_str(&t, "%H:%M:%S") {
-                Ok(time) => time,
-                Err(_) => return (None, vec![]),
-            },
-            None => {
-                // Fallback: Parse from trip_id (e.g. 098550_1..N03R -> 09:50:30)
-                let origin_time = match mta_id.split_once('_') {
-                    // TODO: maybe put the parsing logic in the parse_origin_time function since its being used in multiple places
-                    Some((time_str, _)) => match time_str.parse::<i32>() {
-                        Ok(t) => t / 100,
-                        Err(_) => return (None, vec![]),
-                    },
-                    None => return (None, vec![]),
-                };
-                match parse_origin_time(origin_time) {
-                    Some(t) => t,
-                    None => return (None, vec![]),
-                }
-            }
-        };
-        let created_at = match Trip::created_at(start_date, start_time) {
-            Some(ca) => ca,
-            None => return (None, vec![]),
-        };
+        let consist = helium_trip.consist.as_ref().map(|c| Consist {
+            car_count: c.car_count,
+            car_length_feet: c.car_length_feet,
+        });
 
         let trip = Trip {
-            id: Uuid::now_v7(),
-            original_id: mta_id,
-            route_id,
+            id: trip_id,
+            original_id: helium_trip.trip_id.clone(),
+            route_id: helium_trip.route_id.clone(),
+            shape_ids: helium_trip.shape_segment_ids.clone(),
             direction,
             created_at,
-            vehicle_id: train_id,
-            updated_at: Utc::now(),
-            data: TripData::MtaSubway,
+            vehicle_id: helium_trip.trip_id.clone(),
+            updated_at,
+            data: TripData::MtaSubway(MtaSubwayTripData {
+                consist,
+                consist_cars: helium_trip
+                    .consist_cars
+                    .into_iter()
+                    .map(|c| crate::models::trip::ConsistCar {
+                        number: c.number,
+                        car_type: c.car_type,
+                    })
+                    .collect(),
+            }),
         };
 
-        // Process stop times
-        let stop_times: Vec<StopTime> = update
-            .stop_time_update
-            .into_iter()
-            .filter_map(|st| {
-                // Extract stop_id and remove direction suffix (N/S)
-                let mut stop_id = st.stop_id?;
-                stop_id.pop(); // Remove N or S
-
-                if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-                    return None;
-                }
-
-                // Extract arrival/departure times
-                let arrival = match st.arrival {
-                    Some(a) => a.time?,
-                    None => st.departure.as_ref()?.time?,
-                };
-                let departure = match st.departure {
-                    Some(d) => d.time?,
-                    None => st.arrival.as_ref()?.time?,
-                };
-
-                let arrival = DateTime::from_timestamp(arrival, 0)?;
-                let departure = DateTime::from_timestamp(departure, 0)?;
-
-                // Extract track info from NYCT extension
-                let (scheduled_track, actual_track) = match st.nyct_stop_time_update {
-                    Some(nyct) => (nyct.scheduled_track, nyct.actual_track),
-                    None => (None, None),
-                };
-
+        let stop_times = helium_trip
+            .stops
+            .iter()
+            .filter_map(|stop| {
+                let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
                 Some(StopTime {
-                    trip_id: trip.id,
-                    stop_id,
+                    trip_id,
+                    stop_id: stop.station_id.to_string(),
                     arrival,
-                    departure,
+                    departure: arrival,
                     data: StopTimeData::MtaSubway(MtaSubwayStopTimeData {
-                        scheduled_track,
-                        actual_track,
+                        scheduled_track: None,
+                        actual_track: None,
+                        platform_edges: stop.platform_edges.clone(),
                     }),
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        (Some(trip), stop_times)
-    }
+        let current_stop = helium_trip
+            .stops
+            .iter()
+            .find(|s| s.stop_status == "EN_ROUTE" || s.stop_status == "AT_STOP");
 
-    async fn process_vehicle(
-        &self,
-        vehicle: GtfsVehiclePosition,
-        _static_cache_store: &StaticCacheStore,
-    ) -> Option<VehiclePosition> {
-        let trip = vehicle.trip?;
-        let nyct_trip = trip.nyct_trip_descriptor?;
+        if let Some(stop) = current_stop {
+            let geom = match (
+                helium_trip.estimated_longitude,
+                helium_trip.estimated_latitude,
+            ) {
+                (Some(lon), Some(lat)) => Some(geo::Point::new(lon, lat)),
+                _ => None,
+            };
 
-        let vehicle_id = nyct_trip.train_id?;
-        let mut stop_id = vehicle.stop_id?;
-
-        // Remove N or S from stop id
-        stop_id.pop();
-
-        // TODO: double check if fake stop ids show up in positions (i only know that they are in stop times)
-        if FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-            return None;
+            positions.push(VehiclePosition {
+                vehicle_id: helium_trip.trip_id.clone(),
+                trip_id: Some(trip_id),
+                stop_id: Some(stop.station_id.to_string()),
+                updated_at,
+                geom: geom.map(|g| g.into()),
+                data: PositionData::MtaSubway(MtaSubwayPositionData {
+                    assigned: helium_trip.is_assigned,
+                    status: Some(stop.stop_status.clone()),
+                }),
+            });
         }
 
-        // Parse status
-        let status = match vehicle.current_status {
-            Some(0) => Some("incoming".into()),
-            Some(1) => Some("at_stop".into()),
-            Some(2) => Some("in_transit_to".into()),
-            _ => None,
-        };
-
-        let updated_at = vehicle.timestamp?;
-        let updated_at = DateTime::from_timestamp(updated_at as i64, 0)?;
-
-        // Trains don't have GPS coordinates, so no trip history point is created
-        Some(VehiclePosition {
-            vehicle_id,
-            trip_id: None, // Trains don't need trip_id linking since no GPS
-            stop_id: Some(stop_id.to_string()),
-            updated_at,
-            geom: None,
-            data: PositionData::MtaSubway(MtaSubwayPositionData {
-                assigned: nyct_trip.is_assigned.unwrap_or(false),
-                status,
-            }),
-        })
+        trips.push((trip, stop_times));
     }
+
+    (trips, positions)
 }
 
 #[async_trait]
@@ -294,32 +231,61 @@ impl RealtimeAdapter for MtaSubwayRealtime {
 
     async fn run(
         &self,
-        // pool: &PgPool,
         static_controller: &StaticController,
-        static_cache_store: &StaticCacheStore,
+        _static_cache_store: &StaticCacheStore,
         trip_store: &TripStore,
-        // stop_time_store: &StopTimeStore,
         position_store: &PositionStore,
     ) -> anyhow::Result<()> {
-        gtfs_realtime::run_pipeline(
-            self,
-            static_controller,
-            static_cache_store,
-            trip_store,
-            // stop_time_store,
-            position_store,
-        )
-        .await
+        static_controller.ensure_updated(Source::MtaSubway).await?;
+
+        let client = reqwest::Client::new();
+        let response: HeliumTripsResponse =
+            client.get(SUBWAY_TRIPS_URL).send().await?.json().await?;
+
+        info!(
+            "Fetched {} subway trips from Helium API",
+            response.trips.len()
+        );
+
+        let (trip_stop_pairs, mut positions) = build_realtime_from_response(response, Utc::now());
+
+        // Save trips and stop times
+        let id_map = if !trip_stop_pairs.is_empty() {
+            trip_store
+                .save_all(Source::MtaSubway, &trip_stop_pairs)
+                .await?
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        // Save positions
+        if !positions.is_empty() {
+            for pos in &mut positions {
+                if let Some(trip_id) = pos.trip_id {
+                    if let Some(&actual_id) = id_map.get(&trip_id) {
+                        pos.trip_id = Some(actual_id);
+                    } else {
+                        // The trip was dropped during deduplication
+                        pos.trip_id = None;
+                    }
+                }
+            }
+            position_store
+                .save_vehicle_positions(Source::MtaSubway, &positions)
+                .await?;
+        }
+
+        Ok(())
     }
 }
+
 // --- Helpers ---
 
-/// Convert SIR express into SI. This doesn't appear in static data unlike other express routes.
-fn parse_route_id(route_id: String) -> String {
-    if route_id == "SS" {
-        "SI".to_string()
-    } else {
-        route_id
+fn normalize_subway_direction(direction: &str) -> Option<i16> {
+    match direction {
+        "NORTH" | "EAST" => Some(1),
+        "SOUTH" | "WEST" => Some(3),
+        _ => None,
     }
 }
 
@@ -334,56 +300,78 @@ pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
     NaiveTime::from_hms_opt(h, m, s)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::feed::FeedMessage;
-    use crate::stores::static_cache::StaticCacheStore;
-    use bb8_redis::RedisConnectionManager;
-    use prost::Message;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn load_fixture(path: &str) -> FeedMessage {
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/fixtures");
-        d.push(path);
-        let bytes = fs::read(d).expect("Failed to read fixture file");
-        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
+// TODO: test this around midnight
+/// Try to parse a created_at timestamp from the Helium trip_id.
+///
+/// Trip ID format: `<prefix><route> <HHMM>[+] <origin>/<dest>`
+/// Examples: `"1W 2009 WHL/DIT"`, `"01 1845+ 242/SFT"`, `"0L 1941+RPY/8AV"`
+///
+/// The 4-digit number is the scheduled origin departure time in Eastern Time (HHMM).
+/// The `+` suffix means add 30 seconds (e.g., `1845+` = 18:45:30).
+///
+/// Since the trip ID has no date component, we infer the service date from `now`:
+/// - Get today's date in Eastern Time
+/// - If the resulting datetime is >6 hours in the future, use yesterday (trip from previous day still in feed)
+/// - If the resulting datetime is >18 hours in the past, use tomorrow (trip just past midnight)
+fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let parts: Vec<&str> = trip_id.split_whitespace().collect();
+    if parts.len() < 2 {
+        return None;
     }
 
-    #[tokio::test]
-    async fn test_process_subway_trip_from_fixture() {
-        let fixture = load_fixture("mta_subway/mta_subway-ace.pb");
-        let adapter = MtaSubwayRealtime;
-        
-        // We don't need a real redis for this unit test as _static_cache_store is unused in subway process_trip
-        // but we need a placeholder if we were to call it. 
-        // For now, subway doesn't use it.
-        
-        let mut trip_count = 0;
-        for entity in fixture.entity {
-            if let Some(update) = entity.trip_update {
-                let manager = RedisConnectionManager::new("redis://localhost").unwrap();
-                let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
-                let cache = StaticCacheStore::new(redis_pool);
+    // The time token may have a + suffix (possibly concatenated with the next field, e.g. "1941+RPY/8AV")
+    let time_token = parts[1];
+    let digits: String = time_token
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
 
-                let (trip, stop_times) = adapter.process_trip(update, &cache).await;
-                if let Some(trip) = trip {
-                    trip_count += 1;
-                    assert!(!trip.original_id.is_empty());
-                    assert!(!trip.vehicle_id.is_empty());
-                    // MTA Subway direction is usually 1 or 3
-                    assert!(trip.direction == 1 || trip.direction == 3);
-                    
-                    if !stop_times.is_empty() {
-                        let st = &stop_times[0];
-                        assert_eq!(st.trip_id, trip.id);
-                        assert!(!st.stop_id.is_empty());
-                    }
-                }
-            }
-        }
-        assert!(trip_count > 0, "Should have processed at least one trip from fixture");
+    if digits.len() != 4 {
+        return None;
+    }
+
+    let hh: u32 = digits[..2].parse().ok()?;
+    let mm: u32 = digits[2..].parse().ok()?;
+    // '+' immediately after the digits means add 30 seconds
+    let has_plus = time_token
+        .chars()
+        .nth(digits.len())
+        .map_or(false, |c| c == '+');
+    let ss: u32 = if has_plus { 30 } else { 0 };
+
+    let origin_time = NaiveTime::from_hms_opt(hh, mm, ss)?;
+
+    // Determine the service date in Eastern Time
+    let now_et = now.with_timezone(&chrono_tz::America::New_York);
+    let today_et = now_et.date_naive();
+
+    // Try today first
+    let candidate = Trip::created_at(today_et, origin_time)?;
+    let diff_hours = (candidate - now).num_hours();
+
+    if diff_hours > 6 {
+        // Origin time is far in the future — this trip is from yesterday's service
+        let yesterday = today_et - chrono::Duration::days(1);
+        Trip::created_at(yesterday, origin_time)
+    } else if diff_hours < -18 {
+        // Origin time is far in the past — this trip is from tomorrow's service (just past midnight)
+        let tomorrow = today_et + chrono::Duration::days(1);
+        Trip::created_at(tomorrow, origin_time)
+    } else {
+        Some(candidate)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_subway_direction;
+
+    #[test]
+    fn normalizes_subway_directions_to_north_south() {
+        assert_eq!(normalize_subway_direction("NORTH"), Some(1));
+        assert_eq!(normalize_subway_direction("EAST"), Some(1));
+        assert_eq!(normalize_subway_direction("SOUTH"), Some(3));
+        assert_eq!(normalize_subway_direction("WEST"), Some(3));
+        assert_eq!(normalize_subway_direction("UP"), None);
     }
 }

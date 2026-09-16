@@ -1,5 +1,54 @@
-import type { RouteStop, Stop } from '$lib/client';
-import { calculateTextHeight } from '$lib/text-measurement';
+import type { Route, RouteStop, Stop, StopTime, Trip } from '$lib/client';
+import { calculateTextHeight } from '$lib/text_measurement';
+
+/**
+ * Destination shown on an MTA bus for a given trip direction.
+ *
+ * The upstream feed maps headsigns to directions at the route level, not to
+ * individual stops, so `RouteStop.data.headsign` is always empty for buses.
+ * Resolve from the route's directions using the trip's `direction` instead.
+ */
+export function bus_headsign(route: Route | undefined, direction: number): string | undefined {
+	if (route?.data.source !== 'mta_bus') return undefined;
+
+	const match = route.data.directions?.find((d) => d.direction_id === direction);
+	if (!match) return undefined;
+
+	return match.via?.length ? `${match.destination} via ${match.via.join('/')}` : match.destination;
+}
+
+/** Resolve destinations identically in trip cards and stop arrivals. */
+export function trip_headsign(
+	trip: Trip,
+	route: Route | undefined,
+	stop_times: readonly StopTime[] = [],
+	stops: Record<string, Stop> = {}
+): string {
+	if (trip.data.source === 'mta_bus') {
+		return bus_headsign(route, trip.direction) || 'Unknown';
+	}
+
+	if (trip.data.source === 'njt_bus') {
+		const headsign = trip.data.headsign;
+		if (headsign) return headsign;
+
+		// Static route-stop labels may describe the opposite direction or a
+		// different branch. Only use labels on this trip in its own direction.
+		for (const st of stop_times) {
+			const route_stop = stops[st.stop_id]?.routes.find(
+				(rs) =>
+					rs.route_id === trip.route_id &&
+					rs.data.source === 'njt_bus' &&
+					rs.data.direction === trip.direction &&
+					rs.data.headsign
+			);
+			if (route_stop?.data.source === 'njt_bus') return route_stop.data.headsign;
+		}
+	}
+
+	const last_stop = stop_times[stop_times.length - 1];
+	return (last_stop && stops[last_stop.stop_id]?.name) || 'Unknown';
+}
 
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -65,7 +114,12 @@ export function calculate_stop_height(item: Stop) {
 	let height = 16;
 
 	// Stop name — may wrap on narrow screens
-	height += calculateTextHeight(item.name, STOP_NAME_FONT, STOP_NAME_MAX_WIDTH, STOP_NAME_LINE_HEIGHT);
+	height += calculateTextHeight(
+		item.name,
+		STOP_NAME_FONT,
+		STOP_NAME_MAX_WIDTH,
+		STOP_NAME_LINE_HEIGHT
+	);
 
 	if (item.data.source === 'mta_bus' || item.data.source === 'njt_bus') {
 		// Each bus route row: icon (20px) + headsign text + ETAs line ≈ 56px fixed

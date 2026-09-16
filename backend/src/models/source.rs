@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::{fmt, str::FromStr};
 use utoipa::ToSchema;
 
 #[derive(sqlx::Type, Copy, Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize, ToSchema)]
@@ -23,6 +24,25 @@ impl Source {
             // Source::Lirr => "lirr",
             // Source::Mnr => "mnr",
             // Source::NjtRail => "njt_rail",
+        }
+    }
+}
+
+impl fmt::Display for Source {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Source {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "mta_subway" => Ok(Self::MtaSubway),
+            "mta_bus" => Ok(Self::MtaBus),
+            "njt_bus" => Ok(Self::NjtBus),
+            other => anyhow::bail!("unknown source: {other}"),
         }
     }
 }

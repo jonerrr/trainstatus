@@ -1,0 +1,18 @@
+{
+  "source": "njt_bus",
+  "kind": "realtime",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "trip_updates",
+      "path": "raw/trip_updates.pb",
+      "format": "gtfs_realtime_protobuf"
+    },
+    {
+      "name": "vehicle_positions",
+      "path": "raw/vehicle_positions.pb",
+      "format": "gtfs_realtime_protobuf"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}

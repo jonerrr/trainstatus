@@ -1,5 +1,6 @@
 import type { Source } from '$lib/client';
-import { COOKIE_NAME, parse_sources, supported_sources } from '$lib/source_preferences.svelte';
+import { all_sources } from '$lib/resources/index.svelte';
+import { COOKIE_NAME, parse_sources } from '$lib/source_preferences.svelte';
 
 import type { LayoutServerLoad } from './$types';
 
@@ -13,7 +14,7 @@ export const load: LayoutServerLoad = async ({ url, cookies }) => {
 	const src_param = url.searchParams.get('src');
 	if (
 		src_param &&
-		supported_sources.includes(src_param as Source) &&
+		all_sources.includes(src_param as Source) &&
 		!selected_sources.includes(src_param as Source)
 	) {
 		selected_sources = [...selected_sources, src_param as Source];

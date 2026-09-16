@@ -1,4 +1,5 @@
 pub mod alerts;
+pub mod patterns;
 pub mod realtime;
 pub mod static_data;
 
@@ -11,29 +12,11 @@ use crate::integrations::gtfs_realtime::FeedFuture;
 
 pub(super) const NJT_GTFS_AUTH_URL: &str =
     "https://pcsdata.njtransit.com/api/GTFSG2/authenticateUser";
-pub(super) const NJT_BUSDV2_AUTH_URL: &str =
-    "https://pcsdata.njtransit.com/api/BUSDV2/authenticateUser";
 pub(super) const NJT_TRIP_UPDATES_URL: &str =
     "https://pcsdata.njtransit.com/api/GTFSG2/getTripUpdates";
 pub(super) const NJT_VEHICLE_POSITIONS_URL: &str =
     "https://pcsdata.njtransit.com/api/GTFSG2/getVehiclePositions";
 pub(super) const NJT_ALERTS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getAlerts";
-pub(super) const NJT_BUS_ROUTES_URL: &str = "https://pcsdata.njtransit.com/api/BUSDV2/getBusRoutes";
-
-#[derive(Clone, Copy, Debug)]
-pub(super) enum NjtApi {
-    GtfsG2,
-    BusDv2,
-}
-
-impl NjtApi {
-    fn auth_url(self) -> &'static str {
-        match self {
-            Self::GtfsG2 => NJT_GTFS_AUTH_URL,
-            Self::BusDv2 => NJT_BUSDV2_AUTH_URL,
-        }
-    }
-}
 
 #[derive(serde::Deserialize)]
 struct AuthResponse {
@@ -43,29 +26,26 @@ struct AuthResponse {
 
 /// Cached (token, acquired_at). Refreshed after 23 hours.
 static NJT_GTFS_TOKEN: OnceLock<Mutex<Option<(String, Instant)>>> = OnceLock::new();
-static NJT_BUSDV2_TOKEN: OnceLock<Mutex<Option<(String, Instant)>>> = OnceLock::new();
 
 /// Returns a valid NJT API token, re-authenticating if the cached one is stale.
-pub(super) async fn get_token(api: NjtApi) -> anyhow::Result<String> {
-    let mutex = match api {
-        NjtApi::GtfsG2 => NJT_GTFS_TOKEN.get_or_init(|| Mutex::new(None)),
-        NjtApi::BusDv2 => NJT_BUSDV2_TOKEN.get_or_init(|| Mutex::new(None)),
-    };
+pub(super) async fn get_token() -> anyhow::Result<String> {
+    let mutex = NJT_GTFS_TOKEN.get_or_init(|| Mutex::new(None));
     let mut guard = mutex.lock().await;
 
     if let Some((ref token, acquired_at)) = *guard
-        && acquired_at.elapsed() < Duration::from_secs(23 * 60 * 60) {
-            return Ok(token.clone());
-        }
+        && acquired_at.elapsed() < Duration::from_secs(23 * 60 * 60)
+    {
+        return Ok(token.clone());
+    }
 
-    let token = authenticate(api)
+    let token = authenticate()
         .await
         .context("NJT re-authentication failed")?;
     *guard = Some((token.clone(), Instant::now()));
     Ok(token)
 }
 
-async fn authenticate(api: NjtApi) -> anyhow::Result<String> {
+async fn authenticate() -> anyhow::Result<String> {
     let username = std::env::var("NJT_USERNAME").context("NJT_USERNAME env var not set")?;
     let password = std::env::var("NJT_PASSWORD").context("NJT_PASSWORD env var not set")?;
 
@@ -74,7 +54,7 @@ async fn authenticate(api: NjtApi) -> anyhow::Result<String> {
         .text("password", password);
 
     let resp: AuthResponse = reqwest::Client::new()
-        .post(api.auth_url())
+        .post(NJT_GTFS_AUTH_URL)
         .multipart(form)
         .send()
         .await?

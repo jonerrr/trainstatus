@@ -1,3 +1,6 @@
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
@@ -17,9 +20,24 @@ use crate::{
     stores::{position::PositionStore, static_cache::StaticCacheStore, trip::TripStore},
 };
 
-use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, NjtApi, get_token, njt_post_future};
+use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
 pub struct NjtBusRealtime;
+
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let token = get_token().await?;
+    let trip_updates = njt_post_future(NJT_TRIP_UPDATES_URL, token.clone()).await?;
+    let vehicle_positions = njt_post_future(NJT_VEHICLE_POSITIONS_URL, token).await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert("trip_updates.pb".to_string(), trip_updates.to_vec());
+    fixtures.insert(
+        "vehicle_positions.pb".to_string(),
+        vehicle_positions.to_vec(),
+    );
+    Ok(fixtures)
+}
 
 #[async_trait]
 impl GtfsSource for NjtBusRealtime {
@@ -28,10 +46,10 @@ impl GtfsSource for NjtBusRealtime {
     }
 
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token(NjtApi::GtfsG2).await {
+        let token = match get_token().await {
             Ok(t) => t,
             Err(e) => {
-                error!("NJT auth failed: {:?}", e);
+                error!(error = %e, "NJT auth failed");
                 return vec![];
             }
         };
@@ -61,6 +79,17 @@ impl GtfsSource for NjtBusRealtime {
             None => return (None, vec![]),
         };
 
+        let pattern = match static_cache_store
+            .get_trip_pattern(Source::NjtBus, &trip_id)
+            .await
+        {
+            Ok(pattern) => pattern,
+            Err(error) => {
+                warn!(%error, "Unable to resolve NJT trip pattern");
+                None
+            }
+        };
+
         // Try to get from static cache to fill in missing fields
         // We guess start_date as today if not present
         // TODO: stop guessing start_date, it will cause issues near midnight.
@@ -79,6 +108,7 @@ impl GtfsSource for NjtBusRealtime {
         let route_id = trip_desc
             .route_id
             .or_else(|| cached_trip.as_ref().map(|ct| ct.route_id.clone()))
+            .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
                     trip_id,
@@ -95,6 +125,7 @@ impl GtfsSource for NjtBusRealtime {
             .direction_id
             .map(|d| d as i16)
             .or_else(|| cached_trip.as_ref().map(|ct| ct.direction_id))
+            .or_else(|| pattern.as_ref().map(|p| p.direction))
             .unwrap_or(0);
 
         let start_date = match NaiveDate::parse_from_str(&start_date_str, "%Y%m%d") {
@@ -148,10 +179,17 @@ impl GtfsSource for NjtBusRealtime {
             return (None, vec![]);
         };
 
+        let shape_ids = pattern
+            .filter(|p| p.route_id.eq_ignore_ascii_case(&route_id) && p.direction == direction)
+            .and_then(|p| p.shape_id)
+            .map(|id| vec![id])
+            .unwrap_or_default();
+
         let trip = Trip {
             id: Uuid::now_v7(),
             original_id: trip_id,
             route_id,
+            shape_ids,
             direction,
             created_at,
             vehicle_id,
@@ -249,72 +287,5 @@ impl RealtimeAdapter for NjtBusRealtime {
             position_store,
         )
         .await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::feed::FeedMessage;
-    use crate::stores::static_cache::StaticCacheStore;
-    use bb8_redis::RedisConnectionManager;
-    use prost::Message;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn load_fixture(path: &str) -> FeedMessage {
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/fixtures");
-        d.push(path);
-        let bytes = fs::read(d).expect("Failed to read fixture file");
-        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
-    }
-
-    #[tokio::test]
-    async fn test_process_njt_trip_from_fixture() {
-        let fixture = load_fixture("njt_bus/njt_bus_getTripUpdates.pb");
-        let adapter = NjtBusRealtime;
-
-        // Setup mock cache
-        let manager = RedisConnectionManager::new("redis://localhost").unwrap();
-        let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
-        let cache = StaticCacheStore::new(redis_pool);
-
-        // Seed cache for trip "13" which is in our fixture
-        let today = Utc::now()
-            .with_timezone(&chrono_tz::America::New_York)
-            .format("%Y%m%d")
-            .to_string();
-
-        cache
-            .cache_trips(
-                Source::NjtBus,
-                &[crate::models::static_cache::CachedTrip {
-                    trip_id: "13".to_string(),
-                    route_id: "123".to_string(),
-                    direction_id: 0,
-                    headsign: "Test Headsign".to_string(),
-                    start_date: today.clone(),
-                    start_time: Utc::now(),
-                    stop_times: vec![],
-                }],
-            )
-            .await
-            .unwrap();
-
-        let mut trip_count = 0;
-        for entity in fixture.entity {
-            if let Some(update) = entity.trip_update {
-                let (trip, _stop_times) = adapter.process_trip(update, &cache).await;
-                if let Some(trip) = trip {
-                    trip_count += 1;
-                    assert!(!trip.original_id.is_empty());
-                }
-            }
-        }
-        assert!(
-            trip_count > 0,
-            "Should have processed at least one NJT trip from fixture"
-        );
     }
 }

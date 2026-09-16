@@ -2,11 +2,6 @@ name: Update Geo Assets
 
 on:
     workflow_dispatch:
-        inputs:
-            style_base_urls:
-                description: Comma-separated base URLs for generated style JSON files
-                required: false
-                default: "http://localhost:5173,https://trainstat.us"
 
 permissions:
     contents: read
@@ -42,7 +37,5 @@ jobs:
                   context: ./geo
                   file: ./geo/Dockerfile.assets
                   push: true
-                  build-args: |
-                      STYLE_BASE_URLS=${{ inputs.style_base_urls || 'http://localhost:5173,https://trainstat.us' }}
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}

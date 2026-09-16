@@ -1,0 +1,22 @@
+{
+  "alert_count": 0,
+  "entity_count": 721,
+  "sample_entity_ids": {
+    "alerts": [],
+    "trip_updates": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9"
+    ],
+    "vehicles": []
+  },
+  "trip_update_count": 721,
+  "vehicle_count": 0
+}

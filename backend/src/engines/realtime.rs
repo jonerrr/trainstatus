@@ -28,16 +28,21 @@ pub async fn run(
             loop {
                 let source = adapter.source();
                 if let Err(e) = adapter
-                    .run(&controller, &static_cache_store, &trip_store, &position_store)
+                    .run(
+                        &controller,
+                        &static_cache_store,
+                        &trip_store,
+                        &position_store,
+                    )
                     .await
                 {
-                    error!("Realtime pipeline error for {:?}: {}", source, e);
+                    error!(source = %source, error = %format!("{e:#}"), "Realtime pipeline error");
                 }
                 // TODO: use stop time store to save stop times (instead of trip store)
                 // then we don't have to add this separate cache population step just for stop times
                 // Populate stop times cache after trips are committed
                 if let Err(e) = stop_time_store.populate_cache(source).await {
-                    error!("Stop time cache populate error for {:?}: {}", source, e);
+                    error!(source = %source, error = %e, "Stop time cache populate error");
                 }
 
                 sleep(adapter.refresh_interval()).await;

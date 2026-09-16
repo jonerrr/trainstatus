@@ -1,0 +1,13 @@
+{
+  "source": "mta_bus",
+  "kind": "alerts",
+  "scenario": "basic",
+  "payloads": [
+    {
+      "name": "alerts",
+      "path": "raw/alerts.pb",
+      "format": "gtfs_realtime_protobuf"
+    }
+  ],
+  "notes": "Captured by backend fixture CLI."
+}

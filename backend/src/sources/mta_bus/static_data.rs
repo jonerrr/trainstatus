@@ -2,69 +2,123 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use futures::FutureExt;
-use geo::{Distance, Euclidean, LineString, MultiLineString, Point};
-use indicatif::{ProgressBar, ProgressStyle};
-use proj4rs::{Proj, transform::transform};
-use rayon::prelude::*;
-use serde::{Deserialize, Deserializer};
+use geo::{LineString, Point};
+use proj4rs::Proj;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     engines::valhalla::ValhallaManager,
     models::{
-        route::{MtaBusRouteData, Route, RouteData},
+        route::{MtaBusDirection, MtaBusRouteData, Route, RouteData},
+        shape::Shape,
         source::Source,
-        stop::{CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData},
+        static_dataset::StaticDataset,
+        stop::{
+            Borough, CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData,
+        },
     },
-    mta_oba_api_key,
-    sources::{StaticAdapter, mta_bus::AGENCIES, normalize_title},
+    sources::StaticAdapter,
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
+    trajectory::{
+        geometry::{
+            cumulative_distances, project_linestring_wgs84_to_epsg, project_point_onto_line,
+            project_point_wgs84_to_epsg,
+        },
+        types::source_projected_epsg_code,
+    },
 };
 
-// TODO: check etag and only re-import if changed
-// /// OpenData SODA2 query URL for fetching bus routes with their geometries (as GeoJSON).
-// const ROUTES_URL: &str = "https://data.ny.gov/resource/bzwk-3hb4.geojson?$query=SELECT%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%0AWHERE%20caseless_one_of(%60in_effect%60%2C%20%22true%22)%0AGROUP%20BY%0A%20%20%60route_id%60%2C%0A%20%20%60direction_id%60%2C%0A%20%20%60geometry%60%2C%0A%20%20%60route_short_name%60%2C%0A%20%20%60route_long_name%60%2C%0A%20%20%60route_description%60%2C%0A%20%20%60trip_type%60%2C%0A%20%20%60route_color%60%2C%0A%20%20%60direction%60%20LIMIT%2050000";
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
 
-/// Maximum distance (in meters) allowed when pairing opposite-direction stops.
-const MAX_OPPOSITE_DIST: f64 = 500.0;
+const BUS_INFRASTRUCTURE_URL: &str = concat!(
+    env!("MTA_API_URL"),
+    "/v1/infrastructure/bus?fields=routes,stops,shapes"
+);
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusInfrastructure {
+    routes: Vec<HeliumBusRoute>,
+    stops: Vec<HeliumBusStop>,
+    shapes: HeliumBusShapes,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusShapes {
+    shape_to_segment: HashMap<String, Vec<i32>>,
+    segments: Vec<Vec<[f64; 2]>>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusRoute {
+    route_id: String,
+    route_name: String,
+    #[serde(default)]
+    name_prefix: String,
+    #[serde(default)]
+    name_number: i32,
+    #[serde(default)]
+    name_suffix: Option<String>,
+    #[serde(default)]
+    borough: Option<String>,
+    color: String,
+    text_color: Option<String>,
+    sort_key: i32,
+    service_types: Vec<String>,
+    #[serde(default)]
+    directions: Vec<HeliumBusRouteDirection>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusRouteDirection {
+    direction_id: i16,
+    headsign: HeliumBusHeadsign,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusHeadsign {
+    destination: String,
+    #[serde(default)]
+    via: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusStop {
+    stop_id: i32,
+    name_parts: Vec<String>,
+    latitude: f64,
+    longitude: f64,
+    #[serde(default)]
+    routes: Vec<HeliumBusStopRoute>,
+    // TODO: does this need to be nullable?
+    bearing: Option<f64>,
+    #[serde(default)]
+    is_boardable: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HeliumBusStopRoute {
+    route_name: String,
+    service_type: String,
+    shape_ids: Vec<String>,
+}
 
 pub struct MtaBusStatic {
-    valhalla: Arc<ValhallaManager>,
+    _valhalla: Arc<ValhallaManager>,
 }
 
 impl MtaBusStatic {
     pub fn new(valhalla: Arc<ValhallaManager>) -> Self {
-        Self { valhalla }
-    }
-
-    async fn snap_route_geometry(
-        &self,
-        route_id: &str,
-        route_geom: &MultiLineString,
-    ) -> MultiLineString {
-        let mut snapped = Vec::with_capacity(route_geom.0.len());
-
-        for (line_index, line) in route_geom.0.iter().enumerate() {
-            if line.0.len() < 2 {
-                snapped.push(line.clone());
-                continue;
-            }
-
-            match self.valhalla.trace_route(line).await {
-                Ok(snapped_line) => snapped.push(snapped_line),
-                Err(err) => {
-                    tracing::warn!(
-                        route_id,
-                        line_index,
-                        error = %err,
-                        "MTA bus route snapping failed; preserving original linestring"
-                    );
-                    snapped.push(line.clone());
-                }
-            }
+        Self {
+            _valhalla: valhalla,
         }
-
-        MultiLineString::new(snapped)
     }
 }
 
@@ -82,444 +136,609 @@ impl StaticAdapter for MtaBusStatic {
         &self,
         route_store: &RouteStore,
         stop_store: &StopStore,
-        _static_cache_store: &StaticCacheStore,
+        static_cache_store: &StaticCacheStore,
     ) -> anyhow::Result<()> {
-        let (routes, stops, route_stops) = self.import_routes_and_stops().await?;
-
-        route_store
-            .save_all(Source::MtaBus, &routes)
+        let client = reqwest::Client::new();
+        let infra = fetch_infrastructure(&client).await?;
+        let dataset = build_static_dataset(infra);
+        dataset
+            .persist(route_store, stop_store, static_cache_store)
             .await
-            .context("Failed to save routes to database")?;
-
-        stop_store
-            .save_all(Source::MtaBus, &stops)
-            .await
-            .context("Failed to save stops to database")?;
-
-        stop_store
-            .save_all_route_stops(Source::MtaBus, &route_stops)
-            .await
-            .context("Failed to save route_stops to database")?;
-
-        // Buses don't have transfer data in the API, so we skip it
-
-        Ok(())
     }
 }
 
-impl MtaBusStatic {
-    async fn import_routes_and_stops(
-        &self,
-    ) -> anyhow::Result<(Vec<Route>, Vec<Stop>, Vec<RouteStop>)> {
-        let mut routes: Vec<Route> = Vec::new();
-        let mut stops: Vec<Stop> = Vec::new();
-        let mut route_stops: Vec<RouteStop> = Vec::new();
+/// The feed has no route long name, so build one out of the two terminals the
+/// way the MTA writes them on schedules ("Bay Ridge 4 Av - Manhattan Beach").
+/// Falls back to the route name for the handful of routes with one direction.
+fn route_long_name(route_name: &str, directions: &[MtaBusDirection]) -> String {
+    let mut terminals: Vec<&str> = directions
+        .iter()
+        .map(|d| d.destination.trim())
+        .filter(|d| !d.is_empty())
+        .collect();
+    terminals.dedup();
 
-        let all_routes = AgencyBusRoute::get_all().await?;
-        let pb = ProgressBar::new(all_routes.len() as u64);
+    match terminals.len() {
+        0 => route_name.to_string(),
+        1 => terminals[0].to_string(),
+        // Direction 1 is the inbound/return trip, so naming it first reads as
+        // origin - destination.
+        _ => format!("{} - {}", terminals[terminals.len() - 1], terminals[0]),
+    }
+}
 
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{prefix:.bold.dim} {bar:40.cyan/blue} {pos:>7}/{len:7} {elapsed_precise}",
-                )
-                .unwrap(),
-        );
-
-        let proj_wgs84 = Proj::from_epsg_code(4326).context("Failed to create WGS84 proj")?;
-        let proj_ny = Proj::from_epsg_code(6538).context("Failed to create NY proj")?;
-
-        // Keep Valhalla warm while this import's snapping pass is active.
-        let _import_snap_usage = match self.valhalla.acquire_usage().await {
-            Ok(lease) => Some(lease),
-            Err(err) => {
-                tracing::warn!(
-                    error = %err,
-                    "Unable to acquire Valhalla import usage lease; will continue with per-request fallback"
-                );
-                None
+fn build_static_dataset(infra: HeliumBusInfrastructure) -> StaticDataset {
+    // First pass: collect all shape_ids per route from stop-route data.
+    // The GTFS-RT feed does not include shape_id, so we store all shapes
+    // for a route here so the trajectory engine can pick the best one at runtime.
+    let mut route_name_to_shape_ids: HashMap<String, Vec<String>> = HashMap::new();
+    for stop in &infra.stops {
+        for route in &stop.routes {
+            let key = route.route_name.to_uppercase();
+            let entry = route_name_to_shape_ids.entry(key).or_default();
+            for shape_id in &route.shape_ids {
+                if !entry.contains(shape_id) {
+                    entry.push(shape_id.clone());
+                }
             }
-        };
+        }
+    }
 
-        for mut route in all_routes.into_iter() {
-            // Get the stops for the route
-            let r_stops = match BusRouteStops::get(&route.id).await {
-                Ok(stops) => stops,
-                Err(e) => {
-                    tracing::warn!("Failed to fetch stops for route {}: {}", route.id, e);
-                    pb.inc(1);
+    let mut route_id_map = HashMap::new();
+    let routes: Vec<Route> = infra
+        .routes
+        .iter()
+        .map(|r| {
+            route_id_map.insert(r.route_name.to_uppercase(), r.route_id.clone());
+            let shape_ids = route_name_to_shape_ids
+                .get(&r.route_name.to_uppercase())
+                .cloned()
+                .unwrap_or_default();
+            let mut directions: Vec<MtaBusDirection> = r
+                .directions
+                .iter()
+                .map(|d| MtaBusDirection {
+                    direction_id: d.direction_id,
+                    destination: d.headsign.destination.clone(),
+                    via: d.headsign.via.clone(),
+                })
+                .collect();
+            directions.sort_by_key(|d| d.direction_id);
+
+            Route {
+                id: r.route_id.clone(),
+                long_name: route_long_name(&r.route_name, &directions),
+                short_name: r.route_name.clone(),
+                color: r.color.clone(),
+                text_color: r
+                    .text_color
+                    .clone()
+                    .unwrap_or_else(|| "#FFFFFF".to_string()),
+                data: RouteData::MtaBus(MtaBusRouteData {
+                    sort_key: r.sort_key,
+                    service_types: r.service_types.clone(),
+                    borough: r.borough.as_deref().and_then(Borough::from_feed_name),
+                    name_prefix: r.name_prefix.clone(),
+                    name_number: r.name_number,
+                    name_suffix: r.name_suffix.clone(),
+                    directions,
+                    shape_ids,
+                }),
+            }
+        })
+        .collect();
+
+    let stops: Vec<Stop> = infra
+        .stops
+        .iter()
+        .map(|s| {
+            let name = s.name_parts.join("/");
+            Stop {
+                id: s.stop_id.to_string(),
+                name,
+                geom: Point::new(s.longitude, s.latitude).into(),
+                transfers: vec![],
+                data: StopData::MtaBus(MtaBusStopData {
+                    bearing: s.bearing,
+                    is_boardable: s.is_boardable,
+                    direction: s
+                        .bearing
+                        .map(CompassDirection::from_bearing)
+                        .unwrap_or(CompassDirection::Unknown),
+                }),
+                routes: vec![],
+            }
+        })
+        .collect();
+
+    // Built before the route stops because stop sequences are derived by
+    // projecting each stop onto the shapes that serve it.
+    let shape_lines = build_shape_lines(&infra.shapes);
+
+    let mut shape_to_stops: HashMap<&str, Vec<String>> = HashMap::new();
+    for s in &infra.stops {
+        for r in &s.routes {
+            for shape_id in &r.shape_ids {
+                shape_to_stops
+                    .entry(shape_id.as_str())
+                    .or_default()
+                    .push(s.stop_id.to_string());
+            }
+        }
+    }
+    let stop_orders = shape_stop_orders(&shape_lines, &shape_to_stops, &infra.stops);
+
+    let mut route_stop_map = HashMap::new();
+    for s in &infra.stops {
+        for r in &s.routes {
+            let route_id = match route_id_map.get(&r.route_name.to_uppercase()) {
+                Some(id) => id.clone(),
+                None => {
+                    tracing::warn!(
+                        route_name = %r.route_name,
+                        stop_id = s.stop_id,
+                        "Route name not found in routes list; skipping stop"
+                    );
                     continue;
                 }
             };
 
-            // Strip agency prefix from route ID (e.g., "MTA NYCT_M1" -> "M1")
-            route.id = route
-                .id
-                .split_once('_')
-                .map(|(_, id)| id)
-                .unwrap_or(&route.id)
-                .to_owned();
-
-            let shuttle = route.route_type == 711;
-
-            // Build route geometry from each direction's stop-group polylines.
-            let stop_groups = &r_stops.entry.stop_groupings[0].stop_groups;
-
-            let route_geom = MultiLineString::new(
-                stop_groups
-                    .iter()
-                    .flat_map(|group| group.polylines.iter().map(|p| p.points.clone()))
-                    .collect::<Vec<LineString>>(),
-            );
-            let route_geom = self.snap_route_geometry(&route.id, &route_geom).await;
-
-            if route.color.is_empty() {
-                tracing::warn!("No color for bus route {}. Setting to white", route.id);
-                route.color = "FFFFFF".to_string();
-            }
-
-            // Add route
-            routes.push(Route {
-                id: route.id.clone(),
-                // source: Source::MtaBus,
-                long_name: route.long_name,
-                short_name: route.short_name,
-                color: route.color,
-                data: RouteData::MtaBus(MtaBusRouteData { shuttle }),
-                geom: Some(route_geom.into()),
+            let key = (route_id.clone(), s.stop_id.to_string());
+            let entry = route_stop_map.entry(key).or_insert_with(|| RouteStop {
+                route_id,
+                stop_id: s.stop_id.to_string(),
+                stop_sequence: 0,
+                data: RouteStopData::MtaBus {
+                    // The feed exposes no stop-to-direction mapping, so per-stop
+                    // headsigns and directions are not derivable here. Consumers
+                    // read headsigns off `MtaBusRouteData::directions` instead,
+                    // keyed by the trip's direction.
+                    headsign: String::new(),
+                    direction: 0,
+                    opposite_stop_id: None,
+                    shape_ids: Vec::new(),
+                },
             });
-
-            // --- Opposite-stop matching ---
-            // Build a map from stop code: projected Point (EPSG:6538, meters)
-            // so we can compute accurate planar distances between candidate pairs.
-            let stop_geom_map: HashMap<i32, Point<f64>> = r_stops
-                .references
-                .stops
-                .iter()
-                .filter_map(|s| {
-                    let mut point =
-                        Point::new((s.lon as f64).to_radians(), (s.lat as f64).to_radians());
-                    transform(&proj_wgs84, &proj_ny, &mut point).ok()?;
-                    Some((s.code, point))
-                })
-                .collect();
-
-            // Extract direction-0 and direction-1 stop ID lists for this route.
-            let dir0_ids: Vec<i32> = stop_groups
-                .iter()
-                .find(|g| g.id == 0)
-                .map(|g| g.stop_ids.clone())
-                .unwrap_or_default();
-            let dir1_ids: Vec<i32> = stop_groups
-                .iter()
-                .find(|g| g.id == 1)
-                .map(|g| g.stop_ids.clone())
-                .unwrap_or_default();
-
-            let opposite_map =
-                compute_opposite_stops(&dir0_ids, &dir1_ids, &stop_geom_map, MAX_OPPOSITE_DIST);
-
-            // Add stops
-            let new_stops = r_stops
-                .references
-                .stops
-                .into_par_iter()
-                .map(|s| Stop {
-                    id: s.code.to_string(),
-                    name: s.name,
-                    geom: Point::new(s.lon as f64, s.lat as f64).into(),
-                    transfers: vec![],
-                    routes: vec![],
-                    data: StopData::MtaBus(MtaBusStopData {
-                        direction: s.direction,
-                    }),
-                })
-                .collect::<Vec<_>>();
-
-            stops.extend(new_stops);
-
-            // Parse and collect route stops for each group/direction.
-            let group_route_stops = stop_groups
-                .iter()
-                .map(|rs| {
-                    let route_id = &route.id;
-
-                    rs.stop_ids
-                        .iter()
-                        .enumerate()
-                        .map(|(sequence, stop_id)| RouteStop {
-                            route_id: route_id.clone(),
-                            stop_id: stop_id.to_string(),
-                            stop_sequence: sequence as i16,
-                            data: RouteStopData::MtaBus {
-                                headsign: rs.name.name.clone(),
-                                direction: rs.id as i16,
-                                opposite_stop_id: opposite_map
-                                    .get(stop_id)
-                                    .map(|id| id.to_string()),
-                            },
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
-            route_stops.extend(group_route_stops.into_iter().flatten());
-
-            pb.set_prefix(route.id);
-            pb.inc(1);
-        }
-
-        // Remove duplicates
-        stops.sort_by(|a, b| a.id.cmp(&b.id));
-        stops.dedup_by(|a, b| a.id == b.id);
-
-        // Remove duplicate route stops (same stop id and route id)
-        route_stops.sort_by(|a, b| a.stop_id.cmp(&b.stop_id));
-        route_stops.dedup_by(|a, b| a.stop_id == b.stop_id && a.route_id == b.route_id);
-
-        pb.finish();
-
-        Ok((routes, stops, route_stops))
-    }
-}
-
-// --- Opposite-stop matching ---
-
-/// For each stop in `dir0_ids`, find the nearest stop in `dir1_ids` (and vice-versa) whose
-/// projected distance is within `max_dist` (EPSG:6538 meters).
-/// Returns a map of `stop_id → opposite_stop_id`.
-fn compute_opposite_stops(
-    dir0_ids: &[i32],
-    dir1_ids: &[i32],
-    stop_geom_map: &HashMap<i32, Point<f64>>,
-    max_dist: f64,
-) -> HashMap<i32, i32> {
-    let mut opposite_map: HashMap<i32, i32> = HashMap::new();
-
-    // dir0 → nearest dir1 match
-    for &stop_id in dir0_ids {
-        let Some(p0) = stop_geom_map.get(&stop_id) else {
-            continue;
-        };
-        let best = dir1_ids
-            .iter()
-            .filter_map(|&opp_id| {
-                let p1 = stop_geom_map.get(&opp_id)?;
-                let dist = Euclidean.distance(p0, p1);
-                (dist <= max_dist).then_some((opp_id, dist))
-            })
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        if let Some((opp_id, _)) = best {
-            opposite_map.insert(stop_id, opp_id);
-        }
-    }
-
-    // dir1 → nearest dir0 match
-    for &stop_id in dir1_ids {
-        let Some(p1) = stop_geom_map.get(&stop_id) else {
-            continue;
-        };
-        let best = dir0_ids
-            .iter()
-            .filter_map(|&opp_id| {
-                let p0 = stop_geom_map.get(&opp_id)?;
-                let dist = Euclidean.distance(p1, p0);
-                (dist <= max_dist).then_some((opp_id, dist))
-            })
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        if let Some((opp_id, _)) = best {
-            opposite_map.insert(stop_id, opp_id);
-        }
-    }
-
-    opposite_map
-}
-
-// --- Helper types for parsing MTA Bus API responses ---
-
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct AgencyBusRoute {
-    pub color: String,
-    pub id: String,
-    pub long_name: String,
-    pub short_name: String,
-    #[serde(rename = "type")]
-    // 3 = bus, 711 = shuttle
-    pub route_type: i32,
-}
-
-impl AgencyBusRoute {
-    async fn get_agency_routes(agency: &str) -> anyhow::Result<Vec<Self>> {
-        let url = format!(
-            "https://bustime.mta.info/api/where/routes-for-agency/{}.json",
-            agency
-        );
-        let response = reqwest::Client::new()
-            .get(&url)
-            .query(&[("key", mta_oba_api_key())])
-            .send()
-            .await?
-            .json::<serde_json::Value>()
-            .await?;
-
-        let routes = serde_json::from_value(response["data"]["list"].to_owned())?;
-        Ok(routes)
-    }
-
-    async fn get_all() -> anyhow::Result<Vec<Self>> {
-        let futures = AGENCIES.iter().map(|agency| {
-            Self::get_agency_routes(agency).map(move |res| {
-                res.context(format!("Failed to fetch routes for agency {}", agency))
-            })
-        });
-
-        Ok(futures::future::join_all(futures)
-            .await
-            .into_iter()
-            .flat_map(|res| match res {
-                Ok(routes) => routes,
-                Err(err) => {
-                    // TODO: probably want to bubble this up instead of silently skipping, but for now we'll just log and skip
-                    tracing::error!(error = %err, "Failed to fetch routes for an agency");
-                    vec![]
+            // TODO: double check if this is a good way to handle it
+            // A stop can list the same route more than once (e.g. LOCAL and LIMITED
+            // service_types with different shape_ids), so union rather than overwrite.
+            if let RouteStopData::MtaBus { shape_ids, .. } = &mut entry.data {
+                for shape_id in &r.shape_ids {
+                    if !shape_ids.contains(shape_id) {
+                        shape_ids.push(shape_id.clone());
+                    }
                 }
-            })
-            .collect())
+            }
+        }
     }
-}
 
-#[derive(Deserialize, Clone)]
-struct BusRouteStops {
-    entry: Entry,
-    references: References,
-}
-
-#[derive(Deserialize, Clone)]
-struct Entry {
-    #[serde(rename = "stopGroupings")]
-    stop_groupings: Vec<StopGrouping>,
-    // polylines: Vec<PolyLine>,
-}
-
-#[derive(Deserialize, Clone)]
-struct StopGrouping {
-    #[serde(rename = "stopGroups")]
-    stop_groups: Vec<StopGroup>,
-}
-
-#[derive(Deserialize, Clone)]
-struct StopGroup {
-    // can be 0 or 1
-    #[serde(deserialize_with = "de_str_to_i32")]
-    id: i32,
-    name: StopName,
-    #[serde(rename = "stopIds", deserialize_with = "de_get_id")]
-    stop_ids: Vec<i32>,
-    polylines: Vec<PolyLine>,
-}
-
-#[derive(Deserialize, Clone)]
-struct StopName {
-    #[serde(deserialize_with = "de_stop_name")]
-    name: String,
-}
-
-// TODO: double check which polylines im using / combining. I think i should be looking at a different field
-#[derive(Deserialize, Clone)]
-struct PolyLine {
-    #[serde(deserialize_with = "de_polyline")]
-    points: LineString,
-}
-
-#[derive(Deserialize, Clone)]
-struct References {
-    stops: Vec<BusStopData>,
-}
-
-#[derive(Deserialize, Clone)]
-struct BusStopData {
-    #[serde(deserialize_with = "de_str_to_i32")]
-    code: i32,
-    #[serde(deserialize_with = "de_str_to_direction")]
-    direction: CompassDirection,
-    lat: f32,
-    lon: f32,
-    #[serde(deserialize_with = "de_stop_name")]
-    name: String,
-}
-
-impl BusRouteStops {
-    async fn get(route_id: &str) -> anyhow::Result<Self> {
-        let route_stops: serde_json::Value = reqwest::Client::new()
-            .get(format!(
-                "https://bustime.mta.info/api/where/stops-for-route/{}.json",
-                route_id
-            ))
-            .query(&[("key", mta_oba_api_key()), ("version", "2")])
-            .send()
-            .await?
-            .json::<serde_json::Value>()
-            .await?;
-
-        Ok(serde_json::from_value(route_stops["data"].to_owned())?)
+    // A route's two directions each start their own sequence at 0, and the
+    // primary key collapses them into one row per (route, stop), so take the
+    // earliest position across every shape serving the stop.
+    for ((_, stop_id), route_stop) in route_stop_map.iter_mut() {
+        let RouteStopData::MtaBus { shape_ids, .. } = &route_stop.data else {
+            continue;
+        };
+        route_stop.stop_sequence = shape_ids
+            .iter()
+            .filter_map(|shape_id| stop_orders.get(shape_id.as_str())?.get(stop_id.as_str()))
+            .copied()
+            .min()
+            .unwrap_or(0);
     }
-}
 
-// --- Custom deserializers ---
+    let mut route_stops: Vec<RouteStop> = route_stop_map.into_values().collect();
+    route_stops.sort_by(|a, b| (&a.route_id, &a.stop_id).cmp(&(&b.route_id, &b.stop_id)));
 
-fn de_str_to_i32<'de, D>(deserializer: D) -> Result<i32, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    str.parse().map_err(serde::de::Error::custom)
-}
-
-fn de_get_id<'de, D>(deserializer: D) -> Result<Vec<i32>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let ids = Vec::<String>::deserialize(deserializer)?;
-    Ok(ids
+    let mut shapes: Vec<Shape> = shape_lines
         .into_iter()
-        .filter_map(|id| {
-            id.split_once('_')
-                .and_then(|(_, id)| id.parse::<i32>().ok())
+        .map(|(shape_id, geom)| Shape {
+            id: shape_id,
+            source: Source::MtaBus,
+            geom: geom.into(),
+            data: serde_json::Value::Null,
         })
-        .collect())
-}
+        .collect();
+    shapes.sort_by(|a, b| a.id.cmp(&b.id));
 
-fn de_stop_name<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let mut name = String::deserialize(deserializer)?;
-    name = normalize_title(&name);
-    Ok(name)
-}
-
-fn de_str_to_direction<'de, D>(deserializer: D) -> Result<CompassDirection, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str = String::deserialize(deserializer)?;
-    match str.as_str() {
-        "SW" => Ok(CompassDirection::SW),
-        "S" => Ok(CompassDirection::S),
-        "SE" => Ok(CompassDirection::SE),
-        "E" => Ok(CompassDirection::E),
-        "W" => Ok(CompassDirection::W),
-        "NE" => Ok(CompassDirection::NE),
-        "NW" => Ok(CompassDirection::NW),
-        "N" => Ok(CompassDirection::N),
-        _ => Ok(CompassDirection::Unknown),
+    StaticDataset {
+        source: Source::MtaBus,
+        routes,
+        stops,
+        route_stops,
+        shapes,
+        cached_trips: vec![],
     }
 }
 
-fn de_polyline<'de, D>(deserializer: D) -> Result<LineString, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let polyline = String::deserialize(deserializer)?;
-    polyline::decode_polyline(&polyline, 5).map_err(serde::de::Error::custom)
+/// Reassemble each shape's polyline from the feed's shared segment pool.
+/// A negative index means that segment is traversed in reverse.
+fn build_shape_lines(shapes: &HeliumBusShapes) -> HashMap<String, LineString> {
+    let mut lines = HashMap::with_capacity(shapes.shape_to_segment.len());
+
+    for (shape_id, segment_indices) in &shapes.shape_to_segment {
+        let mut coords: Vec<geo::Coord<f64>> = Vec::new();
+        for &idx in segment_indices {
+            let Some(seg_coords) = shapes.segments.get(idx.unsigned_abs() as usize) else {
+                continue;
+            };
+            let points = seg_coords.iter().map(|p| geo::Coord { x: p[0], y: p[1] });
+            if idx < 0 {
+                coords.extend(points.rev());
+            } else {
+                coords.extend(points);
+            }
+        }
+
+        if coords.len() >= 2 {
+            lines.insert(shape_id.clone(), LineString::new(coords));
+        }
+    }
+
+    lines
+}
+
+/// Order the stops along each shape by projecting them onto its geometry.
+/// Returns `shape_id -> (stop_id -> position along the shape)`.
+///
+/// The feed lists which shapes serve a stop but never the order, so the
+/// ordering has to be recovered geometrically.
+fn shape_stop_orders<'a>(
+    shape_lines: &'a HashMap<String, LineString>,
+    shape_to_stops: &HashMap<&'a str, Vec<String>>,
+    stops: &[HeliumBusStop],
+) -> HashMap<&'a str, HashMap<String, i16>> {
+    let epsg = source_projected_epsg_code(Source::MtaBus);
+    let (Ok(proj_wgs84), Ok(proj_target)) =
+        (Proj::from_epsg_code(4326), Proj::from_epsg_code(epsg))
+    else {
+        tracing::error!(
+            epsg,
+            "Failed to build projections; stop sequences will be 0"
+        );
+        return HashMap::new();
+    };
+
+    // Project every stop once up front — stops are shared across many shapes.
+    let stop_points: HashMap<String, Point<f64>> = stops
+        .iter()
+        .filter_map(|s| {
+            let point = Point::new(s.longitude, s.latitude);
+            let projected = project_point_wgs84_to_epsg(&point, &proj_wgs84, &proj_target)?;
+            Some((s.stop_id.to_string(), projected))
+        })
+        .collect();
+
+    let mut orders = HashMap::with_capacity(shape_to_stops.len());
+
+    for (&shape_id, stop_ids) in shape_to_stops {
+        let Some(line) = shape_lines.get(shape_id) else {
+            continue;
+        };
+        let Some(projected_line) =
+            project_linestring_wgs84_to_epsg(line, &proj_wgs84, &proj_target)
+        else {
+            continue;
+        };
+        let cum_dist = cumulative_distances(&projected_line);
+
+        let mut positions: Vec<(&str, f64)> = stop_ids
+            .iter()
+            .filter_map(|stop_id| {
+                let point = stop_points.get(stop_id)?;
+                let along = project_point_onto_line(point, &projected_line, &cum_dist)?;
+                Some((stop_id.as_str(), along))
+            })
+            .collect();
+
+        // Ties (a shape passing the same point twice) break on stop id so the
+        // import stays deterministic across runs.
+        positions.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(b.0))
+        });
+        positions.dedup_by(|a, b| a.0 == b.0);
+
+        let sequences = positions
+            .into_iter()
+            .enumerate()
+            .map(|(i, (stop_id, _))| (stop_id.to_string(), i as i16))
+            .collect();
+        orders.insert(shape_id, sequences);
+    }
+
+    orders
+}
+
+#[cfg(feature = "fixture-capture")]
+pub fn build_static_dataset_from_fixture(
+    infrastructure: serde_json::Value,
+) -> anyhow::Result<StaticDataset> {
+    Ok(build_static_dataset(serde_json::from_value(
+        infrastructure,
+    )?))
+}
+
+async fn fetch_infrastructure(client: &reqwest::Client) -> anyhow::Result<HeliumBusInfrastructure> {
+    client
+        .get(BUS_INFRASTRUCTURE_URL)
+        .send()
+        .await?
+        .json()
+        .await
+        .context("Failed to fetch bus infrastructure")
+}
+
+// TODO: fetch other data here as well
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, serde_json::Value>> {
+    let client = reqwest::Client::new();
+    let infrastructure = fetch_infrastructure(&client).await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert(
+        "infrastructure.json".to_string(),
+        serde_json::to_value(infrastructure)?,
+    );
+
+    Ok(fixtures)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn route(route_id: &str, directions: Vec<(i16, &str)>) -> HeliumBusRoute {
+        HeliumBusRoute {
+            route_id: route_id.to_string(),
+            route_name: route_id.to_string(),
+            name_prefix: String::new(),
+            name_number: 0,
+            name_suffix: None,
+            borough: None,
+            color: "#0039A6".to_string(),
+            text_color: None,
+            sort_key: 0,
+            service_types: vec!["LOCAL".to_string()],
+            directions: directions
+                .into_iter()
+                .map(|(direction_id, destination)| HeliumBusRouteDirection {
+                    direction_id,
+                    headsign: HeliumBusHeadsign {
+                        destination: destination.to_string(),
+                        via: vec![],
+                    },
+                })
+                .collect(),
+        }
+    }
+
+    fn stop(
+        stop_id: i32,
+        lon: f64,
+        lat: f64,
+        route_name: &str,
+        shape_ids: &[&str],
+    ) -> HeliumBusStop {
+        HeliumBusStop {
+            stop_id,
+            name_parts: vec![format!("Stop {stop_id}")],
+            latitude: lat,
+            longitude: lon,
+            routes: vec![HeliumBusStopRoute {
+                route_name: route_name.to_string(),
+                service_type: "LOCAL".to_string(),
+                shape_ids: shape_ids.iter().map(|s| s.to_string()).collect(),
+            }],
+            bearing: None,
+            is_boardable: true,
+        }
+    }
+
+    /// A stop can list the same route_name more than once with different
+    /// `service_type`s (e.g. LOCAL and LIMITED) and disjoint `shape_ids`. The
+    /// per-(route, stop) shape_ids used for realtime shape resolution must be
+    /// the union of all of them, not just whichever entry is seen first.
+    #[test]
+    fn route_stop_shape_ids_union_across_service_types() {
+        let infra = HeliumBusInfrastructure {
+            routes: vec![route("M1", vec![])],
+            stops: vec![HeliumBusStop {
+                stop_id: 403311,
+                name_parts: vec!["5 Av/E 42 St".to_string()],
+                latitude: 40.7527,
+                longitude: -73.9805,
+                routes: vec![
+                    HeliumBusStopRoute {
+                        route_name: "M1".to_string(),
+                        service_type: "LOCAL".to_string(),
+                        shape_ids: vec!["M010104".to_string()],
+                    },
+                    HeliumBusStopRoute {
+                        route_name: "M1".to_string(),
+                        service_type: "LIMITED".to_string(),
+                        shape_ids: vec!["M010089".to_string()],
+                    },
+                ],
+                bearing: None,
+                is_boardable: true,
+            }],
+            shapes: HeliumBusShapes {
+                shape_to_segment: HashMap::new(),
+                segments: vec![],
+            },
+        };
+
+        let dataset = build_static_dataset(infra);
+        assert_eq!(dataset.route_stops.len(), 1);
+        let route_stop = &dataset.route_stops[0];
+        assert_eq!(route_stop.route_id, "M1");
+        assert_eq!(route_stop.stop_id, "403311");
+
+        let RouteStopData::MtaBus { shape_ids, .. } = &route_stop.data else {
+            panic!("expected MtaBus route stop data");
+        };
+        let mut shape_ids = shape_ids.clone();
+        shape_ids.sort();
+        assert_eq!(
+            shape_ids,
+            vec!["M010089".to_string(), "M010104".to_string()]
+        );
+    }
+
+    /// The feed has no route long name, and the old import fell back to the
+    /// route id, so `long_name` and `short_name` were both just "B1".
+    #[test]
+    fn route_long_name_is_built_from_both_terminals() {
+        let directions = vec![
+            MtaBusDirection {
+                direction_id: 0,
+                destination: "Bay Ridge 4 Av".to_string(),
+                via: vec![],
+            },
+            MtaBusDirection {
+                direction_id: 1,
+                destination: "Manhattan Beach Kingsboro CC".to_string(),
+                via: vec![],
+            },
+        ];
+        assert_eq!(
+            route_long_name("B1", &directions),
+            "Manhattan Beach Kingsboro CC - Bay Ridge 4 Av"
+        );
+
+        // Seven routes (B74, S81, Q70+, ...) only publish one direction.
+        assert_eq!(route_long_name("B74", &directions[..1]), "Bay Ridge 4 Av");
+        assert_eq!(route_long_name("B74", &[]), "B74");
+    }
+
+    #[test]
+    fn route_directions_are_sorted_and_carry_headsigns() {
+        let infra = HeliumBusInfrastructure {
+            routes: vec![route("B1", vec![(1, "Manhattan Beach"), (0, "Bay Ridge")])],
+            stops: vec![],
+            shapes: HeliumBusShapes {
+                shape_to_segment: HashMap::new(),
+                segments: vec![],
+            },
+        };
+
+        let dataset = build_static_dataset(infra);
+        let RouteData::MtaBus(data) = &dataset.routes[0].data else {
+            panic!("expected MtaBus route data");
+        };
+
+        assert_eq!(
+            data.directions
+                .iter()
+                .map(|d| (d.direction_id, d.destination.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(0, "Bay Ridge"), (1, "Manhattan Beach")]
+        );
+        assert_eq!(dataset.routes[0].short_name, "B1");
+    }
+
+    /// The feed lists a stop's shapes but never its position along them, so the
+    /// sequence has to be recovered by projecting stops onto the geometry. The
+    /// stops here are deliberately supplied out of order.
+    #[test]
+    fn stop_sequence_follows_the_shape_geometry() {
+        let mut shape_to_segment = HashMap::new();
+        shape_to_segment.insert("B10062".to_string(), vec![0]);
+
+        let infra = HeliumBusInfrastructure {
+            routes: vec![route("B1", vec![(0, "Bay Ridge")])],
+            stops: vec![
+                stop(300, -73.98, 40.75, "B1", &["B10062"]),
+                stop(100, -74.00, 40.75, "B1", &["B10062"]),
+                stop(200, -73.99, 40.75, "B1", &["B10062"]),
+            ],
+            shapes: HeliumBusShapes {
+                shape_to_segment,
+                // West to east, passing all three stops in id order.
+                segments: vec![vec![[-74.00, 40.75], [-73.98, 40.75]]],
+            },
+        };
+
+        let dataset = build_static_dataset(infra);
+        let mut sequences: Vec<(&str, i16)> = dataset
+            .route_stops
+            .iter()
+            .map(|rs| (rs.stop_id.as_str(), rs.stop_sequence))
+            .collect();
+        sequences.sort();
+
+        assert_eq!(sequences, vec![("100", 0), ("200", 1), ("300", 2)]);
+    }
+
+    /// A shape traversed in reverse (negative segment index) must yield the
+    /// reversed stop order, not the same one.
+    #[test]
+    fn stop_sequence_respects_reversed_segments() {
+        let mut shape_to_segment = HashMap::new();
+        shape_to_segment.insert("B10064".to_string(), vec![-1]);
+
+        let infra = HeliumBusInfrastructure {
+            routes: vec![route("B1", vec![(1, "Manhattan Beach")])],
+            stops: vec![
+                stop(100, -74.00, 40.75, "B1", &["B10064"]),
+                stop(200, -73.99, 40.75, "B1", &["B10064"]),
+                stop(300, -73.98, 40.75, "B1", &["B10064"]),
+            ],
+            shapes: HeliumBusShapes {
+                shape_to_segment,
+                // Segment 0 is unused padding so the shape can reference index 1.
+                segments: vec![vec![], vec![[-74.00, 40.75], [-73.98, 40.75]]],
+            },
+        };
+
+        let dataset = build_static_dataset(infra);
+        let mut sequences: Vec<(&str, i16)> = dataset
+            .route_stops
+            .iter()
+            .map(|rs| (rs.stop_id.as_str(), rs.stop_sequence))
+            .collect();
+        sequences.sort();
+
+        assert_eq!(sequences, vec![("100", 2), ("200", 1), ("300", 0)]);
+    }
+
+    #[test]
+    fn stop_compass_direction_comes_from_bearing() {
+        // The feed reports bearings in [-180, 180].
+        assert_eq!(CompassDirection::from_bearing(0.0), CompassDirection::N);
+        assert_eq!(CompassDirection::from_bearing(90.0), CompassDirection::E);
+        assert_eq!(CompassDirection::from_bearing(180.0), CompassDirection::S);
+        assert_eq!(CompassDirection::from_bearing(-90.0), CompassDirection::W);
+        assert_eq!(
+            CompassDirection::from_bearing(-114.43),
+            CompassDirection::SW
+        );
+        // Sector boundaries round outward from north.
+        assert_eq!(CompassDirection::from_bearing(22.5), CompassDirection::NE);
+        assert_eq!(CompassDirection::from_bearing(-22.5), CompassDirection::N);
+        assert_eq!(
+            CompassDirection::from_bearing(f64::NAN),
+            CompassDirection::Unknown
+        );
+    }
+
+    #[test]
+    fn stop_without_bearing_has_unknown_direction() {
+        let infra = HeliumBusInfrastructure {
+            routes: vec![route("B1", vec![(0, "Bay Ridge")])],
+            stops: vec![stop(100, -74.00, 40.75, "B1", &[])],
+            shapes: HeliumBusShapes {
+                shape_to_segment: HashMap::new(),
+                segments: vec![],
+            },
+        };
+
+        let dataset = build_static_dataset(infra);
+        let StopData::MtaBus(data) = &dataset.stops[0].data else {
+            panic!("expected MtaBus stop data");
+        };
+        assert_eq!(data.direction, CompassDirection::Unknown);
+    }
 }

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE realtime.trip AS t\n            SET shape_ids = ARRAY[u.shape_id]\n            FROM UNNEST($1::uuid[], $2::text[]) AS u(trip_id, shape_id)\n            WHERE t.id = u.trip_id\n              AND (t.shape_ids IS NULL OR array_length(t.shape_ids, 1) IS NULL OR array_length(t.shape_ids, 1) = 0)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c49a80a3d96c65e5cb9731b3aa72fd45072e1886d1a1df4550bf6874723819e"
+}

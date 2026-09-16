@@ -1,0 +1,149 @@
+{
+  "processed_trip_count": 4058,
+  "sample": {
+    "position_count": 0,
+    "positions": [],
+    "trip_count": 5,
+    "trips": [
+      {
+        "data": {
+          "deviation": -370,
+          "source": "mta_bus"
+        },
+        "direction": 1,
+        "original_id": "GH_C6-Weekday-SDon-068500_BX5_103",
+        "route_id": "BX29",
+        "shape_ids": [],
+        "stop_ids": [
+          "100860",
+          "100861",
+          "100862",
+          "100863",
+          "100865",
+          "100866",
+          "100867",
+          "100869",
+          "100870",
+          "103659",
+          "802158"
+        ],
+        "stop_time_count": 11,
+        "vehicle_id": "9770"
+      },
+      {
+        "data": {
+          "deviation": -370,
+          "source": "mta_bus"
+        },
+        "direction": 0,
+        "original_id": "GH_C6-Weekday-SDon-072000_BX5_103",
+        "route_id": "BX29",
+        "shape_ids": [],
+        "stop_ids": [
+          "100820",
+          "100822",
+          "100823",
+          "100824",
+          "100826",
+          "100827",
+          "100828",
+          "100829",
+          "103590",
+          "103660",
+          "103943",
+          "103946"
+        ],
+        "stop_time_count": 12,
+        "vehicle_id": "9770"
+      },
+      {
+        "data": {
+          "deviation": 138,
+          "source": "mta_bus"
+        },
+        "direction": 0,
+        "original_id": "MV_C6-Weekday-SDon-061600_M4_425",
+        "route_id": "M4",
+        "shape_ids": [],
+        "stop_ids": [
+          "400609",
+          "400610",
+          "400611",
+          "400612",
+          "400613",
+          "400614",
+          "400615",
+          "400616",
+          "400617",
+          "400618",
+          "400619",
+          "400620",
+          "400621",
+          "400622",
+          "400626",
+          "400627",
+          "400628",
+          "400629",
+          "400630",
+          "400631",
+          "400632",
+          "400633",
+          "400634",
+          "400635",
+          "400636",
+          "403122",
+          "403125",
+          "403126",
+          "403461",
+          "403462",
+          "404232",
+          "404262",
+          "404920",
+          "404921",
+          "405072",
+          "803067",
+          "903290"
+        ],
+        "stop_time_count": 37,
+        "vehicle_id": "9771"
+      },
+      {
+        "data": {
+          "deviation": -69,
+          "source": "mta_bus"
+        },
+        "direction": 0,
+        "original_id": "MV_C6-Weekday-SDon-066800_M98_901",
+        "route_id": "M10",
+        "shape_ids": [],
+        "stop_ids": [
+          "401281",
+          "401282",
+          "401286",
+          "401287",
+          "401288",
+          "403826",
+          "404325",
+          "404825"
+        ],
+        "stop_time_count": 8,
+        "vehicle_id": "9775"
+      },
+      {
+        "data": {
+          "deviation": 138,
+          "source": "mta_bus"
+        },
+        "direction": 1,
+        "original_id": "MV_C6-Weekday-SDon-075300_M4_432",
+        "route_id": "M4",
+        "shape_ids": [],
+        "stop_ids": [
+          "400639"
+        ],
+        "stop_time_count": 1,
+        "vehicle_id": "9771"
+      }
+    ]
+  }
+}

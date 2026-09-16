@@ -1,5 +1,6 @@
 use crate::{
     models::{
+        geom::Geom,
         source::Source,
         trip::{StopTime, Trip},
     },
@@ -11,6 +12,28 @@ use sqlx::PgPool;
 use std::time::Instant;
 use std::{collections::HashMap, time::Duration};
 use uuid::Uuid;
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct TrajectoryInputRow {
+    pub trip_id: Uuid,
+    pub route_id: String,
+    pub route_color: String,
+    pub direction: i16,
+    pub trip_geom: Geom,
+    /// The shape ID that was selected for this trip (either from the trip's own
+    /// shape_ids or resolved via best-fit from the route's shape list).
+    pub shape_id: String,
+    pub stop_id: String,
+    pub arrival_unix: f64,
+    pub departure_unix: f64,
+    pub stop_distance_m: f64,
+    pub car_count: Option<i32>,
+    pub car_length_feet: Option<i32>,
+    #[sqlx(json)]
+    pub stop_time_data: serde_json::Value,
+    #[sqlx(json)]
+    pub stop_data: serde_json::Value,
+}
 
 const TTL: Duration = Duration::from_secs(30);
 
@@ -66,6 +89,7 @@ impl TripStore {
                     t.original_id,
                     t.vehicle_id,
                     t.route_id,
+                    t.shape_ids,
                     t.source,
                     t.direction,
                     t.created_at,
@@ -90,9 +114,222 @@ impl TripStore {
         .await?)
     }
 
+    /// Return PostGIS-prepared trajectory inputs for active trips.
+    ///
+    /// Shape binding is data-driven (no per-source flags):
+    /// - nonempty `trip.shape_ids` → merge those geometries in order
+    /// - else nonempty `route.data.shape_ids` → score via stop membership / distance
+    /// - else → no geometry
+    pub async fn get_trajectory_inputs(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+        route_ids: Option<&[String]>,
+    ) -> anyhow::Result<Vec<TrajectoryInputRow>> {
+        let route_ids_vec: Vec<String> = route_ids.map(|r| r.to_vec()).unwrap_or_default();
+        let has_route_filter = !route_ids_vec.is_empty();
+        Ok(sqlx::query_as::<_, TrajectoryInputRow>(
+            r#"
+            WITH filtered_trips AS (
+                SELECT
+                    t.id,
+                    t.route_id,
+                    t.direction,
+                    t.source,
+                    t.shape_ids,
+                    (t.data->'consist'->>'car_count')::int AS car_count,
+                    (t.data->'consist'->>'car_length_feet')::int AS car_length_feet
+                FROM realtime.trip t
+                WHERE
+                    t.source = $1
+                    AND t.updated_at >= (($2)::timestamp with time zone - INTERVAL '5 minutes')
+                    AND t.id = ANY(
+                        SELECT t2.id
+                        FROM realtime.trip t2
+                        LEFT JOIN realtime.stop_time st2 ON st2.trip_id = t2.id
+                        WHERE st2.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                    )
+                    AND ($4 = false OR t.route_id = ANY($3))
+            ),
+            -- Trip shapes win; otherwise use route-level candidates when present.
+            trip_shape_candidates AS (
+                SELECT
+                    ft.id AS trip_id,
+                    ft.route_id,
+                    ft.direction,
+                    ft.car_count,
+                    ft.car_length_feet,
+                    r.color AS route_color,
+                    r.source AS route_source,
+                    COALESCE(array_length(ft.shape_ids, 1), 0) > 0 AS has_own_shape_ids,
+                    CASE
+                        WHEN COALESCE(array_length(ft.shape_ids, 1), 0) > 0
+                            THEN ft.shape_ids
+                        ELSE
+                            ARRAY(
+                                SELECT jsonb_array_elements_text(
+                                    CASE
+                                        WHEN jsonb_typeof(r.data->'shape_ids') = 'array'
+                                            THEN r.data->'shape_ids'
+                                        ELSE '[]'::jsonb
+                                    END
+                                )
+                            )
+                    END AS effective_shape_ids
+                FROM filtered_trips ft
+                JOIN static.route r ON r.id = ft.route_id AND r.source = ft.source
+            ),
+            -- Trips with their own shape_ids (subway) report one segment per
+            -- station-to-station leg, in travel order
+            merged_shape AS (
+                SELECT
+                    tsc.trip_id,
+                    tsc.route_id,
+                    tsc.direction,
+                    tsc.car_count,
+                    tsc.car_length_feet,
+                    tsc.route_color,
+                    array_to_string(tsc.effective_shape_ids, ',') AS shape_id,
+                    ST_MakeLine(sh.geom ORDER BY sid.ord) AS shape_geom
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) WITH ORDINALITY AS sid(id, ord) ON TRUE
+                JOIN static.shape sh ON sh.id = sid.id AND sh.source = tsc.route_source
+                WHERE tsc.has_own_shape_ids
+                GROUP BY tsc.trip_id, tsc.route_id, tsc.direction, tsc.car_count,
+                         tsc.car_length_feet, tsc.route_color, tsc.effective_shape_ids
+            ),
+            -- Trips using route-level shapes (no shape_ids of their own, e.g. bus) have
+            -- several candidate whole-route shapes and no realtime signal for which one
+            -- they're on. For each candidate, count how many of the trip's actual stops
+            -- Helium's static data says that shape serves (static.route_stop.data) — an
+            -- exact identity signal, not a geometric guess.
+            candidate_shape_hits AS (
+                SELECT
+                    tsc.trip_id,
+                    sid AS shape_id,
+                    count(*) AS hits
+                FROM trip_shape_candidates tsc
+                JOIN realtime.stop_time st
+                    ON st.trip_id = tsc.trip_id AND st.source = tsc.route_source
+                JOIN static.route_stop rs
+                    ON rs.route_id = tsc.route_id AND rs.stop_id = st.stop_id AND rs.source = tsc.route_source
+                CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(rs.data->'shape_ids', '[]'::jsonb)) AS sid
+                WHERE NOT tsc.has_own_shape_ids
+                GROUP BY tsc.trip_id, sid
+            ),
+            -- Score every candidate whole-route shape by its confirmed stop-membership
+            -- hit count (0 when the shape serves none of the trip's stops).
+            shape_candidate_scores AS (
+                SELECT
+                    tsc.trip_id,
+                    sid AS shape_id,
+                    COALESCE(csh.hits, 0) AS hits
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
+                LEFT JOIN candidate_shape_hits csh
+                    ON csh.trip_id = tsc.trip_id AND csh.shape_id = sid
+                WHERE NOT tsc.has_own_shape_ids
+            ),
+            -- Primary selector: the candidate with the most stop-membership hits,
+            -- ties broken deterministically by shape_id. This is cheap — no geometry.
+            hit_best_shape AS (
+                SELECT DISTINCT ON (trip_id)
+                    trip_id, shape_id, hits
+                FROM shape_candidate_scores
+                ORDER BY trip_id, hits DESC, shape_id
+            ),
+            -- Geometric fallback for the rare trip whose stops give no hit signal at
+            -- all (e.g. stops/routes predating the route_stop shape data). Only these
+            -- trips pay the ST_Distance cost, so a cold cache no longer computes
+            -- distances over full-route linestrings for every candidate of every trip
+            -- (which took minutes and could OOM the DB). Planar distance is fine here —
+            -- it is only a relative tie-break, not a reported metric.
+            dist_best_shape AS (
+                SELECT DISTINCT ON (tsc.trip_id)
+                    tsc.trip_id, sh.id AS shape_id
+                FROM trip_shape_candidates tsc
+                JOIN LATERAL UNNEST(tsc.effective_shape_ids) AS sid ON TRUE
+                JOIN static.shape sh ON sh.id = sid AND sh.source = tsc.route_source
+                JOIN realtime.stop_time st
+                    ON st.trip_id = tsc.trip_id AND st.source = tsc.route_source
+                JOIN static.stop s ON s.id = st.stop_id AND s.source = tsc.route_source
+                WHERE NOT tsc.has_own_shape_ids
+                  AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+                  AND tsc.trip_id IN (SELECT trip_id FROM hit_best_shape WHERE hits = 0)
+                GROUP BY tsc.trip_id, sh.id
+                ORDER BY tsc.trip_id, AVG(ST_Distance(sh.geom, s.geom)) ASC
+            ),
+            chosen_shape AS (
+                SELECT trip_id, shape_id FROM hit_best_shape WHERE hits > 0
+                UNION ALL
+                SELECT trip_id, shape_id FROM dist_best_shape
+            ),
+            best_shape AS (
+                SELECT
+                    tsc.trip_id,
+                    tsc.route_id,
+                    tsc.direction,
+                    tsc.car_count,
+                    tsc.car_length_feet,
+                    tsc.route_color,
+                    sh.id AS shape_id,
+                    sh.geom AS shape_geom
+                FROM chosen_shape cs
+                JOIN trip_shape_candidates tsc ON tsc.trip_id = cs.trip_id
+                JOIN static.shape sh ON sh.id = cs.shape_id AND sh.source = tsc.route_source
+                WHERE NOT tsc.has_own_shape_ids
+            ),
+            trip_lines AS (
+                SELECT trip_id, route_id, direction, car_count, car_length_feet,
+                       route_color, shape_id, shape_geom AS trip_geom
+                FROM merged_shape
+                WHERE GeometryType(shape_geom) = 'LINESTRING'
+                  AND ST_NPoints(shape_geom) >= 2
+                UNION ALL
+                SELECT trip_id, route_id, direction, car_count, car_length_feet,
+                       route_color, shape_id, shape_geom AS trip_geom
+                FROM best_shape
+                WHERE GeometryType(shape_geom) = 'LINESTRING'
+                  AND ST_NPoints(shape_geom) >= 2
+            )
+            SELECT
+                tl.trip_id,
+                tl.route_id,
+                tl.route_color,
+                tl.direction,
+                tl.trip_geom,
+                tl.shape_id,
+                st.stop_id,
+                EXTRACT(EPOCH FROM st.arrival)::double precision AS arrival_unix,
+                EXTRACT(EPOCH FROM st.departure)::double precision AS departure_unix,
+                (
+                    ST_LineLocatePoint(tl.trip_geom, s.geom)
+                    * ST_Length(tl.trip_geom::geography)
+                )::double precision AS stop_distance_m
+                ,tl.car_count,
+                tl.car_length_feet,
+                st.data AS stop_time_data,
+                s.data AS stop_data
+            FROM trip_lines tl
+            JOIN realtime.stop_time st ON st.trip_id = tl.trip_id
+            JOIN static.stop s ON s.id = st.stop_id AND s.source = $1
+            WHERE
+                st.source = $1
+                AND st.arrival BETWEEN $2 AND ($2 + INTERVAL '4 hours')
+            ORDER BY tl.trip_id, st.arrival
+            "#,
+        )
+        .bind(source)
+        .bind(at)
+        .bind(&route_ids_vec)
+        .bind(has_route_filter)
+        .fetch_all(&self.pg_pool)
+        .await?)
+    }
+
     /// Bulk insert trips with their stop times so we can remap to the correct trip IDs.
     /// Returns a map of input_id -> actual_id for callers that need to reference the saved trips.
-    #[tracing::instrument(skip(self, data), fields(source = %source.as_str(), count = data.len()), level = "debug")]
+    #[tracing::instrument(level = "debug", skip(self, data), fields(source = %source, count = data.len()))]
     pub async fn save_all(
         &self,
         source: Source,
@@ -105,20 +342,58 @@ impl TripStore {
             return Ok(HashMap::new());
         }
 
+        // TODO: remove this once we figure out why this is happening
+        // Deduplicate trips based on unique constraint: (original_id, vehicle_id, created_at, direction)
+        let mut unique_trips = HashMap::new();
+        for (trip, sts) in data {
+            let key = (
+                trip.original_id.clone(),
+                trip.vehicle_id.clone(),
+                trip.created_at,
+                trip.direction,
+            );
+            // Keep the one with the latest updated_at
+            unique_trips
+                .entry(key)
+                .and_modify(
+                    |(existing_trip, existing_sts): &mut (Trip, Vec<StopTime>)| {
+                        if trip.updated_at > existing_trip.updated_at {
+                            *existing_trip = trip.clone();
+                            *existing_sts = sts.clone();
+                        }
+                    },
+                )
+                .or_insert_with(|| (trip.clone(), sts.clone()));
+        }
+
+        let deduped_data: Vec<_> = unique_trips.into_values().collect();
+
         // Prepare vectors for bulk insert
-        let input_ids: Vec<Uuid> = data.iter().map(|(t, _)| t.id).collect();
+        let input_ids: Vec<Uuid> = deduped_data.iter().map(|(t, _)| t.id).collect();
         // TODO: maybe make original and vehicle id uppercase for consistency
-        let original_ids: Vec<String> = data.iter().map(|(t, _)| t.original_id.clone()).collect();
-        let vehicle_ids: Vec<String> = data.iter().map(|(t, _)| t.vehicle_id.clone()).collect();
-        let route_ids: Vec<String> = data
+        let original_ids: Vec<String> = deduped_data
+            .iter()
+            .map(|(t, _)| t.original_id.clone())
+            .collect();
+        let vehicle_ids: Vec<String> = deduped_data
+            .iter()
+            .map(|(t, _)| t.vehicle_id.clone())
+            .collect();
+        let route_ids: Vec<String> = deduped_data
             .iter()
             .map(|(t, _)| t.route_id.to_uppercase())
             .collect();
-        let sources: Vec<Source> = vec![source; data.len()];
-        let directions: Vec<i16> = data.iter().map(|(t, _)| t.direction).collect();
-        let created_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.created_at).collect();
-        let updated_ats: Vec<DateTime<Utc>> = data.iter().map(|(t, _)| t.updated_at).collect();
-        let trip_data: Vec<serde_json::Value> = data
+        let shape_ids_json: Vec<serde_json::Value> = deduped_data
+            .iter()
+            .map(|(t, _)| serde_json::to_value(&t.shape_ids).unwrap())
+            .collect();
+        let sources: Vec<Source> = vec![source; deduped_data.len()];
+        let directions: Vec<i16> = deduped_data.iter().map(|(t, _)| t.direction).collect();
+        let created_ats: Vec<DateTime<Utc>> =
+            deduped_data.iter().map(|(t, _)| t.created_at).collect();
+        let updated_ats: Vec<DateTime<Utc>> =
+            deduped_data.iter().map(|(t, _)| t.updated_at).collect();
+        let trip_data: Vec<serde_json::Value> = deduped_data
             .iter()
             .map(|(t, _)| serde_json::to_value(&t.data).unwrap())
             .collect();
@@ -127,21 +402,53 @@ impl TripStore {
         // Bulk insert/upsert trips and get mapping from input_id -> actual_id
         // We use a CTE to map the input_id (which we generated) to the actual_id (from DB)
         // matching on the unique constraint columns.
-        let records  = sqlx::query!(
+        // Note: shape_ids are passed as jsonb and converted to varchar[] in SQL
+        // because UNNEST doesn't handle array-of-arrays well.
+        // TODO: are mta bus trip shapes actually flakey? if not we can simplify the shape_ids update logic and just always use the incoming shape_ids if present.
+        let records = sqlx::query_as::<_, (Uuid, Uuid)>(
             r#"
             WITH input_rows AS (
-                SELECT * FROM UNNEST(
-                    $1::uuid[], $2::text[], $3::text[], $4::text[], $5::source_enum[],
-                    $6::smallint[], $7::timestamptz[], $8::timestamptz[], $9::jsonb[]
-                ) AS t(input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)
+                SELECT
+                    t.input_id,
+                    t.original_id,
+                    t.vehicle_id,
+                    t.route_id,
+                    ARRAY(SELECT jsonb_array_elements_text(t.shape_ids_json))::varchar[] AS shape_ids,
+                    t.source,
+                    t.direction,
+                    t.created_at,
+                    t.updated_at,
+                    t.data
+                FROM UNNEST(
+                    $1::uuid[], $2::text[], $3::text[], $4::text[], $5::jsonb[], $6::source_enum[],
+                    $7::smallint[], $8::timestamptz[], $9::timestamptz[], $10::jsonb[]
+                ) AS t(input_id, original_id, vehicle_id, route_id, shape_ids_json, source, direction, created_at, updated_at, data)
             ),
             inserted_rows AS (
-                INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data)
-                SELECT input_id, original_id, vehicle_id, route_id, source, direction, created_at, updated_at, data
+                INSERT INTO realtime.trip (id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data)
+                SELECT input_id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data
                 FROM input_rows
-                ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
+                 ON CONFLICT (original_id, vehicle_id, created_at, direction) DO UPDATE SET
                     data = EXCLUDED.data,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    -- Nonempty incoming wins. Empty incoming clears unless the route
+                    -- publishes shape candidates (MTA bus), in which case keep the
+                    -- previously resolved trip shape across flaky empty updates.
+                    shape_ids = CASE
+                        WHEN EXCLUDED.shape_ids IS NOT NULL
+                             AND array_length(EXCLUDED.shape_ids, 1) > 0
+                            THEN EXCLUDED.shape_ids
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM static.route r
+                            WHERE r.id = EXCLUDED.route_id
+                              AND r.source = EXCLUDED.source
+                              AND jsonb_typeof(r.data->'shape_ids') = 'array'
+                              AND jsonb_array_length(r.data->'shape_ids') > 0
+                        )
+                            THEN realtime.trip.shape_ids
+                        ELSE EXCLUDED.shape_ids
+                    END
                 RETURNING id, original_id, vehicle_id, created_at, direction
             )
             SELECT
@@ -154,23 +461,24 @@ impl TripStore {
                 inserted_rows.created_at = input_rows.created_at AND
                 inserted_rows.direction = input_rows.direction
             "#,
-            &input_ids,
-            &original_ids,
-            &vehicle_ids,
-            &route_ids,
-            &sources as &[Source],
-            &directions as &[i16],
-            &created_ats,
-            &updated_ats,
-            &trip_data
         )
+        .bind(&input_ids)
+        .bind(&original_ids)
+        .bind(&vehicle_ids)
+        .bind(&route_ids)
+        .bind(&shape_ids_json)
+        .bind(&sources)
+        .bind(&directions)
+        .bind(&created_ats)
+        .bind(&updated_ats)
+        .bind(&trip_data)
         .fetch_all(&self.pg_pool)
         .await?;
 
         // Create a map for quick lookup
         let id_map: HashMap<Uuid, Uuid> = records
             .into_iter()
-            .filter_map(|r| r.input_id.map(|id| (id, r.actual_id)))
+            .map(|(actual_id, input_id)| (input_id, actual_id))
             .collect();
 
         // Prepare stop times for bulk insert
@@ -183,7 +491,7 @@ impl TripStore {
         let mut seen_stop_times = std::collections::HashSet::new();
         let mut duplicate_count = 0usize;
 
-        for (trip, sts) in data {
+        for (trip, sts) in deduped_data {
             if let Some(&actual_id) = id_map.get(&trip.id) {
                 for st in sts {
                     let stop_id = st.stop_id.to_uppercase();
@@ -243,5 +551,37 @@ impl TripStore {
 
         // might want to insert positions from here instead of returning the map
         Ok(id_map)
+    }
+
+    // TODO: improve this. i don't like how the shape resolution is separate from the main insert also maybe this should be using moka?
+    /// Cache resolved shape IDs on trips that don't have shape IDs set.
+    pub async fn update_resolved_shapes(&self, shapes: &[(Uuid, String)]) -> anyhow::Result<()> {
+        if shapes.is_empty() {
+            return Ok(());
+        }
+
+        let mut trip_ids = Vec::with_capacity(shapes.len());
+        let mut shape_ids = Vec::with_capacity(shapes.len());
+
+        for (trip_id, shape_id) in shapes {
+            trip_ids.push(*trip_id);
+            shape_ids.push(shape_id.clone());
+        }
+
+        sqlx::query!(
+            r#"
+            UPDATE realtime.trip AS t
+            SET shape_ids = ARRAY[u.shape_id]
+            FROM UNNEST($1::uuid[], $2::text[]) AS u(trip_id, shape_id)
+            WHERE t.id = u.trip_id
+              AND (t.shape_ids IS NULL OR array_length(t.shape_ids, 1) IS NULL OR array_length(t.shape_ids, 1) = 0)
+            "#,
+            &trip_ids,
+            &shape_ids,
+        )
+        .execute(&self.pg_pool)
+        .await?;
+
+        Ok(())
     }
 }

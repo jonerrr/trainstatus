@@ -1,0 +1,13 @@
+{
+  "source": "mta_subway",
+  "kind": "realtime",
+  "scenario": "ace",
+  "payloads": [
+    {
+      "name": "feed",
+      "path": "raw/feed.pb",
+      "format": "gtfs_realtime_protobuf"
+    }
+  ],
+  "notes": "Legacy GTFS-RT subway feed fixture retained as raw replay input."
+}

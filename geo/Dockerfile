@@ -1,3 +1,7 @@
+# Declared before the first FROM so it can be used in later FROM lines.
+# Bump manually when upgrading; tile major version must match backend Valhalla.
+ARG VALHALLA_VERSION=3.8.3
+
 FROM debian:bookworm-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb AS osm-data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,7 +31,7 @@ RUN --mount=type=cache,id=osm-pbf-cache,target=/var/cache/osm-pbfs \
     /var/cache/osm-pbfs/connecticut-latest.osm.pbf \
     -o /build/merged.osm.pbf
 
-FROM ghcr.io/valhalla/valhalla:3.7.0@sha256:c19b052fa132474da719e0e931007cd3931f25c43890f88acf270ba837fdc89f AS valhalla-builder
+FROM ghcr.io/valhalla/valhalla:${VALHALLA_VERSION} AS valhalla-builder
 
 WORKDIR /build
 COPY --from=osm-data /build/merged.osm.pbf /build/merged.osm.pbf
@@ -62,6 +66,5 @@ RUN --mount=type=cache,id=planetiler-sources-cache,target=/data/sources \
 
 FROM scratch
 
-COPY --from=valhalla-builder /build/valhalla.json /valhalla.json
 COPY --from=valhalla-builder /data/valhalla_tiles.tar /valhalla_tiles.tar
 COPY --from=planetiler-builder /data/basemap.mbtiles /basemap.mbtiles

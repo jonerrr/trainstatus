@@ -21,11 +21,41 @@ use crate::{
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 pub struct MtaBusRealtime;
+
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let adapter = MtaBusRealtime;
+    let trip_updates = reqwest::get("https://gtfsrt.prod.obanyc.com/tripUpdates")
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+    let vehicle_positions = reqwest::get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+    let oba_vehicles = adapter.fetch_oba_data().await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert("trip_updates.pb".to_string(), trip_updates.to_vec());
+    fixtures.insert(
+        "vehicle_positions.pb".to_string(),
+        vehicle_positions.to_vec(),
+    );
+    fixtures.insert(
+        "oba_vehicles.json".to_string(),
+        serde_json::to_vec_pretty(&oba_vehicles)?,
+    );
+    Ok(fixtures)
+}
 
 impl MtaBusRealtime {
     /// Fetch OBA data from all MTA agencies
@@ -40,11 +70,15 @@ impl MtaBusRealtime {
 
             match oba::fetch_vehicles(&url, mta_oba_api_key()).await {
                 Ok(vehicles) => {
-                    debug!("Fetched {} vehicles from {}", vehicles.len(), agency);
+                    debug!(
+                        agency,
+                        vehicle_count = vehicles.len(),
+                        "Fetched OBA vehicles"
+                    );
                     all_vehicles.extend(vehicles);
                 }
                 Err(e) => {
-                    warn!("Failed to fetch OBA data from {}: {:?}", agency, e);
+                    warn!(agency, error = %e, "Failed to fetch OBA data");
                 }
             }
         }
@@ -152,6 +186,7 @@ impl GtfsSource for MtaBusRealtime {
             id: Uuid::now_v7(),
             original_id: mta_id,
             route_id,
+            shape_ids: vec![],
             direction,
             created_at,
             vehicle_id,
@@ -242,7 +277,7 @@ impl RealtimeAdapter for MtaBusRealtime {
         std::time::Duration::from_secs(30)
     }
 
-    #[instrument(skip_all, fields(source = ?Source::MtaBus))]
+    #[instrument(level = "debug", skip_all, fields(source = %Source::MtaBus))]
     async fn run(
         &self,
         static_controller: &StaticController,
@@ -271,7 +306,7 @@ impl RealtimeAdapter for MtaBusRealtime {
                     .collect()
             }
             Err(e) => {
-                error!("OBA fetch failed: {:?}", e);
+                error!(error = %e, "OBA fetch failed");
                 HashMap::new()
             }
         };
@@ -300,19 +335,19 @@ impl RealtimeAdapter for MtaBusRealtime {
                 if let Some(vehicle) = entity.vehicle
                     && let Some(mut position) =
                         self.process_vehicle(vehicle, static_cache_store).await
-                    {
-                        // Merge OBA data if available
-                        if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
-                            // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
-                            if let PositionData::MtaBus(data) = &mut position.data {
-                                data.passengers = oba_data.occupancy_count;
-                                data.capacity = oba_data.occupancy_capacity;
-                                data.status = Some(oba_data.status.clone());
-                                data.phase = Some(oba_data.phase.clone());
-                            }
+                {
+                    // Merge OBA data if available
+                    if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
+                        // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
+                        if let PositionData::MtaBus(data) = &mut position.data {
+                            data.passengers = oba_data.occupancy_count;
+                            data.capacity = oba_data.occupancy_capacity;
+                            data.status = Some(oba_data.status.clone());
+                            data.phase = Some(oba_data.phase.clone());
                         }
-                        positions.push(position);
                     }
+                    positions.push(position);
+                }
             }
         }
 
@@ -336,19 +371,20 @@ impl RealtimeAdapter for MtaBusRealtime {
                     if let Some(db_err) = e
                         .downcast_ref::<sqlx::Error>()
                         .and_then(|x| x.as_database_error())
-                        && db_err.code().as_deref() == Some("23503") {
-                            warn!("Missing static data for bus. Forcing update...");
+                        && db_err.code().as_deref() == Some("23503")
+                    {
+                        warn!("Missing static data for bus. Forcing update...");
 
-                            if let Err(update_err) = static_controller
-                                .force_update(GtfsSource::source(self))
-                                .await
-                            {
-                                anyhow::bail!("Ensure update failed: {}", update_err);
-                            }
-
-                            attempts += 1;
-                            continue;
+                        if let Err(update_err) = static_controller
+                            .force_update(GtfsSource::source(self))
+                            .await
+                        {
+                            anyhow::bail!("Ensure update failed: {}", update_err);
                         }
+
+                        attempts += 1;
+                        continue;
+                    }
 
                     return Err(e);
                 }
@@ -409,54 +445,4 @@ fn parse_bus_origin_time(trip_id: &str) -> Option<NaiveTime> {
     let time_num = time_str.parse::<i32>().ok()? / 100;
 
     parse_origin_time(time_num)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::feed::FeedMessage;
-    use crate::stores::static_cache::StaticCacheStore;
-    use bb8_redis::RedisConnectionManager;
-    use prost::Message;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn load_fixture(path: &str) -> FeedMessage {
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/fixtures");
-        d.push(path);
-        let bytes = fs::read(d).expect("Failed to read fixture file");
-        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
-    }
-
-    #[tokio::test]
-    async fn test_process_bus_trip_from_fixture() {
-        let fixture = load_fixture("mta_bus/mta_bus-trips.pb");
-        let adapter = MtaBusRealtime;
-        
-        let mut trip_count = 0;
-        for entity in fixture.entity {
-            if let Some(update) = entity.trip_update {
-                let manager = RedisConnectionManager::new("redis://localhost").unwrap();
-                let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
-                let cache = StaticCacheStore::new(redis_pool);
-
-                let (trip, stop_times) = adapter.process_trip(update, &cache).await;
-                if let Some(trip) = trip {
-                    trip_count += 1;
-                    assert!(!trip.original_id.is_empty());
-                    assert!(!trip.vehicle_id.is_empty());
-                    // MTA Bus direction is usually 0 or 1
-                    assert!(trip.direction == 0 || trip.direction == 1);
-                    
-                    if !stop_times.is_empty() {
-                        let st = &stop_times[0];
-                        assert_eq!(st.trip_id, trip.id);
-                        assert!(!st.stop_id.is_empty());
-                    }
-                }
-            }
-        }
-        assert!(trip_count > 0, "Should have processed at least one bus trip from fixture");
-    }
 }

@@ -5,9 +5,11 @@ use geozero::{
 };
 use serde::{Deserialize, Serialize};
 use std::io::Read;
+use utoipa::ToSchema;
 
 // TODO: define utoipa schema
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(value_type = Object)]
 #[serde(transparent)]
 pub struct Geom(pub geo::Geometry<f64>);
 

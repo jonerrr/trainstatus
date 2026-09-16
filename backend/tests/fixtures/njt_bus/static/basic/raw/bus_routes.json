@@ -1,0 +1,1122 @@
+[
+  {
+    "BusRouteID": "1",
+    "BusRouteDescription": "Newark"
+  },
+  {
+    "BusRouteID": "2",
+    "BusRouteDescription": "Jersey City - Journal Square - Secaucus"
+  },
+  {
+    "BusRouteID": "5",
+    "BusRouteDescription": "Kinney"
+  },
+  {
+    "BusRouteID": "6",
+    "BusRouteDescription": "Ocean Avenue - Journal Square"
+  },
+  {
+    "BusRouteID": "7",
+    "BusRouteDescription": "Newark Light Rail"
+  },
+  {
+    "BusRouteID": "8",
+    "BusRouteDescription": "Bergen Avenue"
+  },
+  {
+    "BusRouteID": "9",
+    "BusRouteDescription": "Montgomery St - West Side Avenue"
+  },
+  {
+    "BusRouteID": "10",
+    "BusRouteDescription": "Bayonne - Jersey City"
+  },
+  {
+    "BusRouteID": "11",
+    "BusRouteDescription": "Newark - Willowbrook"
+  },
+  {
+    "BusRouteID": "12",
+    "BusRouteDescription": "Broadway Bayonne"
+  },
+  {
+    "BusRouteID": "13",
+    "BusRouteDescription": "Broad Street - Clinton Avenue"
+  },
+  {
+    "BusRouteID": "14",
+    "BusRouteDescription": "Duncan - Mallory - NJ 440"
+  },
+  {
+    "BusRouteID": "16",
+    "BusRouteDescription": "Newport Mall - Journal Square"
+  },
+  {
+    "BusRouteID": "21",
+    "BusRouteDescription": "Main Street"
+  },
+  {
+    "BusRouteID": "22",
+    "BusRouteDescription": "North Bergen - Union City - Hoboken"
+  },
+  {
+    "BusRouteID": "23",
+    "BusRouteDescription": "North Bergen - Weehawken - Hoboken"
+  },
+  {
+    "BusRouteID": "24",
+    "BusRouteDescription": "Elizabethport - Newark -  Orange"
+  },
+  {
+    "BusRouteID": "25",
+    "BusRouteDescription": "Springfield Avenue"
+  },
+  {
+    "BusRouteID": "26",
+    "BusRouteDescription": "Irvington - Elizabeth"
+  },
+  {
+    "BusRouteID": "27",
+    "BusRouteDescription": "Mount Prospect"
+  },
+  {
+    "BusRouteID": "28",
+    "BusRouteDescription": "Newark - Montclair State - Willowbrook"
+  },
+  {
+    "BusRouteID": "29",
+    "BusRouteDescription": "Bloomfield Avenue"
+  },
+  {
+    "BusRouteID": "30",
+    "BusRouteDescription": "North Arlington-Kearny-Newark"
+  },
+  {
+    "BusRouteID": "31",
+    "BusRouteDescription": "South Orange Avenue - Newark Penn Station"
+  },
+  {
+    "BusRouteID": "34",
+    "BusRouteDescription": "Market Street"
+  },
+  {
+    "BusRouteID": "37",
+    "BusRouteDescription": "Lyons Avenue"
+  },
+  {
+    "BusRouteID": "39",
+    "BusRouteDescription": "Irvington - Newark"
+  },
+  {
+    "BusRouteID": "40",
+    "BusRouteDescription": "Kearny - Jersey Gardens"
+  },
+  {
+    "BusRouteID": "41",
+    "BusRouteDescription": "Park Avenue"
+  },
+  {
+    "BusRouteID": "44",
+    "BusRouteDescription": "Tremont - Central Avenue - Newark Penn Station"
+  },
+  {
+    "BusRouteID": "48",
+    "BusRouteDescription": "Elizabeth - Woodbridge - Perth Amboy"
+  },
+  {
+    "BusRouteID": "52",
+    "BusRouteDescription": "Morris Avenue"
+  },
+  {
+    "BusRouteID": "56",
+    "BusRouteDescription": "Elizabeth - Winfield"
+  },
+  {
+    "BusRouteID": "57",
+    "BusRouteDescription": "Tremley"
+  },
+  {
+    "BusRouteID": "58",
+    "BusRouteDescription": "Elizabeth - Kenilworth"
+  },
+  {
+    "BusRouteID": "59",
+    "BusRouteDescription": "Plainfield - Newark"
+  },
+  {
+    "BusRouteID": "62",
+    "BusRouteDescription": "Newark -  Elizabeth"
+  },
+  {
+    "BusRouteID": "63",
+    "BusRouteDescription": "Lakewood - Jersey City - Weehawken Exp."
+  },
+  {
+    "BusRouteID": "64",
+    "BusRouteDescription": "Lakewood - Jersey City - Weehawken"
+  },
+  {
+    "BusRouteID": "65",
+    "BusRouteDescription": "Newark - Somerville"
+  },
+  {
+    "BusRouteID": "66",
+    "BusRouteDescription": "Newark - Mountainside"
+  },
+  {
+    "BusRouteID": "67",
+    "BusRouteDescription": "Toms River - Lakewood - Newark"
+  },
+  {
+    "BusRouteID": "68",
+    "BusRouteDescription": "Old Bridge-East Brunswick-Jersey City -Weehawken"
+  },
+  {
+    "BusRouteID": "70",
+    "BusRouteDescription": "Newark - Livingston Mall"
+  },
+  {
+    "BusRouteID": "71",
+    "BusRouteDescription": "Newark - West Caldwell"
+  },
+  {
+    "BusRouteID": "72",
+    "BusRouteDescription": "Paterson - Bloomfield - Newark"
+  },
+  {
+    "BusRouteID": "73",
+    "BusRouteDescription": "Newark - Orange - Livingston"
+  },
+  {
+    "BusRouteID": "74",
+    "BusRouteDescription": "Paterson - Nutley - Newark"
+  },
+  {
+    "BusRouteID": "76",
+    "BusRouteDescription": "Newark - Hackensack"
+  },
+  {
+    "BusRouteID": "78",
+    "BusRouteDescription": "Newark - Secaucus"
+  },
+  {
+    "BusRouteID": "79",
+    "BusRouteDescription": "Parsippany - Newark Express"
+  },
+  {
+    "BusRouteID": "80",
+    "BusRouteDescription": "Greenville - Journal Square - Exchange Place"
+  },
+  {
+    "BusRouteID": "81",
+    "BusRouteDescription": "Bayonne - Jersey City"
+  },
+  {
+    "BusRouteID": "82",
+    "BusRouteDescription": "Jersey City Heights - Exchange Place"
+  },
+  {
+    "BusRouteID": "83",
+    "BusRouteDescription": "Hackensack - Jersey City - Journal Square"
+  },
+  {
+    "BusRouteID": "84",
+    "BusRouteDescription": "North Bergen - Jersey City - Journal Square"
+  },
+  {
+    "BusRouteID": "85",
+    "BusRouteDescription": "American Dream - Mill Creek  - Hoboken"
+  },
+  {
+    "BusRouteID": "86",
+    "BusRouteDescription": "Union City - Jersey City - Newport Centre Mall"
+  },
+  {
+    "BusRouteID": "87",
+    "BusRouteDescription": "Jersey City - Hoboken"
+  },
+  {
+    "BusRouteID": "88",
+    "BusRouteDescription": "North Bergen - Jersey City - Journal Square"
+  },
+  {
+    "BusRouteID": "89",
+    "BusRouteDescription": "North Bergen - Hoboken"
+  },
+  {
+    "BusRouteID": "90",
+    "BusRouteDescription": "Grove Street Crosstown"
+  },
+  {
+    "BusRouteID": "92",
+    "BusRouteDescription": "Orange Crosstown"
+  },
+  {
+    "BusRouteID": "94",
+    "BusRouteDescription": "Stuyvesant Crosstown"
+  },
+  {
+    "BusRouteID": "96",
+    "BusRouteDescription": "18th Street Crosstown"
+  },
+  {
+    "BusRouteID": "97",
+    "BusRouteDescription": "East Orange - Montclair"
+  },
+  {
+    "BusRouteID": "99",
+    "BusRouteDescription": "Clifton Avenue Crosstown"
+  },
+  {
+    "BusRouteID": "101",
+    "BusRouteDescription": "West Orange - Montclair - New York"
+  },
+  {
+    "BusRouteID": "102",
+    "BusRouteDescription": "Bloomfield - New York"
+  },
+  {
+    "BusRouteID": "105",
+    "BusRouteDescription": "West Caldwell - Cedar Grove - New York"
+  },
+  {
+    "BusRouteID": "107",
+    "BusRouteDescription": "Irvington - New York"
+  },
+  {
+    "BusRouteID": "108",
+    "BusRouteDescription": "Newark - New York"
+  },
+  {
+    "BusRouteID": "109",
+    "BusRouteDescription": "North Newark - Harrison - New York"
+  },
+  {
+    "BusRouteID": "111",
+    "BusRouteDescription": "New York - IKEA - Jersey Gardens"
+  },
+  {
+    "BusRouteID": "112",
+    "BusRouteDescription": "Clark - New York"
+  },
+  {
+    "BusRouteID": "113",
+    "BusRouteDescription": "Dunellen - New York"
+  },
+  {
+    "BusRouteID": "114",
+    "BusRouteDescription": "Bridgewater - New York"
+  },
+  {
+    "BusRouteID": "115",
+    "BusRouteDescription": "Rahway - New York"
+  },
+  {
+    "BusRouteID": "116",
+    "BusRouteDescription": "Perth Amboy - New York"
+  },
+  {
+    "BusRouteID": "117",
+    "BusRouteDescription": "Somerville - New York Express"
+  },
+  {
+    "BusRouteID": "119",
+    "BusRouteDescription": "Bayonne - Jersey City - New York"
+  },
+  {
+    "BusRouteID": "120",
+    "BusRouteDescription": "Bayonne - New York Downtown"
+  },
+  {
+    "BusRouteID": "121",
+    "BusRouteDescription": "North Bergen - New York"
+  },
+  {
+    "BusRouteID": "122",
+    "BusRouteDescription": "Secaucus - New York"
+  },
+  {
+    "BusRouteID": "123",
+    "BusRouteDescription": "Jersey City - Union City - New York"
+  },
+  {
+    "BusRouteID": "124",
+    "BusRouteDescription": "Secaucus - New York"
+  },
+  {
+    "BusRouteID": "125",
+    "BusRouteDescription": "Jersey City - Journal Square - New York"
+  },
+  {
+    "BusRouteID": "126",
+    "BusRouteDescription": "Hoboken - New York"
+  },
+  {
+    "BusRouteID": "127",
+    "BusRouteDescription": "Ridgefield - Union City - New York"
+  },
+  {
+    "BusRouteID": "128",
+    "BusRouteDescription": "North Bergen - Boulevard East - New York"
+  },
+  {
+    "BusRouteID": "129",
+    "BusRouteDescription": "Secaucus - Union City - New York"
+  },
+  {
+    "BusRouteID": "130",
+    "BusRouteDescription": "Lakewood - New York - Union Hill Express"
+  },
+  {
+    "BusRouteID": "131",
+    "BusRouteDescription": "Sayreville - New York"
+  },
+  {
+    "BusRouteID": "132",
+    "BusRouteDescription": "Lakewood - New York - Gordons Corner Express"
+  },
+  {
+    "BusRouteID": "133",
+    "BusRouteDescription": "Old Bridge - Aberdeen - New York"
+  },
+  {
+    "BusRouteID": "135",
+    "BusRouteDescription": "Freehold - Matawan - New York"
+  },
+  {
+    "BusRouteID": "136",
+    "BusRouteDescription": "Lakewood - New York - Freehold Mall Express"
+  },
+  {
+    "BusRouteID": "137",
+    "BusRouteDescription": "Toms River - New York"
+  },
+  {
+    "BusRouteID": "138",
+    "BusRouteDescription": "Old Bridge - East Brunswick - New York"
+  },
+  {
+    "BusRouteID": "139",
+    "BusRouteDescription": "Lakewood - Old Bridge - New York (via Route 9)"
+  },
+  {
+    "BusRouteID": "144",
+    "BusRouteDescription": "Elmwood Park-Hackensack-New York"
+  },
+  {
+    "BusRouteID": "145",
+    "BusRouteDescription": "Fair Lawn - New York"
+  },
+  {
+    "BusRouteID": "148",
+    "BusRouteDescription": "Midland Park - New York"
+  },
+  {
+    "BusRouteID": "151",
+    "BusRouteDescription": "Paterson - New York Express"
+  },
+  {
+    "BusRouteID": "153",
+    "BusRouteDescription": "Fairview - Fort Lee - New York"
+  },
+  {
+    "BusRouteID": "154",
+    "BusRouteDescription": "Fort Lee-Palisades Park-New York"
+  },
+  {
+    "BusRouteID": "155",
+    "BusRouteDescription": "Bogota-Ridgefield Park-New York"
+  },
+  {
+    "BusRouteID": "156",
+    "BusRouteDescription": "Englewood Cliffs - Fort Lee - New York"
+  },
+  {
+    "BusRouteID": "157",
+    "BusRouteDescription": "Teaneck-Ridgefield Park-New York"
+  },
+  {
+    "BusRouteID": "158",
+    "BusRouteDescription": "Fort Lee-Edgewater-New York"
+  },
+  {
+    "BusRouteID": "159",
+    "BusRouteDescription": "Fort Lee-New York"
+  },
+  {
+    "BusRouteID": "160",
+    "BusRouteDescription": "Elmwood Park - Wallington - New York"
+  },
+  {
+    "BusRouteID": "161",
+    "BusRouteDescription": "Paterson - Passaic - New York"
+  },
+  {
+    "BusRouteID": "162",
+    "BusRouteDescription": "Maywood - New York"
+  },
+  {
+    "BusRouteID": "163",
+    "BusRouteDescription": "Ridgewood - New York"
+  },
+  {
+    "BusRouteID": "164",
+    "BusRouteDescription": "Midland Park - Fair Lawn - New York"
+  },
+  {
+    "BusRouteID": "165",
+    "BusRouteDescription": "Westwood - New York"
+  },
+  {
+    "BusRouteID": "166",
+    "BusRouteDescription": "Cresskill - Bergenfield - New York"
+  },
+  {
+    "BusRouteID": "167",
+    "BusRouteDescription": "Harrington Park - Dumont - New York"
+  },
+  {
+    "BusRouteID": "168",
+    "BusRouteDescription": "Paramus - New York"
+  },
+  {
+    "BusRouteID": "171",
+    "BusRouteDescription": "Paterson - New York (GWB)"
+  },
+  {
+    "BusRouteID": "175",
+    "BusRouteDescription": "Ridgewood - New York (GWB)"
+  },
+  {
+    "BusRouteID": "177",
+    "BusRouteDescription": "Harrington Park - New Milford - New York Express"
+  },
+  {
+    "BusRouteID": "178",
+    "BusRouteDescription": "Hackensack - Englewood - New York (GWB)"
+  },
+  {
+    "BusRouteID": "181",
+    "BusRouteDescription": "Union City - New York (GWB)"
+  },
+  {
+    "BusRouteID": "182",
+    "BusRouteDescription": "Hackensack - New York (GWB)"
+  },
+  {
+    "BusRouteID": "186",
+    "BusRouteDescription": "Dumont - New York (GWB)"
+  },
+  {
+    "BusRouteID": "188",
+    "BusRouteDescription": "West New York - New York (GWB)"
+  },
+  {
+    "BusRouteID": "190",
+    "BusRouteDescription": "Paterson - Secaucus - New York"
+  },
+  {
+    "BusRouteID": "191",
+    "BusRouteDescription": "Willowbrook - Montclair - New York"
+  },
+  {
+    "BusRouteID": "192",
+    "BusRouteDescription": "Clifton - New York"
+  },
+  {
+    "BusRouteID": "193",
+    "BusRouteDescription": "Willowbrook - New York Express"
+  },
+  {
+    "BusRouteID": "194",
+    "BusRouteDescription": "Stockholm - West Milford - New York"
+  },
+  {
+    "BusRouteID": "195",
+    "BusRouteDescription": "Willowbrook - Cedar Grove - New York"
+  },
+  {
+    "BusRouteID": "196",
+    "BusRouteDescription": "Warwick - Ringwood - New York"
+  },
+  {
+    "BusRouteID": "197",
+    "BusRouteDescription": "Warwick - Wayne - New York"
+  },
+  {
+    "BusRouteID": "198",
+    "BusRouteDescription": "Wayne-William Paterson University-New York"
+  },
+  {
+    "BusRouteID": "199",
+    "BusRouteDescription": "Clifton - Lyndhurst - New York"
+  },
+  {
+    "BusRouteID": "230",
+    "BusRouteDescription": "Manalapan-Marlboro"
+  },
+  {
+    "BusRouteID": "231",
+    "BusRouteDescription": "Freehold Township"
+  },
+  {
+    "BusRouteID": "250",
+    "BusRouteDescription": "go25 Springfield Avenue"
+  },
+  {
+    "BusRouteID": "258",
+    "BusRouteDescription": "go28 Newark Airport - Newark - Bloomfield"
+  },
+  {
+    "BusRouteID": "313",
+    "BusRouteDescription": "Cape May - Wildwood - 30th Street Philadelphia"
+  },
+  {
+    "BusRouteID": "315",
+    "BusRouteDescription": "Cape May - Wildwood - 30th Street Philadelphia"
+  },
+  {
+    "BusRouteID": "316",
+    "BusRouteDescription": "Cape May - Wildwood - Philadelphia Express"
+  },
+  {
+    "BusRouteID": "317",
+    "BusRouteDescription": "Asbury Park - Fort Dix - Philadelphia"
+  },
+  {
+    "BusRouteID": "319",
+    "BusRouteDescription": "New York  - Atlantic City - Cape May"
+  },
+  {
+    "BusRouteID": "320",
+    "BusRouteDescription": "Mill Creek - North Bergen Park/Ride - New York"
+  },
+  {
+    "BusRouteID": "321",
+    "BusRouteDescription": "Vince Lombardi Park/Ride - New York"
+  },
+  {
+    "BusRouteID": "324",
+    "BusRouteDescription": "Wayne/Route 23 Transit Center-New York Express"
+  },
+  {
+    "BusRouteID": "329",
+    "BusRouteDescription": "Harmon Cove-Secaucus Junction"
+  },
+  {
+    "BusRouteID": "342",
+    "BusRouteDescription": "Hudson Bergen Light Rail"
+  },
+  {
+    "BusRouteID": "343",
+    "BusRouteDescription": "River LINE"
+  },
+  {
+    "BusRouteID": "344",
+    "BusRouteDescription": "River LINE Bus substitute"
+  },
+  {
+    "BusRouteID": "346",
+    "BusRouteDescription": "Princeton Rail Shuttle Service"
+  },
+  {
+    "BusRouteID": "355",
+    "BusRouteDescription": "American Dream - New York"
+  },
+  {
+    "BusRouteID": "361",
+    "BusRouteDescription": "Newark - Ivy Hill Express"
+  },
+  {
+    "BusRouteID": "364",
+    "BusRouteDescription": "Ridgewood - Paramus Seasonal"
+  },
+  {
+    "BusRouteID": "372",
+    "BusRouteDescription": "Bloomfield Seasonal Service"
+  },
+  {
+    "BusRouteID": "375",
+    "BusRouteDescription": "Springfield Avenue Express"
+  },
+  {
+    "BusRouteID": "378",
+    "BusRouteDescription": "Newark - UPS Secaucus Express"
+  },
+  {
+    "BusRouteID": "390",
+    "BusRouteDescription": "Northern Division Mail Truck"
+  },
+  {
+    "BusRouteID": "395",
+    "BusRouteDescription": "40th Lot Man for Howell"
+  },
+  {
+    "BusRouteID": "399",
+    "BusRouteDescription": "Southern Division Mail Truck"
+  },
+  {
+    "BusRouteID": "400",
+    "BusRouteDescription": "Sicklerville  - Philadelphia"
+  },
+  {
+    "BusRouteID": "401",
+    "BusRouteDescription": "Salem - Philadelphia"
+  },
+  {
+    "BusRouteID": "402",
+    "BusRouteDescription": "Pennsville - Philadelphia"
+  },
+  {
+    "BusRouteID": "403",
+    "BusRouteDescription": "Camden - Lindenwold PATCO - Turnersville"
+  },
+  {
+    "BusRouteID": "404",
+    "BusRouteDescription": "Cherry Hill Mall - Pennsauken - Philadelphia"
+  },
+  {
+    "BusRouteID": "405",
+    "BusRouteDescription": "Camden - Merchantville - Cherry Hill Mall"
+  },
+  {
+    "BusRouteID": "406",
+    "BusRouteDescription": "Berlin - Marlton - Philadelphia"
+  },
+  {
+    "BusRouteID": "407",
+    "BusRouteDescription": "Camden - Merchantville - Moorestown Mall"
+  },
+  {
+    "BusRouteID": "408",
+    "BusRouteDescription": "Millville - Philadelphia"
+  },
+  {
+    "BusRouteID": "409",
+    "BusRouteDescription": "Trenton - Willingboro - Philadelphia"
+  },
+  {
+    "BusRouteID": "410",
+    "BusRouteDescription": "Bridgeton - Philadelphia"
+  },
+  {
+    "BusRouteID": "412",
+    "BusRouteDescription": "Sewell - Glassboro - Philadelphia"
+  },
+  {
+    "BusRouteID": "413",
+    "BusRouteDescription": "Camden - Mt. Holly - Florence"
+  },
+  {
+    "BusRouteID": "414",
+    "BusRouteDescription": "Philadelphia - Moorestown"
+  },
+  {
+    "BusRouteID": "417",
+    "BusRouteDescription": "Willingboro Express"
+  },
+  {
+    "BusRouteID": "418",
+    "BusRouteDescription": "Trenton Express"
+  },
+  {
+    "BusRouteID": "419",
+    "BusRouteDescription": "Camden-Pennsauken Transit Center-Riverside"
+  },
+  {
+    "BusRouteID": "450",
+    "BusRouteDescription": "Cherry Hill Mall - Audubon -Camden"
+  },
+  {
+    "BusRouteID": "451",
+    "BusRouteDescription": "Camden-Voorhees Town Center"
+  },
+  {
+    "BusRouteID": "452",
+    "BusRouteDescription": "Camden - 36th St. Station"
+  },
+  {
+    "BusRouteID": "453",
+    "BusRouteDescription": "Ferry Avenue PATCO - Camden"
+  },
+  {
+    "BusRouteID": "455",
+    "BusRouteDescription": "Cherry Hill Mall-Woodbury-Paulsboro"
+  },
+  {
+    "BusRouteID": "457",
+    "BusRouteDescription": "Moorestown Mall - Camden"
+  },
+  {
+    "BusRouteID": "459",
+    "BusRouteDescription": "Voorhees Town Ctr-Camden County Coll.-Avandale P/R"
+  },
+  {
+    "BusRouteID": "463",
+    "BusRouteDescription": "Woodbury - Avandale Park/Ride"
+  },
+  {
+    "BusRouteID": "468",
+    "BusRouteDescription": "Penns Grove - Salem - Woodstown"
+  },
+  {
+    "BusRouteID": "501",
+    "BusRouteDescription": "Atlantic City - Brigantine Beach"
+  },
+  {
+    "BusRouteID": "502",
+    "BusRouteDescription": "Atlantic City - Hamilton Mall - Atlantic/Cape C. C"
+  },
+  {
+    "BusRouteID": "504",
+    "BusRouteDescription": "Atlantic City - Ventnor Plaza - Margate"
+  },
+  {
+    "BusRouteID": "505",
+    "BusRouteDescription": "Atlantic City-Margate-Longport"
+  },
+  {
+    "BusRouteID": "507",
+    "BusRouteDescription": "Atlantic City - Ocean City"
+  },
+  {
+    "BusRouteID": "508",
+    "BusRouteDescription": "Atlantic City-Stockton College-Hamilton Mall"
+  },
+  {
+    "BusRouteID": "509",
+    "BusRouteDescription": "Atlantic City-Somers Point-Ocean City via New Road"
+  },
+  {
+    "BusRouteID": "510",
+    "BusRouteDescription": "510"
+  },
+  {
+    "BusRouteID": "511",
+    "BusRouteDescription": "A.C.Rail - Tropicana"
+  },
+  {
+    "BusRouteID": "513",
+    "BusRouteDescription": "A.C. Rail - Hard Rock/Resorts"
+  },
+  {
+    "BusRouteID": "515",
+    "BusRouteDescription": "A.C. Rail - Marina Casinos"
+  },
+  {
+    "BusRouteID": "529",
+    "BusRouteDescription": "Morris Metro Pull in to Pumps"
+  },
+  {
+    "BusRouteID": "530",
+    "BusRouteDescription": "Weekawken Taxi, Oradell"
+  },
+  {
+    "BusRouteID": "531",
+    "BusRouteDescription": "Weehawken Taxi, Westwood"
+  },
+  {
+    "BusRouteID": "532",
+    "BusRouteDescription": "Weehawken Taxi, Wayne"
+  },
+  {
+    "BusRouteID": "534",
+    "BusRouteDescription": "Weehawken Taxi, Ironbound 113/116"
+  },
+  {
+    "BusRouteID": "535",
+    "BusRouteDescription": "Weehawken Taxi, Ironbound 114/117"
+  },
+  {
+    "BusRouteID": "539",
+    "BusRouteDescription": "Weehawken Taxi, Howell"
+  },
+  {
+    "BusRouteID": "551",
+    "BusRouteDescription": "Philadelphia-Atlantic City"
+  },
+  {
+    "BusRouteID": "552",
+    "BusRouteDescription": "Cape May - Atlantic City"
+  },
+  {
+    "BusRouteID": "553",
+    "BusRouteDescription": "Upper Deerfield - Atlantic City"
+  },
+  {
+    "BusRouteID": "554",
+    "BusRouteDescription": "Lindenwold - PATCO - Atlantic City"
+  },
+  {
+    "BusRouteID": "555",
+    "BusRouteDescription": "Avandale-30th Street Philadelphia"
+  },
+  {
+    "BusRouteID": "559",
+    "BusRouteDescription": "Lakewood - Atlantic City"
+  },
+  {
+    "BusRouteID": "600",
+    "BusRouteDescription": "Trenton- Plainsboro (US 1 Corridor)"
+  },
+  {
+    "BusRouteID": "601",
+    "BusRouteDescription": "College of New Jersey-Trenton-Hamilton Marketplace"
+  },
+  {
+    "BusRouteID": "603",
+    "BusRouteDescription": "Mercer Mall-Hamilton Square-Hamilton Marketplace"
+  },
+  {
+    "BusRouteID": "605",
+    "BusRouteDescription": "Montgomery - Princeton - Quaker Bridge Mall"
+  },
+  {
+    "BusRouteID": "606",
+    "BusRouteDescription": "Princeton - Mercerville - Hamilton Marketplace"
+  },
+  {
+    "BusRouteID": "607",
+    "BusRouteDescription": "Ewing - Trenton - Independence Plaza"
+  },
+  {
+    "BusRouteID": "608",
+    "BusRouteDescription": "Hamilton - Ewing"
+  },
+  {
+    "BusRouteID": "609",
+    "BusRouteDescription": "Ewing-Quaker Bridge Mall"
+  },
+  {
+    "BusRouteID": "610",
+    "BusRouteDescription": "Trenton Seasonal"
+  },
+  {
+    "BusRouteID": "611",
+    "BusRouteDescription": "Trenton-River View Plaza Circulator"
+  },
+  {
+    "BusRouteID": "612",
+    "BusRouteDescription": "Lawrence-West Windsor-Princeton Jct. Rail Sta."
+  },
+  {
+    "BusRouteID": "613",
+    "BusRouteDescription": "Mercer Mall-Yardville- Hamilton Marketplace"
+  },
+  {
+    "BusRouteID": "619",
+    "BusRouteDescription": "Ewing - Mercer County College"
+  },
+  {
+    "BusRouteID": "624",
+    "BusRouteDescription": "Pennington - East Trenton"
+  },
+  {
+    "BusRouteID": "702",
+    "BusRouteDescription": "Paterson - Elmwood Park"
+  },
+  {
+    "BusRouteID": "703",
+    "BusRouteDescription": "Haledon - Paterson - East Rutherford"
+  },
+  {
+    "BusRouteID": "704",
+    "BusRouteDescription": "Paterson - Willowbrook Mall"
+  },
+  {
+    "BusRouteID": "705",
+    "BusRouteDescription": "Passaic - Willowbrook Mall"
+  },
+  {
+    "BusRouteID": "707",
+    "BusRouteDescription": "Paterson - Paramus"
+  },
+  {
+    "BusRouteID": "709",
+    "BusRouteDescription": "Bloomfield - Passaic - Paramus"
+  },
+  {
+    "BusRouteID": "712",
+    "BusRouteDescription": "Hackensack - Paterson - Willowbrook Mall"
+  },
+  {
+    "BusRouteID": "722",
+    "BusRouteDescription": "Paterson - Paramus Park"
+  },
+  {
+    "BusRouteID": "744",
+    "BusRouteDescription": "Passaic - Paterson"
+  },
+  {
+    "BusRouteID": "746",
+    "BusRouteDescription": "Ridgewood - Paterson"
+  },
+  {
+    "BusRouteID": "748",
+    "BusRouteDescription": "Paterson - Wayne"
+  },
+  {
+    "BusRouteID": "751",
+    "BusRouteDescription": "Paramus - Cliffside Park - Edgewater"
+  },
+  {
+    "BusRouteID": "752",
+    "BusRouteDescription": "Oakland - Ridgewood - Hackensack"
+  },
+  {
+    "BusRouteID": "753",
+    "BusRouteDescription": "New Milford - Paramus"
+  },
+  {
+    "BusRouteID": "755",
+    "BusRouteDescription": "Paramus - Fort Lee - Edgewater"
+  },
+  {
+    "BusRouteID": "756",
+    "BusRouteDescription": "Englewood Cliffs - Fort Lee - Paramus"
+  },
+  {
+    "BusRouteID": "758",
+    "BusRouteDescription": "Passaic - Paramus Park"
+  },
+  {
+    "BusRouteID": "762",
+    "BusRouteDescription": "Hackensack - New Milford - Paramus"
+  },
+  {
+    "BusRouteID": "770",
+    "BusRouteDescription": "Paterson - Hackensack"
+  },
+  {
+    "BusRouteID": "772",
+    "BusRouteDescription": "Paramus - Hackensack - American Dream"
+  },
+  {
+    "BusRouteID": "780",
+    "BusRouteDescription": "Passaic - Hackensack - Englewood"
+  },
+  {
+    "BusRouteID": "801",
+    "BusRouteDescription": "Metropark - JFK Hospital"
+  },
+  {
+    "BusRouteID": "802",
+    "BusRouteDescription": "Metropark - Rt. 1/Green St."
+  },
+  {
+    "BusRouteID": "803",
+    "BusRouteDescription": "Metropark - Woodbridge Center Dr."
+  },
+  {
+    "BusRouteID": "804",
+    "BusRouteDescription": "Metropark - Wood Ave."
+  },
+  {
+    "BusRouteID": "805",
+    "BusRouteDescription": "Metropark - Ford Ave."
+  },
+  {
+    "BusRouteID": "810",
+    "BusRouteDescription": "New Brunswick - Woodbridge Center"
+  },
+  {
+    "BusRouteID": "811",
+    "BusRouteDescription": "New Brunswick - South River"
+  },
+  {
+    "BusRouteID": "813",
+    "BusRouteDescription": "Perth Amboy - Middlesex County College"
+  },
+  {
+    "BusRouteID": "814",
+    "BusRouteDescription": "N. Brunswick - New Brunswick - Middlesex C. C."
+  },
+  {
+    "BusRouteID": "815",
+    "BusRouteDescription": "New Brunswick-East Brunswick-Woodbridge Ctr"
+  },
+  {
+    "BusRouteID": "817",
+    "BusRouteDescription": "Campbell s Junction - Perth Amboy"
+  },
+  {
+    "BusRouteID": "818",
+    "BusRouteDescription": "New Brunswick - East Brunswick - Old Bridge"
+  },
+  {
+    "BusRouteID": "819",
+    "BusRouteDescription": "Piscataway-Plainfield-Metuchen-Middlesex Mall"
+  },
+  {
+    "BusRouteID": "822",
+    "BusRouteDescription": "Plainfield - North Plainfield"
+  },
+  {
+    "BusRouteID": "830",
+    "BusRouteDescription": "Asbury Park - Point Pleasant Beach"
+  },
+  {
+    "BusRouteID": "831",
+    "BusRouteDescription": "Red Bank - Monmouth Mall - Long Branch"
+  },
+  {
+    "BusRouteID": "832",
+    "BusRouteDescription": "Brookdale Community College-Red Bank-Asbury Park"
+  },
+  {
+    "BusRouteID": "834",
+    "BusRouteDescription": "Red Bank - Highlands"
+  },
+  {
+    "BusRouteID": "836",
+    "BusRouteDescription": "Asbury Park-Freehold Raceway Mall-Centra State"
+  },
+  {
+    "BusRouteID": "837",
+    "BusRouteDescription": "Long Branch - Asbury Park - Seaview Square"
+  },
+  {
+    "BusRouteID": "838",
+    "BusRouteDescription": "Freehold-Red Bank-Sea Bright"
+  },
+  {
+    "BusRouteID": "871",
+    "BusRouteDescription": "Morristown - Boonton - Willowbrook Mall"
+  },
+  {
+    "BusRouteID": "872",
+    "BusRouteDescription": "Morristown - Parsippany-Troy Hills"
+  },
+  {
+    "BusRouteID": "873",
+    "BusRouteDescription": "Greystone - Morristown - Livingston"
+  },
+  {
+    "BusRouteID": "874",
+    "BusRouteDescription": "Morristown - Willowbrook Mall"
+  },
+  {
+    "BusRouteID": "875",
+    "BusRouteDescription": "Morristown - Dover - Roxbury"
+  },
+  {
+    "BusRouteID": "878",
+    "BusRouteDescription": "Morris - Florham Park - Madison"
+  },
+  {
+    "BusRouteID": "880",
+    "BusRouteDescription": "Morristown - Dover - Rockaway"
+  },
+  {
+    "BusRouteID": "890",
+    "BusRouteDescription": "South Main Street"
+  },
+  {
+    "BusRouteID": "891",
+    "BusRouteDescription": "Heckman"
+  },
+  {
+    "BusRouteID": "986",
+    "BusRouteDescription": "Summit - Murray Hill - Plainfield"
+  }
+]
