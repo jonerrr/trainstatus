@@ -1,4 +1,4 @@
-FROM rust:slim@sha256:a6ed0cbc27f063c367aee8373f35fdf4dcf8be7596c4d19d6643e3252e514c2e AS build
+FROM rust:slim@sha256:f47a8de237dcbb0b0ce1099901e60a89728e3d51f24e664b40e947171538ade7 AS build
 
 RUN set -eux; \
     apt-get update; \
@@ -9,7 +9,7 @@ COPY . .
 ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM ghcr.io/valhalla/valhalla:3.7.0@sha256:c19b052fa132474da719e0e931007cd3931f25c43890f88acf270ba837fdc89f
+FROM ghcr.io/valhalla/valhalla:3.9.0@sha256:511c095b8caf393dccceb8b519ec96b6f85a0166b2288ba014a8a748acc5a63c
 
 WORKDIR /app
 COPY --chown=ubuntu:ubuntu --from=build /app/target/release/backend /backend
