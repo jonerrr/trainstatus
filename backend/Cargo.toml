@@ -53,13 +53,13 @@ tower-http = { version = "0.6.6", features = [
 ] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.2.0"
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
 
 [dev-dependencies]
-axum-test = "=20.0.0"
+axum-test = "=21.1.0"
 test-log = { version = "=0.2.20", default-features = false, features = ["trace"] }
 tokio-test = "=0.4.5"
 
