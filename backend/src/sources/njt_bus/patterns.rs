@@ -133,6 +133,8 @@ fn connected_line(geometry: &PatternGeometry) -> anyhow::Result<LineString> {
                 }
             }
         }
+        // TODO: analyze the disconnected multipart geometry since theres ~600 of them.
+        // We might be able to salvage some of them
         // Joining either end is fine, but multiple choices at the same endpoint imply a branch.
         ensure!(!candidates.is_empty(), "disconnected multipart geometry");
         for prepend in [false, true] {
