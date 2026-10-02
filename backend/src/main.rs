@@ -24,7 +24,11 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 use backend::{
-    AppState, VERSION, api, api_prefix, engines, models, prefixed_path, sources,
+    AppState, VERSION, api, api_prefix, engines, models, prefixed_path,
+    realtime::{
+        LiveSnapshots, RealtimeEngine, RealtimeIngestor, RealtimeSource, TrajectoryDeriver,
+    },
+    sources,
     sources::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
         njt_bus::realtime::NjtBusRealtime,
@@ -78,12 +82,14 @@ async fn main() {
         _ => panic!("Failed to read redis ping response"),
     }
 
+    let live_snapshots = LiveSnapshots::default();
     let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());
     let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
-    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), redis_pool.clone());
+    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), live_snapshots.clone());
     let stop_time_store =
-        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
-    let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
+        stores::stop_time::StopTimeStore::new(pg_pool.clone(), live_snapshots.clone());
+    let position_store =
+        stores::position::PositionStore::new(pg_pool.clone(), live_snapshots.clone());
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
     let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
@@ -108,20 +114,32 @@ async fn main() {
     )
     .await;
 
-    let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
+    let realtime_sources: Vec<Arc<dyn RealtimeSource>> = vec![
         Arc::new(MtaSubwayRealtime),
         Arc::new(MtaBusRealtime),
-        Arc::new(NjtBusRealtime),
+        Arc::new(NjtBusRealtime::new(
+            static_controller.static_index(),
+            static_cache_store.clone(),
+        )),
     ];
 
-    engines::realtime::run(
-        &trip_store,
-        &stop_time_store,
-        &position_store,
-        &static_cache_store,
-        realtime_adapters,
+    let trajectory_engine = Arc::new(backend::trajectory::TrajectoryEngine::new());
+    let trajectory_cache = Arc::new(backend::trajectory::TrajectoryCache::new());
+    let trajectory_store =
+        stores::trajectory::TrajectoryStore::new(pg_pool.clone(), trajectory_cache.clone());
+    let deriver = TrajectoryDeriver::new(trajectory_engine.clone(), trajectory_cache.clone());
+
+    RealtimeEngine::new(
+        RealtimeIngestor::new(
+            pg_pool.clone(),
+            live_snapshots,
+            static_controller.static_index(),
+        ),
         static_controller.clone(),
+        deriver,
+        trajectory_cache.clone(),
     )
+    .run(realtime_sources)
     .await;
 
     let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
@@ -131,17 +149,6 @@ async fn main() {
     ];
 
     engines::alerts::run(&alert_store, alert_adapters).await;
-
-    let trajectory_engine = Arc::new(backend::trajectory::TrajectoryEngine::new());
-    let trajectory_cache = Arc::new(backend::trajectory::TrajectoryCache::new());
-
-    engines::trajectory::run(
-        trip_store.clone(),
-        position_store.clone(),
-        trajectory_engine.clone(),
-        trajectory_cache.clone(),
-    )
-    .await;
 
     let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
 
@@ -164,6 +171,7 @@ async fn main() {
         position_store,
         alert_store,
         static_cache_store,
+        trajectory_store,
         trajectory_engine,
         trajectory_cache,
     };

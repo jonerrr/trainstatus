@@ -91,4 +91,4 @@ CREATE INDEX idx_trip_history_point_gix ON realtime.trip_history_point USING GIS
 
 CREATE INDEX idx_trip_created_at ON realtime.trip (created_at);
 
-CREATE INDEX idx_stop_time_arrival ON realtime.stop_time (arrival);
+CREATE INDEX idx_stop_time_source_arrival ON realtime.stop_time (source, arrival);

@@ -10,7 +10,7 @@ use super::super::types::{
     TripSnapshot, source_projected_epsg_code,
 };
 
-/// If the live GPS anchor is within this many metres of a schedule knot in the
+/// If the live GPS anchor is within this many meters of a schedule knot in the
 /// same direction, treat the knots as co-located and do not drop them.
 const ANCHOR_DISTANCE_TOLERANCE_M: f64 = 1.0;
 
@@ -27,7 +27,7 @@ struct BusKinematicsConfig {
     decel_mps2: f64,
     /// Fixed dwell time at every stop (seconds).
     dwell_seconds: f64,
-    /// Distance budget for the decel/accel ramp either side of a stop (metres).
+    /// Distance budget for the decel/accel ramp either side of a stop (meters).
     approach_distance_m: f64,
 }
 

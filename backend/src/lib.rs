@@ -5,7 +5,9 @@ pub mod fixtures;
 pub mod integrations;
 pub mod macros;
 pub mod models;
+pub mod realtime;
 pub mod sources;
+pub mod static_index;
 pub mod stores;
 pub mod trajectory;
 pub mod utils;
@@ -29,34 +31,9 @@ pub struct AppState {
     pub position_store: crate::stores::position::PositionStore,
     pub alert_store: crate::stores::alert::AlertStore,
     pub static_cache_store: crate::stores::static_cache::StaticCacheStore,
+    pub trajectory_store: crate::stores::trajectory::TrajectoryStore,
     pub trajectory_engine: std::sync::Arc<crate::trajectory::TrajectoryEngine>,
     pub trajectory_cache: std::sync::Arc<crate::trajectory::TrajectoryCache>,
-}
-
-impl AppState {
-    pub fn new(
-        route_store: crate::stores::route::RouteStore,
-        stop_store: crate::stores::stop::StopStore,
-        trip_store: crate::stores::trip::TripStore,
-        stop_time_store: crate::stores::stop_time::StopTimeStore,
-        position_store: crate::stores::position::PositionStore,
-        alert_store: crate::stores::alert::AlertStore,
-        static_cache_store: crate::stores::static_cache::StaticCacheStore,
-        trajectory_engine: std::sync::Arc<crate::trajectory::TrajectoryEngine>,
-        trajectory_cache: std::sync::Arc<crate::trajectory::TrajectoryCache>,
-    ) -> Self {
-        Self {
-            route_store,
-            stop_store,
-            trip_store,
-            stop_time_store,
-            position_store,
-            alert_store,
-            static_cache_store,
-            trajectory_engine,
-            trajectory_cache,
-        }
-    }
 }
 
 // pub fn mta_api_url() -> &'static str {

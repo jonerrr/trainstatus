@@ -234,14 +234,12 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
             let platform_match = if platform_edges.is_empty() {
                 None
             } else {
-                let platform_edge_ids: Vec<String> =
-                    platform_edges.iter().map(|edge| edge.id.clone()).collect();
                 let key = TrajectoryCache::platform_match_key(
                     Source::MtaSubway,
                     &stop.stop_id,
                     trip.direction,
                     consist_length_m,
-                    &platform_edge_ids,
+                    &platform_edges,
                 );
                 caches.get_platform_match_sync(key, || {
                     Self::match_platform_edge(&platform_edges, trip.direction, consist_length_m)

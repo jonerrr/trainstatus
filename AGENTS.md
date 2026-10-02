@@ -2,25 +2,28 @@
 
 ## Project Overview
 
-Real-time MTA subway and bus tracker. Rust/Axum backend, SvelteKit frontend, PostgreSQL + PostGIS, Valkey/Redis cache. Sources: `mta_subway` (GTFS-RT), `mta_bus` (OBA/SIRI).
+Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, SvelteKit frontend, PostgreSQL + PostGIS, Valkey/Redis cache. Sources: `mta_subway` (Helium), `mta_bus` (GTFS-RT/OBA), `njt_bus` (GTFS-RT).
 
 ## Architecture
 
 ### Backend (`backend/src/`)
 
-**Data flow**: MTA feeds → `sources/` adapters → PostgreSQL → Redis read-through cache → `stores/` → Axum API
+**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` → `RealtimeIngestor` transaction → committed `Arc<PersistedSnapshot>` → shared `LiveSnapshots` watch channels → live stores / `TrajectoryDeriver` → Axum API. Static data and alerts retain their PostgreSQL/Redis paths.
 
 **Key modules**:
 
-- `sources/` — Trait-based adapters (`RealtimeAdapter`, `AlertsAdapter`, `StaticAdapter`) with implementations in `mta_subway/` and `mta_bus/`
-- `engines/` — Spawns background tokio tasks: `static_data` (manages static import lifecycle via `StaticController`), `realtime`, `alerts`
-- `stores/` — Typed store structs (`TripStore`, `RouteStore`, etc.) wrapping PgPool + Redis; use `stores::read_through()` for cache-aside reads
+- `sources/` — `RealtimeSource` collectors plus `AlertsAdapter` and `StaticAdapter` implementations in `mta_subway/`, `mta_bus/` and `njt_bus/`
+- `realtime/` — `RealtimeEngine` collects each source independently; `RealtimeIngestor` commits trips, stop times, positions and resolved shapes together before publishing. `LiveSnapshots` shares the latest committed Arc with stores and trajectory workers; watch channels coalesce pending generations. `TrajectoryDeriver` uses the pinned static revision without SQL readback
+- `engines/` — Background `static_data` (import lifecycle via `StaticController`) and `alerts` tasks
+- `stores/` — Default trip, stop-time and position reads use `LiveSnapshots`; their explicit historical reads use PostgreSQL. Static and alert stores retain Redis caching; `TrajectoryStore` loads historical trajectory inputs
 - `api/` — Axum handlers; `AppState` holds all stores; OpenAPI docs at `/api/docs` (via utoipa/scalar)
 - `integrations/` — Shared GTFS-RT/OBA parsing helpers
 - `models/` — DB row types; geometry decoded via `geozero` from WKB
 - `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`
 
-**`StaticController`**: Realtime engines call `controller.ensure_updated(source)` before processing to avoid FK errors. `force_update` re-imports if a FK violation occurs.
+**`StaticController`**: `RealtimeEngine` calls `controller.ensure_updated(source)` before collection. A foreign-key violation triggers one `force_update` and one ingestion retry using the same collected snapshot.
+
+**Live and historical reads**: Default trips, stop times and positions reflect the last committed source snapshot, with route filters applied within its membership. Collection/transaction failures preserve it; a successful empty snapshot clears it; startup is empty until the first commit. These live reads use neither Redis nor retained-history fallback. Explicit `?at=` trips and stop times use retained final arrival-or-departure values in the inclusive four-hour window, without a trip update-time gate; positions and trajectories use their historical store paths.
 
 **API routes** (all under `/api/v1/`):
 
@@ -57,7 +60,7 @@ See README.md for detailed development setup instructions, including environment
 ### Backend
 
 - Always use `sqlx::query_as::<_, ModelType>(...)` (not the `query!` macro) — models use custom `FromRow` impls for PostGIS geometry via `geozero`
-- Add new transit sources by implementing `RealtimeAdapter` + `AlertsAdapter` + `StaticAdapter` traits in a new `sources/<name>/` module, then registering in `main.rs`
+- Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `main.rs` and the per-source `LiveSnapshots` registry. Collectors return normalized entities; `RealtimeIngestor` owns persistence and committed publication
 - Error handling: `AppError(anyhow::Error)` in `api/` converts to 500; use `?` freely
 
 ### Frontend
@@ -69,4 +72,4 @@ See README.md for detailed development setup instructions, including environment
 ## Database
 
 - PostgreSQL with PostGIS; geometry as WKB decoded by `geozero`
-- `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`)
+- `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`, `njt_bus`)

@@ -1,19 +1,8 @@
-//! Route colour normalisation.
-//!
-//! Sources are inconsistent about how they emit route colours: the MTA feeds
-//! hand us `#RRGGBB`, while the GTFS-derived paths (njt_bus and the generic
-//! parser) produce bare `RRGGBB`. MapLibre cannot parse the bare form, so those
-//! lines used to render as nothing until the frontend patched them at draw time.
-//!
-//! We standardise to a single canonical form — `#RRGGBB`, uppercase — at ingest
-//! (see `RouteStore::save_all`), so every row in `static.route` is directly
-//! usable by both the map and the DOM without per-source special-casing.
-
-/// Neutral grey used when a colour can't be parsed. Mirrors the frontend
-/// `FALLBACK_ROUTE_COLOR` so a normalised-away value looks the same everywhere.
+/// Neutral grey used when a color can't be parsed. Mirrors the frontend
+/// `FALLBACK_ROUTE_COLOR` so a normalized-away value looks the same everywhere.
 pub const FALLBACK_ROUTE_COLOR: &str = "#8B95A1";
 
-/// Normalise a route colour to canonical `#RRGGBB` (uppercase).
+/// normalize a route color to canonical `#RRGGBB` (uppercase).
 ///
 /// Accepts `#RRGGBB` or bare `RRGGBB` (any case). Anything else — empty,
 /// wrong length, non-hex — collapses to [`FALLBACK_ROUTE_COLOR`].

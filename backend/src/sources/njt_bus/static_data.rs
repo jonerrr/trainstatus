@@ -100,7 +100,6 @@ impl StaticAdapter for NjtBusStatic {
             !patterns.shapes.is_empty(),
             "No valid NJT operating patterns; retaining previous import"
         );
-        let trip_patterns = patterns.trips.clone();
         let dataset = build_static_dataset(&gtfs, patterns, cached_trips, stops, &stop_remap);
 
         // TODO: move this to a standardized print method in StaticDataset
@@ -128,19 +127,6 @@ impl StaticAdapter for NjtBusStatic {
             .persist(route_store, stop_store, static_cache_store)
             .await
             .context("Failed to persist NJT static dataset")?;
-
-        // Publish the remap only after the canonical stops are persisted, so the
-        // realtime pipeline never remaps to a stop that isn't in the DB yet.
-        static_cache_store
-            .publish_trip_patterns(
-                Source::NjtBus,
-                TripPatternRevision {
-                    patterns: trip_patterns,
-                    stop_remap,
-                },
-            )
-            .await
-            .context("Failed to publish NJT trip patterns")?;
 
         Ok(())
     }
@@ -188,14 +174,15 @@ pub fn build_static_dataset_from_patterns(
     features: Vec<PatternFeature>,
 ) -> PatternStaticBuild {
     let patterns = patterns::build_patterns(gtfs, features);
-    let trips = patterns.trips.clone();
     let (stops, remap) = collapse_stops(gtfs);
+    let dataset = build_static_dataset(gtfs, patterns, vec![], stops, &remap);
     PatternStaticBuild {
-        dataset: build_static_dataset(gtfs, patterns, vec![], stops, &remap),
+        // TODO: why is this clone necessary?
         revision: TripPatternRevision {
-            patterns: trips,
-            stop_remap: remap,
+            patterns: dataset.trip_patterns.clone(),
+            stop_remap: dataset.stop_remap.clone(),
         },
+        dataset,
     }
 }
 
@@ -242,13 +229,17 @@ fn build_static_dataset(
         trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
     }
 
+    let PatternDataset { shapes, trips } = patterns;
+
     StaticDataset {
         source: Source::NjtBus,
         routes: build_routes(gtfs),
         stops,
         route_stops: build_route_stops(gtfs, stop_remap),
-        shapes: patterns.shapes,
+        shapes,
         cached_trips,
+        trip_patterns: trips,
+        stop_remap: stop_remap.clone(),
     }
 }
 
@@ -677,7 +668,7 @@ mod tests {
         assert_eq!(remap.get("16957"), Some(&"16339".to_string()));
         assert_eq!(remap.get("16969"), Some(&"16339".to_string()));
         // The representative itself is identity (absent from the remap).
-        assert!(remap.get("16339").is_none());
+        assert!(!remap.contains_key("16339"));
     }
 
     #[test]

@@ -7,6 +7,7 @@ use tracing::{error, info, instrument};
 
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
+use crate::static_index::StaticTransitIndex;
 use crate::stores::route::RouteStore;
 use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::stop::StopStore;
@@ -26,9 +27,14 @@ pub enum UpdateRequest {
 pub struct StaticController {
     // Map each Source to its specific command channel
     senders: Arc<HashMap<Source, mpsc::Sender<UpdateRequest>>>,
+    static_index: StaticTransitIndex,
 }
 
 impl StaticController {
+    pub fn static_index(&self) -> StaticTransitIndex {
+        self.static_index.clone()
+    }
+
     /// Ensures static data is up to date. Returns immediately if no update is needed,
     /// or waits for an ongoing/new update to complete if data is stale.
     /// Call this before processing realtime data to avoid FK errors.
@@ -73,6 +79,7 @@ pub async fn run(
     static_cache_store: &StaticCacheStore,
     adapters: Vec<Arc<dyn StaticAdapter>>,
 ) -> StaticController {
+    let static_index = static_cache_store.static_index();
     let mut senders = HashMap::new();
     let mut tasks = Vec::new();
 
@@ -84,6 +91,7 @@ pub async fn run(
         let route_store = route_store.clone();
         let stop_store = stop_store.clone();
         let static_cache_store = static_cache_store.clone();
+        let source_static_index = static_index.clone();
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
@@ -92,6 +100,7 @@ pub async fn run(
                 route_store,
                 stop_store,
                 static_cache_store,
+                source_static_index,
                 adapter,
                 rx,
             )
@@ -101,6 +110,7 @@ pub async fn run(
 
     StaticController {
         senders: Arc::new(senders),
+        static_index,
     }
 }
 
@@ -110,6 +120,7 @@ async fn run_source_handler(
     route_store: RouteStore,
     stop_store: StopStore,
     static_cache_store: StaticCacheStore,
+    static_index: StaticTransitIndex,
     adapter: Arc<dyn StaticAdapter>,
     mut rx: mpsc::Receiver<UpdateRequest>,
 ) {
@@ -137,7 +148,8 @@ async fn run_source_handler(
                 match req {
                     UpdateRequest::EnsureUpdated { respond_to } => {
                         // Check if we need an update
-                        let needs_update = check_needs_update(&pool, adapter.as_ref()).await;
+                        let needs_update =
+                            check_needs_update(&pool, adapter.as_ref(), &static_index).await;
 
                         match needs_update {
                             Ok(true) if !import_in_progress => {
@@ -259,7 +271,11 @@ fn spawn_import(
 }
 
 #[instrument(skip_all, fields(source = %adapter.source()))]
-async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyhow::Result<bool> {
+async fn check_needs_update(
+    pool: &PgPool,
+    adapter: &dyn StaticAdapter,
+    static_index: &StaticTransitIndex,
+) -> anyhow::Result<bool> {
     // Ensure the source exists in the table, inserting if needed
     // Use epoch time so it triggers an immediate update on first run
     let epoch = DateTime::<Utc>::from(std::time::UNIX_EPOCH);
@@ -276,6 +292,13 @@ async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyho
     )
     .execute(pool)
     .await?;
+
+    // A process restart begins with an empty in-memory index even when the
+    // persisted source timestamp is still fresh. Rebuild before allowing any
+    // realtime consumer to proceed without a complete source revision.
+    if static_index.get(adapter.source()).is_none() {
+        return Ok(true);
+    }
 
     let config = sqlx::query!(
         r#"

@@ -407,6 +407,40 @@ mod mta_subway_tests {
         }
     }
 
+    #[test]
+    fn trajectory_platform_cache_respects_pinned_marker_data() {
+        let (mut trip, shape) = trip_with_anchor(
+            "EN_ROUTE",
+            vec![stop(
+                "STOP1",
+                200.0,
+                500.0,
+                vec!["same-edge"],
+                vec![platform_edge(
+                    "same-edge",
+                    600.0,
+                    vec![car_marker(480.0, 100.0, PlatformDirection::North)],
+                )],
+            )],
+            0.0,
+        );
+        trip.positions.clear();
+        let cache = TrajectoryCache::new();
+        let builder = MtaSubwayBuilder;
+        let first = builder.generate_knots(&trip, None, &shape, &cache).unwrap();
+        if let StopData::MtaSubway(data) = &mut trip.stops[0].stop_data {
+            data.platform_edges[0].car_markers[0].position_ft = 200.0;
+        }
+        let second = builder.generate_knots(&trip, None, &shape, &cache).unwrap();
+        let marker = |knots: &super::super::types::GeneratedKnots| {
+            knots.knots.iter().find(|k| k.t_event == 200.0).unwrap().s_m
+        };
+        assert!(
+            (marker(&second) - marker(&first) - 30.48).abs() < 0.01,
+            "same platform ID with another revision's marker must recompute its match"
+        );
+    }
+
     fn trip_with_anchor(
         status: &str,
         stops: Vec<TrajectoryStop>,

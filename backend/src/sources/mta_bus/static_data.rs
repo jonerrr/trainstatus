@@ -348,6 +348,8 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> StaticDataset {
         route_stops,
         shapes,
         cached_trips: vec![],
+        trip_patterns: HashMap::new(),
+        stop_remap: HashMap::new(),
     }
 }
 

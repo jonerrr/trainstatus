@@ -2,12 +2,9 @@ mod common;
 
 use backend::{
     fixtures::{self, FixtureKind},
-    integrations::gtfs_realtime::GtfsSource,
     models::source::Source,
     sources::mta_bus::realtime::MtaBusRealtime,
-    stores::static_cache::StaticCacheStore,
 };
-use bb8_redis::RedisConnectionManager;
 use common::{contracts, fixture_root, mta_bus_dataset, mta_subway_dataset};
 use serde_json::json;
 
@@ -84,10 +81,6 @@ fn gtfs_realtime_raw_fixtures_match_expected_feed_summaries() {
 
 #[tokio::test]
 async fn realtime_fixtures_match_expected_domain_outputs() {
-    let manager =
-        RedisConnectionManager::new("redis://fixture-expected-unused").expect("valid Redis URL");
-    let redis_pool = bb8::Pool::builder().build_unchecked(manager);
-    let cache = StaticCacheStore::new(redis_pool);
     let root = fixture_root();
 
     let manifest =
@@ -95,21 +88,9 @@ async fn realtime_fixtures_match_expected_domain_outputs() {
             .expect("MTA bus realtime manifest should load");
     let feed = fixtures::read_gtfs_realtime_payload(&root, &manifest, "trip_updates")
         .expect("MTA bus realtime fixture should decode");
-    let adapter = MtaBusRealtime;
-    let mut processed = 0usize;
-    let mut sample = Vec::new();
-
-    for entity in feed.entity {
-        if let Some(update) = entity.trip_update {
-            let (trip, stop_times) = adapter.process_trip(update, &cache).await;
-            if let Some(trip) = trip {
-                processed += 1;
-                if sample.len() < 5 {
-                    sample.push((trip, stop_times));
-                }
-            }
-        }
-    }
+    let snapshot = MtaBusRealtime.build_snapshot(vec![feed], Vec::new());
+    let processed = snapshot.trips.len();
+    let sample = snapshot.trips.into_iter().take(5).collect::<Vec<_>>();
 
     fixtures::assert_expected_json(
         &root,

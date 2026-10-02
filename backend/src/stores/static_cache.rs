@@ -1,37 +1,25 @@
 use bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use redis::AsyncCommands;
-use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::models::source::Source;
 use crate::models::static_cache::CachedTrip;
-use crate::utils::source_snapshot::SourceSnapshot;
+use crate::static_index::StaticTransitIndex;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct TripPattern {
-    pub route_id: String,
-    pub direction: i16,
-    pub shape_id: Option<String>,
-}
+pub use crate::static_index::TripPattern;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct TripPatternRevision {
     pub patterns: HashMap<String, TripPattern>,
     pub stop_remap: HashMap<String, String>,
 }
-
-// TODO: review the trip_patterns cache invalidation and overall pattern. idk seems kinda sus to me
+// TODO: should probably redesign this to fit better with the new static index / snapshot stuff.
 #[derive(Clone)]
 pub struct StaticCacheStore {
     redis_pool: Pool<RedisConnectionManager>,
-    trip_patterns: Arc<tokio::sync::Mutex<HashMap<Source, HashMap<String, TripPattern>>>>,
-    /// Per-source `child_stop_id -> canonical_stop_id` remap, published by the
-    /// static import and consumed by the realtime pipeline. In-process and
-    /// atomically swapped each import; cloning the store shares the same `Arc`.
-    stop_remap: Arc<SourceSnapshot<HashMap<String, String>>>,
+    static_index: StaticTransitIndex,
 }
 
 // TODO: maybe replace this with a postgres UNCLOGGED table
@@ -39,65 +27,12 @@ impl StaticCacheStore {
     pub fn new(redis_pool: Pool<RedisConnectionManager>) -> Self {
         Self {
             redis_pool,
-            trip_patterns: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
-            stop_remap: Arc::new(SourceSnapshot::new()),
+            static_index: StaticTransitIndex::new(),
         }
     }
 
-    /// Publish a whole feed revision only after its shapes have been persisted.
-    /// A Redis SET is atomic; no TTL ties this mapping to a service-day window.
-    pub async fn publish_trip_patterns(
-        &self,
-        source: Source,
-        revision: TripPatternRevision,
-    ) -> anyhow::Result<()> {
-        let mut local = self.trip_patterns.lock().await;
-        let mut conn = self.redis_pool.get().await?;
-        let key = format!("static_cache:{}:trip_patterns:v1", source.as_str());
-        let _: () = conn.set(key, serde_json::to_string(&revision)?).await?;
-        local.insert(source, revision.patterns);
-        self.set_stop_remap(source, revision.stop_remap);
-        Ok(())
-    }
-
-    pub async fn get_trip_pattern(
-        &self,
-        source: Source,
-        trip_id: &str,
-    ) -> anyhow::Result<Option<TripPattern>> {
-        // Serialize cold loads with publication to prevent a stale Redis read from
-        // overwriting a freshly published in-process snapshot.
-        let mut local = self.trip_patterns.lock().await;
-        if !local.contains_key(&source) {
-            let mut conn = self.redis_pool.get().await?;
-            let key = format!("static_cache:{}:trip_patterns:v1", source.as_str());
-            let json: Option<String> = conn.get(key).await?;
-            if let Some(json) = json {
-                let revision: TripPatternRevision = serde_json::from_str(&json)?;
-                local.insert(source, revision.patterns);
-                self.set_stop_remap(source, revision.stop_remap);
-            }
-        }
-        Ok(local.get(&source).and_then(|p| p.get(trip_id)).cloned())
-    }
-
-    /// Publish the `child_stop_id -> canonical_stop_id` remap for `source`.
-    /// Called by the static import after a successful build.
-    pub fn set_stop_remap(&self, source: Source, remap: HashMap<String, String>) {
-        self.stop_remap.replace(source, remap);
-    }
-
-    /// Resolve a realtime `stop_id` to its canonical static stop id for `source`.
-    /// Returns the input unchanged when the source has no remap or the id is not
-    /// a collapsed child (the common case).
-    pub fn resolve_stop_id<'a>(&self, source: Source, id: &'a str) -> Cow<'a, str> {
-        match self.stop_remap.get(source) {
-            Some(map) => match map.get(id) {
-                Some(canonical) => Cow::Owned(canonical.clone()),
-                None => Cow::Borrowed(id),
-            },
-            None => Cow::Borrowed(id),
-        }
+    pub fn static_index(&self) -> StaticTransitIndex {
+        self.static_index.clone()
     }
 
     /// Store expanded trips in Redis for the next 48 hours.

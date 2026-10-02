@@ -5,8 +5,11 @@ use std::{env, sync::Arc};
 use backend::{
     AppState,
     models::static_dataset::StaticDataset,
+    realtime::{LiveSnapshots, RealtimeIngestor},
     sources::{
-        mta_bus::static_data as mta_bus_static, mta_subway::static_data as mta_subway_static,
+        mta_bus::static_data as mta_bus_static,
+        mta_subway::static_data as mta_subway_static,
+        njt_bus::{patterns::PatternFeature, static_data as njt_bus_static},
     },
     stores::{
         alert::AlertStore, position::PositionStore, route::RouteStore,
@@ -22,6 +25,8 @@ pub type RedisPool = bb8::Pool<RedisConnectionManager>;
 
 #[derive(Clone)]
 pub struct TestStores {
+    pub live_snapshots: LiveSnapshots,
+    pub ingestor: RealtimeIngestor,
     pub route_store: RouteStore,
     pub stop_store: StopStore,
     pub trip_store: TripStore,
@@ -49,30 +54,41 @@ pub async fn flush_redis(redis_pool: &RedisPool) {
 }
 
 pub fn test_stores(pool: sqlx::PgPool, redis_pool: RedisPool) -> TestStores {
+    let static_cache_store = StaticCacheStore::new(redis_pool.clone());
+    let live_snapshots = LiveSnapshots::default();
     TestStores {
+        ingestor: RealtimeIngestor::new(
+            pool.clone(),
+            live_snapshots.clone(),
+            static_cache_store.static_index(),
+        ),
         route_store: RouteStore::new(pool.clone(), redis_pool.clone()),
         stop_store: StopStore::new(pool.clone(), redis_pool.clone()),
-        trip_store: TripStore::new(pool.clone(), redis_pool.clone()),
-        stop_time_store: StopTimeStore::new(pool.clone(), redis_pool.clone()),
-        position_store: PositionStore::new(pool.clone(), redis_pool.clone()),
+        trip_store: TripStore::new(pool.clone(), live_snapshots.clone()),
+        stop_time_store: StopTimeStore::new(pool.clone(), live_snapshots.clone()),
+        position_store: PositionStore::new(pool.clone(), live_snapshots.clone()),
+        live_snapshots,
         alert_store: AlertStore::new(pool, redis_pool.clone()),
-        static_cache_store: StaticCacheStore::new(redis_pool),
+        static_cache_store,
     }
 }
 
 pub fn app_state(pool: sqlx::PgPool, redis_pool: RedisPool) -> AppState {
+    let cache = Arc::new(TrajectoryCache::new());
+    let historical = backend::stores::trajectory::TrajectoryStore::new(pool.clone(), cache.clone());
     let stores = test_stores(pool, redis_pool);
-    AppState::new(
-        stores.route_store,
-        stores.stop_store,
-        stores.trip_store,
-        stores.stop_time_store,
-        stores.position_store,
-        stores.alert_store,
-        stores.static_cache_store,
-        Arc::new(TrajectoryEngine::new()),
-        Arc::new(TrajectoryCache::new()),
-    )
+    AppState {
+        route_store: stores.route_store,
+        stop_store: stores.stop_store,
+        trip_store: stores.trip_store,
+        stop_time_store: stores.stop_time_store,
+        position_store: stores.position_store,
+        alert_store: stores.alert_store,
+        static_cache_store: stores.static_cache_store,
+        trajectory_store: historical,
+        trajectory_engine: Arc::new(TrajectoryEngine::new()),
+        trajectory_cache: cache,
+    }
 }
 
 pub fn mta_subway_dataset() -> StaticDataset {
@@ -107,6 +123,27 @@ pub fn mta_bus_dataset() -> StaticDataset {
 
     mta_bus_static::build_static_dataset_from_fixture(infrastructure)
         .expect("MTA bus static fixture should build")
+}
+
+pub fn njt_bus_dataset() -> StaticDataset {
+    let root = fixture_root();
+    let manifest = backend::fixtures::load_manifest_for(
+        &root,
+        backend::models::source::Source::NjtBus,
+        backend::fixtures::FixtureKind::Static,
+        "basic",
+    )
+    .expect("NJT bus static manifest should load");
+    let gtfs_path = manifest.fixture_dir(&root).join("raw/patterns_gtfs.zip");
+    let gtfs =
+        gtfs_structures::Gtfs::from_path(gtfs_path).expect("NJT bus GTFS fixture should load");
+    let patterns: Vec<PatternFeature> = serde_json::from_value(
+        backend::fixtures::read_json_payload(&root, &manifest, "operating_patterns")
+            .expect("NJT bus operating-pattern fixture should load"),
+    )
+    .expect("NJT bus operating-pattern fixture should decode");
+
+    njt_bus_static::build_static_dataset_from_patterns(&gtfs, patterns).dataset
 }
 
 pub fn fixture_root() -> std::path::PathBuf {

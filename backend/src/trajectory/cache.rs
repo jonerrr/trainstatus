@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use moka::future::Cache;
 use uuid::Uuid;
 
-use crate::models::source::Source;
+use crate::models::{source::Source, stop::PlatformEdge};
 
 use super::geometry::{ShapeGeometry, build_shape_geometry, shape_key_from_line};
 use super::types::{
@@ -31,6 +31,7 @@ pub struct ShapeKey {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct StopProjKey {
+    pub point_bits: [u64; 2],
     pub source: Source,
     pub shape_key: String,
     pub stop_id: String,
@@ -38,6 +39,7 @@ pub struct StopProjKey {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct PlatformMatchKey {
+    pub platform_content_hash: [u8; 32],
     pub source: Source,
     pub stop_id: String,
     pub trip_direction: i16,
@@ -147,6 +149,7 @@ impl TrajectoryCache {
         shape_geom: &ShapeGeometry,
     ) -> Option<f64> {
         let key = StopProjKey {
+            point_bits: [stop_point.x().to_bits(), stop_point.y().to_bits()],
             source,
             shape_key: shape_key.to_string(),
             stop_id: stop_id.to_string(),
@@ -185,20 +188,24 @@ impl TrajectoryCache {
         stop_id: &str,
         trip_direction: i16,
         consist_length_m: f64,
-        platform_edge_ids: &[String],
+        platform_edges: &[PlatformEdge],
     ) -> PlatformMatchKey {
         let consist_length_ft = (consist_length_m / 0.3048).round() as i32;
-        let platform_hint = if platform_edge_ids.is_empty() {
+        let platform_hint = if platform_edges.is_empty() {
             None
         } else {
-            let mut ids: Vec<String> = platform_edge_ids
+            let mut ids: Vec<String> = platform_edges
                 .iter()
-                .map(|id| id.to_uppercase())
+                .map(|edge| edge.id.to_uppercase())
                 .collect();
             ids.sort();
             Some(ids.join(","))
         };
+        // Pinned revisions can be derived after another static import bumps the
+        // global version. Their platform IDs may match while marker data differs.
+        let platform_data = serde_json::to_vec(platform_edges).unwrap_or_default();
         PlatformMatchKey {
+            platform_content_hash: *blake3::hash(&platform_data).as_bytes(),
             source,
             stop_id: stop_id.to_string(),
             trip_direction,

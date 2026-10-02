@@ -1,32 +1,26 @@
-use std::time::Duration;
-
 use crate::{
     models::{position::VehiclePosition, source::Source},
-    stores::{cache_get, cache_set},
+    realtime::LiveSnapshots,
 };
-use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
-use geozero::wkb;
 use sqlx::PgPool;
-
-const TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct PositionStore {
     pg_pool: PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    live_snapshots: LiveSnapshots,
 }
 
 impl PositionStore {
-    pub fn new(pg_pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) -> Self {
+    pub fn new(pg_pool: PgPool, live_snapshots: LiveSnapshots) -> Self {
         Self {
             pg_pool,
-            redis_pool,
+            live_snapshots,
         }
     }
 
     /// Gets all positions for a specific source, optionally filtered by a specific time.
-    /// If a time is specified, positions are not cached.
+    /// Explicit times read retained observations; default reads use the committed snapshot.
     pub async fn get_all(
         &self,
         source: Source,
@@ -36,18 +30,11 @@ impl PositionStore {
             return self.query_all_positions(source, at).await;
         }
 
-        let key = format!("positions:{}", source.as_str());
-        if let Some(cached) = cache_get::<Vec<VehiclePosition>>(&self.redis_pool, &key).await {
-            return Ok(cached);
-        }
-        self.query_all_positions(source, Utc::now()).await
-    }
-
-    /// Populate the positions Redis cache by re-querying from DB.
-    async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
-        let key = format!("positions:{}", source.as_str());
-        let positions = self.query_all_positions(source, Utc::now()).await?;
-        cache_set(&self.redis_pool, &key, &positions, TTL).await
+        Ok(self
+            .live_snapshots
+            .get(source)
+            .map(|snapshot| snapshot.positions.clone())
+            .unwrap_or_default())
     }
 
     /// Internal helper function to query positions without caching
@@ -88,79 +75,5 @@ impl PositionStore {
         .bind(at)
         .fetch_all(&self.pg_pool)
         .await?)
-    }
-
-    /// Bulk upsert vehicle positions (updates current state only, no history)
-    /// A database trigger appends trip history points when positions with trip_id and geom are upserted
-    #[tracing::instrument(level = "debug", skip(self, positions), fields(source = %source, count = positions.len()))]
-    pub async fn save_vehicle_positions(
-        &self,
-        source: Source,
-        positions: &[VehiclePosition],
-    ) -> anyhow::Result<()> {
-        if positions.is_empty() {
-            tracing::debug!("No vehicle positions to upsert");
-            return Ok(());
-        }
-
-        let vehicle_ids: Vec<_> = positions.iter().map(|v| v.vehicle_id.clone()).collect();
-        let trip_ids: Vec<_> = positions.iter().map(|v| v.trip_id).collect();
-        let stop_ids: Vec<_> = positions
-            .iter()
-            .map(|v| v.stop_id.as_ref().map(|s| s.to_uppercase()))
-            .collect();
-        let updated_ats: Vec<_> = positions.iter().map(|v| v.updated_at).collect();
-        let geoms: Vec<_> = positions
-            .iter()
-            .map(|v| v.geom.clone().map(wkb::Encode))
-            .collect();
-        let datas: Vec<_> = positions
-            .iter()
-            .map(|v| serde_json::to_value(&v.data).unwrap())
-            .collect();
-
-        sqlx::query!(
-            r#"
-            INSERT INTO realtime.vehicle_position (
-                vehicle_id,
-                source,
-                trip_id,
-                stop_id,
-                geom,
-                data,
-                updated_at
-            )
-            SELECT
-                unnest($1::text[]),
-                unnest($2::source_enum[]),
-                unnest($3::uuid[]),
-                unnest($4::text[]),
-                unnest($5::geometry[]),
-                unnest($6::JSONB[]),
-                unnest($7::timestamptz[])
-            ON CONFLICT (vehicle_id, source) DO UPDATE SET
-                trip_id = EXCLUDED.trip_id,
-                stop_id = EXCLUDED.stop_id,
-                geom = EXCLUDED.geom,
-                data = EXCLUDED.data,
-                updated_at = EXCLUDED.updated_at
-            "#,
-            &vehicle_ids,
-            &vec![source; positions.len()] as _,
-            &trip_ids as _,
-            &stop_ids as _,
-            &geoms as _,
-            &datas,
-            &updated_ats,
-        )
-        .execute(&self.pg_pool)
-        .await?;
-
-        tracing::debug!(count = positions.len(), "Upserted vehicle positions");
-
-        // Populate cache (write-through)
-        self.populate_cache(source).await?;
-
-        Ok(())
     }
 }

@@ -3,6 +3,7 @@ use crate::{
         route::Route, shape::Shape, source::Source, static_cache::CachedTrip, stop::RouteStop,
         stop::Stop,
     },
+    static_index::{StaticTransitRevision, TripPattern},
     stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
     utils::validation::ImportReport,
 };
@@ -14,6 +15,8 @@ pub struct StaticDataset {
     pub route_stops: Vec<RouteStop>,
     pub shapes: Vec<Shape>,
     pub cached_trips: Vec<CachedTrip>,
+    pub trip_patterns: std::collections::HashMap<String, TripPattern>,
+    pub stop_remap: std::collections::HashMap<String, String>,
 }
 // TODO: use the standardized log_summary method instead of having a separate trace in each source
 impl StaticDataset {
@@ -25,6 +28,8 @@ impl StaticDataset {
             route_stops: Vec::new(),
             shapes: Vec::new(),
             cached_trips: Vec::new(),
+            trip_patterns: std::collections::HashMap::new(),
+            stop_remap: std::collections::HashMap::new(),
         }
     }
 
@@ -62,14 +67,14 @@ impl StaticDataset {
                 .await?;
         }
 
-        // Refresh the stops read-through cache immediately from the freshly
-        // persisted rows. Proximity transfers are recomputed asynchronously after
-        // this (and repopulate the cache again with transfer data), but that step
-        // is slow and best-effort — we must not leave stops invisible to the API
-        // if it is delayed or fails. Non-fatal: a cache miss just falls back to DB.
-        if let Err(e) = stop_store.populate_cache(self.source).await {
-            tracing::error!(source = %self.source, error = %e, "Failed to populate stops cache after import");
-        }
+        // Complete the stops read-through cache refresh before publishing the
+        // new revision. A failed write leaves the previous revision authoritative.
+        // Proximity transfers are recomputed separately after the import.
+        stop_store.populate_cache(self.source).await?;
+
+        static_cache_store
+            .static_index()
+            .publish(StaticTransitRevision::from_dataset(self));
 
         Ok(())
     }

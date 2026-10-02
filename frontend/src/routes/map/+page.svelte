@@ -53,13 +53,13 @@
 	} from 'svelte-maplibre-gl';
 
 	let map = $state<maplibregl.Map>();
+	let center = $state<[number, number]>([-74.006, 40.7128]);
 	let zoom = $state(12);
 	let bearing = $state(0);
 	let settledZoom = $state(12);
 	let pixelRatio = $state(1);
 	let cameraMoving = $state(false);
 
-	const HOME_CENTER: [number, number] = [-74.006, 40.7128];
 	// TODO: is this even needed? martin returns ETags for caching
 	const BASEMAP_STYLE_REVISION = 'transit-v2';
 	const RAIL_DETAIL_ZOOM = 14.1;
@@ -84,6 +84,7 @@
 	$effect(() => {
 		const container = map?.getCanvasContainer();
 		if (!container) return;
+		container.classList.toggle('trainstatus-map-default-cursor', hover.cursor === 'default');
 		container.classList.toggle('maplibregl-track-pointer', hover.cursor === 'pointer');
 	});
 
@@ -340,6 +341,7 @@
 
 <div
 	class="relative flex w-full h-full"
+	data-map-center={center.join(',')}
 	data-map-zoom={zoom}
 	data-map-bearing={bearing}
 	bind:clientWidth={viewportWidth}
@@ -349,9 +351,9 @@
 
 	<MapLibre
 		bind:map
+		bind:center
 		bind:zoom
 		bind:bearing
-		center={HOME_CENTER}
 		class="size-full"
 		autoloadGlobalCss={false}
 		style={`${page.url.origin}/martin/style/dark-matter.json?v=${BASEMAP_STYLE_REVISION}`}
@@ -679,5 +681,22 @@
 		border: 1px solid rgb(82 82 82 / 0.5);
 		border-radius: 0.4rem;
 		box-shadow: 0 3px 12px rgb(0 0 0 / 0.2);
+	}
+
+	/* TODO: get rid of these custom styles, it shouldn't be needed */
+	:global(.maplibregl-canvas-container.maplibregl-interactive.trainstatus-map-default-cursor),
+	:global(.maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer) {
+		cursor: default;
+	}
+
+	:global(.maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer) {
+		cursor: pointer;
+	}
+
+	:global(
+		.maplibregl-canvas-container.maplibregl-interactive.trainstatus-map-default-cursor:active
+	),
+	:global(.maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer:active) {
+		cursor: grabbing;
 	}
 </style>

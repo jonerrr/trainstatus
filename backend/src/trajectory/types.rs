@@ -166,12 +166,13 @@ impl HotSnapshot {
 
 impl TrajectoryConfig {
     pub fn for_source(source: Source) -> Self {
-        let mut config = Self::default();
-        config.dt_s = match source {
-            Source::MtaSubway => 2.0,
-            Source::MtaBus | Source::NjtBus => 5.0,
-        };
-        config
+        Self {
+            dt_s: match source {
+                Source::MtaSubway => 2.0,
+                Source::MtaBus | Source::NjtBus => 5.0,
+            },
+            ..Self::default()
+        }
     }
 }
 

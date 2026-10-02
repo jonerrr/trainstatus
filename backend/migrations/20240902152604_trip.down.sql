@@ -1,6 +1,6 @@
 DROP INDEX IF EXISTS realtime.idx_trip_created_at;
 
-DROP INDEX IF EXISTS realtime.idx_stop_time_arrival;
+DROP INDEX IF EXISTS realtime.idx_stop_time_source_arrival;
 
 DROP INDEX IF EXISTS realtime.idx_vehicle_position_trip_id;
 DROP INDEX IF EXISTS realtime.idx_vehicle_position_gix;

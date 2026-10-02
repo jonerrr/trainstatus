@@ -19,60 +19,54 @@ const B94_STOP_COORDS: [(f64, f64); 5] = [
 const B94_REAL_SHAPE: &str = "B940017";
 const DECOY_SHAPE: &str = "TEST_DECOY_SHAPE";
 
-async fn insert_trip_and_stop_times(
-    pool: &sqlx::PgPool,
-    route_id: &str,
-    stop_ids: &[&str],
-) -> Uuid {
-    let trip_id = Uuid::now_v7();
+fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::realtime::CollectedSnapshot {
+    use backend::models::trip::{MtaBusData, StopTime, StopTimeData, Trip, TripData};
+    let id = Uuid::now_v7();
     let now = Utc::now();
-
-    sqlx::query(
-        r#"
-        INSERT INTO realtime.trip
-            (id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data)
-        VALUES ($1, $2, $3, $4, ARRAY[]::varchar[], 'mta_bus', 0, $5, $5, '{}'::jsonb)
-        "#,
-    )
-    .bind(trip_id)
-    .bind(format!("test-trip-{trip_id}"))
-    .bind(format!("test-vehicle-{trip_id}"))
-    .bind(route_id)
-    .bind(now)
-    .execute(pool)
-    .await
-    .expect("insert synthetic trip");
-
-    for (i, stop_id) in stop_ids.iter().enumerate() {
-        let arrival = now + chrono::Duration::minutes(i as i64 * 2);
-        sqlx::query(
-            r#"
-            INSERT INTO realtime.stop_time (trip_id, stop_id, source, arrival, departure, data)
-            VALUES ($1, $2, 'mta_bus', $3, $3, '{"source": "mta_bus"}'::jsonb)
-            "#,
-        )
-        .bind(trip_id)
-        .bind(*stop_id)
-        .bind(arrival)
-        .execute(pool)
-        .await
-        .expect("insert synthetic stop_time");
+    let trip = Trip {
+        id,
+        original_id: format!("test-trip-{id}"),
+        vehicle_id: format!("test-vehicle-{id}"),
+        route_id: route_id.into(),
+        shape_ids: vec![],
+        direction: 0,
+        created_at: now,
+        updated_at: now,
+        data: TripData::MtaBus(MtaBusData { deviation: None }),
+    };
+    let stops = stop_ids
+        .iter()
+        .enumerate()
+        .map(|(i, stop)| {
+            let arrival = now + chrono::Duration::minutes(i as i64 * 2);
+            StopTime {
+                trip_id: id,
+                stop_id: (*stop).into(),
+                arrival,
+                departure: arrival,
+                data: StopTimeData::MtaBus,
+            }
+        })
+        .collect();
+    backend::realtime::CollectedSnapshot {
+        source: Source::MtaBus,
+        trips: vec![(trip, stops)],
+        positions: vec![],
     }
-
-    trip_id
 }
 
 /// A candidate shape can be geometrically closer to a trip's stops than the
 /// real shape (e.g. a coincidence, or here — deliberately — a decoy built
 /// exactly through the stop points) while having zero confirmed stop-membership
-/// hits. `get_trajectory_inputs` must prefer the hit-rich real shape over the
+/// hits. Ingestion must prefer the hit-rich real shape over the
 /// distance-closer decoy.
 #[sqlx::test]
 async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
     let redis_pool = setup_redis().await;
     let stores = test_stores(pool.clone(), redis_pool);
 
-    mta_bus_dataset()
+    let dataset = mta_bus_dataset();
+    dataset
         .persist(
             &stores.route_store,
             &stores.stop_store,
@@ -130,25 +124,29 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         "test setup should make the decoy shape the closer one by raw distance"
     );
 
-    let trip_id = insert_trip_and_stop_times(&pool, "B94", &B94_STOP_IDS).await;
-
-    let rows = stores
-        .trip_store
-        .get_trajectory_inputs(Source::MtaBus, Utc::now(), None)
-        .await
-        .expect("get_trajectory_inputs should succeed");
-
-    let trip_rows: Vec<_> = rows.into_iter().filter(|r| r.trip_id == trip_id).collect();
-    assert!(
-        !trip_rows.is_empty(),
-        "expected rows for the synthetic trip"
+    let mut revision = backend::static_index::StaticTransitRevision::from_dataset(&dataset);
+    revision.shapes.insert(
+        DECOY_SHAPE.into(),
+        backend::models::geom::Geom::from(geo::LineString::from(B94_STOP_COORDS.to_vec())),
     );
-    for row in &trip_rows {
-        assert_eq!(
-            row.shape_id, B94_REAL_SHAPE,
-            "hit-count should win over the geometrically-closer decoy"
-        );
-    }
+    revision
+        .routes
+        .get_mut("B94")
+        .unwrap()
+        .shape_ids
+        .push(DECOY_SHAPE.into());
+    stores.static_cache_store.static_index().publish(revision);
+    let committed = stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
+        .await
+        .unwrap();
+    assert_eq!(
+        committed.trips[0].shape_ids,
+        [B94_REAL_SHAPE],
+        "membership must beat the geometrically closer decoy"
+    );
+    assert_eq!(committed.changes.resolved_shapes, 1);
 }
 
 /// Before a fresh static import populates `route_stop.data->'shape_ids'`, every
@@ -159,7 +157,8 @@ async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
     let redis_pool = setup_redis().await;
     let stores = test_stores(pool.clone(), redis_pool);
 
-    mta_bus_dataset()
+    let dataset = mta_bus_dataset();
+    dataset
         .persist(
             &stores.route_store,
             &stores.stop_store,
@@ -174,17 +173,87 @@ async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
         .await
         .expect("strip shape_ids from route_stop");
 
-    let trip_id = insert_trip_and_stop_times(&pool, "B94", &B94_STOP_IDS).await;
-
-    let rows = stores
-        .trip_store
-        .get_trajectory_inputs(Source::MtaBus, Utc::now(), None)
+    let mut revision = backend::static_index::StaticTransitRevision::from_dataset(&dataset);
+    revision.route_stop_shapes.clear();
+    stores.static_cache_store.static_index().publish(revision);
+    let committed = stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
         .await
-        .expect("get_trajectory_inputs should succeed even with no hit data");
-
-    let trip_rows: Vec<_> = rows.into_iter().filter(|r| r.trip_id == trip_id).collect();
+        .unwrap();
     assert!(
-        !trip_rows.is_empty(),
-        "should still resolve a shape via the distance fallback"
+        !committed.trips[0].shape_ids.is_empty(),
+        "zero membership hits still resolve a shape through distance"
     );
+    assert_eq!(committed.changes.resolved_shapes, 1);
+}
+
+#[sqlx::test]
+async fn historical_trajectory_uses_final_departure_and_past_history_points(pool: sqlx::PgPool) {
+    use backend::{
+        models::{
+            geom::Geom,
+            position::{MtaBusPositionData, PositionData, VehiclePosition},
+        },
+        stores::trajectory::TrajectoryStore,
+        trajectory::TrajectoryCache,
+    };
+    use std::sync::Arc;
+    let redis = setup_redis().await;
+    let stores = test_stores(pool.clone(), redis);
+    mta_bus_dataset()
+        .persist(
+            &stores.route_store,
+            &stores.stop_store,
+            &stores.static_cache_store,
+        )
+        .await
+        .unwrap();
+    let at = Utc::now() - chrono::Duration::hours(1);
+    let mut input = collected_trip("B94", &B94_STOP_IDS);
+    input.trips[0].0.created_at = at - chrono::Duration::minutes(5);
+    input.trips[0].0.updated_at = at + chrono::Duration::hours(2);
+    for stop in &mut input.trips[0].1 {
+        stop.arrival = at - chrono::Duration::minutes(2);
+        stop.departure = at + chrono::Duration::minutes(1);
+    }
+    let old_point = geo::Point::new(-73.948151, 40.744723);
+    input.positions.push(VehiclePosition {
+        vehicle_id: input.trips[0].0.vehicle_id.clone(),
+        trip_id: Some(input.trips[0].0.id),
+        stop_id: None,
+        geom: Some(Geom::from(old_point)),
+        updated_at: at - chrono::Duration::seconds(20),
+        data: PositionData::MtaBus(MtaBusPositionData {
+            bearing: 0.0,
+            passengers: None,
+            capacity: None,
+            status: None,
+            phase: None,
+        }),
+    });
+    let committed = stores.ingestor.ingest(input.clone()).await.unwrap();
+    input.positions[0].updated_at = at + chrono::Duration::seconds(20);
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.94, 40.75)));
+    stores.ingestor.ingest(input).await.unwrap();
+    let historical = TrajectoryStore::new(pool.clone(), Arc::new(TrajectoryCache::new()))
+        .load_historical_inputs(Source::MtaBus, at)
+        .await
+        .unwrap();
+    assert_eq!(
+        historical.len(),
+        1,
+        "final departure keeps retained trip relevant even with later updated_at"
+    );
+    assert_eq!(historical[0].trip_id, committed.trips[0].id);
+    assert_eq!(historical[0].positions.len(), 1);
+    assert_eq!(
+        historical[0].positions[0].updated_at,
+        committed.positions[0].updated_at
+    );
+    assert_eq!(
+        historical[0].positions[0].geom.as_ref().unwrap().0,
+        geo::Geometry::Point(old_point)
+    );
+    assert!(!historical[0].stops.is_empty());
 }

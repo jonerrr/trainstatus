@@ -1,4 +1,4 @@
-use crate::engines::static_data::StaticController;
+use crate::feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition};
 use crate::integrations::gtfs_realtime;
 use crate::integrations::oba;
 use crate::models::source::Source;
@@ -8,23 +8,16 @@ use crate::models::{
     trip::{StopTime, StopTimeData},
 };
 use crate::mta_oba_api_key;
-use crate::sources::RealtimeAdapter;
+use crate::realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig};
 use crate::sources::mta_bus::AGENCIES;
 use crate::sources::mta_subway::realtime::parse_origin_time;
-use crate::stores::position::PositionStore;
-use crate::stores::static_cache::StaticCacheStore;
-use crate::stores::trip::TripStore;
-use crate::{
-    feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
-    integrations::gtfs_realtime::GtfsSource,
-};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 pub struct MtaBusRealtime;
@@ -91,12 +84,7 @@ impl MtaBusRealtime {
     }
 }
 
-#[async_trait]
-impl GtfsSource for MtaBusRealtime {
-    fn source(&self) -> Source {
-        Source::MtaBus
-    }
-
+impl MtaBusRealtime {
     async fn fetch_feeds(&self) -> Vec<FeedMessage> {
         gtfs_realtime::fetch_feeds(vec![
             (
@@ -111,11 +99,7 @@ impl GtfsSource for MtaBusRealtime {
         .await
     }
 
-    async fn process_trip(
-        &self,
-        update: TripUpdate,
-        _static_cache_store: &StaticCacheStore,
-    ) -> (Option<Trip>, Vec<StopTime>) {
+    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
         let trip_desc = update.trip;
 
         // Extract trip ID and route ID
@@ -230,11 +214,7 @@ impl GtfsSource for MtaBusRealtime {
         (Some(trip), stop_times)
     }
 
-    async fn process_vehicle(
-        &self,
-        vehicle: GtfsVehiclePosition,
-        _static_cache_store: &StaticCacheStore,
-    ) -> Option<VehiclePosition> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -268,147 +248,72 @@ impl GtfsSource for MtaBusRealtime {
 }
 
 #[async_trait]
-impl RealtimeAdapter for MtaBusRealtime {
-    fn source(&self) -> Source {
-        Source::MtaBus
+impl RealtimeSource for MtaBusRealtime {
+    fn config(&self) -> RealtimeSourceConfig {
+        RealtimeSourceConfig {
+            source: Source::MtaBus,
+            refresh_interval: std::time::Duration::from_secs(30),
+        }
     }
 
-    fn refresh_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(30)
-    }
-
-    #[instrument(level = "debug", skip_all, fields(source = %Source::MtaBus))]
-    async fn run(
-        &self,
-        static_controller: &StaticController,
-        static_cache_store: &StaticCacheStore,
-        trip_store: &TripStore,
-        position_store: &PositionStore,
-    ) -> anyhow::Result<()> {
-        // 0. Ensure static data is loaded before processing realtime data
-        static_controller
-            .ensure_updated(GtfsSource::source(self))
-            .await?;
-
-        // 1. Fetch GTFS and OBA data in parallel
+    async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
         let (feeds, oba_result) = tokio::join!(self.fetch_feeds(), self.fetch_oba_data());
+        anyhow::ensure!(!feeds.is_empty(), "No MTA bus GTFS-RT feeds returned");
+        let oba = oba_result.unwrap_or_else(|error| {
+            error!(%error, "OBA fetch failed");
+            Vec::new()
+        });
+        Ok(self.build_snapshot(feeds, oba))
+    }
+}
 
-        // 2. Process OBA data into lookup map
-        let oba_map: HashMap<String, oba::VehicleStatus> = match oba_result {
-            Ok(vehicles) => {
-                // Parse vehicle IDs and create lookup map
-                vehicles
-                    .into_iter()
-                    .map(|mut v| {
-                        v.vehicle_id = parse_prefixed_id(v.vehicle_id);
-                        (v.vehicle_id.clone(), v)
-                    })
-                    .collect()
-            }
-            Err(e) => {
-                error!(error = %e, "OBA fetch failed");
-                HashMap::new()
-            }
-        };
-
-        let mut data = Vec::new();
-        let mut positions: Vec<VehiclePosition> = Vec::new();
-
-        // Build a map of vehicle_id -> trip for linking positions to trips
-        let mut vehicle_to_trip: HashMap<String, Uuid> = HashMap::new();
-
-        // 3. Process GTFS feeds
+impl MtaBusRealtime {
+    pub fn build_snapshot(
+        &self,
+        feeds: Vec<FeedMessage>,
+        oba_vehicles: Vec<oba::VehicleStatus>,
+    ) -> CollectedSnapshot {
+        let oba_map: HashMap<_, _> = oba_vehicles
+            .into_iter()
+            .map(|v| (parse_prefixed_id(v.vehicle_id.clone()), v))
+            .collect();
+        let mut trips = Vec::new();
+        let mut positions = Vec::new();
         for feed in feeds {
             for entity in feed.entity {
-                // Process trips and stop times
                 if let Some(update) = entity.trip_update {
-                    let (trip_opt, new_stop_times) =
-                        self.process_trip(update, static_cache_store).await;
-                    if let Some(trip) = trip_opt {
-                        // Map vehicle_id to trip_id for position linking
-                        vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
-                        data.push((trip, new_stop_times));
+                    let (trip, times) = self.process_trip(update);
+                    if let Some(trip) = trip {
+                        trips.push((trip, times));
                     }
                 }
-
-                // Process vehicles and merge with OBA data
                 if let Some(vehicle) = entity.vehicle
-                    && let Some(mut position) =
-                        self.process_vehicle(vehicle, static_cache_store).await
+                    && let Some(mut position) = self.process_vehicle(vehicle)
                 {
-                    // Merge OBA data if available
-                    if let Some(oba_data) = oba_map.get(&position.vehicle_id) {
-                        // TODO: maybe include the oba trip_id so we know which trip (if theres multiple with same vehicle_id) is associated with the OBA data.
-                        if let PositionData::MtaBus(data) = &mut position.data {
-                            data.passengers = oba_data.occupancy_count;
-                            data.capacity = oba_data.occupancy_capacity;
-                            data.status = Some(oba_data.status.clone());
-                            data.phase = Some(oba_data.phase.clone());
-                        }
+                    if let Some(oba) = oba_map.get(&position.vehicle_id)
+                        && let PositionData::MtaBus(data) = &mut position.data
+                    {
+                        data.passengers = oba.occupancy_count;
+                        data.capacity = oba.occupancy_capacity;
+                        data.status = Some(oba.status.clone());
+                        data.phase = Some(oba.phase.clone());
                     }
                     positions.push(position);
                 }
             }
         }
-
-        info!(
-            "Saving {} bus trips and {} positions",
-            data.len(),
-            positions.len()
-        );
-
-        // 4. Save data with FK retry logic
-        let mut attempts = 0;
-        let id_map = loop {
-            if attempts >= 2 {
-                anyhow::bail!("Failed to save bus trips after retries");
-            }
-
-            match trip_store.save_all(GtfsSource::source(self), &data).await {
-                Ok(map) => break map,
-                Err(e) => {
-                    // Check for Postgres Foreign Key Violation (Code 23503)
-                    if let Some(db_err) = e
-                        .downcast_ref::<sqlx::Error>()
-                        .and_then(|x| x.as_database_error())
-                        && db_err.code().as_deref() == Some("23503")
-                    {
-                        warn!("Missing static data for bus. Forcing update...");
-
-                        if let Err(update_err) = static_controller
-                            .force_update(GtfsSource::source(self))
-                            .await
-                        {
-                            anyhow::bail!("Ensure update failed: {}", update_err);
-                        }
-
-                        attempts += 1;
-                        continue;
-                    }
-
-                    return Err(e);
-                }
-            }
-        };
-
-        // 5. Link positions to trips via vehicle_id
-        // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
-        // The database trigger will automatically append trip history points
+        let vehicle_to_trip: HashMap<_, _> = trips
+            .iter()
+            .map(|(trip, _)| (trip.vehicle_id.as_str(), trip.id))
+            .collect();
         for position in &mut positions {
-            if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id) {
-                // Translate input_id to actual DB id
-                if let Some(&actual_id) = id_map.get(&input_id) {
-                    position.trip_id = Some(actual_id);
-                }
-            }
+            position.trip_id = vehicle_to_trip.get(position.vehicle_id.as_str()).copied();
         }
-
-        // 6. Save positions (trigger appends trip history points automatically)
-        position_store
-            .save_vehicle_positions(GtfsSource::source(self), &positions)
-            .await?;
-
-        Ok(())
+        CollectedSnapshot {
+            source: Source::MtaBus,
+            trips,
+            positions,
+        }
     }
 }
 

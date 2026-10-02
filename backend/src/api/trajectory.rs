@@ -13,7 +13,7 @@ use super::{AppError, AppState, CurrentTime, parse_list};
 use crate::models::source::Source;
 use crate::trajectory::{
     HotSnapshot, RenderUnit, TrajectoryConfig, bbox_intersects, compute_trajectory_async,
-    encode_render_units, expand_render_units, snapshot_from_rows, source_supports_trajectories,
+    encode_render_units, expand_render_units, source_supports_trajectories,
 };
 
 #[derive(Deserialize, IntoParams)]
@@ -50,15 +50,15 @@ fn filter_render_units<'a>(
 
     render_units
         .filter(|t| {
-            if let Some(ref routes) = route_set {
-                if !routes.contains(t.route_id.as_str()) {
-                    return false;
-                }
+            if let Some(ref routes) = route_set
+                && !routes.contains(t.route_id.as_str())
+            {
+                return false;
             }
-            if let Some(bbox) = query_bbox {
-                if !bbox_intersects(t.path_bbox, bbox) {
-                    return false;
-                }
+            if let Some(bbox) = query_bbox
+                && !bbox_intersects(t.path_bbox, bbox)
+            {
+                return false;
             }
             true
         })
@@ -72,80 +72,41 @@ async fn load_snapshot(
     user_specified: bool,
 ) -> Result<HotSnapshot, AppError> {
     if !user_specified {
-        if let Some(hot) = state.trajectory_cache.get_hot(source).await {
-            return Ok(hot);
-        }
+        return Ok(state
+            .trajectory_cache
+            .get_hot(source)
+            .await
+            .unwrap_or_else(HotSnapshot::empty));
     }
-
     if let Some(hist) = state.trajectory_cache.get_historical(source, at).await {
         return Ok(hist);
     }
-
-    let rows = state
-        .trip_store
-        .get_trajectory_inputs(source, at, None)
+    let inputs = state
+        .trajectory_store
+        .load_historical_inputs(source, at)
         .await?;
-
-    if rows.is_empty() {
-        return Ok(HotSnapshot::empty());
-    }
-
-    let mut trip_rows: std::collections::HashMap<uuid::Uuid, Vec<_>> =
-        std::collections::HashMap::new();
-    for row in rows {
-        trip_rows.entry(row.trip_id).or_default().push(row);
-    }
-
     let config = TrajectoryConfig::for_source(source);
     let engine = state.trajectory_engine.clone();
     let cache = state.trajectory_cache.clone();
-    let mut positions_by_trip: std::collections::HashMap<
-        uuid::Uuid,
-        Vec<crate::models::position::VehiclePosition>,
-    > = std::collections::HashMap::new();
-    for position in state.position_store.get_all(source, Some(at)).await? {
-        let Some(trip_id) = position.trip_id else {
-            continue;
-        };
-        positions_by_trip.entry(trip_id).or_default().push(position);
-    }
-
-    let futures: Vec<_> = trip_rows
+    let futures: Vec<_> = inputs
         .into_iter()
-        .map(|(trip_id, rows)| {
+        .map(|snapshot| {
             let engine = engine.clone();
             let cache = cache.clone();
-            let positions = positions_by_trip.remove(&trip_id).unwrap_or_default();
             async move {
-                let first = rows.first()?;
-                let mut snapshot = snapshot_from_rows(
-                    trip_id,
-                    first.route_id.clone(),
-                    first.route_color.clone(),
-                    first.direction,
-                    first.trip_geom.clone(),
-                    0.0,
-                    rows,
-                    positions,
-                    at,
-                )
-                .map_err(|e| {
-                    tracing::warn!("snapshot_from_rows failed for {trip_id}: {e}");
-                })
-                .ok()?;
                 let shape_geom = cache
                     .get_shape_geometry(source, &snapshot.shape_key, &snapshot.shape)
                     .await?;
-                snapshot.shape_length_m = shape_geom.length_m;
-                let computed =
-                    compute_trajectory_async(&engine, source, &snapshot, None, &cache, &config)
-                        .await
-                        .map_err(|e| {
-                            // if !e.to_string().contains("outside the active time window") {
-                            tracing::warn!("compute_trajectory failed for {trip_id}: {e}");
-                            // }
-                        })
-                        .ok()?;
+                let computed = compute_trajectory_async(
+                    &engine, source, &snapshot, None, &cache, &config,
+                )
+                .await
+                .map_err(|e| {
+                    // if !e.to_string().contains("outside the active time window") {
+                    tracing::warn!(trip_id = %snapshot.trip_id, "compute_trajectory failed: {e}");
+                    // }
+                })
+                .ok()?;
                 let units =
                     expand_render_units(source, &snapshot, &computed.trajectory, &shape_geom);
                 Some(units)

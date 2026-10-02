@@ -26,11 +26,11 @@ impl TrajectoryEngine {
         let mut builders: HashMap<Source, Arc<dyn TrajectoryBuilder>> = HashMap::new();
         builders.insert(
             Source::MtaSubway,
-            Arc::new(MtaSubwayBuilder::default()) as Arc<dyn TrajectoryBuilder>,
+            Arc::new(MtaSubwayBuilder) as Arc<dyn TrajectoryBuilder>,
         );
         builders.insert(
             Source::MtaBus,
-            Arc::new(MtaBusBuilder::default()) as Arc<dyn TrajectoryBuilder>,
+            Arc::new(MtaBusBuilder) as Arc<dyn TrajectoryBuilder>,
         );
         builders.insert(
             Source::NjtBus,
@@ -105,10 +105,10 @@ pub fn compute_trajectory(
         sampled_t.push(t);
         t += config.dt_s;
     }
-    if let Some(&last) = sampled_t.last() {
-        if (last - sample_max).abs() > 1e-6 {
-            sampled_t.push(sample_max);
-        }
+    if let Some(&last) = sampled_t.last()
+        && (last - sample_max).abs() > 1e-6
+    {
+        sampled_t.push(sample_max);
     }
 
     let sampled_s = method.interpolate_distance(&knots, &sampled_t)?;

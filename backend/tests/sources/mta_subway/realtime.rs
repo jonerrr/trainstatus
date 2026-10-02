@@ -1,6 +1,7 @@
 use backend::{
     fixtures::{self, FixtureKind},
     models::source::Source,
+    realtime::CollectedSnapshot,
     sources::mta_subway::realtime::build_realtime_from_fixture,
 };
 use chrono::{TimeZone, Utc};
@@ -20,16 +21,25 @@ fn realtime_fixture_maps_trips_and_positions() {
         .single()
         .expect("valid fixture time");
 
-    let (trips, positions) =
+    let snapshot: CollectedSnapshot =
         build_realtime_from_fixture(payload, now).expect("subway realtime fixture should build");
 
-    assert!(!trips.is_empty(), "fixture should include subway trips");
-    let (trip, stop_times) = trips.first().expect("trip sample");
+    assert_eq!(snapshot.source, Source::MtaSubway);
+    for (trip, times) in &snapshot.trips {
+        for time in times {
+            assert_eq!(time.trip_id, trip.id);
+        }
+    }
+    assert!(
+        !snapshot.trips.is_empty(),
+        "fixture should include subway trips"
+    );
+    let (trip, stop_times) = snapshot.trips.first().expect("trip sample");
     assert!(!trip.original_id.is_empty());
     assert!(!trip.route_id.is_empty());
     assert!(!stop_times.is_empty());
 
-    if let Some(position) = positions.first() {
+    if let Some(position) = snapshot.positions.first() {
         assert!(!position.vehicle_id.is_empty());
         assert!(position.trip_id.is_some());
     }

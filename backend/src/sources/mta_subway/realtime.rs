@@ -1,7 +1,6 @@
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 
-use crate::engines::static_data::StaticController;
 use crate::models::source::Source;
 use crate::models::{
     position::{MtaSubwayPositionData, PositionData, VehiclePosition},
@@ -9,14 +8,11 @@ use crate::models::{
         Consist, MtaSubwayStopTimeData, MtaSubwayTripData, StopTime, StopTimeData, Trip, TripData,
     },
 };
-use crate::sources::RealtimeAdapter;
-use crate::stores::position::PositionStore;
-use crate::stores::static_cache::StaticCacheStore;
-use crate::stores::trip::TripStore;
+use crate::realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig};
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveTime, Utc};
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 const SUBWAY_TRIPS_URL: &str = concat!(env!("MTA_API_URL"), "/v1/subway/trips");
@@ -103,7 +99,7 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 pub fn build_realtime_from_fixture(
     payload: serde_json::Value,
     now: DateTime<Utc>,
-) -> anyhow::Result<(Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>)> {
+) -> anyhow::Result<CollectedSnapshot> {
     let response = serde_json::from_value::<HeliumTripsResponse>(payload)?;
     Ok(build_realtime_from_response(response, now))
 }
@@ -111,7 +107,7 @@ pub fn build_realtime_from_fixture(
 fn build_realtime_from_response(
     response: HeliumTripsResponse,
     now: DateTime<Utc>,
-) -> (Vec<(Trip, Vec<StopTime>)>, Vec<VehiclePosition>) {
+) -> CollectedSnapshot {
     let mut trips = Vec::new();
     let mut positions = Vec::new();
 
@@ -216,66 +212,31 @@ fn build_realtime_from_response(
         trips.push((trip, stop_times));
     }
 
-    (trips, positions)
+    CollectedSnapshot {
+        source: Source::MtaSubway,
+        trips,
+        positions,
+    }
 }
 
 #[async_trait]
-impl RealtimeAdapter for MtaSubwayRealtime {
-    fn source(&self) -> Source {
-        Source::MtaSubway
-    }
-
-    fn refresh_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(30)
-    }
-
-    async fn run(
-        &self,
-        static_controller: &StaticController,
-        _static_cache_store: &StaticCacheStore,
-        trip_store: &TripStore,
-        position_store: &PositionStore,
-    ) -> anyhow::Result<()> {
-        static_controller.ensure_updated(Source::MtaSubway).await?;
-
-        let client = reqwest::Client::new();
-        let response: HeliumTripsResponse =
-            client.get(SUBWAY_TRIPS_URL).send().await?.json().await?;
-
-        info!(
-            "Fetched {} subway trips from Helium API",
-            response.trips.len()
-        );
-
-        let (trip_stop_pairs, mut positions) = build_realtime_from_response(response, Utc::now());
-
-        // Save trips and stop times
-        let id_map = if !trip_stop_pairs.is_empty() {
-            trip_store
-                .save_all(Source::MtaSubway, &trip_stop_pairs)
-                .await?
-        } else {
-            std::collections::HashMap::new()
-        };
-
-        // Save positions
-        if !positions.is_empty() {
-            for pos in &mut positions {
-                if let Some(trip_id) = pos.trip_id {
-                    if let Some(&actual_id) = id_map.get(&trip_id) {
-                        pos.trip_id = Some(actual_id);
-                    } else {
-                        // The trip was dropped during deduplication
-                        pos.trip_id = None;
-                    }
-                }
-            }
-            position_store
-                .save_vehicle_positions(Source::MtaSubway, &positions)
-                .await?;
+impl RealtimeSource for MtaSubwayRealtime {
+    fn config(&self) -> RealtimeSourceConfig {
+        RealtimeSourceConfig {
+            source: Source::MtaSubway,
+            refresh_interval: std::time::Duration::from_secs(30),
         }
+    }
 
-        Ok(())
+    async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
+        let response = reqwest::Client::new()
+            .get(SUBWAY_TRIPS_URL)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<HeliumTripsResponse>()
+            .await?;
+        Ok(build_realtime_from_response(response, Utc::now()))
     }
 }
 
@@ -333,10 +294,7 @@ fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<Da
     let hh: u32 = digits[..2].parse().ok()?;
     let mm: u32 = digits[2..].parse().ok()?;
     // '+' immediately after the digits means add 30 seconds
-    let has_plus = time_token
-        .chars()
-        .nth(digits.len())
-        .map_or(false, |c| c == '+');
+    let has_plus = time_token.chars().nth(digits.len()) == Some('+');
     let ss: u32 = if has_plus { 30 } else { 0 };
 
     let origin_time = NaiveTime::from_hms_opt(hh, mm, ss)?;

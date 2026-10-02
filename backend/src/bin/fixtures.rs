@@ -8,7 +8,6 @@ use std::{
 use anyhow::{Context, Result};
 use backend::{
     fixtures::{self, FixtureKind, FixtureManifest, FixturePayload},
-    integrations::gtfs_realtime::GtfsSource,
     models::source::Source,
     sources::{
         mta_bus::{
@@ -22,9 +21,7 @@ use backend::{
             alerts as njt_bus_alerts, realtime as njt_bus_realtime, static_data as njt_bus_static,
         },
     },
-    stores::static_cache::StaticCacheStore,
 };
-use bb8_redis::RedisConnectionManager;
 use serde_json::json;
 
 const DEFAULT_ROOT: &str = "tests/fixtures";
@@ -347,10 +344,10 @@ async fn expected_outputs(
 ) -> Result<BTreeMap<String, serde_json::Value>> {
     let mut outputs = BTreeMap::new();
 
-    if manifest.kind == FixtureKind::Static {
-        if let Some(value) = static_dataset_expected(root, manifest)? {
-            outputs.insert("dataset".to_string(), value);
-        }
+    if manifest.kind == FixtureKind::Static
+        && let Some(value) = static_dataset_expected(root, manifest)?
+    {
+        outputs.insert("dataset".to_string(), value);
     }
 
     if manifest.kind == FixtureKind::Realtime {
@@ -413,25 +410,9 @@ async fn realtime_domain_expected(
     }
 
     let feed = fixtures::read_gtfs_realtime_payload(root, manifest, "trip_updates")?;
-    let manager = RedisConnectionManager::new("redis://fixture-expected-unused")
-        .context("valid Redis URL")?;
-    let redis_pool = bb8::Pool::builder().build_unchecked(manager);
-    let cache = StaticCacheStore::new(redis_pool);
-    let adapter = mta_bus_realtime::MtaBusRealtime;
-    let mut processed = 0usize;
-    let mut sample = Vec::new();
-
-    for entity in feed.entity {
-        if let Some(update) = entity.trip_update {
-            let (trip, stop_times) = adapter.process_trip(update, &cache).await;
-            if let Some(trip) = trip {
-                processed += 1;
-                if sample.len() < 5 {
-                    sample.push((trip, stop_times));
-                }
-            }
-        }
-    }
+    let snapshot = mta_bus_realtime::MtaBusRealtime.build_snapshot(vec![feed], Vec::new());
+    let processed = snapshot.trips.len();
+    let sample = snapshot.trips.into_iter().take(5).collect::<Vec<_>>();
 
     Ok(Some(json!({
         "processed_trip_count": processed,

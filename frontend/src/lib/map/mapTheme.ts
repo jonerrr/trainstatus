@@ -20,13 +20,13 @@ export const BODY_HEAD_RGB: [number, number, number] = [255, 255, 255];
 export const STOP_FILL = '#ffffff';
 export const BUS_STOP_FILL = '#aeb8c4';
 
-/** Used when a route has no usable colour. */
+/** Used when a route has no usable color. */
 export const FALLBACK_ROUTE_COLOR = '#8b95a1';
 
 /**
- * Route line colour. Colours are normalised to canonical `#RRGGBB` at ingest
+ * Route line color. colors are normalized to canonical `#RRGGBB` at ingest
  * (backend `RouteStore::save_all`), so the tile `color` property is used as-is;
- * the coalesce only guards the rare route that carries no colour at all.
+ * the coalesce only guards the rare route that carries no color at all.
  */
 export const ROUTE_COLOR: maplibregl.ExpressionSpecification = [
 	'coalesce',

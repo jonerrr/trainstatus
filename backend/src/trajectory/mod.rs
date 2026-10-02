@@ -22,7 +22,7 @@ pub use continuity::ContinuityDiscardReason;
 pub use engine::{TrajectoryEngine, compute_trajectory, compute_trajectory_async};
 pub use geometry::{route_length_m, shape_key_from_line};
 pub use render_units::{expand_render_units, source_render_config};
-pub use snapshot::{snapshot_from_rows, source_supports_trajectories};
+pub use snapshot::{snapshot_from_persisted_trip, source_supports_trajectories};
 pub use types::{
     ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit, Trajectory,
     TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, bbox_intersects,

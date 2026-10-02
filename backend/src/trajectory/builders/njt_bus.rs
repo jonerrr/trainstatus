@@ -11,7 +11,7 @@ use super::super::{
 use crate::models::{position::PositionData, source::Source, stop::StopData};
 
 pub const NJT_MAX_GPS_AGE_SECONDS: i64 = 120;
-pub const NJT_MAX_GPS_OFFSET_METRES: f64 = 100.0;
+pub const NJT_MAX_GPS_OFFSET_METERS: f64 = 100.0;
 // TODO: the other sources have this exact tolerance. make it a global constant or standardize the trajectory configuration better
 const DISTANCE_TOLERANCE_M: f64 = 1.0;
 
@@ -58,7 +58,7 @@ impl NjtBusBuilder {
             else {
                 continue;
             };
-            if Euclidean.distance(&projected, &Point::from(snapped)) > NJT_MAX_GPS_OFFSET_METRES {
+            if Euclidean.distance(&projected, &Point::from(snapped)) > NJT_MAX_GPS_OFFSET_METERS {
                 continue;
             }
             let ceiling = position

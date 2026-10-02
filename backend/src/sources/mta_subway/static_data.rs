@@ -413,6 +413,8 @@ fn build_static_dataset(
         route_stops,
         shapes,
         cached_trips: vec![],
+        trip_patterns: HashMap::new(),
+        stop_remap: HashMap::new(),
     }
 }
 

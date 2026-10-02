@@ -45,6 +45,8 @@ fn validation_catches_missing_route_stop_references() {
         }],
         shapes: vec![],
         cached_trips: vec![],
+        trip_patterns: std::collections::HashMap::new(),
+        stop_remap: std::collections::HashMap::new(),
     };
 
     let err = dataset.validate().expect_err("missing route should fail");

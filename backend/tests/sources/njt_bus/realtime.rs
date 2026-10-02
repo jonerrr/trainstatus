@@ -1,13 +1,14 @@
 use backend::{
     fixtures::{self, FixtureKind},
-    integrations::gtfs_realtime::GtfsSource,
     models::{source::Source, static_cache::CachedTrip},
+    realtime::CollectedSnapshot,
     sources::njt_bus::realtime::NjtBusRealtime,
+    static_index::StaticTransitRevision,
     stores::static_cache::StaticCacheStore,
 };
 use chrono::Utc;
 
-use crate::common::{fixture_root, flush_redis, setup_redis};
+use crate::common::{fixture_root, flush_redis, njt_bus_dataset, setup_redis};
 
 #[tokio::test]
 async fn realtime_fixture_maps_trips() {
@@ -20,7 +21,11 @@ async fn realtime_fixture_maps_trips() {
             .expect("NJT bus realtime manifest should load");
     let fixture = fixtures::read_gtfs_realtime_payload(&root, &manifest, "trip_updates")
         .expect("NJT bus realtime fixture should decode");
-    let adapter = NjtBusRealtime;
+    let vehicles = fixtures::read_gtfs_realtime_payload(&root, &manifest, "vehicle_positions")
+        .expect("NJT positions fixture should decode");
+    let index = cache.static_index();
+    index.publish(StaticTransitRevision::from_dataset(&njt_bus_dataset()));
+    let adapter = NjtBusRealtime::new(index, cache.clone());
 
     let today = Utc::now()
         .with_timezone(&chrono_tz::America::New_York)
@@ -54,19 +59,33 @@ async fn realtime_fixture_maps_trips() {
         .await
         .expect("static cache seed should succeed");
 
-    let mut trip_count = 0;
-    for entity in fixture.entity {
-        if let Some(update) = entity.trip_update {
-            let (trip, _stop_times) = adapter.process_trip(update, &cache).await;
-            if let Some(trip) = trip {
-                trip_count += 1;
-                assert!(!trip.original_id.is_empty());
-            }
-        }
-    }
-
+    let snapshot: CollectedSnapshot = adapter
+        .build_snapshot(vec![fixture, vehicles])
+        .await
+        .expect("NJT snapshot should normalize");
+    assert_eq!(snapshot.source, Source::NjtBus);
     assert!(
-        trip_count > 0,
+        !snapshot.trips.is_empty(),
         "fixture should include processable NJT trips"
     );
+    assert!(
+        !snapshot.positions.is_empty(),
+        "fixture should include NJT positions"
+    );
+    for position in &snapshot.positions {
+        if let Some(trip_id) = position.trip_id {
+            assert!(
+                snapshot
+                    .trips
+                    .iter()
+                    .any(|(trip, _)| trip.id == trip_id && trip.vehicle_id == position.vehicle_id)
+            );
+        }
+    }
+    for (trip, stop_times) in &snapshot.trips {
+        assert!(!trip.original_id.is_empty());
+        for stop_time in stop_times {
+            assert_eq!(stop_time.trip_id, trip.id);
+        }
+    }
 }

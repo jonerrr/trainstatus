@@ -527,7 +527,7 @@ impl StopStore {
             .bind(&from_sources)
             .bind(&to_ids)
             .bind(&to_sources)
-            .bind(&vec![6i16; chunk.len()])
+            .bind(vec![6i16; chunk.len()])
             .execute(&mut *tx)
             .await?;
         }

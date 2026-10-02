@@ -154,8 +154,8 @@
 	}
 
 	function bodyColor(vehicle: ActiveVehicle): [number, number, number, number] {
-		// Buses keep a light body too: filling them with the route colour made them
-		// disappear into the identically coloured route line they sit on.
+		// Buses keep a light body too: filling them with the route color made them
+		// disappear into the identically colored route line they sit on.
 		const rgb = vehicle.isHead ? BODY_HEAD_RGB : BODY_RGB;
 		return [rgb[0], rgb[1], rgb[2], alphaFor(vehicle, 245)];
 	}

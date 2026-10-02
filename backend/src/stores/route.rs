@@ -80,7 +80,7 @@ impl RouteStore {
         let sources: Vec<_> = routes.iter().map(|_| source).collect();
         let long_names: Vec<_> = routes.iter().map(|r| &r.long_name).collect();
         let short_names: Vec<_> = routes.iter().map(|r| &r.short_name).collect();
-        // Canonicalise colours to `#RRGGBB` here, the single write path for every
+        // Normalize colors to `#RRGGBB` here, the single write path for every
         // source, so the map and DOM never have to reconcile bare vs prefixed hex.
         let colors: Vec<_> = routes
             .iter()

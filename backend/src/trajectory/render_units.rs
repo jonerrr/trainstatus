@@ -41,23 +41,21 @@ pub fn expand_render_units(
     let config = source_render_config(source);
     let passengers = trip_passengers(trip);
 
-    if config.expand_consists {
-        if let (Some(unit_count), Some(car_length_m)) =
+    if config.expand_consists
+        && let (Some(unit_count), Some(car_length_m)) =
             (trip.consist_car_count, trip.consist_car_length_m)
-        {
-            let expanded = expand_consist_units(
-                source,
-                trip,
-                trajectory,
-                shape_geom,
-                unit_count,
-                car_length_m,
-                passengers,
-                config,
-            );
-            if !expanded.is_empty() {
-                return expanded;
-            }
+    {
+        let expanded = expand_consist_units(
+            source,
+            trajectory,
+            shape_geom,
+            unit_count,
+            car_length_m,
+            passengers,
+            config,
+        );
+        if !expanded.is_empty() {
+            return expanded;
         }
     }
 
@@ -68,7 +66,6 @@ pub fn expand_render_units(
 
 fn expand_consist_units(
     source: Source,
-    _trip: &TripSnapshot,
     trajectory: &Trajectory,
     shape_geom: &ShapeGeometry,
     unit_count: i16,

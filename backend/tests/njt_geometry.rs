@@ -4,12 +4,8 @@ use async_trait::async_trait;
 use backend::{
     engines::static_data,
     feed::{self, FeedMessage, TripUpdate},
-    integrations::gtfs_realtime::{GtfsSource, run_pipeline},
-    models::{
-        position::VehiclePosition,
-        source::Source,
-        trip::{StopTime, Trip},
-    },
+    models::source::Source,
+    realtime::RealtimeIngestor,
     sources::{
         StaticAdapter,
         njt_bus::{
@@ -17,11 +13,8 @@ use backend::{
             static_data::build_static_dataset_from_patterns,
         },
     },
-    stores::{
-        route::RouteStore,
-        static_cache::{StaticCacheStore, TripPatternRevision},
-        stop::StopStore,
-    },
+    static_index::StaticTransitRevision,
+    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 use chrono::Utc;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -44,31 +37,6 @@ impl StaticAdapter for FixtureStatic {
         Ok(())
     }
 }
-struct FixtureRealtime(FeedMessage);
-#[async_trait]
-impl GtfsSource for FixtureRealtime {
-    fn source(&self) -> Source {
-        Source::NjtBus
-    }
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        vec![self.0.clone()]
-    }
-    async fn process_trip(
-        &self,
-        update: TripUpdate,
-        cache: &StaticCacheStore,
-    ) -> (Option<Trip>, Vec<StopTime>) {
-        NjtBusRealtime.process_trip(update, cache).await
-    }
-    async fn process_vehicle(
-        &self,
-        vehicle: feed::VehiclePosition,
-        cache: &StaticCacheStore,
-    ) -> Option<VehiclePosition> {
-        NjtBusRealtime.process_vehicle(vehicle, cache).await
-    }
-}
-
 /// Exercises production parsing, remapping, upsert, position linkage, SQL shape
 /// joins, tile generation, and the HTTP Arrow endpoint with isolated stores.
 #[sqlx::test]
@@ -85,12 +53,9 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         "fixtures/njt_bus/static/basic/raw/operating_patterns.json"
     ))
     .unwrap();
-    let built = build_static_dataset_from_patterns(&gtfs, features);
-    let dataset = &built.dataset;
-    let patterns = &built.revision.patterns;
+    let mut built = build_static_dataset_from_patterns(&gtfs, features);
+    let patterns = built.revision.patterns.clone();
     let mut gate_remap = built.revision.stop_remap.clone();
-    assert_eq!(dataset.shapes.len(), 3);
-    common::contracts::assert_static_persistence_contract(dataset, &stores).await;
     let scheduled = gtfs
         .trips
         .values()
@@ -103,31 +68,22 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         .cloned()
         .unwrap_or_else(|| first.id.clone());
     gate_remap.insert("test-gate".into(), first_canonical.clone());
-    stores
-        .static_cache_store
-        .publish_trip_patterns(
-            Source::NjtBus,
-            TripPatternRevision {
-                patterns: patterns.clone(),
-                stop_remap: gate_remap.clone(),
-            },
-        )
-        .await
-        .unwrap();
-
-    // A new process loads the exact mapping and canonical stop remap from Redis.
+    built.dataset.stop_remap = gate_remap.clone();
+    let dataset = &built.dataset;
+    assert_eq!(dataset.shapes.len(), 3);
+    common::contracts::assert_static_persistence_contract(dataset, &stores).await;
+    // A restarted process needs a complete coherent static import before collection.
     let restarted = StaticCacheStore::new(redis.clone());
+    assert!(restarted.static_index().get(Source::NjtBus).is_none());
+    restarted
+        .static_index()
+        .publish(StaticTransitRevision::from_dataset(dataset));
+    let revision = restarted.static_index().get(Source::NjtBus).unwrap();
     assert_eq!(
-        restarted
-            .get_trip_pattern(Source::NjtBus, &scheduled.id)
-            .await
-            .unwrap(),
-        patterns.get(&scheduled.id).cloned()
+        revision.trip_patterns.get(&scheduled.id),
+        patterns.get(&scheduled.id)
     );
-    assert_eq!(
-        restarted.resolve_stop_id(Source::NjtBus, "test-gate"),
-        first_canonical.as_str()
-    );
+    assert_eq!(revision.stop_remap.get("test-gate"), Some(&first_canonical));
     // Pattern resolution does not require any date-specific schedule cache entry.
     assert!(
         restarted
@@ -193,7 +149,7 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         // No ceiling: allow the fixture to exercise motion over several stops.
         ..Default::default()
     };
-    let feed = FixtureRealtime(FeedMessage {
+    let feed = FeedMessage {
         header: feed::FeedHeader {
             gtfs_realtime_version: "2.0".into(),
             ..Default::default()
@@ -210,8 +166,9 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
                 ..Default::default()
             },
         ],
-    });
-    let controller = static_data::run(
+    };
+    let collector = NjtBusRealtime::new(restarted.static_index(), restarted.clone());
+    let _controller = static_data::run(
         &pool,
         &stores.route_store,
         &stores.stop_store,
@@ -219,25 +176,20 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         vec![Arc::new(FixtureStatic)],
     )
     .await;
-    run_pipeline(
-        &feed,
-        &controller,
-        &restarted,
-        &stores.trip_store,
-        &stores.position_store,
-    )
-    .await
-    .unwrap();
+    let ingestor = RealtimeIngestor::new(
+        pool.clone(),
+        stores.live_snapshots.clone(),
+        restarted.static_index(),
+    );
+    ingestor
+        .ingest(collector.build_snapshot(vec![feed.clone()]).await.unwrap())
+        .await
+        .unwrap();
     // Run again to verify vehicle linkage uses the existing database trip UUID.
-    run_pipeline(
-        &feed,
-        &controller,
-        &restarted,
-        &stores.trip_store,
-        &stores.position_store,
-    )
-    .await
-    .unwrap();
+    ingestor
+        .ingest(collector.build_snapshot(vec![feed.clone()]).await.unwrap())
+        .await
+        .unwrap();
     let trips = stores
         .trip_store
         .get_all(Source::NjtBus, Some(now))
@@ -251,14 +203,34 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         .await
         .unwrap();
     assert_eq!(positions[0].trip_id, Some(trips[0].id));
-    let rows = stores
-        .trip_store
-        .get_trajectory_inputs(Source::NjtBus, now, None)
+    let trajectory_store = backend::stores::trajectory::TrajectoryStore::new(
+        pool.clone(),
+        Arc::new(backend::trajectory::TrajectoryCache::new()),
+    );
+    let rows = trajectory_store
+        .load_historical_inputs(Source::NjtBus, now)
         .await
         .unwrap();
     assert!(!rows.is_empty());
-    assert!(rows.iter().all(|r| r.shape_id == "87-3"));
-    assert!(rows.iter().all(|r| r.stop_id != "test-gate"));
+    assert!(rows.iter().all(|r| {
+        r.shape_key
+            == backend::trajectory::shape_key_from_line(&match &dataset
+                .shapes
+                .iter()
+                .find(|s| s.id == "87-3")
+                .unwrap()
+                .geom
+                .0
+            {
+                geo::Geometry::LineString(line) => line.clone(),
+                _ => panic!("expected line"),
+            })
+    }));
+    assert!(
+        rows.iter()
+            .flat_map(|r| &r.stops)
+            .all(|s| s.stop_id != "test-gate")
+    );
     let tile: (Vec<u8>,) = sqlx::query_as("SELECT realtime.active_route_shapes(0,0,0)")
         .fetch_one(&pool)
         .await
@@ -345,57 +317,37 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         }
     }
 
-    // A metadata refresh removes an obsolete mapping, and an authoritative empty
-    // NJT update clears the old shape instead of invoking MTA heuristic fallback.
-    restarted
-        .publish_trip_patterns(
-            Source::NjtBus,
-            TripPatternRevision {
-                patterns: HashMap::new(),
-                stop_remap: gate_remap.clone(),
-            },
-        )
+    // Empty shape input after a metadata refresh preserves the previously
+    // resolved shape, consistently with every source's ingestion contract.
+    let mut empty_pattern_revision = StaticTransitRevision::from_dataset(dataset);
+    empty_pattern_revision.trip_patterns.clear();
+    restarted.static_index().publish(empty_pattern_revision);
+    assert!(
+        !restarted
+            .static_index()
+            .get(Source::NjtBus)
+            .unwrap()
+            .trip_patterns
+            .contains_key(&scheduled.id)
+    );
+    ingestor
+        .ingest(collector.build_snapshot(vec![feed.clone()]).await.unwrap())
+        .await
+        .unwrap();
+    let rows = trajectory_store
+        .load_historical_inputs(Source::NjtBus, Utc::now())
         .await
         .unwrap();
     assert!(
-        restarted
-            .get_trip_pattern(Source::NjtBus, &scheduled.id)
-            .await
-            .unwrap()
-            .is_none()
-    );
-    let reload = StaticCacheStore::new(redis);
-    assert!(
-        reload
-            .get_trip_pattern(Source::NjtBus, &scheduled.id)
-            .await
-            .unwrap()
-            .is_none()
-    );
-    run_pipeline(
-        &feed,
-        &controller,
-        &restarted,
-        &stores.trip_store,
-        &stores.position_store,
-    )
-    .await
-    .unwrap();
-    let rows = stores
-        .trip_store
-        .get_trajectory_inputs(Source::NjtBus, Utc::now(), None)
-        .await
-        .unwrap();
-    assert!(
-        rows.is_empty(),
-        "NJT must never guess a route-level pattern"
+        !rows.is_empty(),
+        "preserved stored shape remains usable historically"
     );
     let shape_ids: (Vec<String>,) =
         sqlx::query_as("SELECT shape_ids FROM realtime.trip WHERE source='njt_bus'")
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert!(shape_ids.0.is_empty());
+    assert_eq!(shape_ids.0, ["87-3"]);
 
     // Even without geometry or a service-day cache entry, complete static trip
     // metadata keeps a trip visible when GTFS-RT omits route/direction.
@@ -403,46 +355,46 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
     for pattern in unmatched_patterns.values_mut() {
         pattern.shape_id = None;
     }
+    let mut unmatched_revision = StaticTransitRevision::from_dataset(dataset);
+    unmatched_revision.trip_patterns = unmatched_patterns;
+    unmatched_revision.stop_remap = HashMap::new();
     stores
         .static_cache_store
-        .publish_trip_patterns(
-            Source::NjtBus,
-            TripPatternRevision {
-                patterns: unmatched_patterns,
-                stop_remap: HashMap::new(),
-            },
-        )
-        .await
-        .unwrap();
+        .static_index()
+        .publish(unmatched_revision);
     let mut incomplete = update.clone();
     incomplete.trip.route_id = None;
     incomplete.trip.direction_id = None;
     incomplete.trip.start_date = Some("19990101".into());
-    let (trip, _) = NjtBusRealtime
-        .process_trip(incomplete, &stores.static_cache_store)
-        .await;
-    let trip = trip.expect("unmatched trip remains available for lists");
+    let source = NjtBusRealtime::new(
+        stores.static_cache_store.static_index(),
+        stores.static_cache_store.clone(),
+    );
+    let mut incomplete_feed = feed.clone();
+    incomplete_feed.entity[0].trip_update = Some(incomplete);
+    let snapshot = source.build_snapshot(vec![incomplete_feed]).await.unwrap();
+    let trip = &snapshot
+        .trips
+        .first()
+        .expect("unmatched trip remains available for lists")
+        .0;
     assert_eq!(trip.route_id, scheduled.route_id);
     assert!(trip.shape_ids.is_empty());
 
     let mut mismatched = update;
     mismatched.trip.direction_id = Some(1);
+    let mut mismatched_revision = StaticTransitRevision::from_dataset(dataset);
+    mismatched_revision.trip_patterns = patterns.clone();
+    mismatched_revision.stop_remap = HashMap::new();
     stores
         .static_cache_store
-        .publish_trip_patterns(
-            Source::NjtBus,
-            TripPatternRevision {
-                patterns: patterns.clone(),
-                stop_remap: HashMap::new(),
-            },
-        )
-        .await
-        .unwrap();
-    let (trip, _) = NjtBusRealtime
-        .process_trip(mismatched, &stores.static_cache_store)
-        .await;
+        .static_index()
+        .publish(mismatched_revision);
+    let mut mismatched_feed = feed;
+    mismatched_feed.entity[0].trip_update = Some(mismatched);
+    let snapshot = source.build_snapshot(vec![mismatched_feed]).await.unwrap();
     assert!(
-        trip.unwrap().shape_ids.is_empty(),
+        snapshot.trips[0].0.shape_ids.is_empty(),
         "direction mismatch is not assigned a pattern"
     );
 }
