@@ -7,13 +7,10 @@ use axum::{
     routing::get,
 };
 use bb8_redis::RedisConnectionManager;
-use http::{HeaderValue, Method, StatusCode, request::Parts};
+use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
-use tokio::{
-    signal,
-    sync::broadcast::{self, Sender},
-};
+use tokio::signal;
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
     compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
@@ -24,13 +21,23 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 use backend::{
-    AppState, VERSION, api, api_prefix, engines, models, prefixed_path, sources,
+    AppState, VERSION, api, api_prefix, engines, models, prefixed_path,
+    realtime::{
+        LiveSnapshots, RealtimeEngine, RealtimeIngestor, RealtimeSource, TrajectoryDeriver,
+    },
+    sources,
     sources::{
         StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
         njt_bus::realtime::NjtBusRealtime,
     },
-    stores, valhalla_config,
+    stores, valhalla_tile_extract,
 };
+
+// Use jemalloc instead of the system allocator to curb RSS growth from glibc
+// malloc arena retention/fragmentation under our threaded, bursty workload.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +48,7 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    tracing::info!("Starting Train Status API v{}", VERSION);
+    tracing::info!(version = VERSION, "Starting Train Status API");
 
     let pg_connect_option: PgConnectOptions = var("DATABASE_URL").unwrap().parse().unwrap();
     let pg_pool = PgPoolOptions::new()
@@ -72,23 +79,25 @@ async fn main() {
         _ => panic!("Failed to read redis ping response"),
     }
 
+    let live_snapshots = LiveSnapshots::default();
     let route_store = stores::route::RouteStore::new(pg_pool.clone(), redis_pool.clone());
     let stop_store = stores::stop::StopStore::new(pg_pool.clone(), redis_pool.clone());
-    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), redis_pool.clone());
+    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), live_snapshots.clone());
     let stop_time_store =
-        stores::stop_time::StopTimeStore::new(pg_pool.clone(), redis_pool.clone());
-    let position_store = stores::position::PositionStore::new(pg_pool.clone(), redis_pool.clone());
+        stores::stop_time::StopTimeStore::new(pg_pool.clone(), live_snapshots.clone());
+    let position_store =
+        stores::position::PositionStore::new(pg_pool.clone(), live_snapshots.clone());
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone(), redis_pool.clone());
     let static_cache_store = stores::static_cache::StaticCacheStore::new(redis_pool.clone());
 
     let valhalla_manager = engines::valhalla::ValhallaManager::new(
-        engines::valhalla::ValhallaConfig::from_config_path(valhalla_config().to_owned()),
+        engines::valhalla::ValhallaConfig::from_tile_extract(valhalla_tile_extract().to_owned()),
     );
 
     let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
         Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
         Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
-            valhalla_manager.clone(),
+            valhalla_manager,
         )),
         Arc::new(sources::njt_bus::static_data::NjtBusStatic),
     ];
@@ -102,20 +111,32 @@ async fn main() {
     )
     .await;
 
-    let realtime_adapters: Vec<Arc<dyn sources::RealtimeAdapter>> = vec![
+    let realtime_sources: Vec<Arc<dyn RealtimeSource>> = vec![
         Arc::new(MtaSubwayRealtime),
         Arc::new(MtaBusRealtime),
-        Arc::new(NjtBusRealtime),
+        Arc::new(NjtBusRealtime::new(
+            static_controller.static_index(),
+            static_cache_store.clone(),
+        )),
     ];
 
-    engines::realtime::run(
-        &trip_store,
-        &stop_time_store,
-        &position_store,
-        &static_cache_store,
-        realtime_adapters,
+    let trajectory_engine = Arc::new(backend::trajectory::TrajectoryEngine::new());
+    let trajectory_cache = Arc::new(backend::trajectory::TrajectoryCache::new());
+    let trajectory_store =
+        stores::trajectory::TrajectoryStore::new(pg_pool.clone(), trajectory_cache.clone());
+    let deriver = TrajectoryDeriver::new(trajectory_engine.clone(), trajectory_cache.clone());
+
+    RealtimeEngine::new(
+        RealtimeIngestor::new(
+            pg_pool.clone(),
+            live_snapshots,
+            static_controller.static_index(),
+        ),
         static_controller.clone(),
+        deriver,
+        trajectory_cache.clone(),
     )
+    .run(realtime_sources)
     .await;
 
     let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
@@ -126,15 +147,13 @@ async fn main() {
 
     engines::alerts::run(&alert_store, alert_adapters).await;
 
-    let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
-
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
-    servers((url = "/api")),
     tags(
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
     ),
+    // TODO: maybe add route, stop, and shape models here
     components(schemas(models::source::Source))
     )]
     struct ApiDoc;
@@ -146,6 +165,10 @@ async fn main() {
         stop_time_store,
         position_store,
         alert_store,
+        static_cache_store,
+        trajectory_store,
+        trajectory_engine,
+        trajectory_cache,
     };
 
     let api_prefix = api_prefix().to_owned();
@@ -191,10 +214,10 @@ async fn main() {
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "127.0.0.1:3055".into()))
             .await
             .unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!(address = %listener.local_addr().unwrap(), "Listening");
 
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-        .with_graceful_shutdown(shutdown_signal(shutdown_tx))
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 }
@@ -203,7 +226,7 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "404 not found :(")
 }
 
-async fn shutdown_signal(shutdown_tx: Sender<()>) {
+async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -222,11 +245,7 @@ async fn shutdown_signal(shutdown_tx: Sender<()>) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
-            shutdown_tx.send(()).expect("shutdown_tx send failed");
-        },
-        _ = terminate => {
-            shutdown_tx.send(()).expect("shutdown_tx send failed");
-        },
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
 }

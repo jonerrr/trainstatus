@@ -1,9 +1,7 @@
 use crate::{
-    engines::static_data::StaticController,
     models::source::Source,
     stores::{
-        alert::AlertStore, position::PositionStore, route::RouteStore,
-        static_cache::StaticCacheStore, stop::StopStore, trip::TripStore,
+        alert::AlertStore, route::RouteStore, static_cache::StaticCacheStore, stop::StopStore,
     },
 };
 use async_trait::async_trait;
@@ -13,25 +11,6 @@ use tokio::time::Duration;
 pub mod mta_bus;
 pub mod mta_subway;
 pub mod njt_bus;
-
-// need for Dyn traits
-#[async_trait]
-pub trait RealtimeAdapter: Send + Sync {
-    fn source(&self) -> Source;
-
-    fn refresh_interval(&self) -> Duration;
-
-    async fn run(
-        &self,
-        // TODO: prob remove pool since stores have it
-        // pool: &PgPool,
-        static_controller: &StaticController,
-        static_cache_store: &StaticCacheStore,
-        trip_store: &TripStore,
-        // stop_time_store: &StopTimeStore,
-        position_store: &PositionStore,
-    ) -> anyhow::Result<()>;
-}
 
 #[async_trait]
 pub trait AlertsAdapter: Send + Sync {
@@ -60,6 +39,12 @@ pub trait StaticAdapter: Send + Sync {
 }
 
 ///// various utilities for parsing and normalizing static data
+
+/// Trim and uppercase an ID for case-insensitive feed matching.
+// TODO: probably use this in other sources, not just njt_bus
+pub fn normalize_id(id: &str) -> String {
+    id.trim().to_uppercase()
+}
 
 /// Trim leading/trailing whitespace and collapse internal whitespace runs.
 pub fn normalize_whitespace(value: &str) -> String {

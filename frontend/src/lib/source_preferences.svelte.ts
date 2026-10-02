@@ -1,11 +1,11 @@
 import { browser } from '$app/environment';
 
 import type { Source } from '$lib/client';
+import { all_sources } from '$lib/resources/index.svelte';
 import { LocalStorage } from '$lib/storage.svelte';
 
 export const COOKIE_NAME = 'selected_sources';
 
-export const supported_sources: Source[] = ['mta_subway', 'mta_bus', 'njt_bus'];
 export const default_sources: Source[] = ['mta_subway', 'mta_bus'];
 
 /**
@@ -19,7 +19,7 @@ export function parse_sources(value: string | null | undefined): Source[] {
 		const parsed = value
 			.split(',')
 			.map((s) => s.trim())
-			.filter((s): s is Source => supported_sources.includes(s as Source));
+			.filter((s): s is Source => all_sources.includes(s as Source));
 
 		return parsed.length > 0 ? parsed : default_sources;
 	} catch {
@@ -47,7 +47,7 @@ export class SourcePreferences {
 
 	set current(value: Source[]) {
 		// Enforce at least one source
-		const next = value.filter((s) => supported_sources.includes(s));
+		const next = value.filter((s) => all_sources.includes(s));
 		const final = next.length > 0 ? next : default_sources;
 
 		this.#storage.current = final;

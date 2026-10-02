@@ -211,7 +211,7 @@ impl AlertStore {
             )
             .execute(&mut *tx)
             .await?;
-            tracing::debug!("Deleted {} cloned alerts", cloned_mta_ids.len());
+            tracing::debug!(count = cloned_mta_ids.len(), "Deleted cloned alerts");
         }
 
         // let test_alert = alerts
@@ -304,7 +304,7 @@ impl AlertStore {
         let id_mapping: std::collections::HashMap<uuid::Uuid, uuid::Uuid> =
             id_rows.into_iter().map(|r| (r.new_id, r.id)).collect();
 
-        tracing::debug!("Inserted {} alerts", alerts.len());
+        tracing::debug!(count = alerts.len(), "Inserted alerts");
 
         // Insert translations
         if !translations.is_empty() {
@@ -380,7 +380,7 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} translations", filtered_translations.len());
+                tracing::debug!(count = filtered_translations.len(), "Inserted translations");
             }
         }
 
@@ -444,7 +444,7 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} active periods", filtered_periods.len());
+                tracing::debug!(count = filtered_periods.len(), "Inserted active periods");
             }
         }
 
@@ -453,6 +453,7 @@ impl AlertStore {
             // Deduplicate affected entities by (alert_id, route_id, source, stop_id) - last one wins
             // This is needed because stop ID stripping (e.g. A01N/A01S -> A01) can produce duplicates
             let mut seen_entity_keys = std::collections::HashSet::new();
+            let mut duplicate_entity_count = 0;
             let deduped_entities: Vec<_> = affected_entities
                 .iter()
                 .filter(|ae| {
@@ -465,16 +466,21 @@ impl AlertStore {
                             ae.stop_id.as_ref().map(|s| s.to_uppercase()),
                         );
                         if !seen_entity_keys.insert(key) {
-                            tracing::warn!(
-                                "Duplicate affected entity key (alert_id={}, route_id={:?}, source={:?}, stop_id={:?}) - skipping",
-                                id, ae.route_id, ae.source, ae.stop_id
-                            );
+                            duplicate_entity_count += 1;
                             return false;
                         }
                     }
                     true
                 })
                 .collect();
+
+            if duplicate_entity_count > 0 {
+                tracing::warn!(
+                    source = %source,
+                    count = duplicate_entity_count,
+                    "Skipped duplicate affected entities"
+                );
+            }
 
             let alert_ids = deduped_entities
                 .iter()
@@ -540,7 +546,10 @@ impl AlertStore {
                 .execute(&mut *tx)
                 .await?;
 
-                tracing::debug!("Inserted {} affected entities", filtered_entities.len());
+                tracing::debug!(
+                    count = filtered_entities.len(),
+                    "Inserted affected entities"
+                );
             }
         }
 

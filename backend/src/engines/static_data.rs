@@ -7,6 +7,7 @@ use tracing::{error, info, instrument};
 
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
+use crate::static_index::StaticTransitIndex;
 use crate::stores::route::RouteStore;
 use crate::stores::static_cache::StaticCacheStore;
 use crate::stores::stop::StopStore;
@@ -26,9 +27,14 @@ pub enum UpdateRequest {
 pub struct StaticController {
     // Map each Source to its specific command channel
     senders: Arc<HashMap<Source, mpsc::Sender<UpdateRequest>>>,
+    static_index: StaticTransitIndex,
 }
 
 impl StaticController {
+    pub fn static_index(&self) -> StaticTransitIndex {
+        self.static_index.clone()
+    }
+
     /// Ensures static data is up to date. Returns immediately if no update is needed,
     /// or waits for an ongoing/new update to complete if data is stale.
     /// Call this before processing realtime data to avoid FK errors.
@@ -73,6 +79,7 @@ pub async fn run(
     static_cache_store: &StaticCacheStore,
     adapters: Vec<Arc<dyn StaticAdapter>>,
 ) -> StaticController {
+    let static_index = static_cache_store.static_index();
     let mut senders = HashMap::new();
     let mut tasks = Vec::new();
 
@@ -84,6 +91,7 @@ pub async fn run(
         let route_store = route_store.clone();
         let stop_store = stop_store.clone();
         let static_cache_store = static_cache_store.clone();
+        let source_static_index = static_index.clone();
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
@@ -92,6 +100,7 @@ pub async fn run(
                 route_store,
                 stop_store,
                 static_cache_store,
+                source_static_index,
                 adapter,
                 rx,
             )
@@ -101,15 +110,17 @@ pub async fn run(
 
     StaticController {
         senders: Arc::new(senders),
+        static_index,
     }
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = %adapter.source()))]
 async fn run_source_handler(
     pool: PgPool,
     route_store: RouteStore,
     stop_store: StopStore,
     static_cache_store: StaticCacheStore,
+    static_index: StaticTransitIndex,
     adapter: Arc<dyn StaticAdapter>,
     mut rx: mpsc::Receiver<UpdateRequest>,
 ) {
@@ -137,12 +148,19 @@ async fn run_source_handler(
                 match req {
                     UpdateRequest::EnsureUpdated { respond_to } => {
                         // Check if we need an update
-                        let needs_update = check_needs_update(&pool, adapter.as_ref()).await;
+                        let needs_update = check_needs_update(
+                            &pool,
+                            adapter.as_ref(),
+                            &static_index,
+                            &route_store,
+                            &stop_store,
+                        )
+                        .await;
 
                         match needs_update {
                             Ok(true) if !import_in_progress => {
                                 // Need update and none in progress - start one
-                                info!("Starting import (triggered by ensure_updated)");
+                                info!(source = %adapter.source(), "Starting import triggered by ensure_updated");
                                 pending_waiters.push(respond_to);
 
                                 // Collect any other pending requests
@@ -160,12 +178,11 @@ async fn run_source_handler(
                                 pending_waiters.push(respond_to);
                             }
                             Ok(false) => {
-                                // No update needed - respond immediately
                                 let _ = respond_to.send(Ok(()));
                             }
                             Err(e) => {
                                 // Error checking - respond with error
-                                error!("Error checking update status: {:#}", e);
+                                error!(error = %e, "Error checking update status");
                                 let _ = respond_to.send(Err(e));
                             }
                             _ => unreachable!(),
@@ -176,7 +193,7 @@ async fn run_source_handler(
                             // Piggyback on the in-progress import
                             pending_waiters.push(respond_to);
                         } else {
-                            info!("Starting import (forced)");
+                            info!(source = %adapter.source(), "Starting forced import");
                             pending_waiters.push(respond_to);
 
                             // Drain any other queued requests
@@ -199,7 +216,7 @@ async fn run_source_handler(
     }
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
+#[instrument(skip_all, fields(source = %adapter.source()))]
 fn spawn_import(
     pool: &PgPool,
     route_store: &RouteStore,
@@ -228,7 +245,7 @@ fn spawn_import(
             .await;
 
         if result.is_ok() {
-            info!("Import successful");
+            info!(source = %adapter_clone.source(), "Import successful");
             let _ = sqlx::query!(
                 "UPDATE source SET updated_at = NOW() WHERE id = $1",
                 adapter_clone.source() as Source
@@ -243,20 +260,32 @@ fn spawn_import(
                 .compute_proximity_transfers(Some(adapter_clone.source()))
                 .await
             {
-                error!("Failed to compute proximity transfers: {:#}", e);
+                error!(source = %adapter_clone.source(), error = %e, "Failed to compute proximity transfers");
+            }
+
+            if adapter_clone.source() == crate::models::source::Source::MtaSubway {
+                crate::trajectory::bump_platform_static_version();
             }
         } else if let Err(e) = &result {
-            error!("Import failed for {:?}: {:#}", adapter_clone.source(), e);
+            // `{:#}` prints the full anyhow context chain (e.g. the underlying DB
+            // error), not just the outermost "Failed to persist ..." wrapper.
+            error!(source = %adapter_clone.source(), error = %format!("{e:#}"), "Import failed");
         }
 
         let _ = import_tx_clone.send(result).await;
     });
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
-async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyhow::Result<bool> {
-    // Ensure the source exists in the table, inserting if needed
-    // Use epoch time so it triggers an immediate update on first run
+#[instrument(skip_all, fields(source = %adapter.source()))]
+async fn check_needs_update(
+    pool: &PgPool,
+    adapter: &dyn StaticAdapter,
+    static_index: &StaticTransitIndex,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
+) -> anyhow::Result<bool> {
+    // Ensure the source exists in the table, inserting if needed.
+    // Use epoch time so it triggers an immediate update on first run.
     let epoch = DateTime::<Utc>::from(std::time::UNIX_EPOCH);
     let source_name = adapter.source().as_str();
     sqlx::query!(
@@ -272,6 +301,28 @@ async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyho
     .execute(pool)
     .await?;
 
+    let source = adapter.source();
+    if static_index.get(source).is_none() {
+        // The index starts empty on every process start. When the last import
+        // is still inside the refresh window, rebuild it from Postgres instead
+        // of downloading the upstream static files again.
+        if !source_timestamp_is_stale(pool, adapter).await?
+            && let Some(revision) = load_persisted_revision(source, route_store, stop_store).await?
+        {
+            info!(source = %source, "Loaded static revision from the database");
+            static_index.publish(revision);
+            return Ok(false);
+        }
+        return Ok(true);
+    }
+
+    source_timestamp_is_stale(pool, adapter).await
+}
+
+async fn source_timestamp_is_stale(
+    pool: &PgPool,
+    adapter: &dyn StaticAdapter,
+) -> anyhow::Result<bool> {
     let config = sqlx::query!(
         r#"
         SELECT updated_at
@@ -283,11 +334,45 @@ async fn check_needs_update(pool: &PgPool, adapter: &dyn StaticAdapter) -> anyho
     .fetch_one(pool)
     .await?;
 
-    // Check if data is stale
     let elapsed = Utc::now()
         .signed_duration_since(config.updated_at)
         .num_seconds();
     let refresh_secs = adapter.refresh_interval().as_secs() as i64;
-
     Ok(elapsed > refresh_secs)
+}
+
+// TODO: shouldn't need to return a Result<Option<>>?
+/// Read the last imported routes, stops, and shapes back into a revision.
+///
+/// A missing or incomplete revision returns `Ok(None)` so the caller downloads
+/// the upstream files. Unreadable revision metadata does the same.
+async fn load_persisted_revision(
+    source: Source,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
+) -> anyhow::Result<Option<crate::static_index::StaticTransitRevision>> {
+    let (trip_patterns, stop_remap) = match route_store.load_revision_metadata(source).await {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            tracing::warn!(
+                source = %source,
+                error = %error,
+                "Static revision metadata could not be read; downloading static data"
+            );
+            return Ok(None);
+        }
+    };
+    let routes = route_store.get_all(source).await?;
+    let stops = stop_store.get_all(source).await?;
+    let shapes = route_store.get_all_shapes(source).await?;
+    Ok(
+        crate::static_index::StaticTransitRevision::try_from_persisted(
+            source,
+            routes,
+            stops,
+            shapes,
+            trip_patterns,
+            stop_remap,
+        ),
+    )
 }

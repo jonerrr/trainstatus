@@ -19,6 +19,12 @@ pub struct Stop {
     // probably also make a custom serializer/deserializer
     #[schema(schema_with = point_schema)]
     pub geom: Geom,
+    // TODO: consider implementing parent stop id
+    // I think we might want to just find the route ids on the parent stop ids and attach them to the actual stop and not include other location types
+    // pub parent_stop_id: Option<String>,
+    /// See https://gtfs.org/documentation/schedule/reference/#stopstxt location_type field for more details on what these values represent
+    /// Values above 4 are not
+    // pub location_type: i16,
     #[sqlx(json)]
     pub transfers: Vec<Transfer>,
     #[sqlx(json)]
@@ -37,33 +43,105 @@ pub struct Transfer {
     pub min_transfer_time: Option<i16>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EgressType {
+    Staircase,
+    Elevator,
+    Escalator,
+    FareControl,
+    Door,
+    Exit,
+    Ramp,
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum VerticalDirection {
+    Up,
+    Down,
+    None,
+}
+
+// TODO: this should match the trip direction (and maybe add east and west)
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PlatformDirection {
+    North,
+    South,
+}
+
+// TODO: convert all units to metric before insertion
+/// Represents a marker on the platform that indicates where a consist will stop.
+/// For example if we have "marked_as: "S", direction: North, position_ft: 13",
+/// That means this marker is for northbound trains which will arrive from the south and stop 13 feet from the north end of the platform.
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct CarMarker {
+    /// The label on the platform. Usually is a number representing the amount of cars in the consist.
+    /// Sometimes its "S" or "OPTO S", which seems to be short for the motorman's stop board.
+    pub marked_as: String,
+    /// One-person operations
+    pub is_opto: bool,
+    /// Length of the consist in feet that this marker is meant to accommodate
+    pub consist_length_ft: Option<f32>,
+    /// Position of the marker on the platform in feet starting from the railway north end of the platform
+    /// The value can be between 0 and the length of the platform edge.
+    pub position_ft: f32,
+    /// Direction of the trips that the marker is for.
+    pub direction: PlatformDirection,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct EgressPoint {
+    pub id: i32,
+    pub egress_type: EgressType,
+    // TODO: double check reference point
+    /// Position of the egress point on the platform in feet from a reference point
+    pub position_ft: f32,
+    pub vertical_direction: VerticalDirection,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
+pub struct PlatformEdge {
+    pub id: String,
+    // #[serde(rename = "sectionId")]
+    // pub section_id: String,
+    pub length_ft: f32,
+    pub car_markers: Vec<CarMarker>,
+    pub egress_points: Vec<EgressPoint>,
+}
+
+// TODO: should we use pathAdjusted or normal lat/lng for mtasubway
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MtaSubwayStopData {
-    pub ada: bool,
-    /// Notes about ADA accessibility at the stop
-    #[schema(example = "Uptown only")]
-    pub notes: Option<String>,
+    pub gtfs_stop_id: String,
+    pub station_group_id: String,
+    pub bubble_id: String,
+    pub platform_edges: Vec<PlatformEdge>,
+    pub line: String,
+    pub is_major: bool,
     #[schema(example = "242 St")]
     pub north_headsign: String,
     #[schema(example = "Manhattan")]
     pub south_headsign: String,
-    // TODO: maybe remove borough since its not used (and can be determined from geom)
-    pub borough: Borough,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct MtaBusStopData {
+    pub bearing: Option<f64>,
+    pub is_boardable: bool,
     pub direction: CompassDirection,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug, Clone)]
 pub struct NjtBusStopData {
     /// Public-facing 5-digit stop code (e.g. "10001"), shown on signs and NJT apps
     pub stop_code: String,
 }
 
 /// Stop data changes based on the `Source`
-#[derive(Serialize, Deserialize, ToSchema, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopData {
     MtaSubway(MtaSubwayStopData),
@@ -103,6 +181,12 @@ pub enum RouteStopData {
         // TODO: check if there are any stops where route stops each have a different opposite stop id. If not, we can move this field to the stop level (e.g. in transfers vec)
         /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
         opposite_stop_id: Option<String>,
+        /// Helium shape_ids (across all service types) known to pass through this stop
+        /// for this route. Used to deterministically resolve which of a route's several
+        /// candidate shapes a realtime trip is following, by counting how many of the
+        /// trip's actual stops each candidate is known to serve.
+        #[serde(default)]
+        shape_ids: Vec<String>,
     },
     NjtBus {
         headsign: String,
@@ -129,7 +213,7 @@ pub enum StopType {
     Unknown,
 }
 
-#[derive(sqlx::Type, Serialize, Deserialize, ToSchema, Debug)]
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy, ToSchema, Debug, PartialEq, Eq)]
 // #[sqlx(type_name = "static.borough", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum Borough {
@@ -140,10 +224,27 @@ pub enum Borough {
     Manhattan,
 }
 
-/// Direction of the stop. Currently only for bus stops
-#[derive(sqlx::Type, Serialize, Deserialize, Clone, ToSchema, Debug)]
+impl Borough {
+    /// Parse the SCREAMING_SNAKE_CASE borough names the Helium feed uses.
+    /// Returns `None` for values the feed leaves unset or we don't recognize.
+    pub fn from_feed_name(value: &str) -> Option<Self> {
+        match value {
+            "BROOKLYN" => Some(Self::Brooklyn),
+            "QUEENS" => Some(Self::Queens),
+            "BRONX" => Some(Self::Bronx),
+            "STATEN_ISLAND" => Some(Self::StatenIsland),
+            "MANHATTAN" => Some(Self::Manhattan),
+            _ => None,
+        }
+    }
+}
+
+/// Direction a bus travels through the stop, bucketed into eight compass sectors.
+/// Currently only for bus stops.
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, Copy, ToSchema, Debug, PartialEq, Eq)]
 // #[sqlx(type_name = "static.compass_direction", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
+// lowercase, not snake_case — the latter renders `NW` as `n_w`.
+#[serde(rename_all = "lowercase")]
 pub enum CompassDirection {
     SW,
     S,
@@ -156,11 +257,33 @@ pub enum CompassDirection {
     Unknown,
 }
 
+impl CompassDirection {
+    /// Bucket a compass bearing (0 = north, increasing clockwise) into one of the
+    /// eight 45°-wide sectors. Accepts the `[-180, 180]` range the Helium feed
+    /// uses as well as `[0, 360)`.
+    pub fn from_bearing(bearing: f64) -> Self {
+        if !bearing.is_finite() {
+            return Self::Unknown;
+        }
+        // Shift by half a sector so each sector maps to a whole index.
+        match ((bearing.rem_euclid(360.0) + 22.5) / 45.0) as u8 % 8 {
+            0 => Self::N,
+            1 => Self::NE,
+            2 => Self::E,
+            3 => Self::SE,
+            4 => Self::S,
+            5 => Self::SW,
+            6 => Self::W,
+            _ => Self::NW,
+        }
+    }
+}
+
 // There are certain stops that are included in the GTFS feed but actually don't exist (https://groups.google.com/g/mtadeveloperresources/c/W_HSpV1BO6I/m/v8HjaopZAwAJ)
 // Thanks MTA for that
 // Shout out to N12 for being included in the static gtfs data even though its not a real stop (The lat/long point to Stillwell ave station)
-pub const FAKE_STOP_IDS: [&str; 28] = [
-    "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
-    "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
-    "S12", "S10",
-];
+// pub const FAKE_STOP_IDS: [&str; 28] = [
+//     "F17", "A62", "Q02", "H19", "H17", "A58", "A29", "A39", "F10", "H18", "H05", "R60", "D23",
+//     "R65", "M07", "X22", "N12", "R10", "B05", "M17", "R70", "J18", "G25", "D60", "B24", "S0M",
+//     "S12", "S10",
+// ];

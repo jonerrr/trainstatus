@@ -6,6 +6,7 @@ GEO_ASSETS_IMAGE = "ghcr.io/jonerrr/trainstatus-geo-assets:latest"
 run = { tasks = ["//geo:build:data", "//geo:build:assets"] }
 
 [tasks."build:data"]
+description = "Build geo data image (bump VALHALLA_VERSION ARG in Dockerfile when upgrading)"
 run = "podman build -f Dockerfile -t $GEO_DATA_IMAGE ."
 
 [tasks."build:assets"]
@@ -13,33 +14,35 @@ run = "podman build -f Dockerfile.assets -t $GEO_ASSETS_IMAGE ."
 
 [tasks.export]
 # TODO: remove other exports once 100% sure they aren't needed
-description = "Export valhalla config for local development"
-run = """
-set -eu
+description = "Export Valhalla tile extract for local development via podman mount"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
 
 image="$GEO_DATA_IMAGE"
 out_dir="${MISE_CONFIG_ROOT}/data"
 container_id="$(podman create "$image")"
+mounted=0
 
 cleanup() {
+	if [[ "$mounted" -eq 1 ]]; then
+		podman unshare podman umount "$container_id" >/dev/null 2>&1 || true
+	fi
 	podman rm -f "$container_id" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 mkdir -p "$out_dir"
 
-podman cp "$container_id:/valhalla.json" "$out_dir/valhalla.json"
-podman cp "$container_id:/valhalla_tiles.tar" "$out_dir/valhalla_tiles.tar"
-# podman cp "$container_id:/basemap.mbtiles" "$out_dir/basemap.mbtiles"
+# Rootless mount only works inside the user namespace (podman-mount(1)).
+mnt="$(podman unshare podman mount "$container_id")"
+mounted=1
 
-tmp_json="${out_dir}/valhalla.json.tmp"
-if command -v jq >/dev/null 2>&1; then
-	jq --arg tile_extract "${out_dir}/valhalla_tiles.tar" '.mjolnir.tile_extract = $tile_extract' "$out_dir/valhalla.json" >"$tmp_json"
-else
-	echo "jq is required to update valhalla.json" >&2
-	exit 1
-fi
-mv "$tmp_json" "$out_dir/valhalla.json"
+podman unshare bash -c "
+	set -euo pipefail
+	cp \"${mnt}/valhalla_tiles.tar\" \"${out_dir}/valhalla_tiles.tar\"
+	# cp \"${mnt}/basemap.mbtiles\" \"${out_dir}/basemap.mbtiles\"
+"
 
-echo "Copied artifacts from $image to $out_dir"
-"""
+echo "Exported artifacts from $image to $out_dir"
+'''

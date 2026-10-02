@@ -49,14 +49,14 @@ pub struct ProcessedAlerts {
 }
 
 /// The main pipeline: Fetch -> Process -> Save
-#[instrument(skip(adapter, alert_store), fields(source = ?adapter.source()))]
+#[instrument(level = "debug", skip(adapter, alert_store), fields(source = %adapter.source()))]
 pub async fn run_pipeline<T: GtfsAlertSource>(
     adapter: &T,
     alert_store: &AlertStore,
 ) -> anyhow::Result<()> {
     let feeds = adapter.fetch_feeds().await;
     if feeds.is_empty() {
-        warn!("No alert feeds fetched for {:?}", adapter.source());
+        warn!(source = %adapter.source(), "No alert feeds fetched");
         return Ok(());
     }
 

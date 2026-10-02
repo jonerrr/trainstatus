@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
 	import { slide } from 'svelte/transition';
 
 	import { page } from '$app/state';
@@ -10,12 +11,14 @@
 	import Transfers from '$lib/Trip/Transfers.svelte';
 	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
 	import type { StopTime, Trip } from '$lib/client';
+	import { source_info } from '$lib/resources/index.svelte';
 	import { position_context } from '$lib/resources/positions.svelte';
 	import { stop_time_context } from '$lib/resources/stop_times.svelte';
 	import { trip_context } from '$lib/resources/trips.svelte';
 	import { current_time } from '$lib/url_params.svelte';
+	import { trip_headsign } from '$lib/util.svelte';
 
-	import { ArrowBigRight, ChevronDown, ChevronUp } from '@lucide/svelte';
+	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {
 		show_previous: boolean;
@@ -32,6 +35,19 @@
 
 	const source_stop_times = $derived(all_stop_times[trip.data.source]);
 
+	// For sources that filter stop times by route (mta_bus, njt_bus), the trip's
+	// stop times are only fetched once its route is on the monitor list. Opening a
+	// trip modal directly — e.g. clicking a bus vehicle on the map — bypasses the
+	// Stop modal that would otherwise register the route, so without this the
+	// destination and stop list stay empty and `last_stop` shows "Unknown".
+	$effect(() => {
+		if (source_stop_times && source_info[trip.data.source]?.monitor_routes) {
+			const route_id = trip.route_id;
+			source_stop_times.add_route(route_id);
+			return () => source_stop_times.remove_route(route_id);
+		}
+	});
+
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
 
 	const st_loading = $derived(
@@ -47,23 +63,9 @@
 		)
 	);
 
-	const last_stop = $derived.by(() => {
-		if (!stop_times.length) return 'Unknown';
-
-		switch (trip.data.source) {
-			case 'mta_bus':
-				const stop = page.data.stops_by_id[trip.data.source]?.[stop_times[0].stop_id];
-				const routeStop = stop?.routes.find((r) => r.route_id === trip.route_id);
-				if (!routeStop) return 'Unknown';
-				// this shouldn't be necessary since we should only be looking at bus routes, but just in case (and also to satisfy type checker)
-				return routeStop.data.source === 'mta_bus' ? routeStop.data.headsign : 'Unknown';
-			case 'mta_subway':
-				const last_st = stop_times[stop_times.length - 1];
-				return page.data.stops_by_id[trip.data.source]?.[last_st.stop_id]?.name ?? 'Unknown';
-			default:
-				return 'Unknown';
-		}
-	});
+	const last_stop = $derived(
+		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
+	);
 
 	type StopTransfers = Record<string, StopTime[]>;
 
@@ -72,7 +74,7 @@
 		for (const st of stop_times) {
 			transfers[st.stop_id] = [];
 
-			const added_routes = new Set<string>();
+			const added_routes = new SvelteSet<string>();
 
 			const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id];
 			if (!stop) continue;
@@ -134,6 +136,11 @@
 	type OpenTransfers = Record<string, boolean>;
 
 	const open_transfers = $state<OpenTransfers>({});
+	const subway_consist = $derived(trip.data.source === 'mta_subway' ? trip.data.consist : null);
+	const subway_consist_cars = $derived(
+		trip.data.source === 'mta_subway' ? (trip.data.consist_cars ?? []) : []
+	);
+	const subway_consist_model = $derived(subway_consist_cars[0]?.type);
 </script>
 
 <div class="flex items-center gap-1 p-1">
@@ -163,12 +170,70 @@
 		</div>
 	{/if}
 </div>
+<!-- TODO: rework -->
+{#if trip.data.source === 'mta_subway'}
+	<details
+		class="group mx-2 mb-2 overflow-hidden rounded-xl border border-neutral-700/80 bg-neutral-900/80 text-sm shadow-sm shadow-black/20"
+	>
+		<summary
+			class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-neutral-100 transition hover:bg-neutral-800/60 [&::-webkit-details-marker]:hidden"
+		>
+			<div class="flex min-w-0 flex-1 items-center gap-2">
+				<div class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Consist</div>
+
+				{#if subway_consist}
+					<div class="flex min-w-0 items-center gap-1.5 text-xs text-neutral-300">
+						<span class="truncate">{subway_consist.car_count} cars</span>
+						{#if subway_consist_model}
+							<Circle class="h-1 w-1 shrink-0 fill-current text-neutral-500" />
+							<span class="truncate">{subway_consist_model}</span>
+						{/if}
+					</div>
+				{:else}
+					<div class="truncate text-xs text-neutral-400">No consist details available</div>
+				{/if}
+			</div>
+
+			<ChevronDown class="h-4 w-4 shrink-0 text-neutral-400 transition group-open:rotate-180" />
+		</summary>
+
+		<div class="border-t border-neutral-800 px-3 pt-2 pb-3">
+			{#if subway_consist}
+				{#if subway_consist_cars.length}
+					<div class="overflow-x-auto pb-1">
+						<div class="mx-auto flex w-fit min-w-max items-center justify-center gap-px">
+							{#each subway_consist_cars as car, index (car.number)}
+								<div
+									class={[
+										'flex min-h-7 items-center justify-center border border-neutral-600 bg-neutral-800 px-2.5 text-center text-[0.7rem] leading-none shadow-inner shadow-white/5',
+										index === 0 && 'rounded-l-full pl-3.5',
+										index === subway_consist_cars.length - 1 && 'rounded-r-full pr-3.5',
+										index !== 0 && 'border-l-0'
+									]}
+									title={car.number}
+								>
+									<div class="font-medium text-neutral-100">#{car.number}</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{:else}
+					<div class="text-xs text-neutral-400">No cars are listed for this train yet.</div>
+				{/if}
+			{:else}
+				<div class="text-xs text-neutral-400">
+					No consist details are available for this train yet.
+				</div>
+			{/if}
+		</div>
+	</details>
+{/if}
 
 {#if st_loading}
 	<Skeleton lines={6} class="p-2" />
 {:else}
 	<ModalList>
-		{#each stop_times as st}
+		{#each stop_times as st (`${st.stop_id}:${st.arrival.toISOString()}`)}
 			{@const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id]}
 			{#if stop}
 				<div class="relative text-base">

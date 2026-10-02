@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 
-	import { source_info } from '$lib/resources/index.svelte';
-	import { source_preferences, supported_sources } from '$lib/source_preferences.svelte';
+	import { all_sources, source_info } from '$lib/resources/index.svelte';
+	import { source_preferences } from '$lib/source_preferences.svelte';
 	import { current_time } from '$lib/url_params.svelte';
 
 	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers } from '@lucide/svelte';
@@ -31,7 +31,7 @@
 				</p>
 
 				<div class="flex flex-col gap-3 pl-6">
-					{#each supported_sources as source}
+					{#each all_sources as source}
 						{@const info = source_info[source]}
 						<label
 							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"

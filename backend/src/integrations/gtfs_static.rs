@@ -148,8 +148,6 @@ fn build_routes<M: StaticParserMapper>(
     mapper: &M,
     options: &ParserOptions,
 ) -> anyhow::Result<Vec<Route>> {
-    let route_geometries = build_route_geometries(merged);
-
     let mut routes = merged
         .routes
         .values()
@@ -174,10 +172,6 @@ fn build_routes<M: StaticParserMapper>(
                     .unwrap_or_default(),
                 color,
                 data: mapper.map_route_data(route)?,
-                geom: route_geometries
-                    .get(&route.id.to_uppercase())
-                    .cloned()
-                    .map(Into::into),
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;

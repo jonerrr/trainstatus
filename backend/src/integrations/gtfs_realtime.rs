@@ -1,20 +1,15 @@
-use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
+use crate::debug_rt_data;
+use crate::feed::FeedMessage;
 use crate::models::{
     position::VehiclePosition as VehiclePositionModel,
     trip::{StopTime, Trip},
 };
-use crate::stores::position::PositionStore;
-use crate::stores::static_cache::StaticCacheStore;
-use crate::stores::trip::TripStore;
-use crate::{debug_rt_data, engines::static_data::StaticController, models::source::Source};
-use async_trait::async_trait;
+use crate::static_index::StaticTransitRevision;
 use futures::future::BoxFuture;
 use prost::Message;
 use prost::bytes;
-use std::collections::HashMap;
 use tokio::fs::{create_dir_all, write};
-use tracing::{error, info, instrument};
-use uuid::Uuid;
+use tracing::error;
 /// A future that fetches a GTFS-RT feed and returns the raw protobuf bytes.
 pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
 
@@ -28,30 +23,6 @@ pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
             .bytes()
             .await?)
     })
-}
-
-#[async_trait]
-pub trait GtfsSource: Send + Sync {
-    /// Friendly name for logging
-    fn source(&self) -> Source;
-
-    /// Fetch and decode all GTFS-RT feeds for this source.
-    async fn fetch_feeds(&self) -> Vec<FeedMessage>;
-
-    /// Maps a raw TripUpdate to a Trip AND its StopTimes.
-    /// We return both because StopTimes usually need the Trip's UUID.
-    async fn process_trip(
-        &self,
-        update: TripUpdate,
-        static_cache_store: &StaticCacheStore,
-    ) -> (Option<Trip>, Vec<StopTime>);
-
-    /// Maps a raw VehiclePosition to a VehiclePositionModel.
-    async fn process_vehicle(
-        &self,
-        vehicle: VehiclePosition,
-        static_cache_store: &StaticCacheStore,
-    ) -> Option<VehiclePositionModel>;
 }
 
 /// Fetches and decodes GTFS-RT feeds from the provided labeled futures.
@@ -108,71 +79,30 @@ pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<Feed
         .collect()
 }
 
-#[instrument(skip_all, fields(source = ?adapter.source()))]
-pub async fn run_pipeline<T: GtfsSource>(
-    adapter: &T,
-    static_controller: &StaticController,
-    static_cache_store: &StaticCacheStore,
-    trip_store: &TripStore,
-    position_store: &PositionStore,
-) -> anyhow::Result<()> {
-    // Ensure static data is loaded before processing realtime data
-    // TODO: maybe this should be in the engines/realtime.rs
-    static_controller.ensure_updated(adapter.source()).await?;
-
-    let feeds = adapter.fetch_feeds().await;
-    if feeds.is_empty() {
-        return Ok(());
-    }
-
-    let mut data = Vec::new();
-    let mut positions = Vec::new();
-
-    // Build a map of vehicle_id -> input_trip_id for linking positions to trips
-    let mut vehicle_to_trip: HashMap<String, Uuid> = HashMap::new();
-
-    for feed in feeds {
-        for entity in feed.entity {
-            if let Some(update) = entity.trip_update {
-                let (trip_opt, new_stop_times) =
-                    adapter.process_trip(update, static_cache_store).await;
-                if let Some(trip) = trip_opt {
-                    // Map vehicle_id to trip_id for position linking
-                    vehicle_to_trip.insert(trip.vehicle_id.clone(), trip.id);
-                    data.push((trip, new_stop_times));
-                }
+/// Rewrite realtime stop ids to their canonical static stop id.
+///
+/// Sources that collapse parent/child stops (e.g. NJT bus gates) publish a
+/// `child_stop_id -> canonical_id` remap during static import; every other
+/// source resolves to identity at no cost. This keeps the
+/// `stop_id -> static.stop` foreign keys satisfied when child stops have been
+/// collapsed away.
+pub fn remap_realtime_stop_ids(
+    revision: &StaticTransitRevision,
+    data: &mut [(Trip, Vec<StopTime>)],
+    positions: &mut [VehiclePositionModel],
+) {
+    for (_trip, stop_times) in data.iter_mut() {
+        for st in stop_times.iter_mut() {
+            if let Some(canonical) = revision.stop_remap.get(&st.stop_id) {
+                st.stop_id = canonical.clone();
             }
-
-            if let Some(vehicle) = entity.vehicle
-                && let Some(pos) = adapter.process_vehicle(vehicle, static_cache_store).await {
-                    positions.push(pos);
-                }
         }
     }
-
-    info!(
-        "Fetched {} trips, {} positions for {:?}",
-        data.len(),
-        positions.len(),
-        adapter.source()
-    );
-
-    // Save trips first to get the actual IDs
-    let id_map = trip_store.save_all(adapter.source(), &data).await?;
-
-    // Link positions to trips via vehicle_id
-    // Use id_map to translate input_id -> actual_id (handles upsert case where DB id differs)
-    for position in &mut positions {
-        if let Some(&input_id) = vehicle_to_trip.get(&position.vehicle_id)
-            && let Some(&actual_id) = id_map.get(&input_id) {
-                position.trip_id = Some(actual_id);
-            }
+    for position in positions.iter_mut() {
+        if let Some(stop_id) = &position.stop_id
+            && let Some(canonical) = revision.stop_remap.get(stop_id)
+        {
+            position.stop_id = Some(canonical.clone());
+        }
     }
-
-    // Save positions (trigger appends trip history points for positions with trip_id and geom)
-    position_store
-        .save_vehicle_positions(adapter.source(), &positions)
-        .await?;
-
-    Ok(())
 }

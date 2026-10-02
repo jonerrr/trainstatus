@@ -36,11 +36,12 @@ export function index_alerts<S extends Source>(data: ApiAlert[]): AlertResource<
 
 		alerts.push(processed);
 
-		for (const entity of processed.entities) {
-			if (!alerts_by_route.has(entity.route_id)) {
-				alerts_by_route.set(entity.route_id, []);
+		// An alert can affect multiple stops on a route, but belongs in its route list only once.
+		for (const route_id of new Set(processed.entities.map((entity) => entity.route_id))) {
+			if (!alerts_by_route.has(route_id)) {
+				alerts_by_route.set(route_id, []);
 			}
-			alerts_by_route.get(entity.route_id)!.push(processed);
+			alerts_by_route.get(route_id)!.push(processed);
 		}
 	}
 

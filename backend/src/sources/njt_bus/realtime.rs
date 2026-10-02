@@ -1,42 +1,58 @@
+#[cfg(feature = "fixture-capture")]
+use std::collections::BTreeMap;
+
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::{
-    engines::static_data::StaticController,
     feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition},
-    integrations::gtfs_realtime::{self, GtfsSource},
+    integrations::gtfs_realtime,
     models::{
         position::{NjtBusPositionData, PositionData, VehiclePosition},
         source::Source,
         trip::{StopTime, StopTimeData, Trip, TripData},
     },
-    sources::RealtimeAdapter,
-    stores::{position::PositionStore, static_cache::StaticCacheStore, trip::TripStore},
+    realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig},
+    static_index::{StaticTransitIndex, StaticTransitRevision},
+    stores::static_cache::StaticCacheStore,
 };
 
-use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, NjtApi, get_token, njt_post_future};
+use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
-pub struct NjtBusRealtime;
+pub struct NjtBusRealtime {
+    static_index: StaticTransitIndex,
+    static_cache_store: StaticCacheStore,
+}
 
-#[async_trait]
-impl GtfsSource for NjtBusRealtime {
-    fn source(&self) -> Source {
-        Source::NjtBus
+#[cfg(feature = "fixture-capture")]
+pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let token = get_token().await?;
+    let trip_updates = njt_post_future(NJT_TRIP_UPDATES_URL, token.clone()).await?;
+    let vehicle_positions = njt_post_future(NJT_VEHICLE_POSITIONS_URL, token).await?;
+
+    let mut fixtures = BTreeMap::new();
+    fixtures.insert("trip_updates.pb".to_string(), trip_updates.to_vec());
+    fixtures.insert(
+        "vehicle_positions.pb".to_string(),
+        vehicle_positions.to_vec(),
+    );
+    Ok(fixtures)
+}
+
+impl NjtBusRealtime {
+    pub fn new(static_index: StaticTransitIndex, static_cache_store: StaticCacheStore) -> Self {
+        Self {
+            static_index,
+            static_cache_store,
+        }
     }
 
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token(NjtApi::GtfsG2).await {
-            Ok(t) => t,
-            Err(e) => {
-                error!("NJT auth failed: {:?}", e);
-                return vec![];
-            }
-        };
-
-        gtfs_realtime::fetch_feeds(vec![
+    async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
+        let token = get_token().await?;
+        let feeds = gtfs_realtime::fetch_feeds(vec![
             (
                 "njt_bus_getTripUpdates".into(),
                 njt_post_future(NJT_TRIP_UPDATES_URL, token.clone()),
@@ -46,13 +62,55 @@ impl GtfsSource for NjtBusRealtime {
                 njt_post_future(NJT_VEHICLE_POSITIONS_URL, token),
             ),
         ])
-        .await
+        .await;
+        anyhow::ensure!(!feeds.is_empty(), "No NJT bus GTFS-RT feeds returned");
+        Ok(feeds)
+    }
+
+    pub async fn build_snapshot(
+        &self,
+        feeds: Vec<FeedMessage>,
+    ) -> anyhow::Result<CollectedSnapshot> {
+        let revision = self
+            .static_index
+            .get(Source::NjtBus)
+            .ok_or_else(|| anyhow::anyhow!("NJT static transit index is not loaded"))?;
+        let mut trips = Vec::new();
+        let mut positions = Vec::new();
+        for feed in feeds {
+            for entity in feed.entity {
+                if let Some(update) = entity.trip_update {
+                    let (trip, times) = self.process_trip(update, &revision).await;
+                    if let Some(trip) = trip {
+                        trips.push((trip, times));
+                    }
+                }
+                if let Some(vehicle) = entity.vehicle
+                    && let Some(position) = self.process_vehicle(vehicle)
+                {
+                    positions.push(position);
+                }
+            }
+        }
+        gtfs_realtime::remap_realtime_stop_ids(&revision, &mut trips, &mut positions);
+        let vehicle_to_trip: std::collections::HashMap<_, _> = trips
+            .iter()
+            .map(|(trip, _)| (trip.vehicle_id.as_str(), trip.id))
+            .collect();
+        for position in &mut positions {
+            position.trip_id = vehicle_to_trip.get(position.vehicle_id.as_str()).copied();
+        }
+        Ok(CollectedSnapshot {
+            source: Source::NjtBus,
+            trips,
+            positions,
+        })
     }
 
     async fn process_trip(
         &self,
         update: TripUpdate,
-        static_cache_store: &StaticCacheStore,
+        revision: &StaticTransitRevision,
     ) -> (Option<Trip>, Vec<StopTime>) {
         let trip_desc = update.trip;
 
@@ -60,6 +118,8 @@ impl GtfsSource for NjtBusRealtime {
             Some(id) => id,
             None => return (None, vec![]),
         };
+
+        let pattern = revision.trip_patterns.get(&trip_id);
 
         // Try to get from static cache to fill in missing fields
         // We guess start_date as today if not present
@@ -71,7 +131,8 @@ impl GtfsSource for NjtBusRealtime {
                 .to_string()
         });
 
-        let cached_trip = static_cache_store
+        let cached_trip = self
+            .static_cache_store
             .get_trip(Source::NjtBus, &trip_id, &start_date_str)
             .await
             .unwrap_or(None);
@@ -79,6 +140,7 @@ impl GtfsSource for NjtBusRealtime {
         let route_id = trip_desc
             .route_id
             .or_else(|| cached_trip.as_ref().map(|ct| ct.route_id.clone()))
+            .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
                     trip_id,
@@ -95,6 +157,7 @@ impl GtfsSource for NjtBusRealtime {
             .direction_id
             .map(|d| d as i16)
             .or_else(|| cached_trip.as_ref().map(|ct| ct.direction_id))
+            .or_else(|| pattern.as_ref().map(|p| p.direction))
             .unwrap_or(0);
 
         let start_date = match NaiveDate::parse_from_str(&start_date_str, "%Y%m%d") {
@@ -148,10 +211,17 @@ impl GtfsSource for NjtBusRealtime {
             return (None, vec![]);
         };
 
+        let shape_ids = pattern
+            .filter(|p| p.route_id.eq_ignore_ascii_case(&route_id) && p.direction == direction)
+            .and_then(|p| p.shape_id.clone())
+            .map(|id| vec![id])
+            .unwrap_or_default();
+
         let trip = Trip {
             id: Uuid::now_v7(),
             original_id: trip_id,
             route_id,
+            shape_ids,
             direction,
             created_at,
             vehicle_id,
@@ -193,11 +263,7 @@ impl GtfsSource for NjtBusRealtime {
         (Some(trip), stop_times)
     }
 
-    async fn process_vehicle(
-        &self,
-        vehicle: GtfsVehiclePosition,
-        _static_cache_store: &StaticCacheStore,
-    ) -> Option<VehiclePosition> {
+    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
         let vehicle_desc = vehicle.vehicle.as_ref()?;
         let vehicle_id = vehicle_desc.id.clone()?;
 
@@ -225,96 +291,15 @@ impl GtfsSource for NjtBusRealtime {
 }
 
 #[async_trait]
-impl RealtimeAdapter for NjtBusRealtime {
-    fn source(&self) -> Source {
-        Source::NjtBus
-    }
-
-    fn refresh_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(30)
-    }
-
-    async fn run(
-        &self,
-        static_controller: &StaticController,
-        static_cache_store: &StaticCacheStore,
-        trip_store: &TripStore,
-        position_store: &PositionStore,
-    ) -> anyhow::Result<()> {
-        gtfs_realtime::run_pipeline(
-            self,
-            static_controller,
-            static_cache_store,
-            trip_store,
-            position_store,
-        )
-        .await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::feed::FeedMessage;
-    use crate::stores::static_cache::StaticCacheStore;
-    use bb8_redis::RedisConnectionManager;
-    use prost::Message;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn load_fixture(path: &str) -> FeedMessage {
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/fixtures");
-        d.push(path);
-        let bytes = fs::read(d).expect("Failed to read fixture file");
-        FeedMessage::decode(&bytes[..]).expect("Failed to decode GTFS fixture")
-    }
-
-    #[tokio::test]
-    async fn test_process_njt_trip_from_fixture() {
-        let fixture = load_fixture("njt_bus/njt_bus_getTripUpdates.pb");
-        let adapter = NjtBusRealtime;
-
-        // Setup mock cache
-        let manager = RedisConnectionManager::new("redis://localhost").unwrap();
-        let redis_pool = bb8::Pool::builder().build(manager).await.unwrap();
-        let cache = StaticCacheStore::new(redis_pool);
-
-        // Seed cache for trip "13" which is in our fixture
-        let today = Utc::now()
-            .with_timezone(&chrono_tz::America::New_York)
-            .format("%Y%m%d")
-            .to_string();
-
-        cache
-            .cache_trips(
-                Source::NjtBus,
-                &[crate::models::static_cache::CachedTrip {
-                    trip_id: "13".to_string(),
-                    route_id: "123".to_string(),
-                    direction_id: 0,
-                    headsign: "Test Headsign".to_string(),
-                    start_date: today.clone(),
-                    start_time: Utc::now(),
-                    stop_times: vec![],
-                }],
-            )
-            .await
-            .unwrap();
-
-        let mut trip_count = 0;
-        for entity in fixture.entity {
-            if let Some(update) = entity.trip_update {
-                let (trip, _stop_times) = adapter.process_trip(update, &cache).await;
-                if let Some(trip) = trip {
-                    trip_count += 1;
-                    assert!(!trip.original_id.is_empty());
-                }
-            }
+impl RealtimeSource for NjtBusRealtime {
+    fn config(&self) -> RealtimeSourceConfig {
+        RealtimeSourceConfig {
+            source: Source::NjtBus,
+            refresh_interval: std::time::Duration::from_secs(30),
         }
-        assert!(
-            trip_count > 0,
-            "Should have processed at least one NJT trip from fixture"
-        );
+    }
+
+    async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
+        self.build_snapshot(self.fetch_feeds().await?).await
     }
 }

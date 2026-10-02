@@ -1,36 +1,15 @@
 <script lang="ts">
 	import type { CompassDirection } from '$lib/client';
+	import { COMPASS_DIRECTIONS } from '$lib/compassDirections';
 
-	import {
-		ArrowDown,
-		ArrowDownLeft,
-		ArrowDownRight,
-		ArrowLeft,
-		ArrowRight,
-		ArrowUp,
-		ArrowUpLeft,
-		ArrowUpRight
-	} from '@lucide/svelte';
+	import { ArrowUp } from '@lucide/svelte';
 
 	const { direction, size = '1.5rem' }: { direction: CompassDirection; size?: string } = $props();
+	const rotation = $derived(COMPASS_DIRECTIONS[direction].rotation);
 </script>
 
 <div>
-	{#if direction === 's_w'}
-		<ArrowDownLeft {size} />
-	{:else if direction === 's'}
-		<ArrowDown {size} />
-	{:else if direction === 's_e'}
-		<ArrowDownRight {size} />
-	{:else if direction === 'e'}
-		<ArrowRight {size} />
-	{:else if direction === 'w'}
-		<ArrowLeft {size} />
-	{:else if direction === 'n_w'}
-		<ArrowUpLeft {size} />
-	{:else if direction === 'n_e'}
-		<ArrowUpRight {size} />
-	{:else if direction === 'n'}
-		<ArrowUp {size} />
+	{#if rotation !== null}
+		<ArrowUp {size} style={`transform: rotate(${rotation}deg)`} />
 	{/if}
 </div>

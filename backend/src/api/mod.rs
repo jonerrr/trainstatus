@@ -14,13 +14,14 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 // pub mod websocket;
 pub mod realtime;
 pub mod static_data;
+pub mod trajectory;
 pub mod util;
 
 pub struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        error!("Internal server error: {}", self.0);
+        error!(error = %self.0, "Internal server error");
 
         (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong :(").into_response()
     }
@@ -46,11 +47,11 @@ pub fn router(state: AppState) -> OpenApiRouter {
         .routes(routes!(realtime::stop_times_handler))
         .routes(routes!(realtime::positions_handler))
         .routes(routes!(realtime::alerts_handler))
+        .routes(routes!(trajectory::trajectories_handler))
         .with_state(state)
 }
 
 // not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
-#[allow(dead_code)]
 pub fn json_headers() -> &'static HeaderMap {
     static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
     HEADERS.get_or_init(|| {
@@ -173,7 +174,7 @@ where
                     },
                     _ => {
                         // TODO: maybe return a 400 instead of logging
-                        tracing::error!("Invalid timestamp: {}", at);
+                        tracing::error!(timestamp = at, "Invalid timestamp");
                         CurrentTime {
                             time: Utc::now(),
                             user_specified: false,
