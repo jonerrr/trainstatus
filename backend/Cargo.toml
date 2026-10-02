@@ -10,42 +10,6 @@ name = "fixtures"
 path = "src/bin/fixtures.rs"
 required-features = ["fixture-capture"]
 
-# TODO: re-organize tests so we dont need to specify the fixture-capture requirement everywhere.
-# These integration tests load captured fixtures. The fixture module stays out of
-# the production binary, so `cargo test` skips them unless `--features fixture-capture`
-# is set. `backend/mise.toml` passes that flag.
-[[test]]
-name = "api"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "fixture_tests"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "live_snapshot_reads"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "njt_geometry"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "realtime_ingestion"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "sources"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "trajectory"
-required-features = ["fixture-capture"]
-
-[[test]]
-name = "trajectory_snapshot"
-required-features = ["fixture-capture"]
-
 [dependencies]
 anyhow = "1.0.100"
 arrow = { version = "54.2.1", default-features = false, features = ["ipc"] }
