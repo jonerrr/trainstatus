@@ -2,40 +2,47 @@ use crate::utils::pchip::PchipInterpolator;
 
 use super::types::TrajectoryKnot;
 
+pub struct SampledMotion {
+    pub distances: Vec<f64>,
+    pub state_distance_m: f64,
+    pub state_speed_mps: f64,
+}
+
 pub trait InterpolationMethod: Send + Sync {
-    fn interpolate_distance(
+    /// Sample the path and the state at `state_t` from one interpolator.
+    fn sample_motion(
         &self,
         knots: &[TrajectoryKnot],
         t_samples: &[f64],
-    ) -> anyhow::Result<Vec<f64>>;
-
-    fn derivative_at(&self, knots: &[TrajectoryKnot], t: f64) -> anyhow::Result<f64>;
+        state_t: f64,
+    ) -> anyhow::Result<SampledMotion>;
 }
 
 #[derive(Default)]
 pub struct PchipMethod;
 
 impl InterpolationMethod for PchipMethod {
-    fn interpolate_distance(
+    fn sample_motion(
         &self,
         knots: &[TrajectoryKnot],
         t_samples: &[f64],
-    ) -> anyhow::Result<Vec<f64>> {
+        state_t: f64,
+    ) -> anyhow::Result<SampledMotion> {
         let (t_rel, s_m, t0) = knots_to_relative(knots)?;
         let interp = PchipInterpolator::try_new(&t_rel, &s_m)?;
-        Ok(t_samples
+        let distances = t_samples
             .iter()
-            .map(|&t| {
-                let tr = t - t0;
-                interp.evaluate(tr).unwrap_or(f64::NAN)
-            })
-            .collect())
-    }
-
-    fn derivative_at(&self, knots: &[TrajectoryKnot], t: f64) -> anyhow::Result<f64> {
-        let (t_rel, s_m, t0) = knots_to_relative(knots)?;
-        let interp = PchipInterpolator::try_new(&t_rel, &s_m)?;
-        Ok(interp.evaluate_derivative(t - t0).unwrap_or(0.0))
+            .map(|&t| interp.evaluate(t - t0).unwrap_or(f64::NAN))
+            .collect();
+        let state_offset = state_t - t0;
+        Ok(SampledMotion {
+            distances,
+            state_distance_m: interp
+                .evaluate(state_offset)
+                .filter(|distance| !distance.is_nan())
+                .unwrap_or(0.0),
+            state_speed_mps: interp.evaluate_derivative(state_offset).unwrap_or(0.0),
+        })
     }
 }
 

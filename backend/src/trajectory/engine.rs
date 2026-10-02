@@ -111,7 +111,9 @@ pub fn compute_trajectory(
         sampled_t.push(sample_max);
     }
 
-    let sampled_s = method.interpolate_distance(&knots, &sampled_t)?;
+    let state_t = t_now.clamp(t0, t_max);
+    let sampled = method.sample_motion(&knots, &sampled_t, state_t)?;
+    let sampled_s = sampled.distances;
 
     let line = &shape_geom.wgs84_line;
     let cum_dist = &shape_geom.cum_dist;
@@ -140,15 +142,9 @@ pub fn compute_trajectory(
     }
 
     let path_bbox = super::types::compute_path_bbox(&path);
-    let state_t = t_now.clamp(t0, t_max);
     let end_t = state_t;
-    let v_mps = method.derivative_at(&knots, state_t).unwrap_or(0.0);
-    let end_s = method
-        .interpolate_distance(&knots, &[state_t])?
-        .into_iter()
-        .next()
-        .filter(|s| !s.is_nan())
-        .unwrap_or(0.0);
+    let v_mps = sampled.state_speed_mps;
+    let end_s = sampled.state_distance_m;
 
     let trajectory = Trajectory {
         trip_id: trip.trip_id.to_string(),

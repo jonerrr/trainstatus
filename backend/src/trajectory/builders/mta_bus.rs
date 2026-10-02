@@ -2,17 +2,15 @@ use crate::models::position::PositionData;
 use crate::models::source::Source;
 use crate::models::stop::StopData;
 
-use super::super::builder::{TrajectoryBuilder, collapse_backtracking_knots_with_stats};
+use super::super::builder::{
+    TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
+};
 use super::super::cache::TrajectoryCache;
 use super::super::geometry::{ShapeGeometry, project_point_onto_line, project_wgs84_point_to_epsg};
 use super::super::types::{
     GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryState, TrajectoryStop,
     TripSnapshot, source_projected_epsg_code,
 };
-
-/// If the live GPS anchor is within this many meters of a schedule knot in the
-/// same direction, treat the knots as co-located and do not drop them.
-const ANCHOR_DISTANCE_TOLERANCE_M: f64 = 1.0;
 
 /// Slack allowed above the reported next-stop distance when truncating the
 /// schedule ahead of the live feed. Keeps the arrival/departure dwell knots
@@ -193,14 +191,8 @@ impl TrajectoryBuilder for MtaBusBuilder {
             // Record how far the first schedule knot is from the live fix.
             stats.live_anchor_gap_m = all_knots.first().map(|k| (anchor.s_m - k.s_m).abs());
 
-            // Drop schedule knots that are both earlier in time AND spatially
-            // behind the live anchor — they are in the past and inconsistent.
             let original_len = all_knots.len();
-            let anchor_t = anchor.t_event;
-            let anchor_s = anchor.s_m;
-            all_knots.retain(|k| {
-                !(k.t_event < anchor_t && k.s_m + ANCHOR_DISTANCE_TOLERANCE_M < anchor_s)
-            });
+            retain_anchor_consistent_knots(&mut all_knots, &anchor);
             stats.pre_anchor_knots_dropped = original_len.saturating_sub(all_knots.len()) as u32;
 
             all_knots.push(anchor);
@@ -218,7 +210,7 @@ impl TrajectoryBuilder for MtaBusBuilder {
             // stop the feed is inconsistent, so we trust the fix and skip the
             // clamp rather than risk trimming away every forward knot.
             if let Some(ceiling) = Self::reported_next_stop_distance(trip)
-                && ceiling > anchor_s
+                && ceiling > anchor.s_m
             {
                 all_knots.retain(|k| k.s_m <= ceiling + NEXT_STOP_CEILING_TOLERANCE_M);
             }
@@ -394,6 +386,41 @@ mod tests {
         assert!(
             max_s <= 100.0 + NEXT_STOP_CEILING_TOLERANCE_M + 1e-6,
             "no knot should sit past reported next stop A (s=100); got max s_m={max_s}"
+        );
+    }
+
+    #[test]
+    fn live_anchor_is_kept_when_the_next_stop_is_already_late() {
+        // Stop A was due a minute ago, but the bus is still at the start of the
+        // shape. Keeping that past, spatially-ahead knot sorts it before the GPS
+        // fix, and collapse then discards the fix as backtracking.
+        let now = chrono::Utc::now().timestamp() as f64;
+        let stops = vec![
+            make_stop("A", now - 60.0, 100.0),
+            make_stop("B", now + 180.0, 400.0),
+        ];
+        let mut trip = make_trip(stops, 600.0);
+        trip.as_of = chrono::Utc::now();
+        trip.positions = vec![make_position("B", -74.0, 40.7)];
+
+        let builder = MtaBusBuilder;
+        let cache = crate::trajectory::TrajectoryCache::new();
+        use crate::trajectory::geometry::build_shape_geometry;
+        let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
+        let result = builder
+            .generate_knots(&trip, None, &shape_geom, &cache)
+            .unwrap();
+
+        let anchor_t = trip.as_of.timestamp() as f64;
+        let anchor = result
+            .knots
+            .iter()
+            .find(|knot| (knot.t_event - anchor_t).abs() < 1e-3);
+        assert!(anchor.is_some(), "GPS anchor dropped: {:?}", result.knots);
+        assert!(
+            anchor.unwrap().s_m < 50.0,
+            "anchor should stay on the live fix, got s_m={}",
+            anchor.unwrap().s_m
         );
     }
 

@@ -358,15 +358,21 @@ async fn resolve_shapes(
         candidates.sort();
         let mut best = None;
         let mut most_hits = 0;
+        // Look up each stop once. The key is owned, so doing this inside the
+        // candidate loop cloned both ids for every shape candidate.
+        let route_id = trip.route_id.clone();
+        let stop_shapes: Vec<Option<&Vec<String>>> = trip_stops
+            .iter()
+            .map(|stop| {
+                revision
+                    .route_stop_shapes
+                    .get(&(route_id.clone(), stop.stop_id.clone()))
+            })
+            .collect();
         for shape in &candidates {
-            let hits = trip_stops
+            let hits = stop_shapes
                 .iter()
-                .filter(|stop| {
-                    revision
-                        .route_stop_shapes
-                        .get(&(trip.route_id.clone(), stop.stop_id.clone()))
-                        .is_some_and(|members| members.contains(shape))
-                })
+                .filter(|members| members.is_some_and(|members| members.contains(*shape)))
                 .count();
             if hits > most_hits {
                 most_hits = hits;

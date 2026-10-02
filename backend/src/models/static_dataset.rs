@@ -67,6 +67,10 @@ impl StaticDataset {
                 .await?;
         }
 
+        route_store
+            .save_revision_metadata(self.source, &self.trip_patterns, &self.stop_remap)
+            .await?;
+
         // Complete the stops read-through cache refresh before publishing the
         // new revision. A failed write leaves the previous revision authoritative.
         // Proximity transfers are recomputed separately after the import.

@@ -62,6 +62,29 @@ describe('countActiveFilters', () => {
 		expect(filters.activeFilterCount).toBe(0);
 	});
 
+	it('applies a property filter only to the source that defines it', () => {
+		const filters = new MapFilters();
+		filters.stop_filters.mta_subway.ada = true;
+
+		expect(filters.stop).toEqual([
+			'any',
+			['all', ['==', ['get', 'source'], 'mta_subway'], ['==', ['get', 'ada'], true]],
+			['==', ['get', 'source'], 'mta_bus']
+		]);
+	});
+
+	it('keeps an unfiltered source when another source has a property filter', () => {
+		const filters = new MapFilters();
+		filters.sources = ['mta_subway', 'mta_bus'];
+		filters.stop_filters.mta_bus.direction = 'N';
+
+		expect(filters.stop).toEqual([
+			'any',
+			['==', ['get', 'source'], 'mta_subway'],
+			['all', ['==', ['get', 'source'], 'mta_bus'], ['==', ['get', 'direction'], 'N']]
+		]);
+	});
+
 	it('toggles sources on and off', () => {
 		const filters = new MapFilters();
 		expect(filters.isSourceEnabled('mta_subway')).toBe(true);

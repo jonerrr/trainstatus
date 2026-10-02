@@ -65,7 +65,7 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 3. Set the environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml` you create.
    - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`.
 4. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
-5. Run `mise //geo:export` to export the valhalla config.
+5. Run `mise //geo:export` to export the Valhalla tile extract.
 6. Start the required services with `mise start-containers`.
 7. Once everything is up, start the backend and frontend with `mise dev`.
 

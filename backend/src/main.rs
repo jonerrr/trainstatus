@@ -10,10 +10,7 @@ use bb8_redis::RedisConnectionManager;
 use http::StatusCode;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
-use tokio::{
-    signal,
-    sync::broadcast::{self, Sender},
-};
+use tokio::signal;
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
     compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
@@ -150,8 +147,6 @@ async fn main() {
 
     engines::alerts::run(&alert_store, alert_adapters).await;
 
-    let (shutdown_tx, _rx) = broadcast::channel::<()>(1);
-
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
     tags(
@@ -222,7 +217,7 @@ async fn main() {
     tracing::info!(address = %listener.local_addr().unwrap(), "Listening");
 
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-        .with_graceful_shutdown(shutdown_signal(shutdown_tx))
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
 }
@@ -231,7 +226,7 @@ async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "404 not found :(")
 }
 
-async fn shutdown_signal(shutdown_tx: Sender<()>) {
+async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -250,11 +245,7 @@ async fn shutdown_signal(shutdown_tx: Sender<()>) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
-            shutdown_tx.send(()).expect("shutdown_tx send failed");
-        },
-        _ = terminate => {
-            shutdown_tx.send(()).expect("shutdown_tx send failed");
-        },
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
 }

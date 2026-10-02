@@ -72,9 +72,10 @@ pub struct TrajectoryCache {
 impl TrajectoryCache {
     pub fn new() -> Self {
         Self {
-            hot: Cache::builder()
-                .time_to_live(Duration::from_secs(60))
-                .build(),
+            // One entry per source, replaced when derivation finishes. A TTL
+            // here drops every vehicle if a collection cycle runs long, while
+            // LiveSnapshots keeps serving the last committed generation.
+            hot: Cache::builder().build(),
             historical: Cache::builder()
                 .max_capacity(500)
                 .time_to_live(Duration::from_secs(3600))

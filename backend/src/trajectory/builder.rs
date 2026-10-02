@@ -6,6 +6,30 @@ use super::types::{GeneratedKnots, TrajectoryKnot, TrajectoryState, TripSnapshot
 
 pub const KNOT_COLLAPSE_TOLERANCE_M: f64 = 0.5;
 
+/// Drop schedule knots that contradict a live GPS anchor.
+///
+/// Knots that share the anchor timestamp are removed so the caller can insert
+/// the anchor itself. A knot earlier than the anchor is kept only when it sits
+/// on the same distance: a past knot ahead of the vehicle sorts first, and
+/// [`collapse_backtracking_knots_with_stats`] then discards the live fix. A
+/// past knot just behind the fix is dropped too, because collapse removes the
+/// later knot when distance does not advance by [`KNOT_COLLAPSE_TOLERANCE_M`].
+/// A later knot is kept only when it is at or ahead of the anchor.
+pub fn retain_anchor_consistent_knots(knots: &mut Vec<TrajectoryKnot>, anchor: &TrajectoryKnot) {
+    let anchor_time = anchor.t_event;
+    let anchor_s = anchor.s_m;
+    knots.retain(|knot| {
+        if knot.t_event == anchor_time {
+            return false;
+        }
+        if knot.t_event < anchor_time {
+            (knot.s_m - anchor_s).abs() < 1e-6
+        } else {
+            knot.s_m >= anchor_s
+        }
+    });
+}
+
 /// Source-specific knot synthesis from trip snapshots.
 pub trait TrajectoryBuilder: Send + Sync {
     fn source(&self) -> Source;
@@ -77,4 +101,50 @@ pub fn validate_knots(knots: &[TrajectoryKnot]) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn past_knot_ahead_of_the_vehicle_does_not_discard_the_live_anchor() {
+        let anchor = TrajectoryKnot::new(1_000.0, 40.0, None);
+        let mut knots = vec![
+            TrajectoryKnot::new(900.0, 10.0, None),
+            TrajectoryKnot::new(950.0, 200.0, None),
+            TrajectoryKnot::new(1_100.0, 200.0, None),
+            TrajectoryKnot::new(1_050.0, 20.0, None),
+        ];
+        retain_anchor_consistent_knots(&mut knots, &anchor);
+        knots.push(anchor);
+        knots.sort_by(|a, b| {
+            a.t_event
+                .total_cmp(&b.t_event)
+                .then(a.s_m.total_cmp(&b.s_m))
+        });
+        let (collapsed, _) = collapse_backtracking_knots_with_stats(&knots);
+        assert!(
+            collapsed
+                .iter()
+                .any(|knot| knot.t_event == anchor.t_event && knot.s_m == anchor.s_m),
+            "live anchor missing: {collapsed:?}"
+        );
+        assert!(
+            collapsed
+                .iter()
+                .all(|knot| knot.t_event < anchor.t_event || knot.s_m + 1e-6 >= anchor.s_m)
+        );
+    }
+
+    #[test]
+    fn dwell_at_the_anchor_is_kept_and_a_near_miss_behind_it_is_not() {
+        let anchor = TrajectoryKnot::new(100.0, 50.0, None);
+        let mut knots = vec![
+            TrajectoryKnot::new(90.0, 50.0, Some(0.0)),
+            TrajectoryKnot::new(95.0, 49.7, None),
+        ];
+        retain_anchor_consistent_knots(&mut knots, &anchor);
+        assert_eq!(knots, vec![TrajectoryKnot::new(90.0, 50.0, Some(0.0))]);
+    }
 }

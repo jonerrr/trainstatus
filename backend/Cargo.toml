@@ -10,6 +10,42 @@ name = "fixtures"
 path = "src/bin/fixtures.rs"
 required-features = ["fixture-capture"]
 
+# TODO: re-organize tests so we dont need to specify the fixture-capture requirement everywhere.
+# These integration tests load captured fixtures. The fixture module stays out of
+# the production binary, so `cargo test` skips them unless `--features fixture-capture`
+# is set. `backend/mise.toml` passes that flag.
+[[test]]
+name = "api"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "fixture_tests"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "live_snapshot_reads"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "njt_geometry"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "realtime_ingestion"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "sources"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "trajectory"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "trajectory_snapshot"
+required-features = ["fixture-capture"]
+
 [dependencies]
 anyhow = "1.0.100"
 arrow = { version = "54.2.1", default-features = false, features = ["ipc"] }
@@ -55,8 +91,8 @@ valhalla = "0.6.43"
 [dev-dependencies]
 axum-test = "=20.0.0"
 test-log = { version = "=0.2.20", default-features = false, features = ["trace"] }
-tokio-test = "=0.4.5"
 tokio = { version = "1.48.0", features = ["test-util"] }
+tokio-test = "=0.4.5"
 
 [build-dependencies]
 prost-build = "0.14.1"

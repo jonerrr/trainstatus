@@ -84,6 +84,17 @@
 	});
 
 	let renderUnitsBySource = new SvelteMap<Source, RenderUnitTable>();
+	const trajectoryFetches = new SvelteMap<Source, AbortController>();
+
+	function abortTrajectoryFetch(source: Source) {
+		trajectoryFetches.get(source)?.abort();
+		trajectoryFetches.delete(source);
+	}
+
+	function abortAllTrajectoryFetches() {
+		for (const controller of trajectoryFetches.values()) controller.abort();
+		trajectoryFetches.clear();
+	}
 
 	/**
 	 * Per-source pools of live vehicle objects. `buildActiveVehiclesAtTime`
@@ -352,6 +363,10 @@
 			return;
 		}
 
+		abortTrajectoryFetch(currentSource);
+		const controller = new AbortController();
+		trajectoryFetches.set(currentSource, controller);
+
 		try {
 			const params = new URLSearchParams();
 			if (currentFixedAt !== null) params.set('at', String(currentFixedAt));
@@ -359,13 +374,16 @@
 			const queryString = params.toString();
 			const url = `/api/v1/trajectories/${currentSource}${queryString ? `?${queryString}` : ''}`;
 
-			const res = await fetch(url);
+			const res = await fetch(url, { signal: controller.signal });
 			if (!res.ok) {
 				console.error(`Failed to fetch trajectories for ${currentSource}: ${res.status}`);
 				return;
 			}
 
-			const nextRenderUnits = renderUnitTableFromIPC(await res.arrayBuffer());
+			const buffer = await res.arrayBuffer();
+			if (controller.signal.aborted || trajectoryFetches.get(currentSource) !== controller) return;
+
+			const nextRenderUnits = renderUnitTableFromIPC(buffer);
 			renderUnitsBySource.set(currentSource, nextRenderUnits);
 			updateAllVehiclesAtTime(currentFixedAt ?? Date.now() / 1000);
 			dataVersion += 1;
@@ -377,6 +395,7 @@
 				);
 			}
 		} catch (err) {
+			if (err instanceof Error && err.name === 'AbortError') return;
 			console.error(`Error fetching trajectories for ${currentSource}:`, err);
 		}
 	}
@@ -443,6 +462,7 @@
 		const currentFixedAt = fixedAt;
 		untrack(() => {
 			if (!currentEnabled) {
+				abortAllTrajectoryFetches();
 				renderUnitsBySource.clear();
 				clearActiveVehicles();
 				return;
@@ -451,6 +471,7 @@
 			// Remove keys for sources that are no longer active
 			for (const key of Array.from(renderUnitsBySource.keys())) {
 				if (!currentSources.includes(key)) {
+					abortTrajectoryFetch(key);
 					renderUnitsBySource.delete(key);
 					vehiclePools.delete(key);
 				}
@@ -542,6 +563,7 @@
 
 	onDestroy(() => {
 		stopAnimation();
+		abortAllTrajectoryFetches();
 		if (fetchTimer !== undefined) clearInterval(fetchTimer);
 		onPickerReady?.(null);
 		if (deckOverlay && mapCtx.map?.hasControl(deckOverlay as maplibregl.IControl)) {

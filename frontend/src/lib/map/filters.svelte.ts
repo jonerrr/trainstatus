@@ -182,13 +182,6 @@ export class MapFilters {
 		>
 	);
 
-	// Base source filter expression
-	#source_filter: maplibregl.ExpressionSpecification = $derived([
-		'in',
-		['get', 'source'],
-		['literal', this.sources]
-	]);
-
 	/**
 	 * Build a MapLibre filter expression for a single property filter.
 	 * Returns null if the filter should be skipped (e.g., undefined value or all options selected).
@@ -246,41 +239,45 @@ export class MapFilters {
 	}
 
 	/**
-	 * Build combined filter expression for a layer, combining source filter with all property filters.
+	 * Build a per-source filter for a layer.
+	 *
+	 * Property filters are ANDed only with the source that defines them, then
+	 * those clauses are ORed. A single `all` across every active source would
+	 * hide features that do not carry another source's properties — an ADA
+	 * subway filter would drop every bus stop.
 	 */
 	#buildLayerFilter(
 		layerKey: LayerKey,
 		propertyFilters: Record<Source, Record<string, FilterValue>>
 	): maplibregl.FilterSpecification {
-		const filterExpressions: maplibregl.ExpressionSpecification[] = [this.#source_filter];
-
 		const filterDefs = layer_filter_defs[layerKey];
+		const sourceClauses: maplibregl.ExpressionSpecification[] = [];
 
-		// For each active source, add its property filters
 		for (const source of this.sources) {
 			const sourceFilters = propertyFilters[source];
 			const sourceDefs = filterDefs[source];
+			const exprs: maplibregl.ExpressionSpecification[] = [['==', ['get', 'source'], source]];
 
-			if (!sourceDefs) continue;
+			if (sourceDefs && sourceFilters) {
+				for (const [property, value] of Object.entries(sourceFilters)) {
+					const fieldDef = sourceDefs[property as keyof typeof sourceDefs] as
+						| FilterFieldDef
+						| undefined;
+					if (!fieldDef) continue;
 
-			for (const [property, value] of Object.entries(sourceFilters)) {
-				const fieldDef = sourceDefs[property as keyof typeof sourceDefs] as
-					| FilterFieldDef
-					| undefined;
-				if (!fieldDef) continue;
-
-				const propFilter = this.#buildPropertyFilter(property, value, fieldDef);
-				if (propFilter) {
-					filterExpressions.push(propFilter);
+					const propFilter = this.#buildPropertyFilter(property, value, fieldDef);
+					if (propFilter) exprs.push(propFilter);
 				}
 			}
+
+			sourceClauses.push(
+				exprs.length === 1 ? exprs[0] : (['all', ...exprs] as maplibregl.ExpressionSpecification)
+			);
 		}
 
-		if (filterExpressions.length === 1) {
-			return this.#source_filter;
-		}
-
-		return ['all', ...filterExpressions];
+		if (sourceClauses.length === 0) return ['literal', false];
+		if (sourceClauses.length === 1) return sourceClauses[0];
+		return ['any', ...sourceClauses];
 	}
 
 	// Final filter expressions for each layer, automatically updated when sources or property filters change

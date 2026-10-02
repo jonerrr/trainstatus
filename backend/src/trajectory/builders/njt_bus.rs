@@ -1,7 +1,9 @@
 use geo::{Distance, Euclidean, Point};
 
 use super::super::{
-    builder::{TrajectoryBuilder, collapse_backtracking_knots_with_stats},
+    builder::{
+        TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
+    },
     cache::TrajectoryCache,
     geometry::{
         ShapeGeometry, distance_to_coord, project_point_onto_line, project_wgs84_point_to_epsg,
@@ -127,15 +129,7 @@ impl TrajectoryBuilder for NjtBusBuilder {
         if let Some((anchor, ceiling)) = Self::live_anchor(trip, geometry) {
             stats.live_anchor_gap_m = knots.first().map(|k| (anchor.s_m - k.s_m).abs());
             let before = knots.len();
-            // The observed fix wins over both past and future inconsistent predictions.
-            knots.retain(|k| {
-                k.t_event != anchor.t_event
-                    && if k.t_event < anchor.t_event {
-                        k.s_m <= anchor.s_m && k.s_m + DISTANCE_TOLERANCE_M >= anchor.s_m
-                    } else {
-                        k.s_m >= anchor.s_m
-                    }
-            });
+            retain_anchor_consistent_knots(&mut knots, &anchor);
             stats.pre_anchor_knots_dropped = (before - knots.len()) as u32;
             if let Some(ceiling) = ceiling {
                 knots.retain(|k| k.s_m <= ceiling + DISTANCE_TOLERANCE_M);

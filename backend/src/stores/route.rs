@@ -139,6 +139,61 @@ impl RouteStore {
         Ok(())
     }
 
+    /// Persist the index fields that the normalized static tables do not store.
+    ///
+    /// MTA sources save empty maps. NJT saves one pattern per scheduled trip and
+    /// the child-stop remap. A restart reads these back instead of downloading
+    /// the upstream files again.
+    pub async fn save_revision_metadata(
+        &self,
+        source: Source,
+        trip_patterns: &std::collections::HashMap<String, crate::static_index::TripPattern>,
+        stop_remap: &std::collections::HashMap<String, String>,
+    ) -> anyhow::Result<()> {
+        let patterns = serde_json::to_value(trip_patterns)?;
+        let remap = serde_json::to_value(stop_remap)?;
+        sqlx::query(
+            r#"
+            INSERT INTO source (id, name, updated_at, trip_patterns, stop_remap)
+            VALUES ($1, $2, 'epoch'::timestamptz, $3, $4)
+            ON CONFLICT (id) DO UPDATE SET
+                trip_patterns = EXCLUDED.trip_patterns,
+                stop_remap = EXCLUDED.stop_remap
+            "#,
+        )
+        .bind(source)
+        .bind(source.as_str())
+        .bind(patterns)
+        .bind(remap)
+        .execute(&self.pg_pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn load_revision_metadata(
+        &self,
+        source: Source,
+    ) -> anyhow::Result<(
+        std::collections::HashMap<String, crate::static_index::TripPattern>,
+        std::collections::HashMap<String, String>,
+    )> {
+        let row: Option<(serde_json::Value, serde_json::Value)> =
+            sqlx::query_as("SELECT trip_patterns, stop_remap FROM source WHERE id = $1")
+                .bind(source)
+                .fetch_optional(&self.pg_pool)
+                .await?;
+        let Some((patterns, remap)) = row else {
+            return Ok((
+                std::collections::HashMap::new(),
+                std::collections::HashMap::new(),
+            ));
+        };
+        Ok((
+            serde_json::from_value(patterns)?,
+            serde_json::from_value(remap)?,
+        ))
+    }
+
     pub async fn save_all_shapes(&self, source: Source, shapes: &[Shape]) -> anyhow::Result<()> {
         let ids: Vec<_> = shapes.iter().map(|s| &s.id).collect();
         let sources: Vec<_> = vec![source; shapes.len()];

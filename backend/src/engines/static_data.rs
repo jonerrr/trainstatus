@@ -148,8 +148,14 @@ async fn run_source_handler(
                 match req {
                     UpdateRequest::EnsureUpdated { respond_to } => {
                         // Check if we need an update
-                        let needs_update =
-                            check_needs_update(&pool, adapter.as_ref(), &static_index).await;
+                        let needs_update = check_needs_update(
+                            &pool,
+                            adapter.as_ref(),
+                            &static_index,
+                            &route_store,
+                            &stop_store,
+                        )
+                        .await;
 
                         match needs_update {
                             Ok(true) if !import_in_progress => {
@@ -275,9 +281,11 @@ async fn check_needs_update(
     pool: &PgPool,
     adapter: &dyn StaticAdapter,
     static_index: &StaticTransitIndex,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
 ) -> anyhow::Result<bool> {
-    // Ensure the source exists in the table, inserting if needed
-    // Use epoch time so it triggers an immediate update on first run
+    // Ensure the source exists in the table, inserting if needed.
+    // Use epoch time so it triggers an immediate update on first run.
     let epoch = DateTime::<Utc>::from(std::time::UNIX_EPOCH);
     let source_name = adapter.source().as_str();
     sqlx::query!(
@@ -293,13 +301,28 @@ async fn check_needs_update(
     .execute(pool)
     .await?;
 
-    // A process restart begins with an empty in-memory index even when the
-    // persisted source timestamp is still fresh. Rebuild before allowing any
-    // realtime consumer to proceed without a complete source revision.
-    if static_index.get(adapter.source()).is_none() {
+    let source = adapter.source();
+    if static_index.get(source).is_none() {
+        // The index starts empty on every process start. When the last import
+        // is still inside the refresh window, rebuild it from Postgres instead
+        // of downloading the upstream static files again.
+        if !source_timestamp_is_stale(pool, adapter).await?
+            && let Some(revision) = load_persisted_revision(source, route_store, stop_store).await?
+        {
+            info!(source = %source, "Loaded static revision from the database");
+            static_index.publish(revision);
+            return Ok(false);
+        }
         return Ok(true);
     }
 
+    source_timestamp_is_stale(pool, adapter).await
+}
+
+async fn source_timestamp_is_stale(
+    pool: &PgPool,
+    adapter: &dyn StaticAdapter,
+) -> anyhow::Result<bool> {
     let config = sqlx::query!(
         r#"
         SELECT updated_at
@@ -311,11 +334,45 @@ async fn check_needs_update(
     .fetch_one(pool)
     .await?;
 
-    // Check if data is stale
     let elapsed = Utc::now()
         .signed_duration_since(config.updated_at)
         .num_seconds();
     let refresh_secs = adapter.refresh_interval().as_secs() as i64;
-
     Ok(elapsed > refresh_secs)
+}
+
+// TODO: shouldn't need to return a Result<Option<>>?
+/// Read the last imported routes, stops, and shapes back into a revision.
+///
+/// A missing or incomplete revision returns `Ok(None)` so the caller downloads
+/// the upstream files. Unreadable revision metadata does the same.
+async fn load_persisted_revision(
+    source: Source,
+    route_store: &RouteStore,
+    stop_store: &StopStore,
+) -> anyhow::Result<Option<crate::static_index::StaticTransitRevision>> {
+    let (trip_patterns, stop_remap) = match route_store.load_revision_metadata(source).await {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            tracing::warn!(
+                source = %source,
+                error = %error,
+                "Static revision metadata could not be read; downloading static data"
+            );
+            return Ok(None);
+        }
+    };
+    let routes = route_store.get_all(source).await?;
+    let stops = stop_store.get_all(source).await?;
+    let shapes = route_store.get_all_shapes(source).await?;
+    Ok(
+        crate::static_index::StaticTransitRevision::try_from_persisted(
+            source,
+            routes,
+            stops,
+            shapes,
+            trip_patterns,
+            stop_remap,
+        ),
+    )
 }

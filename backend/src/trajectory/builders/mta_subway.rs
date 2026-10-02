@@ -3,15 +3,15 @@ use crate::models::source::Source;
 use crate::models::stop::{PlatformDirection, PlatformEdge, StopData};
 use crate::models::trip::StopTimeData;
 
-use super::super::builder::{TrajectoryBuilder, collapse_backtracking_knots_with_stats};
+use super::super::builder::{
+    TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
+};
 use super::super::cache::{PlatformMatch, TrajectoryCache};
 use super::super::geometry::{ShapeGeometry, project_point_onto_line, project_wgs84_point_to_epsg};
 use super::super::types::{
     GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryState, TrajectoryStop,
     TripSnapshot,
 };
-
-const ANCHOR_DISTANCE_TOLERANCE_M: f64 = 1.0;
 
 #[derive(Debug, Clone, Copy)]
 struct SubwayKinematicsConfig {
@@ -280,11 +280,7 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
         if let Some(anchor) = Self::live_anchor_knot(trip, shape_geom) {
             stats.live_anchor_gap_m = all_knots.first().map(|k| (anchor.s_m - k.s_m).abs());
             let original_len = all_knots.len();
-            let anchor_time = anchor.t_event;
-            let anchor_s = anchor.s_m;
-            all_knots.retain(|k| {
-                !(k.t_event < anchor_time && k.s_m + ANCHOR_DISTANCE_TOLERANCE_M < anchor_s)
-            });
+            retain_anchor_consistent_knots(&mut all_knots, &anchor);
             stats.pre_anchor_knots_dropped = original_len.saturating_sub(all_knots.len()) as u32;
             all_knots.push(anchor);
             all_knots.sort_by(|a, b| {
