@@ -1,4 +1,4 @@
-FROM rust:1-trixie AS build
+FROM rust:1-trixie@sha256:5d05167b28cef0fa3a6c781cd77949386848191f3382e82cf53bd1277a47a98f AS build
 
 ARG MTA_API_URL
 ENV MTA_API_URL=${MTA_API_URL}
@@ -23,7 +23,7 @@ COPY . .
 ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
