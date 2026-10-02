@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.3...frontend-v1.3.0) (2026-10-02)
+
+
+### Features
+
+* Continuous tracking and large refactor ([#398](https://github.com/jonerrr/trainstatus/issues/398)) ([3e24cff](https://github.com/jonerrr/trainstatus/commit/3e24cff1bbe5e144a49d50ad78436f61b3aad15f))
+
+
+### Bug Fixes
+
+* **docker:** make containers rootless ([b297e28](https://github.com/jonerrr/trainstatus/commit/b297e2852cee5f0ffe1eb536f0da9929d805160a)), closes [#337](https://github.com/jonerrr/trainstatus/issues/337)
+
 ## [1.2.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.2...frontend-v1.2.3) (2026-04-22)
 
 
