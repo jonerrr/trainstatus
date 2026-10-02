@@ -2,7 +2,7 @@
 # Bump manually when upgrading; tile major version must match backend Valhalla.
 ARG VALHALLA_VERSION=3.9.0@sha256:511c095b8caf393dccceb8b519ec96b6f85a0166b2288ba014a8a748acc5a63c
 
-FROM debian:bookworm-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb AS osm-data
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS osm-data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
