@@ -16,7 +16,7 @@
 		"test": "pnpm run test:unit -- --run"
 	},
 	"devDependencies": {
-		"@hey-api/openapi-ts": "0.96.1",
+		"@hey-api/openapi-ts": "0.97.3",
 		"@svelte-maplibre-gl/deckgl": "1.0.3",
 		"@sveltejs/adapter-auto": "7.0.1",
 		"@sveltejs/adapter-node": "5.5.4",
