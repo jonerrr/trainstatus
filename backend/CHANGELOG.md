@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/jonerrr/trainstatus/compare/backend-v1.2.3...backend-v1.3.0) (2026-10-02)
+
+
+### Features
+
+* Continuous tracking and large refactor ([#398](https://github.com/jonerrr/trainstatus/issues/398)) ([3e24cff](https://github.com/jonerrr/trainstatus/commit/3e24cff1bbe5e144a49d50ad78436f61b3aad15f))
+
+
+### Bug Fixes
+
+* **deps:** update backend ([#362](https://github.com/jonerrr/trainstatus/issues/362)) ([4a92e19](https://github.com/jonerrr/trainstatus/commit/4a92e19dfdf7de0e6665d508307582294d1e9463))
+* **docker:** make containers rootless ([b297e28](https://github.com/jonerrr/trainstatus/commit/b297e2852cee5f0ffe1eb536f0da9929d805160a)), closes [#337](https://github.com/jonerrr/trainstatus/issues/337)
+* remove cors since its no longer needed ([924c588](https://github.com/jonerrr/trainstatus/commit/924c58843ad3cd2b3aa5fb7080412c0693c52f9e))
+
 ## [1.2.3](https://github.com/jonerrr/trainstatus/compare/backend-v1.2.2...backend-v1.2.3) (2026-04-22)
 
 
