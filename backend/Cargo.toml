@@ -12,7 +12,7 @@ required-features = ["fixture-capture"]
 
 [dependencies]
 anyhow = "1.0.100"
-arrow = { version = "54.2.1", default-features = false, features = ["ipc"] }
+arrow = { version = "60.0.0", default-features = false, features = ["ipc"] }
 async-trait = "0.1.89"
 axum = { version = "0.8.6", features = ["macros"] }
 bb8 = "0.9.0"
@@ -46,14 +46,14 @@ tower = { version = "0.5.2", features = ["buffer", "limit"] }
 tower-http = { version = "0.7.0", features = ["compression-br", "compression-gzip", "normalize-path", "timeout", "trace"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.3.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }
 valhalla = "0.6.43"
 
 [dev-dependencies]
-axum-test = "=20.1.0"
+axum-test = "=21.1.0"
 test-log = { version = "=0.2.21", default-features = false, features = ["trace"] }
 tokio = { version = "1.48.0", features = ["test-util"] }
 tokio-test = "=0.4.6"
