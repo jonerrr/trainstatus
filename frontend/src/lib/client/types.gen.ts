@@ -166,7 +166,7 @@ export type MtaBusPositionData = {
 };
 
 export type MtaBusRouteData = {
-    borough?: null | Borough;
+    borough?: Borough | null;
     /**
      * Destination headsigns, ordered by `direction_id`.
      *
@@ -225,7 +225,7 @@ export type MtaSubwayStopTimeData = {
 };
 
 export type MtaSubwayTripData = {
-    consist?: null | Consist;
+    consist?: Consist | null;
     consist_cars: Array<ConsistCar>;
 };
 

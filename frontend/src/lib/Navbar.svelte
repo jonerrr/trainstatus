@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { current_time } from '$lib/url_params.svelte';
-
+	import { current_time } from '#lib/url_params.svelte.js';
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
 
 	interface Routes {

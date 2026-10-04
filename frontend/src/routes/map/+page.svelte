@@ -3,18 +3,18 @@
 
 	import { page } from '$app/state';
 
-	import type { Source } from '$lib/client';
-	import FeatureChooser from '$lib/map/FeatureChooser.svelte';
-	import Filters from '$lib/map/Filters.svelte';
-	import TripMarkersLoader from '$lib/map/TripMarkersLoader.svelte';
-	import { MapFilters } from '$lib/map/filters.svelte';
-	import { MapHover } from '$lib/map/hover.svelte';
+	import type { Source } from '#lib/client/index.js';
+	import FeatureChooser from '#lib/map/FeatureChooser.svelte';
+	import Filters from '#lib/map/Filters.svelte';
+	import TripMarkersLoader from '#lib/map/TripMarkersLoader.svelte';
+	import { MapFilters } from '#lib/map/filters.svelte.js';
+	import { MapHover } from '#lib/map/hover.svelte.js';
 	import {
 		MapInteractionController,
 		type MapTarget,
 		type ScreenPoint,
 		type VehiclePicker
-	} from '$lib/map/interactions';
+	} from '#lib/map/interactions.js';
 	import {
 		BUS_SOURCE_FILTER,
 		BUS_STOP_FILL,
@@ -35,12 +35,12 @@
 		STOP_HIT_RADIUS,
 		SUBWAY_SOURCE_FILTER,
 		normalizeRouteColor
-	} from '$lib/map/mapTheme';
-	import { source_info } from '$lib/resources/index.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
+	} from '#lib/map/mapTheme.js';
+	import { source_info } from '#lib/resources/index.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { open_modal } from '#lib/url_params.svelte.js';
 
-	import maplibregl from 'maplibre-gl';
+	import * as maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import {
 		CircleLayer,
@@ -51,6 +51,7 @@
 		SymbolLayer,
 		VectorTileSource
 	} from 'svelte-maplibre-gl';
+	import 'svelte-maplibre-gl/vite';
 
 	let map = $state<maplibregl.Map>();
 	let center = $state<[number, number]>([-74.006, 40.7128]);

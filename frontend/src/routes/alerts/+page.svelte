@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import List from '$lib/List.svelte';
-	import type { Route, Source } from '$lib/client';
-	import { route_pins } from '$lib/pins.svelte';
-	import { calculate_route_height } from '$lib/util.svelte';
+	import List from '#lib/List.svelte';
+	import { route_pins } from '#lib/pins.svelte.js';
+	import { calculate_route_height } from '#lib/util.svelte.js';
 
 	// remove special express mta_subway routes (FX, 6X, 7X, etc) since they won't have any alerts
 	const sources = $derived({

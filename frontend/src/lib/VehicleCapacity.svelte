@@ -1,6 +1,5 @@
 <script lang="ts">
-	import type { TypedVehiclePosition } from '$lib/resources/index.svelte';
-
+	import type { TypedVehiclePosition } from '#lib/resources/index.svelte.js';
 	import { Users } from '@lucide/svelte';
 
 	interface Props {

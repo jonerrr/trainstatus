@@ -1,4 +1,4 @@
-import type { Route, Source, Stop, Trip } from '$lib/client';
+import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
@@ -21,10 +21,7 @@ declare global {
 			// null is not open
 			// type: 'stop' | 'trip' | 'route' | 'settings' | null;
 			modal:
-				| null
-				| (Stop & { type: 'stop' })
-				| (Trip & { type: 'trip' })
-				| (Route & { type: 'route' });
+				null | (Stop & { type: 'stop' }) | (Trip & { type: 'trip' }) | (Route & { type: 'route' });
 			// used to determine if page.state update was forward or backwards
 			index?: number;
 		}

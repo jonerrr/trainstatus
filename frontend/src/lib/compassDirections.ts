@@ -1,4 +1,4 @@
-import type { CompassDirection } from '$lib/client';
+import type { CompassDirection } from '#lib/client/index.js';
 
 interface CompassDirectionMetadata {
 	transfer_order: number;

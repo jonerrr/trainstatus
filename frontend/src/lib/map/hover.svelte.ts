@@ -1,5 +1,5 @@
-import type { Source } from '$lib/client';
-import type { ActiveVehicle } from '$lib/map/trajectoryArrow';
+import type { Source } from '#lib/client/index.js';
+import type { ActiveVehicle } from '#lib/map/trajectoryArrow.js';
 
 /**
  * Single source of truth for what the pointer is currently over.

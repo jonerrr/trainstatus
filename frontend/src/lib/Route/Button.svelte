@@ -1,8 +1,8 @@
 <script lang="ts">
-	import Icon from '$lib/Icon.svelte';
-	import Skeleton from '$lib/Skeleton.svelte';
-	import type { Route } from '$lib/client';
-	import { alert_context } from '$lib/resources/alerts.svelte';
+	import Icon from '#lib/Icon.svelte';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import type { Route } from '#lib/client/index.js';
+	import { alert_context } from '#lib/resources/alerts.svelte.js';
 
 	interface Props {
 		data: Route;

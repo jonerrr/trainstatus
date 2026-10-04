@@ -1,17 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import List from '$lib/List.svelte';
-	import type { Route, Source, Stop, Trip } from '$lib/client';
-	import { route_pins, stop_pins, trip_pins } from '$lib/pins.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
+	import List from '#lib/List.svelte';
+	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
+	import { route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import {
 		calculate_route_height,
 		calculate_stop_height,
 		calculate_trip_height,
 		haversine
-	} from '$lib/util.svelte';
-
+	} from '#lib/util.svelte.js';
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 
 	const all_trips = trip_context.get();

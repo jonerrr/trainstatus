@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import Icon from '$lib/Icon.svelte';
-	import type { StopTime } from '$lib/client';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time, open_modal } from '$lib/url_params.svelte';
+	import Icon from '#lib/Icon.svelte';
+	import type { StopTime } from '#lib/client/index.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { current_time, open_modal } from '#lib/url_params.svelte.js';
 
 	interface Props {
 		transfer_stop_times: StopTime[];

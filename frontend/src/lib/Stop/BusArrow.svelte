@@ -1,7 +1,6 @@
 <script lang="ts">
-	import type { CompassDirection } from '$lib/client';
-	import { COMPASS_DIRECTIONS } from '$lib/compassDirections';
-
+	import type { CompassDirection } from '#lib/client/index.js';
+	import { COMPASS_DIRECTIONS } from '#lib/compassDirections.js';
 	import { ArrowUp } from '@lucide/svelte';
 
 	const { direction, size = '1.5rem' }: { direction: CompassDirection; size?: string } = $props();

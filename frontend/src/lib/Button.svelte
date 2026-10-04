@@ -4,10 +4,10 @@
 	// import { slide } from 'svelte/transition';
 	// import { quintOut } from 'svelte/easing';
 
-	import Pin from '$lib/Pin.svelte';
-	import type { Pins } from '$lib/pins.svelte';
-	import type { LocalStorage } from '$lib/storage.svelte';
-	import { type ModalData, open_modal } from '$lib/url_params.svelte';
+	import Pin from '#lib/Pin.svelte';
+	import type { Pins } from '#lib/pins.svelte.js';
+	import type { LocalStorage } from '#lib/storage.svelte.js';
+	import { type ModalData, open_modal } from '#lib/url_params.svelte.js';
 
 	interface Props {
 		state: ModalData;

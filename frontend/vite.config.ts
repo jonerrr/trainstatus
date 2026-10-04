@@ -1,4 +1,6 @@
+import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 import tailwindcss from '@tailwindcss/vite';
 import { playwright } from '@vitest/browser-playwright';
@@ -10,7 +12,24 @@ export default defineConfig(({ mode }) => {
 	const allowedHosts = env.VITE_ALLOWED_HOSTS?.split(',');
 
 	return {
-		plugins: [tailwindcss(), sveltekit()],
+		// See: https://github.com/MIERUNE/svelte-maplibre-gl/issues/206
+		optimizeDeps: {
+			exclude: ['maplibre-gl']
+		},
+		plugins: [
+			tailwindcss(),
+			sveltekit({
+				// Consult https://kit.svelte.dev/docs/integrations#preprocessors
+				// for more information about preprocessors
+				preprocess: vitePreprocess(),
+				compilerOptions: { experimental: { async: true } },
+				inspector: true,
+				// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
+				// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
+				// See https://kit.svelte.dev/docs/adapters for more information about adapters.
+				adapter: adapter()
+			})
+		],
 		server: {
 			proxy: {
 				// backend

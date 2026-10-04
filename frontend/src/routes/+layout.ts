@@ -1,4 +1,4 @@
-import type { Route, Stop } from '$lib/client';
+import type { Route, Stop } from '#lib/client/index.js';
 
 import type { LayoutLoad } from './$types';
 

@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { Source } from '$lib/client';
-	import FilterField from '$lib/map/FilterField.svelte';
+	import type { Source } from '#lib/client/index.js';
+	import FilterField from '#lib/map/FilterField.svelte';
 	import {
 		type FilterFieldDef,
 		type FilterValue,
 		getFilterDefsForLayer
-	} from '$lib/map/filters.svelte';
+	} from '#lib/map/filters.svelte.js';
 
 	interface Props {
 		layer: 'route' | 'stop' | 'trip';

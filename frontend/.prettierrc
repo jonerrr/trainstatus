@@ -13,7 +13,7 @@
 		"^svelte/(.*)$",
 		"^@sveltejs/(.*)$",
 		"^\\$app/(.*)$",
-		"^\\$lib/(.*)$",
+		"^#lib/(.*)$",
 		"<THIRD_PARTY_MODULES>",
 		"^[./]"
 	],

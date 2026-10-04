@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
-
-	import type { Route, Trip } from '$lib/client';
-	import { open_modal } from '$lib/url_params.svelte';
+	import { type ChartPoint, chart_context } from '#lib/charts/context.js';
+	import type { Route, Trip } from '#lib/client/index.js';
+	import { open_modal } from '#lib/url_params.svelte.js';
 
 	import { line } from 'd3-shape';
 
-	const { xGet, yGet, data } = getContext('LayerCake');
+	const cake = chart_context();
 
 	interface Props {
 		routes?: Route[];
@@ -15,7 +14,11 @@
 
 	const { routes = [], stop_points = $bindable(false) }: Props = $props();
 
-	const path = $derived(line().x($xGet).y($yGet));
+	const path = $derived(
+		line<ChartPoint>()
+			.x((point) => cake.xGet(point))
+			.y((point) => cake.yGet(point))
+	);
 
 	function open_trip(trip: Trip) {
 		open_modal({ ...trip, type: 'trip' });
@@ -23,7 +26,7 @@
 </script>
 
 <!-- Draw a path for each train trip -->
-{#each $data as group}
+{#each cake.data as group (group.trip.id)}
 	{@const tripColor = routes.find((r) => r.id === group.trip.route_id)!.color}
 
 	<!-- Invisible wider path for easier clicking -->
@@ -52,10 +55,10 @@
 		pointer-events="none"
 	/>
 	{#if stop_points}
-		{#each group.points as point}
+		{#each group.points as point (`${point.stop_id}-${point.time.getTime()}`)}
 			<circle
-				cx={$xGet(point)}
-				cy={$yGet(point)}
+				cx={cake.xGet(point)}
+				cy={cake.yGet(point)}
 				r="3"
 				fill={tripColor}
 				stroke="#fff"

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
 
-	import Icon from '$lib/Icon.svelte';
-	import type { Route } from '$lib/client';
-	import { alert_context } from '$lib/resources/alerts.svelte';
-	import { debounce } from '$lib/util.svelte';
+	import Icon from '#lib/Icon.svelte';
+	import type { Route } from '#lib/client/index.js';
+	import { alert_context } from '#lib/resources/alerts.svelte.js';
+	import { debounce } from '#lib/util.svelte.js';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import dayjs from 'dayjs';
@@ -89,9 +89,9 @@
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if route_alerts.length && idx < route_alerts.length}
-			{#if ['mta_subway', 'mta_bus'].includes(route_alerts[idx].data.source)}
-				<!-- TODO: fix type issue -->
-				{route_alerts[idx].data.alert_type}
+			{@const alert_data = route_alerts[idx].data}
+			{#if alert_data.source === 'mta_subway' || alert_data.source === 'mta_bus'}
+				{alert_data.alert_type}
 			{:else}
 				Alert
 			{/if}

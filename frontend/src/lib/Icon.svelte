@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { type Route } from '$lib/client';
-	import icons from '$lib/icons';
-	import { alert_context } from '$lib/resources/alerts.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
+	import { type Route } from '#lib/client/index.js';
+	import icons from '#lib/icons.js';
+	import { alert_context } from '#lib/resources/alerts.svelte.js';
+	import { open_modal } from '#lib/url_params.svelte.js';
 
 	const {
 		route,

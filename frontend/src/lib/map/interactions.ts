@@ -1,5 +1,5 @@
-import type { Source } from '$lib/client';
-import type { ActiveVehicle } from '$lib/map/trajectoryArrow';
+import type { Source } from '#lib/client/index.js';
+import type { ActiveVehicle } from '#lib/map/trajectoryArrow.js';
 
 export type MapTargetKind = 'trip' | 'stop' | 'route';
 
@@ -21,9 +21,7 @@ export interface VehiclePicker {
 }
 
 export type MapTargetResolution =
-	| { kind: 'none' }
-	| { kind: 'open'; target: MapTarget }
-	| { kind: 'choose'; targets: MapTarget[] };
+	{ kind: 'none' } | { kind: 'open'; target: MapTarget } | { kind: 'choose'; targets: MapTarget[] };
 
 const targetPriority: Record<MapTargetKind, number> = {
 	trip: 0,

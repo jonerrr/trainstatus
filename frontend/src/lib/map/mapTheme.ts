@@ -1,4 +1,4 @@
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 
 /**
  * Shared visual language for the map: palette, line/circle sizing ramps, and the

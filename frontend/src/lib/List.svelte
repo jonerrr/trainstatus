@@ -4,18 +4,18 @@
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
 
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { page } from '$app/state';
 
-	import Pin from '$lib/Pin.svelte';
-	import RouteButton from '$lib/Route/Button.svelte';
-	import StopButton from '$lib/Stop/Button.svelte';
-	import TripButton from '$lib/Trip/Button.svelte';
-	import type { Route, Source, Stop, Trip } from '$lib/client';
-	import type { Pins } from '$lib/pins.svelte';
-	import { source_info } from '$lib/resources/index.svelte';
-	import { LocalStorage } from '$lib/storage.svelte';
-	import { open_modal } from '$lib/url_params.svelte';
+	import Pin from '#lib/Pin.svelte';
+	import RouteButton from '#lib/Route/Button.svelte';
+	import StopButton from '#lib/Stop/Button.svelte';
+	import TripButton from '#lib/Trip/Button.svelte';
+	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
+	import type { Pins } from '#lib/pins.svelte.js';
+	import { source_info } from '#lib/resources/index.svelte.js';
+	import { LocalStorage } from '#lib/storage.svelte.js';
+	import { open_modal } from '#lib/url_params.svelte.js';
 
 	type ItemType = 'stop' | 'route' | 'trip';
 
@@ -267,6 +267,7 @@
 			</div>
 		{/if}
 	</div>
+
 	<div class="h-px bg-linear-to-r from-transparent via-neutral-700/50 to-transparent"></div>
 
 	<div

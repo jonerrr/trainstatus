@@ -3,17 +3,16 @@
 
 	import { page } from '$app/state';
 
-	import Icon from '$lib/Icon.svelte';
-	import Skeleton from '$lib/Skeleton.svelte';
-	import AxisX from '$lib/charts/AxisX.svelte';
-	import AxisY from '$lib/charts/AxisY.svelte';
-	import Lines from '$lib/charts/Lines.svelte';
-	import type { Route, Source } from '$lib/client';
-	import { type SourceMap, source_info } from '$lib/resources/index.svelte';
-	import { stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/url_params.svelte';
-
+	import Icon from '#lib/Icon.svelte';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import AxisX from '#lib/charts/AxisX.svelte';
+	import AxisY from '#lib/charts/AxisY.svelte';
+	import Lines from '#lib/charts/Lines.svelte';
+	import type { Route, Source } from '#lib/client/index.js';
+	import { type SourceMap, source_info } from '#lib/resources/index.svelte.js';
+	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { LayerCake, Svg, flatten } from 'layercake';

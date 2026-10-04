@@ -1,7 +1,7 @@
 // mostly from: https://github.com/Rich-Harris/local-storage-test/blob/main/src/lib/storage.svelte.ts (changed browser checks)
 import { tick } from 'svelte';
 
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 export class LocalStorage<T> {
 	#key: string;

@@ -5,28 +5,27 @@
 
 	import { page } from '$app/state';
 
-	import type { Source } from '$lib/client';
-	import type { MapHover } from '$lib/map/hover.svelte';
-	import type { VehiclePicker } from '$lib/map/interactions';
-	import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from '$lib/map/mapTheme';
+	import type { Source } from '#lib/client/index.js';
+	import type { MapHover } from '#lib/map/hover.svelte.js';
+	import type { VehiclePicker } from '#lib/map/interactions.js';
+	import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from '#lib/map/mapTheme.js';
 	import {
 		type ActiveVehicle,
 		type RenderUnitTable,
 		buildActiveVehiclesAtTime,
 		normalizeBearingForIcon,
 		renderUnitTableFromIPC
-	} from '$lib/map/trajectoryArrow';
+	} from '#lib/map/trajectoryArrow.js';
 	import {
 		VEHICLE_ICON_ATLAS,
 		VEHICLE_ICON_MAPPING,
 		type VehicleIconRole,
 		shapeForIconKey
-	} from '$lib/map/vehicleIcons';
+	} from '#lib/map/vehicleIcons.js';
 
 	import type { PickingInfo } from '@deck.gl/core';
 	import { IconLayer } from '@deck.gl/layers';
-	import { MapboxOverlay } from '@deck.gl/mapbox';
-	import maplibregl from 'maplibre-gl';
+	import { MapLibreOverlay } from '@deck.gl/maplibre';
 	import { getMapContext } from 'svelte-maplibre-gl';
 
 	let {
@@ -520,7 +519,7 @@
 	const mapCtx = getMapContext();
 	if (!mapCtx.map) throw new Error('Map instance is not initialized.');
 
-	let deckOverlay = $state<MapboxOverlay>();
+	let deckOverlay = $state<MapLibreOverlay>();
 	const picker: VehiclePicker = {
 		pick(point, radius = 8) {
 			if (!deckOverlay || !enabled) return [];
@@ -539,14 +538,17 @@
 	};
 
 	onMount(() => {
-		deckOverlay = new MapboxOverlay({
+		const map = mapCtx.map;
+		if (!map) return;
+
+		deckOverlay = new MapLibreOverlay({
 			interleaved: true,
 			layers: deckLayers,
 			onHover: handleDeckHover,
 			useDevicePixels: pixelRatio,
 			_pickable: enabled && !paused
 		});
-		mapCtx.map?.addControl(deckOverlay as maplibregl.IControl);
+		map.addControl(deckOverlay);
 		onPickerReady?.(picker);
 	});
 
@@ -566,8 +568,8 @@
 		abortAllTrajectoryFetches();
 		if (fetchTimer !== undefined) clearInterval(fetchTimer);
 		onPickerReady?.(null);
-		if (deckOverlay && mapCtx.map?.hasControl(deckOverlay as maplibregl.IControl)) {
-			mapCtx.map.removeControl(deckOverlay as maplibregl.IControl);
+		if (deckOverlay && mapCtx.map?.hasControl(deckOverlay)) {
+			mapCtx.map.removeControl(deckOverlay);
 		}
 	});
 </script>

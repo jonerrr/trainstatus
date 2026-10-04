@@ -1,10 +1,10 @@
 import { page } from '$app/state';
 
-import type { Source } from '$lib/client';
-import { COMPASS_DIRECTION_OPTIONS } from '$lib/compassDirections';
-import { all_sources } from '$lib/resources/index.svelte';
+import type { Source } from '#lib/client/index.js';
+import { COMPASS_DIRECTION_OPTIONS } from '#lib/compassDirections.js';
+import { all_sources } from '#lib/resources/index.svelte.js';
 
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 
 // Layer metadata
 export const layer_data = {
@@ -261,8 +261,7 @@ export class MapFilters {
 			if (sourceDefs && sourceFilters) {
 				for (const [property, value] of Object.entries(sourceFilters)) {
 					const fieldDef = sourceDefs[property as keyof typeof sourceDefs] as
-						| FilterFieldDef
-						| undefined;
+						FilterFieldDef | undefined;
 					if (!fieldDef) continue;
 
 					const propFilter = this.#buildPropertyFilter(property, value, fieldDef);

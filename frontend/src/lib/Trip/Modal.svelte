@@ -4,20 +4,19 @@
 
 	import { page } from '$app/state';
 
-	import Button from '$lib/Button.svelte';
-	import Icon from '$lib/Icon.svelte';
-	import ModalList from '$lib/ModalList.svelte';
-	import Skeleton from '$lib/Skeleton.svelte';
-	import Transfers from '$lib/Trip/Transfers.svelte';
-	import VehicleCapacity from '$lib/VehicleCapacity.svelte';
-	import type { StopTime, Trip } from '$lib/client';
-	import { source_info } from '$lib/resources/index.svelte';
-	import { position_context } from '$lib/resources/positions.svelte';
-	import { stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/url_params.svelte';
-	import { trip_headsign } from '$lib/util.svelte';
-
+	import Button from '#lib/Button.svelte';
+	import Icon from '#lib/Icon.svelte';
+	import ModalList from '#lib/ModalList.svelte';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import Transfers from '#lib/Trip/Transfers.svelte';
+	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
+	import type { StopTime, Trip } from '#lib/client/index.js';
+	import { source_info } from '#lib/resources/index.svelte.js';
+	import { position_context } from '#lib/resources/positions.svelte.js';
+	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
+	import { trip_headsign } from '#lib/util.svelte.js';
 	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {

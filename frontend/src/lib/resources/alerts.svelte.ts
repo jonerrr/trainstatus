@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
-import type { ApiAlert, Source } from '$lib/client';
-import icons from '$lib/icons';
+import type { ApiAlert, Source } from '#lib/client/index.js';
+import icons from '#lib/icons.js';
 import {
 	type AlertResource,
 	type AlertResources,
@@ -9,8 +9,8 @@ import {
 	type TypedAlert,
 	createMultiSourceContext,
 	source_info
-} from '$lib/resources/index.svelte';
-import { current_time } from '$lib/url_params.svelte';
+} from '#lib/resources/index.svelte.js';
+import { current_time } from '#lib/url_params.svelte.js';
 
 export function index_alerts<S extends Source>(data: ApiAlert[]): AlertResource<S> {
 	// TODO: maybe combine express alerts here (i dont think there should ever be alerts specifically for express mta_subway tho)

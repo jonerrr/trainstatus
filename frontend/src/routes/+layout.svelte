@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
 
-	import { replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import Modal from '$lib/Modal.svelte';
-	import Navbar from '$lib/Navbar.svelte';
-	import SEO from '$lib/SEO.svelte';
-	import type { Source } from '$lib/client';
-	import { alert_context, createAlertResource } from '$lib/resources/alerts.svelte';
-	import { createPositionResource, position_context } from '$lib/resources/positions.svelte';
-	import { createStopTimeResource, stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { createTripResource, trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/url_params.svelte';
+	import Modal from '#lib/Modal.svelte';
+	import Navbar from '#lib/Navbar.svelte';
+	import SEO from '#lib/SEO.svelte';
+	import type { Source } from '#lib/client/index.js';
+	import { alert_context, createAlertResource } from '#lib/resources/alerts.svelte.js';
+	import { createPositionResource, position_context } from '#lib/resources/positions.svelte.js';
+	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
 
 	import '@fontsource/inter';
 
@@ -68,12 +68,24 @@
 		if (stop_id) {
 			const stop = page.data.stops_by_id[source_id]?.[stop_id];
 			if (stop) {
-				tick().then(() => replaceState('', { modal: { ...stop, type: 'stop' } }));
+				tick().then(() =>
+					goto('', {
+						shallow: true,
+						replace: true,
+						state: { modal: { ...stop, type: 'stop' } }
+					})
+				);
 			}
 		} else if (route_id) {
 			const route = page.data.routes_by_id[source_id]?.[route_id];
 			if (route) {
-				tick().then(() => replaceState('', { modal: { ...route, type: 'route' } }));
+				tick().then(() =>
+					goto('', {
+						shallow: true,
+						replace: true,
+						state: { modal: { ...route, type: 'route' } }
+					})
+				);
 			}
 		} else if (trip_id) {
 			const all_trips_data = trip_context.get();
@@ -82,7 +94,13 @@
 				resource.whenReady().then((trips) => {
 					const trip = trips.get(trip_id);
 					if (trip && page.url.searchParams.get('t') === trip_id) {
-						tick().then(() => replaceState('', { modal: { ...trip, type: 'trip' } }));
+						tick().then(() =>
+							goto('', {
+								shallow: true,
+								replace: true,
+								state: { modal: { ...trip, type: 'trip' } }
+							})
+						);
 					}
 				});
 			}
@@ -102,11 +120,11 @@
 			);
 			if (current_at === new_at) return; // no change needed
 
-			const url = new URL(page.url);
+			const url = new URL(page.url.href);
 			if (val !== undefined) url.searchParams.set('at', val.toString());
 			else url.searchParams.delete('at');
 			console.log(`Updating URL search param at=${new_at} (was ${current_at})`);
-			replaceState(url.pathname + url.search, page.state);
+			goto(url.pathname + url.search, { shallow: true, replace: true, state: page.state });
 		});
 	});
 </script>

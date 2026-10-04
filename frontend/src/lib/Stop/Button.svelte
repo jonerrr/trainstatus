@@ -3,14 +3,14 @@
 
 	import { page } from '$app/state';
 
-	import Icon from '$lib/Icon.svelte';
-	import BusArrow from '$lib/Stop/BusArrow.svelte';
-	import type { Stop, StopTime } from '$lib/client';
-	import { source_info } from '$lib/resources/index.svelte';
-	import { stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { trip_context } from '$lib/resources/trips.svelte';
-	import { current_time } from '$lib/url_params.svelte';
-	import { main_route_stops, trip_headsign } from '$lib/util.svelte';
+	import Icon from '#lib/Icon.svelte';
+	import BusArrow from '#lib/Stop/BusArrow.svelte';
+	import type { Stop, StopTime } from '#lib/client/index.js';
+	import { source_info } from '#lib/resources/index.svelte.js';
+	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
+	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 
 	type StopTimeWithETA = StopTime & { eta: number };
 	type StopTimesByRoute = SvelteMap<string, StopTimeWithETA[]>;

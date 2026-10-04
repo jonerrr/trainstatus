@@ -6,3 +6,5 @@ yarn.lock
 build
 node_modules
 .svelte-kit
+
+CHANGELOG.md

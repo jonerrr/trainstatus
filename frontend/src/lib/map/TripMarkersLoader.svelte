@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ComponentProps } from 'svelte';
 
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 
 	// TripMarkers pulls in deck.gl, so it is only ever loaded in the browser.
 	// Referencing its type here (rather than the bare `Component`) keeps the

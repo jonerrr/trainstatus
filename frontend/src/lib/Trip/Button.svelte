@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import Icon from '$lib/Icon.svelte';
-	import Skeleton from '$lib/Skeleton.svelte';
-	import type { Trip } from '$lib/client';
-	import { position_context } from '$lib/resources/positions.svelte';
-	import { stop_time_context } from '$lib/resources/stop_times.svelte';
-	import { current_time } from '$lib/url_params.svelte';
-	import { trip_headsign } from '$lib/util.svelte';
-
+	import Icon from '#lib/Icon.svelte';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import type { Trip } from '#lib/client/index.js';
+	import { position_context } from '#lib/resources/positions.svelte.js';
+	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
+	import { trip_headsign } from '#lib/util.svelte.js';
 	import { ArrowBigRight } from '@lucide/svelte';
 
 	interface Props {

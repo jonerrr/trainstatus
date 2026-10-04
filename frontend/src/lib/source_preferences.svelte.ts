@@ -1,8 +1,8 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
-import type { Source } from '$lib/client';
-import { all_sources } from '$lib/resources/index.svelte';
-import { LocalStorage } from '$lib/storage.svelte';
+import type { Source } from '#lib/client/index.js';
+import { all_sources } from '#lib/resources/index.svelte.js';
+import { LocalStorage } from '#lib/storage.svelte.js';
 
 export const COOKIE_NAME = 'selected_sources';
 

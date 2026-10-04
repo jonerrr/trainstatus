@@ -1,5 +1,5 @@
-import type { Route, RouteStop, Stop, StopTime, Trip } from '$lib/client';
-import { calculateTextHeight } from '$lib/text_measurement';
+import type { Route, RouteStop, Stop, StopTime, Trip } from '#lib/client/index.js';
+import { calculateTextHeight } from '#lib/text_measurement.js';
 
 /**
  * Destination shown on an MTA bus for a given trip direction.

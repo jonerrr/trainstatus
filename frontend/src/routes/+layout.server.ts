@@ -1,6 +1,6 @@
-import type { Source } from '$lib/client';
-import { all_sources } from '$lib/resources/index.svelte';
-import { COOKIE_NAME, parse_sources } from '$lib/source_preferences.svelte';
+import type { Source } from '#lib/client/index.js';
+import { all_sources } from '#lib/resources/index.svelte.js';
+import { COOKIE_NAME, parse_sources } from '#lib/source_preferences.svelte.js';
 
 import type { LayoutServerLoad } from './$types';
 

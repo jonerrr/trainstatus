@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 
-	import { all_sources, source_info } from '$lib/resources/index.svelte';
-	import { source_preferences } from '$lib/source_preferences.svelte';
-	import { current_time } from '$lib/url_params.svelte';
+	import { all_sources, source_info } from '#lib/resources/index.svelte.js';
+	import { source_preferences } from '#lib/source_preferences.svelte.js';
+	import { current_time } from '#lib/url_params.svelte.js';
 
 	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers } from '@lucide/svelte';
 	import { CircleX } from '@lucide/svelte';
@@ -43,7 +43,7 @@
 									source_preferences.current.includes(source)}
 								onchange={() => {
 									source_preferences.toggle(source);
-									invalidateAll();
+									refreshAll();
 								}}
 								class="size-5 rounded border-neutral-700 bg-neutral-800 text-emerald-500 focus:ring-emerald-500/30 disabled:opacity-50"
 							/>
