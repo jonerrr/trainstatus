@@ -3,7 +3,6 @@ use crate::{
     stores::{cache_get, cache_set_with_etag},
 };
 use bb8_redis::RedisConnectionManager;
-use geozero::wkb;
 use redis::AsyncCommands;
 use sqlx::PgPool;
 use std::time::Duration;
@@ -197,7 +196,7 @@ impl RouteStore {
     pub async fn save_all_shapes(&self, source: Source, shapes: &[Shape]) -> anyhow::Result<()> {
         let ids: Vec<_> = shapes.iter().map(|s| &s.id).collect();
         let sources: Vec<_> = vec![source; shapes.len()];
-        let geoms: Vec<_> = shapes.iter().map(|s| wkb::Encode(s.geom.clone())).collect();
+        let geoms: Vec<_> = shapes.iter().map(|s| s.geom.clone()).collect();
         let datas: Vec<_> = shapes
             .iter()
             .map(|s| serde_json::to_value(&s.data).unwrap())

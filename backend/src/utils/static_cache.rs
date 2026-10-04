@@ -62,29 +62,29 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
 }
 
 fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs) -> bool {
+    let Ok(jiff_date) = jiff::civil::Date::new(
+        date.year() as i16,
+        date.month() as i8,
+        date.day() as i8,
+    ) else {
+        return false;
+    };
+
     let calendar = gtfs.calendar.get(service_id);
     let calendar_dates = gtfs.calendar_dates.get(service_id);
 
     let mut runs = false;
 
     if let Some(cal) = calendar
-        && date >= cal.start_date
-        && date <= cal.end_date
+        && jiff_date >= cal.start_date
+        && jiff_date <= cal.end_date
     {
-        runs = match date.weekday() {
-            chrono::Weekday::Mon => cal.monday,
-            chrono::Weekday::Tue => cal.tuesday,
-            chrono::Weekday::Wed => cal.wednesday,
-            chrono::Weekday::Thu => cal.thursday,
-            chrono::Weekday::Fri => cal.friday,
-            chrono::Weekday::Sat => cal.saturday,
-            chrono::Weekday::Sun => cal.sunday,
-        };
+        runs = cal.valid_weekday(jiff_date);
     }
 
     if let Some(dates) = calendar_dates {
         for cd in dates {
-            if cd.date == date {
+            if cd.date == jiff_date {
                 match cd.exception_type {
                     Exception::Added => runs = true,
                     Exception::Deleted => runs = false,

@@ -6,7 +6,6 @@ use crate::{
     stores::{cache_get, cache_set_with_etag},
 };
 use bb8_redis::RedisConnectionManager;
-use geozero::wkb;
 use gtfs_structures::StopTransfer;
 use redis::AsyncCommands;
 use sqlx::PgPool;
@@ -103,7 +102,7 @@ impl StopStore {
         // TODO: probably pass vec instead of slice so we don't need to clone
         let ids: Vec<_> = stops.iter().map(|s| s.id.to_uppercase()).collect();
         let names: Vec<_> = stops.iter().map(|s| &s.name).collect();
-        let geoms: Vec<_> = stops.iter().map(|r| wkb::Encode(r.geom.clone())).collect();
+        let geoms: Vec<_> = stops.iter().map(|r| r.geom.clone()).collect();
         let datas = stops
             .iter()
             .map(|s| serde_json::to_value(&s.data).unwrap())

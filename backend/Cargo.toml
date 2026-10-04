@@ -23,11 +23,12 @@ chrono-tz = "0.10.4"
 futures = "0.3.31"
 geo = { version = "0.33.0", features = ["use-serde"] }
 geojson = "1.0.0"
-geozero = { version = "0.15.1", features = ["with-postgis-sqlx"] }
+geozero = { version = "0.15.1", features = ["with-wkb"] }
 gtfs-structures = "0.50.0"
 headers = "0.4.1"
 http = "1.2.0"
 indicatif = "0.18.0"
+jiff = "0.2"
 moka = { version = "0.12.15", features = ["future", "sync"] }
 polyline = "0.11.0"
 proj4rs = { version = "0.2.0", features = ["crs-definitions", "geo-types"] }
@@ -39,14 +40,14 @@ reqwest = { version = "0.13.2", default-features = false, features = ["json", "m
 rgb = "0.8.52"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["raw_value"] }
-sqlx = { version = "0.9.0", features = ["chrono", "json", "postgres", "runtime-tokio-rustls", "uuid"] }
+sqlx = { version = "0.9.0", features = ["chrono", "json", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
 titlecase = "3.6.0"  # TODO: remove
 tokio = { version = "1.48.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["buffer", "limit"] }
 tower-http = { version = "0.7.0", features = ["compression-br", "compression-gzip", "normalize-path", "timeout", "trace"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-utoipa = { version = "5.4.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.3.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["serde", "v7"] }

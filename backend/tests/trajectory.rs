@@ -81,11 +81,11 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         .iter()
         .map(|(lon, lat)| format!("ST_MakePoint({lon}, {lat})"))
         .collect();
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO static.shape (id, source, geom, data)
          VALUES ('{DECOY_SHAPE}', 'mta_bus', ST_SetSRID(ST_MakeLine(ARRAY[{}]), 4326), '{{}}'::jsonb)",
         decoy_points.join(", ")
-    ))
+    )))
     .execute(&pool)
     .await
     .expect("insert decoy shape");
