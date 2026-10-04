@@ -38,7 +38,7 @@
 				</p>
 
 				<div class="flex flex-col gap-3 pl-6">
-					{#each all_sources as source}
+					{#each all_sources as source (source)}
 						{@const info = source_info[source]}
 						<label
 							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"

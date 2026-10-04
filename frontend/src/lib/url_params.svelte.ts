@@ -1,3 +1,5 @@
+import { SvelteURL } from 'svelte/reactivity';
+
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 
@@ -42,7 +44,7 @@ export type ModalParamKey = (typeof MODAL_PARAM)[keyof typeof MODAL_PARAM];
  */
 export function open_modal(state: ModalData) {
 	const key = MODAL_PARAM[state.type];
-	const url = new URL(page.url.href);
+	const url = new SvelteURL(page.url.href);
 
 	// Remove any existing modal params to avoid stacking them
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
@@ -68,7 +70,7 @@ export function open_modal(state: ModalData) {
  * Works for both push-opened and fresh-load modals.
  */
 export function close_modal() {
-	const url = new URL(page.url.href);
+	const url = new SvelteURL(page.url.href);
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
 	url.searchParams.delete('src');
 	// Explicitly sync ?at from the source of truth so we don't lose it due to

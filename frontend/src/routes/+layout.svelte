@@ -20,8 +20,6 @@
 
 	let { children } = $props();
 
-	let offline = $state(false);
-
 	// Initialize current_time from URL param on page load
 	// If we don't initialize here, the syncing $effect will error out when running replaceState on page load (since router isn't initialized)
 	// TODO: maybe add error handling for invalid at param. for example if its a huge number and becomes NaN, the sync $effect runs and errors out
@@ -110,7 +108,6 @@
 	// Sync current_time.value with ?at URL param whenever it changes.
 	// Reads page.url inside untrack so this effect only re-runs when current_time changes.
 	$effect(() => {
-		$inspect.trace('Syncing current_time with URL param');
 		const val = current_time.value;
 		untrack(() => {
 			const current_at = page.url.searchParams.get('at');
@@ -130,8 +127,6 @@
 </script>
 
 <SEO />
-
-<svelte:window ononline={() => (offline = false)} onoffline={() => (offline = true)} />
 
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->

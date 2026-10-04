@@ -110,13 +110,13 @@
 	$effect(() => {
 		// Closing transient interaction state from one place prevents a hover or
 		// chooser from referring to layers that a filter just removed.
-		filters.sources;
-		filters.layers.route;
-		filters.layers.stop;
-		filters.layers.trip;
-		filters.route;
-		filters.stop;
-		filters.trip;
+		void filters.sources;
+		void filters.layers.route;
+		void filters.layers.stop;
+		void filters.layers.trip;
+		void filters.route;
+		void filters.stop;
+		void filters.trip;
 		hover.clear();
 		chooser = null;
 	});

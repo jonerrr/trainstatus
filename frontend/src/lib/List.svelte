@@ -1,4 +1,4 @@
-<script lang="ts">
+<script lang="ts" generics="T extends Stop | Route | Trip">
 	import type { Snippet } from 'svelte';
 
 	import { cubicInOut } from 'svelte/easing';
@@ -27,7 +27,7 @@
 		// item type for rendering and modal
 		type: ItemType;
 		// data organized by source
-		sources: Partial<Record<Source, (Stop | Route | Trip)[]>>;
+		sources: Partial<Record<Source, T[]>>;
 		// persisted state for pinned items
 		pins?: LocalStorage<Pins>;
 		// persisted state for selected source tab
@@ -39,7 +39,7 @@
 		// scroll list into view if there are few items
 		auto_scroll?: boolean;
 		// height calculation function for virtualization
-		height_calc: (item: any) => number;
+		height_calc: (item: T) => number;
 		// minimum number of items to render during SSR
 		ssr_min?: number;
 		// extra items to render before and after visible items
@@ -113,7 +113,7 @@
 	// Reset scroll when source changes
 	$effect(() => {
 		// maybe move this to derived
-		active_source;
+		void active_source;
 		reset_scroll();
 	});
 
@@ -291,7 +291,9 @@
 						<button
 							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
 							onclick={() => {
-								open_modal({ type, ...data } as any);
+								if (type === 'stop') open_modal({ ...(data as Stop), type });
+								else if (type === 'route') open_modal({ ...(data as Route), type });
+								else open_modal({ ...(data as Trip), type });
 							}}
 						>
 							{#if type === 'stop'}

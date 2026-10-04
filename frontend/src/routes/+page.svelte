@@ -11,6 +11,7 @@
 		calculate_trip_height,
 		haversine
 	} from '#lib/util.svelte.js';
+
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 
 	const all_trips = trip_context.get();
@@ -100,7 +101,6 @@
 	}
 
 	$effect(() => {
-		$inspect.trace('Setting up geolocation watch');
 		// if (location_status.current !== 'denied') {
 		resume();
 		// }

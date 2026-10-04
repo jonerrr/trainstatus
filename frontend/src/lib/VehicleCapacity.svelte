@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TypedVehiclePosition } from '#lib/resources/index.svelte.js';
+
 	import { Users } from '@lucide/svelte';
 
 	interface Props {
@@ -59,7 +60,7 @@
 	>
 		<Users size="16" />
 		<!-- currently only mta_bus returns passenger count -->
-		{#if 'passengers' in position?.data}
+		{#if 'passengers' in position.data}
 			{position.data.passengers}
 		{/if}
 	</div>

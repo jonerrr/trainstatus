@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
+
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
@@ -21,6 +23,7 @@
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
+
 	import { CircleAlert } from '@lucide/svelte';
 
 	interface Props {
@@ -64,7 +67,7 @@
 
 	const { stop_times_with_trip, active_routes } = $derived.by(() => {
 		const now = current_time.ms;
-		const active_routes = new Set<string>();
+		const active_routes = new SvelteSet<string>();
 
 		const stop_times_with_trip = current_stop_times.flatMap((st) => {
 			if (!show_previous && st.arrival.getTime() <= now) return [];
@@ -116,7 +119,7 @@
 <div class="flex items-center gap-1 p-1">
 	<div class="flex max-h-36 max-w-40 flex-wrap items-center gap-1 md:max-w-xs">
 		{#if route_stops.length > 6}
-			{#each route_stops.slice(0, 5) as route_stop}
+			{#each route_stops.slice(0, 5) as route_stop (route_stop.route_id)}
 				{@const route = routes?.[route_stop.route_id]}
 				{#if route}
 					<Icon width={36} height={36} link={true} {route} show_alerts />
@@ -124,7 +127,7 @@
 			{/each}
 			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{stop.routes.length - 5}</div>
 		{:else}
-			{#each route_stops as route_stop}
+			{#each route_stops as route_stop (route_stop.route_id)}
 				{@const route = routes?.[route_stop.route_id]}
 				{#if route}
 					<Icon width={36} height={36} link={true} {route} show_alerts />
@@ -134,7 +137,7 @@
 	</div>
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if (stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus') && 'direction' in stop.data}
-			<BusArrow direction={(stop.data as any).direction} />
+			<BusArrow direction={stop.data.direction} />
 		{/if}
 		{stop.name}
 
@@ -154,7 +157,7 @@
 	<div class="text-center font-semibold text-neutral-400">No upcoming trips</div>
 {:else}
 	<ModalList>
-		{#each selected_stop_times as st}
+		{#each selected_stop_times as st (`${st.trip_id}:${st.arrival.getTime()}`)}
 			{@const position = positions?.current?.get(st.trip.vehicle_id)}
 			{@const route = routes?.[st.trip.route_id]}
 			<Button state={{ type: 'trip', ...st.trip }}>

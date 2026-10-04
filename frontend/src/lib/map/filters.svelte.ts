@@ -64,8 +64,6 @@ const stop_filter_defs = {
 	} as const
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
-type StopFilterDefs = typeof stop_filter_defs;
-
 // Route filter definitions by source (minimal for MVP)
 const route_filter_defs = {
 	mta_subway: {} as const,
@@ -78,16 +76,12 @@ const route_filter_defs = {
 	njt_bus: {} as const
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
-type RouteFilterDefs = typeof route_filter_defs;
-
 // Trip filter definitions (none for MVP - trips have minimal source-specific data)
 const trip_filter_defs = {
 	mta_subway: {} as const,
 	mta_bus: {} as const,
 	njt_bus: {} as const
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
-
-type TripFilterDefs = typeof trip_filter_defs;
 
 // All layer filter definitions combined
 const layer_filter_defs = {

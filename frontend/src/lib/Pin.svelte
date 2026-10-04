@@ -2,6 +2,7 @@
 	import type { Source } from '#lib/client/index.js';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import type { LocalStorage } from '#lib/storage.svelte.js';
+
 	import { Pin } from '@lucide/svelte';
 
 	// TODO: maybe just take the localstorage.current instead of the entire localstorage object

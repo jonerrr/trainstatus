@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
@@ -19,7 +19,7 @@ export function index_positions<S extends Source>(
 			position.vehicle_id,
 			{
 				...position,
-				updated_at: new Date(position.updated_at)
+				updated_at: new SvelteDate(position.updated_at)
 			}
 		])
 	);

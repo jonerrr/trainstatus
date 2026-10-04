@@ -8,6 +8,7 @@
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
+
 	import { ArrowBigRight } from '@lucide/svelte';
 
 	interface Props {
@@ -60,7 +61,7 @@
 
 		<div class="flex gap-1 self-start">
 			{#if position?.data && 'status' in position.data}
-				<span>{(position.data as any).status}</span>
+				<span>{position.data.status}</span>
 			{/if}
 			{current_stop}
 		</div>

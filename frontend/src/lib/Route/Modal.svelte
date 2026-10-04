@@ -40,7 +40,7 @@
 			(entries) => {
 				entries.forEach((entry) => {
 					if (entry.isIntersecting) {
-						const alert_els = node.querySelectorAll('.alert') as NodeListOf<HTMLDivElement>;
+						const alert_els = node.querySelectorAll<HTMLDivElement>('.alert');
 						const index = Array.prototype.indexOf.call(alert_els, entry.target);
 
 						// console.log({ index, alert_els, entry });
@@ -118,19 +118,20 @@
 	bind:this={scroll_area}
 	{@attach manage_scroll}
 >
-	{#each route_alerts as alert}
+	{#each route_alerts as alert (alert.id)}
 		{@const header = alert.translations.find((t) => t.section === 'header')}
 		{@const description = alert.translations.find((t) => t.section === 'description')}
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
 			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-1">
-				<!-- although not every translation text is html, its simpler to just use @html for all of them -->
 				{#if header}
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
 					{@html header.text}
 				{/if}
 				<!-- TODO: maybe add divider between header and description -->
 				{#if description}
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
 					{@html description.text}
 				{/if}
 			</div>
@@ -173,7 +174,7 @@
 			>
 				<ChevronLeft />
 			</button>
-			{#each route_alerts as _alert, i}
+			{#each route_alerts as alert, i (alert.id)}
 				<button
 					class={['size-3 rounded-full bg-neutral-300', { 'bg-neutral-500': i === idx }]}
 					aria-label="Scroll to alert"

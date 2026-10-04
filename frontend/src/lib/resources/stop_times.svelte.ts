@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteDate, SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
@@ -17,8 +17,8 @@ export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): St
 	for (const st of data) {
 		const typed_st = {
 			...st,
-			arrival: new Date(st.arrival),
-			departure: new Date(st.departure)
+			arrival: new SvelteDate(st.arrival),
+			departure: new SvelteDate(st.departure)
 		} as TypedStopTime<S>;
 
 		if (!by_trip_id.has(st.trip_id)) by_trip_id.set(st.trip_id, []);
@@ -43,6 +43,8 @@ const EMPTY_INDEX: StopTimeResource<Source> = {
  */
 export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTimeResource<S>> {
 	/** route_id → number of active holders */
+	// Reference counts are fetch bookkeeping, not UI state; keep them untracked.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	#monitored_routes = new Map<string, number>();
 	readonly #source: S;
 
@@ -58,7 +60,7 @@ export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTim
 					return empty;
 				}
 
-				const query_params = new URLSearchParams();
+				const query_params = new SvelteURLSearchParams();
 				const at = current_time.value;
 				if (at) query_params.set('at', at.toString());
 				// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
@@ -96,7 +98,7 @@ export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTim
 	}
 
 	get monitored_routes(): ReadonlySet<string> {
-		return new Set(this.#monitored_routes.keys());
+		return new SvelteSet(this.#monitored_routes.keys());
 	}
 
 	add_route(route_id: string): Promise<void> {

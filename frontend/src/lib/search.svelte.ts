@@ -1,4 +1,5 @@
 import type { Source, Stop } from '#lib/client/index.js';
+
 import { Index } from 'flexsearch';
 
 export class StopSearch {

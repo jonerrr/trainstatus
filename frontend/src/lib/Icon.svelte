@@ -95,6 +95,7 @@
 		}}
 	>
 		<svg class={class_name} {width} {height} viewBox="0 0 90 90">
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG comes from the static icons module. -->
 			{@html icon.svg}
 		</svg>
 

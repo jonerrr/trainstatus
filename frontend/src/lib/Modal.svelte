@@ -144,7 +144,6 @@
 <!-- TODO: refactor actions now that we have sources -->
 {#snippet actions(
 	history: boolean,
-	param_name: 'r' | 's' | 't',
 	id: string,
 	title: string,
 	source: Source,
@@ -264,7 +263,6 @@
 
 		{@render actions(
 			true,
-			's',
 			current_page_state.modal.id,
 			`Arrivals at ${current_page_state.modal.name}`,
 			current_page_state.modal.data.source,
@@ -275,7 +273,6 @@
 
 		{@render actions(
 			false,
-			'r',
 			current_page_state.modal.id,
 			`Alerts for ${current_page_state.modal.short_name}`,
 			current_page_state.modal.data.source,
@@ -286,7 +283,6 @@
 
 		{@render actions(
 			true,
-			't',
 			current_page_state.modal.id,
 			`${current_page_state.modal.route_id} Trip`,
 			current_page_state.modal.data.source,

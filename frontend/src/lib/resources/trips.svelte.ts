@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
@@ -17,8 +17,8 @@ export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResourc
 			trip.id,
 			{
 				...trip,
-				created_at: new Date(trip.created_at),
-				updated_at: new Date(trip.updated_at)
+				created_at: new SvelteDate(trip.created_at),
+				updated_at: new SvelteDate(trip.updated_at)
 			}
 		])
 	);

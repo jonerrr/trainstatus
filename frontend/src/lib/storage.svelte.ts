@@ -28,7 +28,7 @@ export class LocalStorage<T> {
 	}
 
 	get current(): T {
-		this.#version;
+		void this.#version;
 
 		const root: T = browser ? JSON.parse(localStorage.getItem(this.#key) as string) : this.#value;
 
@@ -44,7 +44,7 @@ export class LocalStorage<T> {
 			if (!p) {
 				p = new Proxy(value as object, {
 					get: (target, property) => {
-						this.#version;
+						void this.#version;
 						return proxy(Reflect.get(target, property));
 					},
 					set: (target, property, value) => {

@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteDate, SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { ApiAlert, Source } from '#lib/client/index.js';
 import icons from '#lib/icons.js';
@@ -21,23 +21,24 @@ export function index_alerts<S extends Source>(data: ApiAlert[]): AlertResource<
 		// const header = alert.translations.find((t) => t.section === 'header')?.text ?? '';
 		// const description = alert.translations.find((t) => t.section === 'description')?.text;
 
-		const processed = {
-			...alert,
+		const typed_alert = alert as TypedAlert<S>;
+		const processed: TypedAlert<S> = {
+			...typed_alert,
 			translations: alert.translations.map((t) => ({
 				...t,
 				// TODO: only use this for mta_subway or standardize icons and stuff across sources
 				text: t.format === 'html' ? parse_html(t.text) : t.text
 			})),
-			start_time: new Date(alert.start_time),
-			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-			updated_at: new Date(alert.updated_at),
-			created_at: new Date(alert.created_at)
-		} as TypedAlert<S>;
+			start_time: new SvelteDate(alert.start_time),
+			end_time: alert.end_time ? new SvelteDate(alert.end_time) : undefined,
+			updated_at: new SvelteDate(alert.updated_at),
+			created_at: new SvelteDate(alert.created_at)
+		};
 
 		alerts.push(processed);
 
 		// An alert can affect multiple stops on a route, but belongs in its route list only once.
-		for (const route_id of new Set(processed.entities.map((entity) => entity.route_id))) {
+		for (const route_id of new SvelteSet(processed.entities.map((entity) => entity.route_id))) {
 			if (!alerts_by_route.has(route_id)) {
 				alerts_by_route.set(route_id, []);
 			}

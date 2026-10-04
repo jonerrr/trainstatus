@@ -7,6 +7,7 @@
 	import { StopSearch } from '#lib/search.svelte.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import { calculate_stop_height } from '#lib/util.svelte.js';
+
 	import { CircleX, Search } from '@lucide/svelte';
 	import { Throttled } from 'runed';
 

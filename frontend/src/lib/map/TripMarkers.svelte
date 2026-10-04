@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte';
 
-	import { SvelteMap } from 'svelte/reactivity';
+	import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 
 	import { page } from '$app/state';
 
@@ -367,7 +367,7 @@
 		trajectoryFetches.set(currentSource, controller);
 
 		try {
-			const params = new URLSearchParams();
+			const params = new SvelteURLSearchParams();
 			if (currentFixedAt !== null) params.set('at', String(currentFixedAt));
 
 			const queryString = params.toString();

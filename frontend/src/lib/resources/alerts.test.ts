@@ -1,4 +1,5 @@
 import type { ApiAlert } from '#lib/client/index.js';
+
 import { describe, expect, it } from 'vitest';
 
 import { index_alerts } from './alerts.svelte';

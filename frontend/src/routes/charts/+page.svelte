@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
+	import { SvelteMap } from 'svelte/reactivity';
+
 	import { page } from '$app/state';
 
 	import Icon from '#lib/Icon.svelte';
@@ -13,6 +15,7 @@
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
+
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { LayerCake, Svg, flatten } from 'layercake';
@@ -98,7 +101,7 @@
 			points: Array<{ stop_id: string; stop_name: string; time: Date }>;
 		}> = [];
 		// Track all stops seen across all sources/routes, keyed by stop.id
-		const stops_seen = new Map<string, { id: string; name: string; sequence: number }>();
+		const stops_seen = new SvelteMap<string, { id: string; name: string; sequence: number }>();
 
 		for (const source of page.data.selected_sources) {
 			const source_routes = routes[source];
@@ -366,7 +369,7 @@
 		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
 		// console.log(xDomain);
 		// Return domain from current time to current time + displayHours
-		return [startTime, endTime] as any;
+		return [startTime.getTime(), endTime.getTime()];
 	});
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;
@@ -401,7 +404,7 @@
 						{#if selected_routes_flat.length === 0}
 							<span>Select routes</span>
 						{:else}
-							{#each selected_routes_flat as selectedRoute}
+							{#each selected_routes_flat as selectedRoute (`${selectedRoute.data.source}:${selectedRoute.id}`)}
 								<div
 									class="flex items-center rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1"
 								>
@@ -461,7 +464,7 @@
 							{#if filteredRoutes.length === 0}
 								<div class="px-4 py-2 text-neutral-400">No routes found</div>
 							{:else}
-								{#each filteredRoutes as routeOption}
+								{#each filteredRoutes as routeOption (`${routeOption.data.source}:${routeOption.id}`)}
 									<div
 										role="option"
 										tabindex="0"

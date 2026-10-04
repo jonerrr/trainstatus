@@ -6,6 +6,7 @@
 	import { page } from '$app/state';
 
 	import { source_info } from '#lib/resources/index.svelte.js';
+
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
 	import MapBackdrop from './MapBackdrop.svelte';

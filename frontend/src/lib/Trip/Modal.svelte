@@ -17,6 +17,7 @@
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
+
 	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {
