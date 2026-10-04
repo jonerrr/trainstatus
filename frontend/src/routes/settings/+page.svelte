@@ -5,8 +5,15 @@
 	import { source_preferences } from '#lib/source_preferences.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
 
-	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers } from '@lucide/svelte';
-	import { CircleX } from '@lucide/svelte';
+	import {
+		BookText,
+		CircleX,
+		CodeXml,
+		ExternalLink,
+		Hourglass,
+		Info,
+		Layers
+	} from '@lucide/svelte';
 	import dayjs from 'dayjs';
 
 	// TODO: improve ui

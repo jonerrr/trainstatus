@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { flushSync, untrack } from 'svelte';
 
 	import type { Attachment } from 'svelte/attachments';
 	import { on } from 'svelte/events';
@@ -14,7 +14,15 @@
 	import { type Pins, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import { close_modal } from '#lib/url_params.svelte.js';
-	import { AlarmClock, CircleX, ClipboardCheck, History, Share, Timer } from '@lucide/svelte';
+
+	import {
+		AlarmClock,
+		CircleX,
+		ClipboardCheck,
+		RotateCcwClock,
+		Share,
+		Timer
+	} from '@lucide/svelte';
 
 	// TODO: make implement some sort of focus trap and restore using attachments (actually, i think the dialog element does this natively?)
 
@@ -33,12 +41,22 @@
 			const is_forward = next_index > local_index;
 			document.documentElement.dataset.modalDirection = is_forward ? 'forward' : 'backward';
 
-			// Wrap the DOM update in the View Transition API
+			// experimental.async makes tick() wait for a frame, which a view transition
+			// defers until this callback finishes. Flush on a microtask so we aren't
+			// calling flushSync from inside the effect.
 			if (document.startViewTransition) {
-				document.startViewTransition(async () => {
-					current_page_state = next_state;
-					await tick();
-				});
+				document.startViewTransition(
+					() =>
+						new Promise<void>((resolve) => {
+							queueMicrotask(() => {
+								// Runs the attachment effect below before the new snapshot.
+								flushSync(() => {
+									current_page_state = next_state;
+								});
+								resolve();
+							});
+						})
+				);
 			} else {
 				current_page_state = next_state;
 			}
@@ -48,13 +66,10 @@
 	const modal: Attachment<HTMLDialogElement> = (node) => {
 		document.body.style.overflow = 'hidden';
 
+		// showModal() is what puts the dialog in the top layer. The open attribute does not.
+		// flushSync in the view transition runs this before the new snapshot is taken.
 		$effect(() => {
-			// $inspect.trace('modal effect');
-			// this was running on close twice because of the handle_click and handle_mouse_up events
-			// console.log('modal update', page.state.modal);
-
 			const has_modal = !!current_page_state.modal;
-			// not sure if we need the node.open check, but just to be safe
 			if (has_modal && !node.open) {
 				node.showModal();
 			} else if (!has_modal && node.open) {
@@ -156,7 +171,7 @@
 						show_previous = !show_previous;
 					}}
 				>
-					<History size="2rem" />
+					<RotateCcwClock size="2rem" />
 				</button>
 			{/if}
 

@@ -63,20 +63,20 @@
 	animation: none;
 }
 
-/* Forward (open / navigate deeper): new slides in from right, old slides out left */
+/* `both` holds the last keyframe. Without it, the outgoing snapshot snaps back
+   to full opacity for a frame when the animation ends. */
 :root[data-modal-direction='forward']::view-transition-new(modal) {
-	animation: modal-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+	animation: modal-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 :root[data-modal-direction='forward']::view-transition-old(modal) {
-	animation: modal-slide-out-left 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+	animation: modal-slide-out-left 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-/* Backward (close / back button): old slides out to right, new slides in from left */
 :root[data-modal-direction='backward']::view-transition-old(modal) {
-	animation: modal-slide-out-right 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+	animation: modal-slide-out-right 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 :root[data-modal-direction='backward']::view-transition-new(modal) {
-	animation: modal-slide-in-left 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+	animation: modal-slide-in-left 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 /* Respect reduced-motion preference */
