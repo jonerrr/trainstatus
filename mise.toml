@@ -9,10 +9,13 @@ config_roots = ["backend", "frontend", "geo", "science"]
 "core:node" = "latest"
 "aqua:pnpm/pnpm" = "latest"
 "pipx:pyvalhalla" = { version = "latest", uvx = true }
-"cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres", default-features = false }
+"cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres,sqlx-toml", default-features = "false" }
 # installing with mise caused the rust vscode extension not to work, and a
 # newer mise protoc breaks Valhalla's CMake (mismatched vs system libprotobuf)
 # protoc = "latest"
+
+[settings]
+lockfile = true
 
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
