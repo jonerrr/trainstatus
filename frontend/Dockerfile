@@ -1,21 +1,33 @@
-FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS build
+FROM ghcr.io/pnpm/pnpm:12 AS base
 
-RUN npm install -g pnpm
+# TODO: find a better way to make container rootless with pnpm base image
+ENV PNPM_HOME="/app/.pnpm-global"
+ENV PATH="$PNPM_HOME/bin:$PATH"
 
+# renovate: datasource=node-version depName=node
+RUN pnpm runtime set node 26 -g
+
+RUN chmod -R a+rX "$PNPM_HOME"
+
+COPY . /app
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-COPY . .
-RUN pnpm build
-RUN pnpm prune --production
 
-FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4
+FROM base AS prod-deps
+RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
+    pnpm install --store-dir /var/cache/pnpm --prod --frozen-lockfile
 
-WORKDIR /app
-COPY --chown=node:node --from=build /app/build build/
-COPY --chown=node:node --from=build /app/node_modules node_modules/
-COPY --chown=node:node package.json .
-# EXPOSE 3000
+FROM base AS build
+RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
+    pnpm install --store-dir /var/cache/pnpm --frozen-lockfile
+RUN pnpm run build
+
+FROM base
+
 ENV NODE_ENV=production
-USER node
+
+COPY --chown=10001:10001 --from=prod-deps /app/node_modules /app/node_modules
+COPY --chown=10001:10001 --from=build /app/build /app/build
+
+USER 10001:10001
+
 CMD ["node", "build"]

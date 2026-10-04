@@ -1,37 +1,34 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the Node.js runtime in Dockerfiles",
+      "fileMatch": ["(^|/)Dockerfile$"],
+      "matchStrings": [
+        "# renovate: datasource=node-version depName=node\\s+RUN pnpm runtime set node (?<currentValue>\\d+(?:\\.\\d+){0,2}) -g"
+      ],
+      "datasourceTemplate": "node-version",
+      "depNameTemplate": "node",
+      "versioningTemplate": "node"
+    }
+  ],
   "packageRules": [
     {
-      "description": "Group all frontend/client (Node.js/pnpm) dependencies",
-      "matchFileNames": [
-        "frontend/**",
-        "client/**",
-        "package.json",
-        "pnpm-workspace.yaml"
-      ],
+      "description": "Group all frontend/client dependencies",
+      "matchFileNames": ["frontend/**"],
       "groupName": "frontend"
     },
     {
-      "description": "Group all backend (Rust/Docker/Postgres) dependencies",
-      "matchFileNames": [
-        "backend/**",
-        "Cargo.toml",
-        "compose.yml",
-        "compose.example.yml",
-        "Dockerfile"
-      ],
+      "description": "Group all backend dependencies",
+      "matchFileNames": ["backend/**"],
       "groupName": "backend"
     },
     {
-      "description": "Group all science (Python/uv) dependencies",
+      "description": "Group all science dependencies",
       "matchFileNames": ["science/**"],
       "groupName": "science"
-    },
-    {
-      "description": "Group root tools",
-      "matchFileNames": ["mise.toml"],
-      "groupName": "tooling"
     }
   ]
 }

@@ -41,6 +41,10 @@ spec:
           value: "3001"
         - name: ORIGIN
           value: "http://traefik"
+        - name: HOST_HEADER
+          value: "x-forwarded-host"
+        - name: PROTOCOL_HEADER
+          value: "x-forwarded-proto"
       ports:
         - containerPort: 3001
       resources:
@@ -288,7 +292,15 @@ data:
           service: frontend
           entryPoints:
             - web
+          middlewares:
+            - frontend-origin
           priority: 1
+      middlewares:
+        frontend-origin:
+          headers:
+            customRequestHeaders:
+              X-Forwarded-Host: "traefik"
+              X-Forwarded-Proto: "http"
       services:
         backend:
           loadBalancer:
