@@ -123,7 +123,7 @@ impl RouteStore {
                 data = EXCLUDED.data
             "#,
             &ids as _,
-            &sources as _,
+            &sources,
             &long_names as _,
             &short_names as _,
             &colors as _,
@@ -212,8 +212,8 @@ impl RouteStore {
                 data = EXCLUDED.data
             "#,
             &ids as _,
-            &sources as _,
-            &geoms as _,
+            &sources,
+            &geoms,
             &datas as _,
         )
         .execute(&self.pg_pool)

@@ -17,9 +17,9 @@ fn trip() -> Trip {
     let now = Utc::now();
     Trip {
         id: Uuid::now_v7(),
-        original_id: "fixture_trip".to_string(),
-        vehicle_id: "fixture_vehicle".to_string(),
-        route_id: "1".to_string(),
+        original_id: "fixture_trip".into(),
+        vehicle_id: "fixture_vehicle".into(),
+        route_id: "1".into(),
         shape_ids: vec![],
         direction: 0,
         created_at: now,
@@ -35,7 +35,7 @@ fn stop_time(stop_id: &str) -> StopTime {
     let now = Utc::now();
     StopTime {
         trip_id: Uuid::now_v7(),
-        stop_id: stop_id.to_string(),
+        stop_id: stop_id.into(),
         arrival: now,
         departure: now,
         data: StopTimeData::NjtBus,
@@ -44,9 +44,9 @@ fn stop_time(stop_id: &str) -> StopTime {
 
 fn vehicle(stop_id: Option<&str>) -> VehiclePosition {
     VehiclePosition {
-        vehicle_id: "fixture_vehicle".to_string(),
+        vehicle_id: "fixture_vehicle".into(),
         trip_id: None,
-        stop_id: stop_id.map(str::to_string),
+        stop_id: stop_id.map(Into::into),
         updated_at: Utc::now(),
         data: PositionData::NjtBus(NjtBusPositionData {
             occupancy_status: OccupancyStatus::default(),

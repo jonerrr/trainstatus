@@ -35,7 +35,7 @@ macro_rules! impl_discriminated_data {
                 $($arms)*
                 <$source_type>::$var => {
                     // Use $json instead of literal raw_json
-                    let payload: $data = serde_json::from_str($json.0.get())
+                    let payload: $data = serde_json::from_str($json.into_inner().get())
                         .map_err(|e| sqlx::Error::ColumnDecode {
                             index: "data".to_string(),
                             source: Box::new(e),

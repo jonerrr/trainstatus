@@ -93,14 +93,14 @@ pub fn remap_realtime_stop_ids(
 ) {
     for (_trip, stop_times) in data.iter_mut() {
         for st in stop_times.iter_mut() {
-            if let Some(canonical) = revision.stop_remap.get(&st.stop_id) {
+            if let Some(canonical) = revision.stop_remap.get(st.stop_id.as_str()) {
                 st.stop_id = canonical.clone();
             }
         }
     }
     for position in positions.iter_mut() {
         if let Some(stop_id) = &position.stop_id
-            && let Some(canonical) = revision.stop_remap.get(stop_id)
+            && let Some(canonical) = revision.stop_remap.get(stop_id.as_str())
         {
             position.stop_id = Some(canonical.clone());
         }

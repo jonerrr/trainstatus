@@ -140,11 +140,25 @@ async fn empty_shapes_preserve_and_nonempty_shapes_replace_stored_shape(pool: sq
     first.trips[0].0.shape_ids = vec!["initial".into()];
     ingestor.ingest(first).await.unwrap();
     let preserved = ingestor.ingest(snapshot()).await.unwrap();
-    assert_eq!(preserved.trips[0].shape_ids, ["initial"]);
+    assert_eq!(
+        preserved.trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
+        ["initial"]
+    );
     let mut replacement = snapshot();
     replacement.trips[0].0.shape_ids = vec!["replacement".into()];
     let replaced = ingestor.ingest(replacement).await.unwrap();
-    assert_eq!(replaced.trips[0].shape_ids, ["replacement"]);
+    assert_eq!(
+        replaced.trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
+        ["replacement"]
+    );
     let stored: (Vec<String>,) = sqlx::query_as("SELECT shape_ids FROM realtime.trip")
         .fetch_one(&pool)
         .await
@@ -240,7 +254,11 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
     let ingestor = RealtimeIngestor::new(pool, stores.live_snapshots.clone(), index.clone());
     let first = ingestor.ingest(snapshot()).await.unwrap();
     assert_eq!(
-        first.trips[0].shape_ids,
+        first.trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
         ["far"],
         "exact stop membership must beat closer geometry"
     );
@@ -262,12 +280,26 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
             .contains_key(&("A".into(), "101".into()))
     );
     let preserved = ingestor.ingest(snapshot()).await.unwrap();
-    assert_eq!(preserved.trips[0].shape_ids, ["far"]);
+    assert_eq!(
+        preserved.trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
+        ["far"]
+    );
     assert_eq!(preserved.changes.resolved_shapes, 0);
     let mut fallback = snapshot();
     fallback.trips[0].0.original_id = "geometric-fallback".into();
     let saved = ingestor.ingest(fallback).await.unwrap();
-    assert_eq!(saved.trips[0].shape_ids, ["near"]);
+    assert_eq!(
+        saved.trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
+        ["near"]
+    );
 }
 
 #[sqlx::test]
@@ -427,7 +459,10 @@ async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
         .trips
         .into_iter()
         .find(|(trip, stops)| {
-            dataset.routes.iter().any(|r| r.id == trip.route_id)
+            dataset
+                .routes
+                .iter()
+                .any(|r| r.id.as_str() == trip.route_id)
                 && stops
                     .iter()
                     .map(|s| s.stop_id.as_str())

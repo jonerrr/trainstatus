@@ -283,7 +283,7 @@ impl AlertStore {
                     data = EXCLUDED.data
                 RETURNING id, created_at, original_id, source
             )
-            SELECT i.new_id as "new_id!", u.id as "id!"
+            SELECT i.new_id as "new_id!", u.id
             FROM input_data i
             JOIN upserted u ON i.created_at = u.created_at
                 AND i.original_id = u.original_id
@@ -291,7 +291,7 @@ impl AlertStore {
             "#,
             &ids,
             &original_ids,
-            &sources as _,
+            &sources,
             &created_ats,
             &updated_ats,
             &recorded_ats,
@@ -372,8 +372,8 @@ impl AlertStore {
                     ON CONFLICT (alert_id, section, format, language) DO UPDATE SET text = EXCLUDED.text
                     "#,
                     &alert_ids,
-                    &sections as _,
-                    &formats as _,
+                    &sections,
+                    &formats,
                     &languages,
                     &texts
                 )
@@ -539,7 +539,7 @@ impl AlertStore {
                     "#,
                     &alert_ids,
                     &route_ids as &[Option<String>],
-                    &sources as _,
+                    &sources,
                     &stop_ids as &[Option<String>],
                     &sort_orders
                 )

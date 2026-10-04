@@ -3,6 +3,7 @@ mod common;
 use backend::models::source::Source;
 use chrono::Utc;
 use common::{mta_bus_dataset, setup_redis, test_stores};
+use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
 /// Real B94 stops (from the checked-in Helium fixture) all served by shape
@@ -77,18 +78,28 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
 
     // A decoy shape threaded exactly through the trip's real stops: ST_Distance
     // to every one of them is ~0m, versus ~5.2m for the real B940017 shape.
-    let decoy_points: Vec<String> = B94_STOP_COORDS
-        .iter()
-        .map(|(lon, lat)| format!("ST_MakePoint({lon}, {lat})"))
-        .collect();
-    sqlx::query(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO static.shape (id, source, geom, data)
-         VALUES ('{DECOY_SHAPE}', 'mta_bus', ST_SetSRID(ST_MakeLine(ARRAY[{}]), 4326), '{{}}'::jsonb)",
-        decoy_points.join(", ")
-    )))
-    .execute(&pool)
-    .await
-    .expect("insert decoy shape");
+    let mut builder: QueryBuilder<Postgres> =
+        QueryBuilder::new("INSERT INTO static.shape (id, source, geom, data) VALUES (");
+    builder.push_bind(DECOY_SHAPE);
+    builder.push(", 'mta_bus', ST_SetSRID(ST_MakeLine(ARRAY[");
+    let mut first = true;
+    for (lon, lat) in B94_STOP_COORDS {
+        if !first {
+            builder.push(", ");
+        }
+        first = false;
+        builder.push("ST_MakePoint(");
+        builder.push_bind(lon);
+        builder.push(", ");
+        builder.push_bind(lat);
+        builder.push(")");
+    }
+    builder.push("]), 4326), '{}'::jsonb)");
+    builder
+        .build()
+        .execute(&pool)
+        .await
+        .expect("insert decoy shape");
 
     sqlx::query(
         "UPDATE static.route

@@ -125,9 +125,9 @@ impl StopStore {
                 data = EXCLUDED.data
             "#,
             &ids,
-            &vec![source; stops.len()] as _,
+            &vec![source; stops.len()],
             &names as _,
-            &geoms as _,
+            &geoms,
             &datas as _,
         )
         .execute(&self.pg_pool)
@@ -199,7 +199,7 @@ impl StopStore {
                 data = EXCLUDED.data
             "#,
             &route_ids,
-            &vec![source; route_stops.len()] as _,
+            &vec![source; route_stops.len()],
             &stop_ids,
             &stop_sequences,
             &datas,
@@ -252,9 +252,9 @@ impl StopStore {
                 min_transfer_time = EXCLUDED.min_transfer_time
             "#,
             &from_stop_ids,
-            &from_stop_sources as _,
+            &from_stop_sources,
             &to_stop_ids,
-            &to_stop_sources as _,
+            &to_stop_sources,
             &transfer_types,
             &min_transfer_times as _,
         )

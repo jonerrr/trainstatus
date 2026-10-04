@@ -196,7 +196,14 @@ async fn njt_import_ingestion_tiles_and_animation(pool: sqlx::PgPool) {
         .await
         .unwrap();
     assert_eq!(trips.len(), 1);
-    assert_eq!(trips[0].shape_ids, vec!["87-3"]);
+    assert_eq!(
+        trips[0]
+            .shape_ids
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>(),
+        ["87-3"]
+    );
     let positions = stores
         .position_store
         .get_all(Source::NjtBus, Some(now))

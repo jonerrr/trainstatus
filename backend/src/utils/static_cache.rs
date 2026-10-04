@@ -62,11 +62,9 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
 }
 
 fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs) -> bool {
-    let Ok(jiff_date) = jiff::civil::Date::new(
-        date.year() as i16,
-        date.month() as i8,
-        date.day() as i8,
-    ) else {
+    let Ok(jiff_date) =
+        jiff::civil::Date::new(date.year() as i16, date.month() as i8, date.day() as i8)
+    else {
         return false;
     };
 
