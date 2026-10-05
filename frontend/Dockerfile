@@ -1,4 +1,4 @@
-FROM ghcr.io/pnpm/pnpm:12 AS base
+FROM ghcr.io/pnpm/pnpm:12@sha256:77123fd40a39db0eb8be6bddfcf0cea15e000122b9221ccce2e4415be29050f2 AS base
 
 # TODO: find a better way to make container rootless with pnpm base image
 ENV PNPM_HOME="/app/.pnpm-global"
