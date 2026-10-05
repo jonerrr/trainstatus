@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.0...frontend-v1.3.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* add API_ORIGIN config for SSR behind reverse proxy ([144fff4](https://github.com/jonerrr/trainstatus/commit/144fff433d49c7edb35ef2bca99710c885d9c1e5))
+
 ## [1.3.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.3...frontend-v1.3.0) (2026-10-05)
 
 
