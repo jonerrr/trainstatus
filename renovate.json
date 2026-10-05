@@ -5,7 +5,9 @@
     {
       "customType": "regex",
       "description": "Track the Node.js runtime in Dockerfiles",
-      "fileMatch": ["(^|/)Dockerfile$"],
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=node-version depName=node\\s+RUN pnpm runtime set node (?<currentValue>\\d+(?:\\.\\d+){0,2}) -g"
       ],
