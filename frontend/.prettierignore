@@ -8,3 +8,4 @@ node_modules
 .svelte-kit
 
 CHANGELOG.md
+renovate.json
