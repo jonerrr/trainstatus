@@ -29,33 +29,26 @@
 
 		return `${title} | Train Status`;
 	});
-	// TODO: improve descriptions
 	// TODO: include details about current page in meta tags
+	// TODO: improve description
+	const description =
+		'Real-time MTA subway, MTA bus, and NJ Transit bus arrivals, alerts, routes, and maps — fast, free, and without ads or tracking.';
 </script>
 
 <svelte:head>
 	<title>{title}</title>
 
-	<meta
-		name="description"
-		content="The best website to view MTA subway (and bus) times and alerts."
-	/>
+	<meta name="description" content={description} />
 
 	<!-- OGP Tags -->
 	<meta property="og:title" content={title} />
 	<meta property="og:type" content="website" />
-	<meta
-		property="og:description"
-		content="The best website to view MTA subway (and bus) times and alerts."
-	/>
+	<meta property="og:description" content={description} />
 
 	<!-- Twitter Meta Tags -->
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta property="twitter:domain" content="Train Status" />
 	<meta property="twitter:url" content="https://trainstat.us" />
 	<meta name="twitter:title" content={title} />
-	<meta
-		name="twitter:description"
-		content="The best website to view MTA subway (and bus) times and alerts."
-	/>
+	<meta name="twitter:description" content={description} />
 </svelte:head>

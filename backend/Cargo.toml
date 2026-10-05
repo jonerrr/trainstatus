@@ -67,7 +67,23 @@ tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_mall
 
 [features]
 fixture-capture = []
+integration-tests = []
 
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[[test]]
+name = "behavior"
+path = "tests/behavior.rs"
+required-features = ["fixture-capture"]
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+required-features = ["fixture-capture", "integration-tests"]
+
+[[test]]
+name = "performance"
+path = "tests/performance.rs"
+required-features = ["fixture-capture", "integration-tests"]

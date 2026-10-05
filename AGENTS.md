@@ -59,6 +59,8 @@ See README.md for detailed development setup instructions, including environment
 
 ### Backend
 
+- When adding, changing, reviewing, or running backend tests, read [.agents/skills/backend-testing/SKILL.md](.agents/skills/backend-testing/SKILL.md) and follow the linked testing policy.
+
 - Always use `sqlx::query_as::<_, ModelType>(...)` (not the `query!` macro) — models use custom `FromRow` impls for PostGIS geometry via `geozero`
 - Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `main.rs` and the per-source `LiveSnapshots` registry. Collectors return normalized entities; `RealtimeIngestor` owns persistence and committed publication
 - Error handling: `AppError(anyhow::Error)` in `api/` converts to 500; use `?` freely

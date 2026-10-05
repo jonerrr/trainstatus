@@ -1,3 +1,6 @@
+[env]
+VALHALLA_TILE_EXTRACT = "../geo/data/valhalla_tiles.tar"
+
 [tasks.csp]
 run = "cargo sqlx prepare"
 
@@ -8,19 +11,85 @@ run = "sqlx migrate run"
 depends = ["//backend:migrate"]
 run = "cargo run"
 
-# TODO: combine into 1 task with args
-[tasks."fixtures:mta_subway"]
-run = "cargo run --features fixture-capture --bin fixtures -- mta_subway"
-
-[tasks."fixtures:mta_bus"]
-run = "cargo run --features fixture-capture --bin fixtures -- mta_bus"
-
 [tasks.build]
 run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t ghcr.io/jonerrr/trainstatus-backend ."
 
+[tasks."fixtures"]
+description = "Capture, list, verify, or update expected fixture outputs; pass --help for command details"
+raw_args = true
+env = { SQLX_OFFLINE = "true" }
+run = "cargo run --features fixture-capture --bin fixtures -- $@"
+
+# Offline applies to compile-time query! metadata; SQLx tests still execute real SQL.
 [tasks.test]
-env = { SQLX_OFFLINE = "true", DATABASE_URL = "postgres://trains:trains@localhost:5432/trains" }
-run = "cargo test --features fixture-capture"
+description = "Run the ordinary backend suite using existing PostgreSQL and isolated test caches"
+run = "mise run test:services full"
+
+[tasks."test:unit"]
+description = "Run private unit and public behavior tests without services"
+env = { SQLX_OFFLINE = "true" }
+run = "cargo test --features fixture-capture --lib --test behavior"
+
+[tasks."test:integration"]
+description = "Run database, cache, and private realtime engine integration tests"
+run = "mise run test:services integration"
+
+[tasks."test:performance"]
+description = "Run the opt-in ingestion benchmark on an idle PostgreSQL server"
+run = "mise run test:services performance"
+
+[tasks."sqlx:check"]
+description = "Check committed query metadata against migrations in a dedicated metadata-check database"
+run = """
+export DATABASE_URL="${SQLX_CHECK_DATABASE_URL:-postgres://trains:trains@localhost:5432/trainstatus_sqlx_check}"
+sqlx database create
+sqlx migrate run
+cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests
+"""
+
+# TODO: if we keep redis, refactor the tests to use a mock redis client instead of relying on a real Redis instance (see https://crates.io/crates/redis-test)
+[tasks."test:services"]
+description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
+env = { SQLX_OFFLINE = "true", TEST_VALKEY_IMAGE = "docker.io/valkey/valkey:alpine" }
+usage = """
+arg "<suite>" {
+  choices "full" "integration" "performance"
+}
+arg "[filter]" default="" help="Optional Rust test name filter"
+"""
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+# SQLx creates and migrates each test database; reuse the running dev server.
+export DATABASE_URL="${TEST_DATABASE_URL:-postgres://trains:trains@localhost:5432/postgres}"
+export TEST_SERVICE_RUN_ID="$(cat /proc/sys/kernel/random/uuid)"
+cleanup() {
+  task_status=$?
+  trap - EXIT
+  # Rust Drop handles normal cache cleanup; sweep this run after interruption.
+  test_cache_ids=$(podman ps --all --quiet --filter "label=trainstatus-test-run=$TEST_SERVICE_RUN_ID") || task_status=1
+  if [ -n "$test_cache_ids" ]; then
+    if ! podman rm --force $test_cache_ids >/dev/null; then task_status=1; fi
+  fi
+  exit "$task_status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+case "$usage_suite" in
+  full)
+    cargo test --features fixture-capture,integration-tests --lib --test behavior --test integration "$usage_filter"
+    cargo test --features fixture-capture --doc "$usage_filter"
+    ;;
+  integration)
+    cargo test --features fixture-capture,integration-tests --lib "realtime::tests::engine::$usage_filter"
+    cargo test --features fixture-capture,integration-tests --test integration "$usage_filter"
+    ;;
+  performance)
+    cargo test --features fixture-capture,integration-tests --test performance "$usage_filter" -- --ignored --test-threads=1 --nocapture
+    ;;
+esac
+'''
 
 [tasks.reset-db]
 confirm = "Are you sure?"
@@ -29,9 +98,6 @@ podman kube down ../dev.pod.yml --force || true
 podman kube play --replace ../dev.pod.yml
 echo "Run DB migrations after the database is ready."
 """
-
-[env]
-VALHALLA_TILE_EXTRACT = "../geo/data/valhalla_tiles.tar"
 
 # Host deps for compiling the valhalla crate (vendored C++).
 # Install with: mise bootstrap packages apply
