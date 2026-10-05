@@ -65,6 +65,7 @@ fn filter_render_units<'a>(
         .collect()
 }
 
+// TODO: why make this a separate function?
 async fn load_snapshot(
     state: &AppState,
     source: Source,

@@ -11,6 +11,7 @@ use utoipa::IntoParams;
 
 const REQUIRE_ROUTE_FILTER_SOURCES: [Source; 2] = [Source::MtaBus, Source::NjtBus];
 
+// TODO: improve documentation
 #[utoipa::path(
     get,
     path = "/trips/{source}",

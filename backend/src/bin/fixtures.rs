@@ -34,12 +34,21 @@ async fn main() -> Result<()> {
         anyhow::bail!("missing command");
     };
     args.remove(0);
+    if matches!(command.as_str(), "--help" | "-h" | "help")
+        || args
+            .iter()
+            .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
+    {
+        print_usage();
+        return Ok(());
+    }
 
     match command.as_str() {
         "capture" => capture(args).await,
         "list" => list(args),
+        // TODO: maybe remove verify command since its kinda redundant with the unit tests
         "verify" => verify(args).await,
-        "bless" => bless(args).await,
+        "update-expected" => update_expected(args).await,
         _ => {
             print_usage();
             anyhow::bail!("unknown command: {command}");
@@ -105,7 +114,7 @@ async fn verify(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-async fn bless(args: Vec<String>) -> Result<()> {
+async fn update_expected(args: Vec<String>) -> Result<()> {
     let root = parse_root(args)?;
     let manifests = fixtures::discover_manifests(&root)?;
     if manifests.is_empty() {
@@ -116,7 +125,7 @@ async fn bless(args: Vec<String>) -> Result<()> {
         fixtures::verify_manifest_payloads(&root, &manifest)?;
         write_expected_outputs(&root, &manifest).await?;
         println!(
-            "blessed {}/{}/{}",
+            "updated expectations for {}/{}/{}",
             manifest.source, manifest.kind, manifest.scenario
         );
     }
@@ -237,7 +246,7 @@ impl CaptureOptions {
         Ok(Self {
             source: source.context("--source is required")?,
             kind: kind.context("--kind is required")?,
-            scenario: scenario.context("--scenario is required")?,
+            scenario: scenario.unwrap_or_else(|| "basic".to_string()),
             root,
         })
     }
@@ -300,12 +309,50 @@ fn payload_format(file_name: &str) -> &'static str {
 }
 
 fn print_usage() {
-    eprintln!(
-        "usage:
-  fixtures capture --source <mta_subway|mta_bus|njt_bus|all> --kind <static|realtime|alerts|all> --scenario <name> [--output <dir>]
-  fixtures list [--root <dir>]
-  fixtures verify [--root <dir>]
-  fixtures bless [--root <dir>]"
+    println!(
+        "Backend fixtures: capture provider data and inspect committed test bundles.
+
+Usage (from backend/):
+  mise run fixtures capture --source <source> --kind <kind> [--scenario <name>] [--output <dir>]
+  mise run fixtures list [--root <dir>]
+  mise run fixtures verify [--root <dir>]
+  mise run fixtures update-expected [--root <dir>]
+  mise run fixtures --help
+
+Commands:
+  capture  Download current provider data and write raw payloads plus a manifest.
+           Requires provider network access and any credentials that source needs.
+           Reusing a source/kind/scenario overwrites its captured payloads.
+           Does not generate expected outputs; review the capture before updating expectations.
+  list     Print every source/kind/scenario bundle found under the root.
+  verify   Decode/check manifest payloads and compare supported generated summaries
+           with existing expected JSON. Missing expected files are skipped.
+           This checks capture integrity; it does not replace the backend test suite.
+  update-expected
+           Rewrite supported expected JSON from existing raw payloads, without fetching.
+           Review the diff: updating expectations accepts current output as the new expectation.
+           Static summaries: MTA subway and bus; feed summaries: realtime protobuf;
+           domain summaries: MTA bus realtime. Other bundles get payload validation.
+
+Capture arguments:
+  --source    mta_subway | mta_bus | njt_bus | all (required)
+  --kind      static | realtime | alerts | all (required)
+  --scenario  Bundle label, default: basic. This is a directory name, not a behavior
+              switch. Use labels such as detour to keep an additional captured case.
+              Tests must explicitly load that label; a new label adds no test itself.
+  --output    Fixture root, default: tests/fixtures. --root is an alias.
+              Bundle path: <root>/<source>/<kind>/<scenario>/manifest.json
+
+List/verify/update-expected arguments:
+  --root      Fixture root, default: tests/fixtures. --output is an alias.
+              These commands operate on all bundles under the root.
+
+Examples:
+  mise run fixtures list
+  mise run fixtures capture --source mta_bus --kind realtime
+  mise run fixtures capture --source njt_bus --kind alerts --scenario detour --output /tmp/trainstatus-fixtures
+  mise run fixtures verify --root /tmp/trainstatus-fixtures
+  mise run fixtures update-expected --root /tmp/trainstatus-fixtures"
     );
 }
 
