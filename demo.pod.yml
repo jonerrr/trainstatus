@@ -39,8 +39,8 @@ spec:
           value: "0.0.0.0"
         - name: PORT
           value: "3001"
-        - name: ORIGIN
-          value: "http://traefik"
+        - name: API_ORIGIN
+          value: "http://127.0.0.1:3055"
         - name: HOST_HEADER
           value: "x-forwarded-host"
         - name: PROTOCOL_HEADER
@@ -292,15 +292,7 @@ data:
           service: frontend
           entryPoints:
             - web
-          middlewares:
-            - frontend-origin
           priority: 1
-      middlewares:
-        frontend-origin:
-          headers:
-            customRequestHeaders:
-              X-Forwarded-Host: "traefik"
-              X-Forwarded-Proto: "http"
       services:
         backend:
           loadBalancer:
