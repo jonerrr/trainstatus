@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.3...frontend-v1.3.0) (2026-10-05)
+
+
+### Features
+
+* Continuous tracking and large refactor ([#398](https://github.com/jonerrr/trainstatus/issues/398)) ([3e24cff](https://github.com/jonerrr/trainstatus/commit/3e24cff1bbe5e144a49d50ad78436f61b3aad15f))
+* handle Android back gesture to manage modal closing ([7d96b6f](https://github.com/jonerrr/trainstatus/commit/7d96b6f915294bebc928e1b4d16c2028d5acca78)), closes [#255](https://github.com/jonerrr/trainstatus/issues/255)
+* migrate to sveltekit 3 ([b2f04c4](https://github.com/jonerrr/trainstatus/commit/b2f04c4766d80985767172d9c785cefb32ff4574))
+* use pnpm base image and fix demo SSR ([599faba](https://github.com/jonerrr/trainstatus/commit/599faba451937ca8a8370e82c731632c5f36defd)), closes [#401](https://github.com/jonerrr/trainstatus/issues/401)
+
+
+### Bug Fixes
+
+* **deps:** update frontend ([#363](https://github.com/jonerrr/trainstatus/issues/363)) ([831501d](https://github.com/jonerrr/trainstatus/commit/831501dac53c19a2f3ddf5fc89f478f99537f441))
+* **docker:** make containers rootless ([b297e28](https://github.com/jonerrr/trainstatus/commit/b297e2852cee5f0ffe1eb536f0da9929d805160a)), closes [#337](https://github.com/jonerrr/trainstatus/issues/337)
+* eslint setup and format frontend ([bc50475](https://github.com/jonerrr/trainstatus/commit/bc50475aa57b8a250f54b57906adea14b5f9a40b))
+* modal flashing ([1027f1f](https://github.com/jonerrr/trainstatus/commit/1027f1fbdc7b1c1c46e234f0fa5b02e4756e749f)), closes [#285](https://github.com/jonerrr/trainstatus/issues/285)
+
 ## [1.2.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.2.2...frontend-v1.2.3) (2026-04-22)
 
 
