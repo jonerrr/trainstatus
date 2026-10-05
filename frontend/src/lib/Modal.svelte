@@ -11,9 +11,10 @@
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import TripModal from '#lib/Trip/Modal.svelte';
 	import type { Source } from '#lib/client/index.js';
+	import { contain_modal_focus } from '#lib/modal_focus.js';
 	import { type Pins, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { close_modal } from '#lib/url_params.svelte.js';
+	import { type ModalData, close_modal } from '#lib/url_params.svelte.js';
 
 	import {
 		AlarmClock,
@@ -24,93 +25,99 @@
 		Timer
 	} from '@lucide/svelte';
 
-	// TODO: make implement some sort of focus trap and restore using attachments (actually, i think the dialog element does this natively?)
-
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
 	let current_page_state = $state(page.state);
+	const has_modal = $derived(!!current_page_state.modal);
+
+	// $state proxies and the objects they wrap are not ===. Compare the modal
+	// itself, or assigning page.state back into current_page_state retriggers
+	// the effect and starts another view transition on every flush.
+	function modal_changed(next: ModalData | null | undefined, local: ModalData | null | undefined) {
+		const next_modal = $state.snapshot(next);
+		const local_modal = $state.snapshot(local);
+		if (!next_modal || !local_modal) return !!next_modal !== !!local_modal;
+		return next_modal.type !== local_modal.type || next_modal.id !== local_modal.id;
+	}
+
+	function slide_to(next_state: typeof page.state, forward: boolean) {
+		document.documentElement.dataset.modalDirection = forward ? 'forward' : 'backward';
+
+		const apply = () => {
+			current_page_state = $state.snapshot(next_state);
+		};
+
+		// experimental.async makes tick() wait for a frame, which a view transition
+		// defers until this callback finishes. Flush on a microtask so we aren't
+		// calling flushSync from inside the effect.
+		if (document.startViewTransition) {
+			const transition = document.startViewTransition(
+				() =>
+					new Promise<void>((resolve) => {
+						queueMicrotask(() => {
+							flushSync(apply);
+							resolve();
+						});
+					})
+			);
+			transition.ready.catch(() => {});
+			transition.finished.catch(() => {});
+		} else {
+			apply();
+		}
+	}
 
 	$effect(() => {
 		// $inspect.trace('modal state transition effect');
 		const next_state = page.state;
-		if (untrack(() => next_state.modal !== current_page_state.modal)) {
-			// Compare the new index against the current index to figure out slide direction
-			const next_index = next_state.index ?? 0;
-			const local_index = untrack(() => current_page_state?.index ?? 0);
-
-			const is_forward = next_index > local_index;
-			document.documentElement.dataset.modalDirection = is_forward ? 'forward' : 'backward';
-
-			// experimental.async makes tick() wait for a frame, which a view transition
-			// defers until this callback finishes. Flush on a microtask so we aren't
-			// calling flushSync from inside the effect.
-			if (document.startViewTransition) {
-				document.startViewTransition(
-					() =>
-						new Promise<void>((resolve) => {
-							queueMicrotask(() => {
-								// Runs the attachment effect below before the new snapshot.
-								flushSync(() => {
-									current_page_state = next_state;
-								});
-								resolve();
-							});
-						})
-				);
-			} else {
-				current_page_state = next_state;
-			}
+		if (untrack(() => modal_changed(next_state.modal, current_page_state.modal))) {
+			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
+			slide_to(next_state, forward);
 		}
 	});
 
-	const modal: Attachment<HTMLDialogElement> = (node) => {
-		document.body.style.overflow = 'hidden';
-
-		// showModal() is what puts the dialog in the top layer. The open attribute does not.
-		// flushSync in the view transition runs this before the new snapshot is taken.
+	const modal: Attachment<HTMLDivElement> = (node) => {
+		// TODO: Restore native <dialog closedby="none"> with showModal() and remove
+		// the custom backdrop/focus helper once this Firefox Android bug is fixed
+		// in supported versions and consecutive system back gestures traverse history:
+		// https://bugzilla.mozilla.org/show_bug.cgi?id=2078216
+		// A native dialog registers a CloseWatcher even with closedby="none".
+		// Firefox Android consumes back for that disabled watcher. Keep the sheet
+		// in the page so history owns back, and supply modal focus/inertness here.
 		$effect(() => {
-			const has_modal = !!current_page_state.modal;
-			if (has_modal && !node.open) {
-				node.showModal();
-			} else if (!has_modal && node.open) {
-				node.close();
-			}
+			if (has_modal) return contain_modal_focus(node);
 		});
 
-		// watch for clicks outside the dialog to close it
-		// function handle_click(event: MouseEvent) {
-		// 	if (event.target === node) {
-		// 		close_modal();
-		// 	}
-		// }
+		$effect(() => {
+			void current_page_state.modal;
+			if (has_modal && !node.contains(document.activeElement)) node.focus();
+		});
 
 		// Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape') {
+			if (has_modal && event.key === 'Escape') {
 				event.preventDefault();
 				close_modal();
 			}
 		}
 
-		// This differentiates between a drag and a click so mobile users don't accidentally close the dialog when swiping to go back
-		// from here https://stackoverflow.com/a/59741870
+		// Dismiss only a tap that starts and ends on the backdrop, not a drag.
 		const delta = 6;
-		let startX: number;
-		let startY: number;
+		let pointer_start: { id: number; x: number; y: number } | undefined;
 
-		function handle_mouse_down(event: MouseEvent) {
-			if (event.target !== node) return;
-
-			startX = event.pageX;
-			startY = event.pageY;
+		function handle_pointer_down(event: PointerEvent) {
+			pointer_start =
+				event.target === node.parentElement && event.button === 0
+					? { id: event.pointerId, x: event.pageX, y: event.pageY }
+					: undefined;
 		}
 
-		function handle_mouse_up(event: MouseEvent) {
-			// Only act if the mouse started and ended directly on the dialog node
-			if (event.target !== node) return;
-
-			const diffX = Math.abs(event.pageX - startX);
-			const diffY = Math.abs(event.pageY - startY);
+		function handle_pointer_up(event: PointerEvent) {
+			const start = pointer_start;
+			pointer_start = undefined;
+			if (!start || start.id !== event.pointerId || event.target !== node.parentElement) return;
+			const diffX = Math.abs(event.pageX - start.x);
+			const diffY = Math.abs(event.pageY - start.y);
 
 			if (diffX < delta && diffY < delta) {
 				close_modal();
@@ -119,13 +126,16 @@
 
 		const listeners_to_remove: Array<() => void> = [];
 
-		// listeners_to_remove.push(on(node, 'click', handle_click));
-		listeners_to_remove.push(on(node, 'mousedown', handle_mouse_down));
-		listeners_to_remove.push(on(node, 'mouseup', handle_mouse_up));
+		listeners_to_remove.push(on(node.parentElement!, 'pointerdown', handle_pointer_down));
+		listeners_to_remove.push(on(node.parentElement!, 'pointerup', handle_pointer_up));
+		listeners_to_remove.push(
+			on(node.parentElement!, 'pointercancel', () => {
+				pointer_start = undefined;
+			})
+		);
 		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
 
 		return () => {
-			document.body.style.overflow = '';
 			listeners_to_remove.forEach((off) => off());
 		};
 	};
@@ -254,42 +264,56 @@
 	</div>
 {/snippet}
 <!-- fixed bottom-0 left-0 right-0 -->
-<dialog
-	{@attach modal}
-	class="m-auto mb-0 flex max-h-[95dvh] w-full max-w-200 flex-col rounded-t-sm bg-neutral-900 text-white backdrop:bg-black/50 focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
->
-	{#if current_page_state.modal?.type === 'stop'}
-		<StopModal stop={current_page_state.modal} {show_previous} time_format={time_format.current} />
+<div class="modal-backdrop fixed inset-0 z-100 bg-black/50" data-open={has_modal}>
+	<div
+		role="dialog"
+		aria-modal="true"
+		aria-label="Transit details"
+		tabindex="-1"
+		{@attach modal}
+		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
+	>
+		{#if current_page_state.modal?.type === 'stop'}
+			<StopModal
+				stop={current_page_state.modal}
+				{show_previous}
+				time_format={time_format.current}
+			/>
 
-		{@render actions(
-			true,
-			current_page_state.modal.id,
-			`Arrivals at ${current_page_state.modal.name}`,
-			current_page_state.modal.data.source,
-			stop_pins
-		)}
-	{:else if current_page_state.modal?.type === 'route'}
-		<RouteModal route={current_page_state.modal} time_format={time_format.current} />
+			{@render actions(
+				true,
+				current_page_state.modal.id,
+				`Arrivals at ${current_page_state.modal.name}`,
+				current_page_state.modal.data.source,
+				stop_pins
+			)}
+		{:else if current_page_state.modal?.type === 'route'}
+			<RouteModal route={current_page_state.modal} time_format={time_format.current} />
 
-		{@render actions(
-			false,
-			current_page_state.modal.id,
-			`Alerts for ${current_page_state.modal.short_name}`,
-			current_page_state.modal.data.source,
-			route_pins
-		)}
-	{:else if current_page_state.modal?.type === 'trip'}
-		<TripModal trip={current_page_state.modal} {show_previous} time_format={time_format.current} />
+			{@render actions(
+				false,
+				current_page_state.modal.id,
+				`Alerts for ${current_page_state.modal.short_name}`,
+				current_page_state.modal.data.source,
+				route_pins
+			)}
+		{:else if current_page_state.modal?.type === 'trip'}
+			<TripModal
+				trip={current_page_state.modal}
+				{show_previous}
+				time_format={time_format.current}
+			/>
 
-		{@render actions(
-			true,
-			current_page_state.modal.id,
-			`${current_page_state.modal.route_id} Trip`,
-			current_page_state.modal.data.source,
-			trip_pins
-		)}
-	{/if}
-</dialog>
+			{@render actions(
+				true,
+				current_page_state.modal.id,
+				`${current_page_state.modal.route_id} Trip`,
+				current_page_state.modal.data.source,
+				trip_pins
+			)}
+		{/if}
+	</div>
+</div>
 
 <!-- <style>
 	@keyframes spin {
@@ -306,11 +330,11 @@
 	}
 </style> -->
 <style>
-	dialog[open] {
-		view-transition-name: modal;
+	.modal-backdrop[data-open='false'] {
+		display: none;
 	}
 
-	dialog::backdrop {
-		background-color: rgb(0 0 0 / 50%);
+	.modal-backdrop[data-open='true'] .modal-sheet {
+		view-transition-name: modal;
 	}
 </style>
