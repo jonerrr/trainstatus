@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/jonerrr/trainstatus/compare/backend-v1.3.1...backend-v1.3.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* add RUST_TEST_THREADS environment variable ([04a9276](https://github.com/jonerrr/trainstatus/commit/04a92762310547e906d7a3c300916df5b075a1b3))
+
 ## [1.3.1](https://github.com/jonerrr/trainstatus/compare/backend-v1.3.0...backend-v1.3.1) (2026-10-05)
 
 
