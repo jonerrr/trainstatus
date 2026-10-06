@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/jonerrr/trainstatus/compare/backend-v1.3.2...backend-v1.3.3) (2026-10-06)
+
+
+### Miscellaneous Chores
+
+* **backend:** Synchronize trainstatus versions
+
 ## [1.3.2](https://github.com/jonerrr/trainstatus/compare/backend-v1.3.1...backend-v1.3.2) (2026-10-06)
 
 
