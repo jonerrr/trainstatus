@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.2...frontend-v1.3.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* remove inactive express routes from stop list and add tests for arrival logic ([95c2f96](https://github.com/jonerrr/trainstatus/commit/95c2f96bd7b82c2ed949ec3b22c0dad08d7a36f7)), closes [#410](https://github.com/jonerrr/trainstatus/issues/410)
+
 ## [1.3.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.1...frontend-v1.3.2) (2026-10-06)
 
 
