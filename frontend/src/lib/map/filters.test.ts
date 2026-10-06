@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MapFilters, countActiveFilters } from './filters.svelte';
+import { countActiveFilters, MapFilters } from './filters.svelte';
 
 vi.mock('$app/state', () => ({
 	page: { data: { selected_sources: ['mta_subway', 'mta_bus'] } }

@@ -28,6 +28,11 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
 # config map with secrets
 demo.configmap.yml
 

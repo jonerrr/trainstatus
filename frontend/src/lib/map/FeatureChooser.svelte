@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
 
-	import MapBackdrop from './MapBackdrop.svelte';
 	import { dismissOnEscape } from './dialog';
 	import type { MapTarget, ScreenPoint } from './interactions';
+	import MapBackdrop from './MapBackdrop.svelte';
 
 	let {
 		targets,

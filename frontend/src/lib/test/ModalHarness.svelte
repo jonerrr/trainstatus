@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../../app.css';
+
 	import Modal from '../Modal.svelte';
 	import { alert_context } from '../resources/alerts.svelte';
 

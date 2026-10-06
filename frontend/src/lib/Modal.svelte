@@ -6,15 +6,15 @@
 
 	import { page } from '$app/state';
 
-	import Pin from '#lib/Pin.svelte';
-	import RouteModal from '#lib/Route/Modal.svelte';
-	import StopModal from '#lib/Stop/Modal.svelte';
-	import TripModal from '#lib/Trip/Modal.svelte';
 	import type { Source } from '#lib/client/index.js';
 	import { contain_modal_focus } from '#lib/modal_focus.js';
-	import { type Pins, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
+	import Pin from '#lib/Pin.svelte';
+	import { route_pins, stop_pins, trip_pins, type Pins } from '#lib/pins.svelte.js';
+	import RouteModal from '#lib/Route/Modal.svelte';
+	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { type ModalData, close_modal } from '#lib/url_params.svelte.js';
+	import TripModal from '#lib/Trip/Modal.svelte';
+	import { close_modal, type ModalData } from '#lib/url_params.svelte.js';
 
 	import {
 		AlarmClock,

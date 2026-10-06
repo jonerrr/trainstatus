@@ -2,9 +2,9 @@
 	import type { Source } from '#lib/client/index.js';
 	import FilterField from '#lib/map/FilterField.svelte';
 	import {
+		getFilterDefsForLayer,
 		type FilterFieldDef,
-		type FilterValue,
-		getFilterDefsForLayer
+		type FilterValue
 	} from '#lib/map/filters.svelte.js';
 
 	interface Props {

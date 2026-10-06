@@ -4,18 +4,17 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
+	import type { Source } from '#lib/client/index.js';
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
-	import SEO from '#lib/SEO.svelte';
-	import type { Source } from '#lib/client/index.js';
 	import { alert_context, createAlertResource } from '#lib/resources/alerts.svelte.js';
 	import { createPositionResource, position_context } from '#lib/resources/positions.svelte.js';
 	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
+	import SEO from '#lib/SEO.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 
 	import '@fontsource/inter';
-
 	import '../app.css';
 
 	let { children } = $props();

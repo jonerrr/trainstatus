@@ -7,14 +7,14 @@
 	import { browser } from '$app/env';
 	import { page } from '$app/state';
 
-	import Pin from '#lib/Pin.svelte';
-	import RouteButton from '#lib/Route/Button.svelte';
-	import StopButton from '#lib/Stop/Button.svelte';
-	import TripButton from '#lib/Trip/Button.svelte';
 	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
+	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
+	import RouteButton from '#lib/Route/Button.svelte';
+	import StopButton from '#lib/Stop/Button.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import TripButton from '#lib/Trip/Button.svelte';
 	import { open_modal } from '#lib/url_params.svelte.js';
 
 	type ItemType = 'stop' | 'route' | 'trip';
@@ -215,7 +215,7 @@
 		<!-- TODO: remove either this header or the main website header -->
 		<!-- it should be possible to combine the logo, tab selection, and settings button in one "row" -->
 		<!-- plus, it already shows in the navbar what section is active (except home page lists) -->
-		<h1 class="flex items-center gap-2 pl-2 text-xl font-bold h-10">
+		<h1 class="flex h-10 items-center gap-2 pl-2 text-xl font-bold">
 			<span>
 				{title}
 			</span>
@@ -247,7 +247,7 @@
 									aria-label={`Show ${source_info[source].name} items`}
 								>
 									<!-- TODO: improve icons (they are kinda ugly rn) -->
-									<img alt="" src={source_info[source].icon} class="size-5" />
+									<enhanced:img alt="" src={source_info[source].icon} sizes="20px" class="size-5" />
 									<!-- <Icon class="h-4 w-4" /> -->
 									<!-- TODO: only show text if theres enough room -->
 									<!-- <span>{source_info[source].name}</span> -->
@@ -277,7 +277,7 @@
 			scroll_top = e.currentTarget.scrollTop;
 		}}
 		style="-webkit-overflow-scrolling: touch;"
-		class="relative flex-1 min-h-0 overflow-y-auto text-base {list_class ?? ''}"
+		class="relative min-h-0 flex-1 overflow-y-auto text-base {list_class ?? ''}"
 	>
 		<div style:height="{total_height}px" class="relative">
 			<div

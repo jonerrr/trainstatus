@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type ChartPoint, chart_context } from '#lib/charts/context.js';
+	import { chart_context, type ChartPoint } from '#lib/charts/context.js';
 	import type { Route, Trip } from '#lib/client/index.js';
 	import { open_modal } from '#lib/url_params.svelte.js';
 

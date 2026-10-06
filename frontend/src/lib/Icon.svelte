@@ -89,7 +89,7 @@
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}
-		class={['relative appearance-none', show_alert_icon && 'ring-3 rounded-full ring-red-800']}
+		class={['relative appearance-none', show_alert_icon && 'rounded-full ring-3 ring-red-800']}
 		onclick={() => {
 			if (link) open_modal({ type: 'route', ...route });
 		}}

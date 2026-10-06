@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
 
-	import Icon from '#lib/Icon.svelte';
 	import type { Route } from '#lib/client/index.js';
+	import Icon from '#lib/Icon.svelte';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
 	import { debounce } from '#lib/util.svelte.js';
 

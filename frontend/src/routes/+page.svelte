@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import List from '#lib/List.svelte';
 	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
+	import List from '#lib/List.svelte';
 	import { route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import {
@@ -213,7 +213,7 @@
 		{/if}
 	</div>
 
-	<div class="flex-1 min-h-0">
+	<div class="min-h-0 flex-1">
 		<!-- TODO: either hide or show error message when nearby_stops is empty and location perms were denied -->
 		<!-- maybe put it inside of List, since we should also start showing an error message when the stop search returns empty -->
 		<!-- {#if nearby_stops} -->

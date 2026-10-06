@@ -4,25 +4,25 @@
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
+	import type { Stop, StopTime, Trip } from '#lib/client/index.js';
 	import Icon from '#lib/Icon.svelte';
 	import ModalList from '#lib/ModalList.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
-	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import Transfers from '#lib/Stop/Transfers.svelte';
-	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
-	import type { Stop, StopTime, Trip } from '#lib/client/index.js';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
 	import {
+		source_info,
 		type SourceMap,
-		type TypedVehiclePosition,
-		source_info
+		type TypedVehiclePosition
 	} from '#lib/resources/index.svelte.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import BusArrow from '#lib/Stop/BusArrow.svelte';
+	import Transfers from '#lib/Stop/Transfers.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
+	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
 

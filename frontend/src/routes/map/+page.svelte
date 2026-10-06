@@ -6,7 +6,6 @@
 	import type { Source } from '#lib/client/index.js';
 	import FeatureChooser from '#lib/map/FeatureChooser.svelte';
 	import Filters from '#lib/map/Filters.svelte';
-	import TripMarkersLoader from '#lib/map/TripMarkersLoader.svelte';
 	import { MapFilters } from '#lib/map/filters.svelte.js';
 	import { MapHover } from '#lib/map/hover.svelte.js';
 	import {
@@ -22,6 +21,7 @@
 		BUS_STOP_RADIUS,
 		CASING,
 		LABEL_FONT,
+		normalizeRouteColor,
 		ROUTE_CASING_WIDTH,
 		ROUTE_COLOR,
 		ROUTE_DIMMED_OPACITY,
@@ -33,15 +33,17 @@
 		STOP_BEAD_STROKE,
 		STOP_FILL,
 		STOP_HIT_RADIUS,
-		SUBWAY_SOURCE_FILTER,
-		normalizeRouteColor
+		SUBWAY_SOURCE_FILTER
 	} from '#lib/map/mapTheme.js';
+	import TripMarkersLoader from '#lib/map/TripMarkersLoader.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import { open_modal } from '#lib/url_params.svelte.js';
 
 	import * as maplibregl from 'maplibre-gl';
+
 	import 'maplibre-gl/dist/maplibre-gl.css';
+
 	import {
 		CircleLayer,
 		GeolocateControl,
@@ -51,6 +53,7 @@
 		SymbolLayer,
 		VectorTileSource
 	} from 'svelte-maplibre-gl';
+
 	import 'svelte-maplibre-gl/vite';
 
 	let map = $state<maplibregl.Map>();
@@ -341,7 +344,7 @@
 </script>
 
 <div
-	class="relative flex w-full h-full"
+	class="relative flex h-full w-full"
 	data-map-center={center.join(',')}
 	data-map-zoom={zoom}
 	data-map-bearing={bearing}

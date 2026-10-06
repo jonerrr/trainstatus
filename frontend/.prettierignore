@@ -2,10 +2,16 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+bun.lock
+bun.lockb
 
 build
 node_modules
 .svelte-kit
+static/
+src/lib/client/
+test-results/
+playwright-report/
 
 CHANGELOG.md
 renovate.json

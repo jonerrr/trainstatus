@@ -5,20 +5,20 @@
 
 	import { page } from '$app/state';
 
-	import Icon from '#lib/Icon.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
 	import AxisX from '#lib/charts/AxisX.svelte';
 	import AxisY from '#lib/charts/AxisY.svelte';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { Route, Source } from '#lib/client/index.js';
-	import { type SourceMap, source_info } from '#lib/resources/index.svelte.js';
+	import Icon from '#lib/Icon.svelte';
+	import { source_info, type SourceMap } from '#lib/resources/index.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Skeleton from '#lib/Skeleton.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import { scalePoint, scaleTime } from 'd3-scale';
-	import { LayerCake, Svg, flatten } from 'layercake';
+	import { flatten, LayerCake, Svg } from 'layercake';
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
@@ -452,7 +452,7 @@
 									bind:this={searchInputRef}
 									bind:value={searchQuery}
 									onkeydown={handleComboboxKeydown}
-									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 text-sm placeholder-neutral-400"
+									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pr-3 pl-10 text-sm placeholder-neutral-400"
 									placeholder="Search routes..."
 									autocomplete="off"
 								/>

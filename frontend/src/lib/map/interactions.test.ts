@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MapInteractionController, type MapTarget, resolveMapTargets } from './interactions';
+import { MapInteractionController, resolveMapTargets, type MapTarget } from './interactions';
 import type { ActiveVehicle } from './trajectoryArrow';
 
 const trip: MapTarget = {

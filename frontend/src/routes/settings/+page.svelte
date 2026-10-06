@@ -55,7 +55,12 @@
 								class="size-5 rounded border-neutral-700 bg-neutral-800 text-emerald-500 focus:ring-emerald-500/30 disabled:opacity-50"
 							/>
 							<div class="flex items-center gap-2">
-								<img src={info.icon} alt="" class="size-6 rounded-sm object-contain" />
+								<enhanced:img
+									src={info.icon}
+									sizes="24px"
+									alt=""
+									class="size-6 rounded-sm object-contain"
+								/>
 								<span class="font-medium">{info.name}</span>
 							</div>
 						</label>
@@ -122,7 +127,7 @@
 					<a
 						href="/api/docs"
 						target="_blank"
-						class="active:scale-98 flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-blue-400 focus:ring-2 focus:ring-blue-500/30 focus:outline-none active:scale-98"
 					>
 						<div>
 							<div class="flex items-center gap-1">
@@ -139,7 +144,7 @@
 					<a
 						href="https://github.com/jonerrr/trainstatus"
 						target="_blank"
-						class="active:scale-98 flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/30"
+						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-green-400 focus:ring-2 focus:ring-green-500/30 focus:outline-none active:scale-98"
 					>
 						<div>
 							<div class="flex items-center gap-1">

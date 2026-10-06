@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import Icon from '#lib/Icon.svelte';
-	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import type { Source, Stop, Transfer } from '#lib/client/index.js';
 	import { COMPASS_DIRECTIONS } from '#lib/compassDirections.js';
+	import Icon from '#lib/Icon.svelte';
+	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import { open_modal } from '#lib/url_params.svelte.js';
 	import { main_route_stops } from '#lib/util.svelte.js';
 

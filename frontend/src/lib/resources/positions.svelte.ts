@@ -2,12 +2,12 @@ import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
+	createMultiSourceContext,
 	LiveResource,
+	source_info,
 	type PositionResource,
 	type PositionResources,
-	type TypedVehiclePosition,
-	createMultiSourceContext,
-	source_info
+	type TypedVehiclePosition
 } from '#lib/resources/index.svelte.js';
 import { current_time } from '#lib/url_params.svelte.js';
 

@@ -1,23 +1,16 @@
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/science/.venv/bin/python",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/science"
-  ],
-  "rust-analyzer.linkedProjects": [
-    "backend/Cargo.toml"
-  ],
-  "rust-analyzer.cargo.features": [
-    "fixture-capture",
-    "integration-tests"
-  ],
+  "python.analysis.extraPaths": ["${workspaceFolder}/science"],
+  "rust-analyzer.linkedProjects": ["backend/Cargo.toml"],
+  "rust-analyzer.cargo.features": ["fixture-capture", "integration-tests"],
   "rust-analyzer.cargo.allTargets": true,
   "rust-analyzer.cfg.setTest": true,
-  "rust-analyzer.check.features": [
-    "fixture-capture",
-    "integration-tests"
-  ],
+  "rust-analyzer.check.features": ["fixture-capture", "integration-tests"],
   "rust-analyzer.check.allTargets": true,
   "rust-analyzer.cargo.extraEnv": {
     "SQLX_OFFLINE": "true"
+  },
+  "files.associations": {
+    "*.css": "tailwindcss"
   }
 }

@@ -7,7 +7,7 @@
 	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import type { LocalStorage } from '#lib/storage.svelte.js';
-	import { type ModalData, open_modal } from '#lib/url_params.svelte.js';
+	import { open_modal, type ModalData } from '#lib/url_params.svelte.js';
 
 	interface Props {
 		state: ModalData;

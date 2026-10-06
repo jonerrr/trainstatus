@@ -1,4 +1,5 @@
 import adapter from '@sveltejs/adapter-node';
+import { enhancedImages } from '@sveltejs/enhanced-img';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
@@ -17,16 +18,18 @@ export default defineConfig(({ mode }) => {
 			exclude: ['maplibre-gl']
 		},
 		plugins: [
+			enhancedImages(),
 			tailwindcss(),
 			sveltekit({
 				// Consult https://kit.svelte.dev/docs/integrations#preprocessors
 				// for more information about preprocessors
 				preprocess: vitePreprocess(),
-				compilerOptions: { experimental: { async: true } },
+				compilerOptions: {
+					runes: ({ filename }) =>
+						filename.split(/[/\\]/).includes('node_modules') ? undefined : true,
+					experimental: { async: true }
+				},
 				inspector: true,
-				// adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
-				// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-				// See https://kit.svelte.dev/docs/adapters for more information about adapters.
 				adapter: adapter()
 			})
 		],
@@ -45,6 +48,14 @@ export default defineConfig(({ mode }) => {
 				}
 			},
 			allowedHosts
+		},
+		preview: {
+			proxy: {
+				'/api': {
+					target: process.env.API_ORIGIN ?? 'http://localhost:3055',
+					changeOrigin: true
+				}
+			}
 		},
 		test: {
 			expect: { requireAssertions: true },

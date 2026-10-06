@@ -2,11 +2,11 @@ import { SvelteDate, SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/
 
 import type { Source } from '#lib/client/index.js';
 import {
-	LiveResource,
-	type StopTimeResource,
-	type TypedStopTime,
 	createMultiSourceContext,
-	source_info
+	LiveResource,
+	source_info,
+	type StopTimeResource,
+	type TypedStopTime
 } from '#lib/resources/index.svelte.js';
 import { current_time } from '#lib/url_params.svelte.js';
 

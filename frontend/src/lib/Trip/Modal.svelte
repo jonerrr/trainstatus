@@ -5,18 +5,18 @@
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
+	import type { StopTime, Trip } from '#lib/client/index.js';
 	import Icon from '#lib/Icon.svelte';
 	import ModalList from '#lib/ModalList.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
-	import Transfers from '#lib/Trip/Transfers.svelte';
-	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
-	import type { StopTime, Trip } from '#lib/client/index.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
+	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
 	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
@@ -179,7 +179,7 @@
 			class="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-neutral-100 transition hover:bg-neutral-800/60 [&::-webkit-details-marker]:hidden"
 		>
 			<div class="flex min-w-0 flex-1 items-center gap-2">
-				<div class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Consist</div>
+				<div class="text-xs font-semibold tracking-wide text-neutral-400 uppercase">Consist</div>
 
 				{#if subway_consist}
 					<div class="flex min-w-0 items-center gap-1.5 text-xs text-neutral-300">

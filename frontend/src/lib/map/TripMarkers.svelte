@@ -10,17 +10,17 @@
 	import type { VehiclePicker } from '#lib/map/interactions.js';
 	import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from '#lib/map/mapTheme.js';
 	import {
-		type ActiveVehicle,
-		type RenderUnitTable,
 		buildActiveVehiclesAtTime,
 		normalizeBearingForIcon,
-		renderUnitTableFromIPC
+		renderUnitTableFromIPC,
+		type ActiveVehicle,
+		type RenderUnitTable
 	} from '#lib/map/trajectoryArrow.js';
 	import {
+		shapeForIconKey,
 		VEHICLE_ICON_ATLAS,
 		VEHICLE_ICON_MAPPING,
-		type VehicleIconRole,
-		shapeForIconKey
+		type VehicleIconRole
 	} from '#lib/map/vehicleIcons.js';
 
 	import type { PickingInfo } from '@deck.gl/core';

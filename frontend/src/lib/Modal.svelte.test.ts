@@ -6,9 +6,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
 
+import { page } from './test/modal-page.svelte';
 import ModalFocusHarness from './test/ModalFocusHarness.svelte';
 import ModalHarness from './test/ModalHarness.svelte';
-import { page } from './test/modal-page.svelte';
 
 vi.mock('$app/state', async () => await import('./test/modal-page.svelte'));
 vi.mock('$app/navigation', () => ({

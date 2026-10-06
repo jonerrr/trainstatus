@@ -1,6 +1,6 @@
 import type { Source } from '#lib/client/index.js';
 
-import { type Table, type Vector, tableFromIPC } from 'apache-arrow';
+import { tableFromIPC, type Table, type Vector } from 'apache-arrow';
 
 export interface RenderUnitTable {
 	table: Table;

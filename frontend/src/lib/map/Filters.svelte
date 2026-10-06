@@ -9,11 +9,10 @@
 
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
+	import { dismissOnEscape } from './dialog';
+	import { layer_data, type FilterValue, type MapFilters } from './filters.svelte';
 	import MapBackdrop from './MapBackdrop.svelte';
 	import SourceFilterGroup from './SourceFilterGroup.svelte';
-	import { dismissOnEscape } from './dialog';
-	import type { FilterValue, MapFilters } from './filters.svelte';
-	import { layer_data } from './filters.svelte';
 
 	// TODO: simplify the code and improve the ui
 	// there should be less padding, i dont like how its called filters but the title is "map settings"
@@ -106,7 +105,7 @@
 			<span class="hidden sm:inline">Filters</span>
 			{#if filters.activeFilterCount > 0}
 				<span
-					class="flex min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold leading-4 text-white"
+					class="flex min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] leading-4 font-bold text-white"
 					aria-label={`${filters.activeFilterCount} active filters`}
 				>
 					{filters.activeFilterCount}
@@ -126,7 +125,7 @@
 					aria-label={`${enabled ? 'Hide' : 'Show'} ${info.name}`}
 					onclick={() => filters.toggleSource(source)}
 				>
-					<img src={info.icon} alt="" class="size-5 rounded object-contain" />
+					<enhanced:img src={info.icon} sizes="20px" alt="" class="size-5 rounded object-contain" />
 					<span class="hidden lg:inline">{info.name.replace('MTA ', '')}</span>
 				</button>
 			{/each}
@@ -224,7 +223,7 @@
 		>
 			<button
 				type="button"
-				class="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-neutral-700 text-sm font-semibold hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-blue-400"
+				class="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-neutral-700 text-sm font-semibold hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
 				disabled={filters.activeFilterCount === 0}
 				onclick={() => filters.reset()}
 			>

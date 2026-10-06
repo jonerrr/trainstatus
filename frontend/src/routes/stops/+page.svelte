@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import List from '#lib/List.svelte';
 	import { type Source, type Stop } from '#lib/client/index.js';
+	import List from '#lib/List.svelte';
 	import { stop_pins } from '#lib/pins.svelte.js';
 	import { StopSearch } from '#lib/search.svelte.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';

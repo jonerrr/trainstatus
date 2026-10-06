@@ -2,10 +2,9 @@ import { createContext } from 'svelte';
 
 import type { SvelteMap } from 'svelte/reactivity';
 
-import mta_bus_icon from '#lib/assets/mta_bus.webp';
-import mta_subway_icon from '#lib/assets/mta_subway.webp';
-// TODO: convert to webp
-import njt_bus_icon from '#lib/assets/njt_bus.png';
+import mta_bus_icon from '#lib/assets/mta_bus.webp?w=24;48;72&enhanced';
+import mta_subway_icon from '#lib/assets/mta_subway.webp?w=24;48;72&enhanced';
+import njt_bus_icon from '#lib/assets/njt_bus.webp?w=24;48;72&enhanced';
 import type {
 	AlertData,
 	ApiAlert,
