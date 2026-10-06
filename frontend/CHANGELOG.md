@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.1...frontend-v1.3.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* chart stop ordering and add test suite for it ([86473b4](https://github.com/jonerrr/trainstatus/commit/86473b44fa705b512e20fa9188336171518ed1c0)), closes [#402](https://github.com/jonerrr/trainstatus/issues/402)
+* update pnpm workspace configuration and enhance image handling ([ec0d8a0](https://github.com/jonerrr/trainstatus/commit/ec0d8a0f359f68d3f88289d0f1c973bb85b31070))
+
 ## [1.3.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.0...frontend-v1.3.1) (2026-10-05)
 
 
