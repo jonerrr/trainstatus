@@ -50,7 +50,7 @@ cargo sqlx prepare --check -- --all-targets --features fixture-capture,integrati
 # TODO: if we keep redis, refactor the tests to use a mock redis client instead of relying on a real Redis instance (see https://crates.io/crates/redis-test)
 [tasks."test:services"]
 description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
-env = { SQLX_OFFLINE = "true", TEST_VALKEY_IMAGE = "docker.io/valkey/valkey:alpine" }
+env = { SQLX_OFFLINE = "true", TEST_VALKEY_IMAGE = "docker.io/valkey/valkey:alpine", RUST_TEST_THREADS = "4" }
 usage = """
 arg "<suite>" {
   choices "full" "integration" "performance"
