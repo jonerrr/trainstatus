@@ -4,8 +4,11 @@
 	import type { Source, Stop, Transfer } from '#lib/client/index.js';
 	import { COMPASS_DIRECTIONS } from '#lib/compassDirections.js';
 	import Icon from '#lib/Icon.svelte';
+	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { get_stop_arrivals } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { open_modal } from '#lib/url_params.svelte.js';
+	import { current_time, open_modal } from '#lib/url_params.svelte.js';
 	import { main_route_stops } from '#lib/util.svelte.js';
 
 	interface Props {
@@ -14,6 +17,18 @@
 	}
 
 	const { transfers, stop_source }: Props = $props();
+	const all_trips = trip_context.get();
+	const all_stop_times = stop_time_context.get();
+
+	function transfer_routes(stop: Stop) {
+		const source = stop.data.source;
+		const { active_routes } = get_stop_arrivals(
+			all_stop_times[source]?.current.by_stop_id.get(stop.id) ?? [],
+			all_trips[source]?.current,
+			current_time.ms
+		);
+		return main_route_stops(stop.routes, active_routes);
+	}
 
 	const sorted_transfers = $derived(
 		transfers
@@ -55,7 +70,7 @@
 				{#if stop.data.source === 'mta_bus'}
 					<BusArrow direction={stop.data.direction} size="1rem" />
 				{/if}
-				{#each main_route_stops(stop.routes) as route_stop (route_stop.route_id)}
+				{#each transfer_routes(stop) as route_stop (route_stop.route_id)}
 					{@const route = page.data.routes_by_id[to_stop_source]?.[route_stop.route_id]}
 					{#if route}
 						<Icon width={24} height={24} link={false} {route} />

@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Route } from './client';
-import { bus_headsign } from './util.svelte';
+import type { Route, RouteStop } from './client';
+import { bus_headsign, main_route_stops } from './util.svelte';
+
+describe('main_route_stops', () => {
+	const routes: RouteStop[] = ['6', '6X', '7', '7X', 'FX'].map((route_id) => ({
+		route_id,
+		stop_id: 'test-stop',
+		stop_sequence: 1,
+		data: { source: 'mta_subway', stop_type: 'full_time' }
+	}));
+
+	it('omits express variants without trips while keeping ordinary routes', () => {
+		expect(main_route_stops(routes, new Set()).map((r) => r.route_id)).toEqual(['6', '7']);
+	});
+
+	it('shows only express variants with actual trips, then hides them when service clears', () => {
+		const active = new Set(['7X', 'FX']);
+		expect(main_route_stops(routes, active).map((r) => r.route_id)).toEqual(['6', '7', '7X', 'FX']);
+		active.clear();
+		expect(main_route_stops(routes, active).map((r) => r.route_id)).toEqual(['6', '7']);
+	});
+});
 
 /**
  * The Helium feed maps headsigns to a route's directions, never to individual

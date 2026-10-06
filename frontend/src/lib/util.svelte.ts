@@ -81,12 +81,16 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 	};
 }
 
-// Get main routes for a stop (for for mta_subway currently, filter to main lines only)
-export const main_route_stops = (route_stops: RouteStop[]): RouteStop[] => {
+// Get main routes for a stop, optionally hiding express variants without service.
+export const main_route_stops = (
+	route_stops: RouteStop[],
+	active_routes?: ReadonlySet<string>
+): RouteStop[] => {
 	return route_stops.filter(
 		(route) =>
 			route.data.source !== 'mta_subway' ||
-			['full_time', 'part_time'].includes(route.data.stop_type)
+			(['full_time', 'part_time'].includes(route.data.stop_type) &&
+				(!route.route_id.endsWith('X') || !active_routes || active_routes.has(route.route_id)))
 	);
 };
 

@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { SvelteSet } from 'svelte/reactivity';
-
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
-	import type { Stop, StopTime, Trip } from '#lib/client/index.js';
+	import type { Stop } from '#lib/client/index.js';
 	import Icon from '#lib/Icon.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
@@ -17,6 +15,7 @@
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Skeleton from '#lib/Skeleton.svelte';
+	import { get_stop_arrivals } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import Transfers from '#lib/Stop/Transfers.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
@@ -30,11 +29,6 @@
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		stop: Stop;
-	}
-
-	interface StopTimeWithTrip extends StopTime {
-		eta: number;
-		trip: Trip;
 	}
 
 	let { stop, show_previous, time_format }: Props = $props();
@@ -65,21 +59,12 @@
 		!stop_times_store || (stop_times_store.status !== 'ready' && current_stop_times.length === 0)
 	);
 
-	const { stop_times_with_trip, active_routes } = $derived.by(() => {
-		const now = current_time.ms;
-		const active_routes = new SvelteSet<string>();
-
-		const stop_times_with_trip = current_stop_times.flatMap((st) => {
-			if (!show_previous && st.arrival.getTime() <= now) return [];
-			const trip = trips?.current?.get(st.trip_id);
-			if (!trip) return [];
-			const eta = (st.arrival.getTime() - now) / 60000;
-			active_routes.add(trip.route_id);
-			return [{ ...st, eta, trip }] as StopTimeWithTrip[];
-		});
-
-		return { stop_times_with_trip, active_routes };
-	});
+	const { arrivals: stop_times_with_trip, active_routes } = $derived(
+		get_stop_arrivals(current_stop_times, trips?.current, current_time.ms, {
+			show_previous,
+			include_due_now: false
+		})
+	);
 
 	let selected_direction = new LocalStorage<SourceMap<number>>('selectedDirection', {
 		mta_subway: 1,
@@ -100,8 +85,8 @@
 	// if there are more than 6 routes, show the main ones first and sort the rest by active vs inactive and then id length
 	// test lots of routes with http://localhost:5173/stops?s=400354
 	const route_stops = $derived.by(() => {
-		const main_rs = main_route_stops(stop.routes);
-		if (stop.routes.length < 6) return main_rs;
+		const main_rs = main_route_stops(stop.routes, active_routes);
+		if (main_rs.length < 6) return main_rs;
 		return main_rs.sort((a, b) => {
 			const a_active = active_routes.has(a.route_id);
 			const b_active = active_routes.has(b.route_id);
@@ -125,7 +110,7 @@
 					<Icon width={36} height={36} link={true} {route} show_alerts />
 				{/if}
 			{/each}
-			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{stop.routes.length - 5}</div>
+			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{route_stops.length - 5}</div>
 		{:else}
 			{#each route_stops as route_stop (route_stop.route_id)}
 				{@const route = routes?.[route_stop.route_id]}

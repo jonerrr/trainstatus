@@ -3,17 +3,17 @@
 
 	import { page } from '$app/state';
 
-	import type { Stop, StopTime } from '#lib/client/index.js';
+	import type { Stop } from '#lib/client/index.js';
 	import Icon from '#lib/Icon.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { get_stop_arrivals, type StopArrival } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 
-	type StopTimeWithETA = StopTime & { eta: number };
-	type StopTimesByRoute = SvelteMap<string, StopTimeWithETA[]>;
+	type StopTimesByRoute = SvelteMap<string, StopArrival[]>;
 
 	interface Props {
 		data: Stop;
@@ -41,12 +41,16 @@
 	});
 
 	const current_stop_times = $derived(stop_times?.current.by_stop_id.get(stop.id) ?? []);
+	const { arrivals, active_routes } = $derived(
+		get_stop_arrivals(current_stop_times, trips?.current, current_time.ms)
+	);
 
 	const is_loading = $derived(
 		!stop_times || (stop_times.status !== 'ready' && current_stop_times.length === 0)
 	);
 
-	const main_rs = $derived(main_route_stops(stop.routes));
+	// Express rows are added below only when an upcoming trip serves this direction.
+	const main_rs = $derived(main_route_stops(stop.routes, new Set()));
 
 	const stop_times_by_direction = $derived.by(() => {
 		const stop_times_by_direction = new SvelteMap<number, StopTimesByRoute>();
@@ -61,11 +65,8 @@
 			}
 		}
 
-		for (const st of current_stop_times) {
-			if (st.arrival.getTime() < current_time.ms) continue;
-			const trip = trips?.current?.get(st.trip_id);
-			if (!trip) continue;
-
+		for (const st of arrivals) {
+			const trip = st.trip;
 			const route_id = trip.route_id;
 
 			if (!stop_times_by_direction.has(trip.direction)) {
@@ -77,16 +78,16 @@
 				target_map.set(route_id, []);
 			}
 
-			const eta = (st.arrival.getTime() - current_time.ms) / 1000 / 60;
-
-			target_map.get(route_id)!.push({ ...st, eta });
+			target_map.get(route_id)!.push(st);
 		}
 
 		return stop_times_by_direction;
 	});
 
 	const default_stop_routes = $derived(
-		main_rs.map((r) => routes[r.route_id]).filter((r) => r !== undefined)
+		main_route_stops(stop.routes, active_routes)
+			.map((r) => routes[r.route_id])
+			.filter((r) => r !== undefined)
 	);
 
 	// A bus stop sits on one side of the street, so it almost always serves a
@@ -94,7 +95,7 @@
 	// Pick the direction of the next arrival so headsign and ETAs agree, rather
 	// than mixing both directions into one row.
 	function next_direction(route_id: string) {
-		let best: { direction: number; times: StopTimeWithETA[] } | undefined;
+		let best: { direction: number; times: StopArrival[] } | undefined;
 		let best_eta = Infinity;
 
 		for (const [direction, by_route] of stop_times_by_direction) {
@@ -121,7 +122,7 @@
 	{/key}
 {/snippet}
 
-{#snippet eta_or_loading(route_stop_times: StopTimeWithETA[])}
+{#snippet eta_or_loading(route_stop_times: StopArrival[])}
 	{#if is_loading}
 		<span
 			class="inline-block w-8 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
@@ -192,7 +193,7 @@
 				{@const next = next_direction(route_stop.route_id)}
 				<!-- TODO: simplify this -->
 				{@const next_st = next?.times.reduce((a, b) => (a.eta <= b.eta ? a : b))}
-				{@const next_trip = next_st && trips?.current?.get(next_st.trip_id)}
+				{@const next_trip = next_st?.trip}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">
