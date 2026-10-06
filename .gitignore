@@ -40,3 +40,7 @@ demo.configmap.yml
 data/
 pgadmin.yaml
 .venv/
+
+# Agent workspaces
+.worktrees/
+.superpowers/

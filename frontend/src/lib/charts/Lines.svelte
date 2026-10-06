@@ -26,8 +26,10 @@
 </script>
 
 <!-- Draw a path for each train trip -->
-{#each cake.data as group (group.trip.id)}
-	{@const tripColor = routes.find((r) => r.id === group.trip.route_id)!.color}
+{#each cake.data as group (`${group.trip.data.source}:${group.trip.id}`)}
+	{@const tripColor = routes.find(
+		(r) => r.id === group.trip.route_id && r.data.source === group.trip.data.source
+	)!.color}
 
 	<!-- Invisible wider path for easier clicking -->
 	<path
@@ -55,7 +57,7 @@
 		pointer-events="none"
 	/>
 	{#if stop_points}
-		{#each group.points as point (`${point.stop_id}-${point.time.getTime()}`)}
+		{#each group.points as point (point.stop_key)}
 			<circle
 				cx={cake.xGet(point)}
 				cy={cake.yGet(point)}

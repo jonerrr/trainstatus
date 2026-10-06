@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import { SvelteMap } from 'svelte/reactivity';
-
 	import { page } from '$app/state';
 
 	import AxisX from '#lib/charts/AxisX.svelte';
 	import AxisY from '#lib/charts/AxisY.svelte';
+	import { buildChartData, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { Route, Source } from '#lib/client/index.js';
 	import Icon from '#lib/Icon.svelte';
@@ -21,8 +20,6 @@
 	import { flatten, LayerCake, Svg } from 'layercake';
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
-
-	// TODO: improve y axis ordering (if theres trains with weird trip patterns, it causes the stops y axis to be in a weird order and lines to look weird)
 
 	const all_trips = trip_context.get();
 	const all_stop_times = stop_time_context.get();
@@ -96,12 +93,7 @@
 	});
 
 	const data = $derived.by(() => {
-		const route_trips: Array<{
-			trip: { id: string; route_id: string; direction: number; [key: string]: unknown };
-			points: Array<{ stop_id: string; stop_name: string; time: Date }>;
-		}> = [];
-		// Track all stops seen across all sources/routes, keyed by stop.id
-		const stops_seen = new SvelteMap<string, { id: string; name: string; sequence: number }>();
+		const inputs: ChartInput[] = [];
 
 		for (const source of page.data.selected_sources) {
 			const source_routes = routes[source];
@@ -120,34 +112,15 @@
 				const trip_st = stop_times_resource?.current.by_trip_id.get(trip.id);
 				if (!trip_st?.length) continue;
 
-				const trip_points: Array<{ stop_id: string; stop_name: string; time: Date }> = [];
-				for (const st of trip_st) {
-					if (st.arrival.getTime() < current_time.ms) continue;
-
-					const stop = page.data.stops_by_id[source]?.[st.stop_id];
-					if (!stop) continue;
-
-					const route_stop = stop.routes.find((r) => r.route_id === trip.route_id);
-					const sequence = route_stop?.stop_sequence ?? 0;
-
-					if (!stops_seen.has(stop.id)) {
-						stops_seen.set(stop.id, { id: stop.id, name: stop.name, sequence });
-					}
-
-					trip_points.push({ stop_id: stop.id, stop_name: stop.name, time: st.arrival });
-				}
-
-				if (trip_points.length) {
-					route_trips.push({ trip, points: trip_points });
-				}
+				inputs.push({
+					trip,
+					stopTimes: trip_st,
+					stops: page.data.stops_by_id[source] ?? {}
+				});
 			}
 		}
 
-		const yDomain = Array.from(stops_seen.values())
-			.sort((a, b) => a.sequence - b.sequence)
-			.map((s) => s.name);
-
-		return { route_trips, yDomain };
+		return buildChartData(inputs, current_time.ms);
 	});
 
 	// Create a reference to the SVG element
@@ -622,7 +595,7 @@
 						ssr
 						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
 						x="time"
-						y="stop_name"
+						y="stop_key"
 						{xDomain}
 						yDomain={data.yDomain}
 						yScale={scalePoint().padding(0)}
@@ -632,7 +605,7 @@
 					>
 						<Svg>
 							<AxisX {current_time_line} interval={xAxisInterval} />
-							<AxisY />
+							<AxisY stopNames={data.stopNames} />
 							<Lines routes={selected_routes_flat} bind:stop_points />
 						</Svg>
 					</LayerCake>

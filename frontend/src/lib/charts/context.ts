@@ -5,6 +5,7 @@ import { getLayerCakeContext } from 'layercake';
 
 export type ChartPoint = {
 	stop_id: string;
+	stop_key: string;
 	stop_name: string;
 	time: Date;
 };
