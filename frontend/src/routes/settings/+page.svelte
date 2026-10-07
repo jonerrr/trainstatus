@@ -20,9 +20,9 @@
 	// TODO: add 'debug' mode that logs data in console and shows extra info about data sources
 </script>
 
-<div class="min-h-screen bg-black text-white">
-	<div class="mx-auto max-w-4xl px-6 py-12">
-		<h1 class="mb-12 text-4xl font-bold">Settings</h1>
+<div class="h-full overflow-y-auto bg-black text-white">
+	<div class="mx-auto max-w-4xl px-6 py-6">
+		<!-- <h1 class="mb-12 text-4xl font-bold">Settings</h1> -->
 
 		<div class="flex flex-col divide-y divide-neutral-800 text-base">
 			<div class="p-6">
