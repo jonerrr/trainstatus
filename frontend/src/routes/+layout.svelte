@@ -129,9 +129,9 @@
 
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->
-<div class="flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
+<div class="app-shell flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
 	<!-- <Header {offline} /> -->
-	<main class="relative flex-1 overflow-hidden text-white">
+	<main class="relative min-h-0 flex-1 overflow-hidden text-white">
 		<Modal />
 
 		{@render children()}
@@ -142,5 +142,15 @@
 <style>
 	:global(body) {
 		background-color: var(--color-neutral-900);
+	}
+
+	/* Android Chrome sizes 100dvh too tall in an installed PWA after a
+	   pull-to-refresh reload, which makes the document scroll. svh matches
+	   the visible viewport in standalone mode. */
+	@media (display-mode: standalone), (display-mode: fullscreen) {
+		.app-shell {
+			height: 100svh;
+			max-height: 100svh;
+		}
 	}
 </style>
