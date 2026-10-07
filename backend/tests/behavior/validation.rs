@@ -1,9 +1,9 @@
 use backend::models::{
     route::{Route, RouteData},
     source::Source,
-    static_dataset::StaticDataset,
     stop::{MtaSubwayStopData, RouteStop, RouteStopData, Stop, StopData, StopType},
 };
+use backend::static_data::dataset::StaticDataset;
 use geo::Point;
 
 #[test]
@@ -44,7 +44,7 @@ fn validation_catches_missing_route_stop_references() {
             },
         }],
         shapes: vec![],
-        cached_trips: vec![],
+        scheduled_trips: vec![],
         trip_patterns: std::collections::HashMap::new(),
         stop_remap: std::collections::HashMap::new(),
     };

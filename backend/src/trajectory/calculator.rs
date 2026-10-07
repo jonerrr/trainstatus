@@ -16,12 +16,12 @@ use super::types::{
     ComputedTrajectory, Trajectory, TrajectoryConfig, TrajectoryState, TripSnapshot,
 };
 
-pub struct TrajectoryEngine {
+pub struct TrajectoryCalculator {
     builders: HashMap<Source, Arc<dyn TrajectoryBuilder>>,
     method: Arc<dyn InterpolationMethod>,
 }
 
-impl TrajectoryEngine {
+impl TrajectoryCalculator {
     pub fn new() -> Self {
         let mut builders: HashMap<Source, Arc<dyn TrajectoryBuilder>> = HashMap::new();
         builders.insert(
@@ -47,7 +47,7 @@ impl TrajectoryEngine {
     }
 }
 
-impl Default for TrajectoryEngine {
+impl Default for TrajectoryCalculator {
     fn default() -> Self {
         Self::new()
     }
@@ -170,7 +170,7 @@ pub fn compute_trajectory(
 }
 
 pub async fn compute_trajectory_async(
-    engine: &TrajectoryEngine,
+    engine: &TrajectoryCalculator,
     source: Source,
     trip: &TripSnapshot,
     prev_state: Option<TrajectoryState>,

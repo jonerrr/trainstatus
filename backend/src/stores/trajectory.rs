@@ -9,7 +9,7 @@ use crate::{
         stop::StopData,
         trip::{StopTime, Trip},
     },
-    static_index::{IndexedRoute, IndexedStop, StaticTransitRevision},
+    static_data::index::{IndexedRoute, IndexedStop, StaticTransitRevision},
     trajectory::{TrajectoryCache, TripSnapshot, snapshot_from_persisted_trip},
 };
 use chrono::{DateTime, Utc};
@@ -148,6 +148,7 @@ impl TrajectoryStore {
             route_stop_shapes: HashMap::new(),
             trip_patterns: HashMap::new(),
             stop_remap: HashMap::new(),
+            scheduled_trips: HashMap::new(),
         };
         let mut stops_by_trip: HashMap<_, Vec<_>> = HashMap::new();
         for stop in stop_times {

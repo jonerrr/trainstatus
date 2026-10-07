@@ -1,11 +1,9 @@
 use crate::support::{mta_bus_dataset, test_stores};
 use async_trait::async_trait;
 use backend::{
-    engines::static_data,
     models::source::Source,
     sources::StaticAdapter,
-    static_index::StaticTransitRevision,
-    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
+    static_data::{controller as static_data, dataset::StaticDataset},
 };
 use std::{
     sync::{
@@ -29,16 +27,9 @@ impl StaticAdapter for CountingStaticAdapter {
         Duration::from_secs(24 * 60 * 60)
     }
 
-    async fn import(
-        &self,
-        route_store: &RouteStore,
-        stop_store: &StopStore,
-        static_cache_store: &StaticCacheStore,
-    ) -> anyhow::Result<()> {
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
         self.imports.fetch_add(1, Ordering::SeqCst);
-        mta_bus_dataset()
-            .persist(route_store, stop_store, static_cache_store)
-            .await
+        Ok(mta_bus_dataset())
     }
 }
 
@@ -57,15 +48,12 @@ async fn static_controller_initializes_empty_index_even_when_database_is_fresh(p
     .await
     .expect("fresh source timestamp should save");
 
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis_pool = _redis.pool();
-    let stores = test_stores(pool.clone(), redis_pool);
+    let stores = test_stores(pool.clone());
     let imports = Arc::new(AtomicUsize::new(0));
     let controller = static_data::run(
         &pool,
-        &stores.route_store,
         &stores.stop_store,
-        &stores.static_cache_store,
+        &stores.static_data_store,
         vec![Arc::new(CountingStaticAdapter {
             imports: imports.clone(),
         })],
@@ -96,39 +84,71 @@ async fn static_controller_initializes_empty_index_even_when_database_is_fresh(p
     assert_eq!(imports.load(Ordering::SeqCst), 1);
 }
 
+struct CountingNjtAdapter {
+    imports: Arc<AtomicUsize>,
+}
+
+#[async_trait]
+impl StaticAdapter for CountingNjtAdapter {
+    fn source(&self) -> Source {
+        Source::NjtBus
+    }
+    fn refresh_interval(&self) -> Duration {
+        Duration::from_secs(24 * 60 * 60)
+    }
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
+        self.imports.fetch_add(1, Ordering::SeqCst);
+        let mut dataset = crate::support::njt_bus_dataset();
+        dataset
+            .scheduled_trips
+            .push(backend::static_data::schedule::ScheduledTrip {
+                trip_id: "restart-trip".into(),
+                route_id: "87".into(),
+                headsign: "Recovered terminal".into(),
+                direction_id: 1,
+                start_date: "20260528".into(),
+                start_time: crate::support::fixed_time(),
+                stop_times: vec![],
+            });
+        Ok(dataset)
+    }
+}
+
 #[sqlx::test]
-async fn failed_stop_cache_refresh_keeps_previous_static_revision(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let stores = test_stores(pool.clone(), _redis.pool());
-    let dataset = mta_bus_dataset();
-    let index = stores.static_cache_store.static_index();
-    index.publish(StaticTransitRevision::from_dataset(&dataset));
-    let previous = index.get(Source::MtaBus).expect("previous revision");
-
-    // Reserve a port without serving Redis, so only the stop cache refresh fails.
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let manager = bb8_redis::RedisConnectionManager::new(format!(
-        "redis://{}",
-        listener.local_addr().unwrap()
-    ))
-    .unwrap();
-    let unavailable_redis = bb8::Pool::builder()
-        .connection_timeout(Duration::from_millis(100))
-        .build_unchecked(manager);
-    let stop_store = StopStore::new(pool, unavailable_redis);
-    let result = dataset
-        .persist(&stores.route_store, &stop_store, &stores.static_cache_store)
+async fn njt_upgrade_imports_once_and_next_restart_restores_without_collection(pool: sqlx::PgPool) {
+    let stores = test_stores(pool.clone());
+    stores
+        .static_data_store
+        .persist(&crate::support::njt_bus_dataset())
+        .await
+        .unwrap();
+    // Simulate an installation whose old static rows predate schedule persistence.
+    sqlx::query("UPDATE source SET schedules_initialized = FALSE WHERE id = $1")
+        .bind(Source::NjtBus)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let imports = Arc::new(AtomicUsize::new(0));
+    for expected_imports in [1, 1] {
+        let restarted = test_stores(pool.clone());
+        let controller = static_data::run(
+            &pool,
+            &restarted.stop_store,
+            &restarted.static_data_store,
+            vec![Arc::new(CountingNjtAdapter {
+                imports: imports.clone(),
+            })],
+        )
         .await;
-
-    assert!(
-        result.is_err(),
-        "a failed stop-cache write must fail the import"
-    );
-    let current = index
-        .get(Source::MtaBus)
-        .expect("previous revision retained");
-    assert!(
-        Arc::ptr_eq(&previous, &current),
-        "failed imports must not publish"
-    );
+        controller.ensure_updated(Source::NjtBus).await.unwrap();
+        let revision = controller.static_index().get(Source::NjtBus).unwrap();
+        assert_eq!(
+            revision
+                .scheduled_trip("restart-trip", "20260528")
+                .unwrap()
+                .headsign,
+            "Recovered terminal"
+        );
+        assert_eq!(imports.load(Ordering::SeqCst), expected_imports);
+    }
 }

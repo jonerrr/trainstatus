@@ -43,22 +43,6 @@ spec:
         initialDelaySeconds: 5
         periodSeconds: 5
 
-    - name: valkey
-      image: valkey/valkey:alpine
-      ports:
-        - containerPort: 6379
-          hostPort: 6379
-      volumeMounts:
-        - name: trainstatus-cache-dev
-          mountPath: /data
-      resources:
-        requests:
-          cpu: "50m"
-          memory: "64Mi"
-        limits:
-          cpu: "1000m"
-          memory: "1Gi"
-
     - name: martin
       image: ghcr.io/maplibre/martin:latest
       env:
@@ -101,9 +85,6 @@ spec:
     - name: trainstatus-db-dev
       persistentVolumeClaim:
         claimName: trainstatus-db-dev
-    - name: trainstatus-cache-dev
-      persistentVolumeClaim:
-        claimName: trainstatus-cache-dev
     - name: martin-config
       configMap:
         name: martin-config-dev
@@ -126,18 +107,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: trainstatus-cache-dev
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
 
 ---
 apiVersion: v1

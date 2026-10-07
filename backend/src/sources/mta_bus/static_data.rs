@@ -1,3 +1,4 @@
+use crate::static_data::dataset::StaticDataset;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Context;
@@ -7,18 +8,16 @@ use proj4rs::Proj;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    engines::valhalla::ValhallaManager,
+    integrations::valhalla::ValhallaManager,
     models::{
         route::{MtaBusDirection, MtaBusRouteData, Route, RouteData},
         shape::Shape,
         source::Source,
-        static_dataset::StaticDataset,
         stop::{
             Borough, CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData,
         },
     },
     sources::StaticAdapter,
-    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
     trajectory::{
         geometry::{
             cumulative_distances, project_linestring_wgs84_to_epsg, project_point_onto_line,
@@ -132,18 +131,11 @@ impl StaticAdapter for MtaBusStatic {
         Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
-    async fn import(
-        &self,
-        route_store: &RouteStore,
-        stop_store: &StopStore,
-        static_cache_store: &StaticCacheStore,
-    ) -> anyhow::Result<()> {
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
         let client = reqwest::Client::new();
         let infra = fetch_infrastructure(&client).await?;
         let dataset = build_static_dataset(infra);
-        dataset
-            .persist(route_store, stop_store, static_cache_store)
-            .await
+        Ok(dataset)
     }
 }
 
@@ -347,7 +339,7 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> StaticDataset {
         stops,
         route_stops,
         shapes,
-        cached_trips: vec![],
+        scheduled_trips: vec![],
         trip_patterns: HashMap::new(),
         stop_remap: HashMap::new(),
     }

@@ -11,15 +11,10 @@ use crate::support::{app_state, mta_subway_dataset, test_stores};
 
 #[sqlx::test]
 async fn explicit_at_uses_final_arrival_time(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis_pool = _redis.pool();
-    let stores = test_stores(pool.clone(), redis_pool.clone());
-    mta_subway_dataset()
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    let stores = test_stores(pool.clone());
+    stores
+        .static_data_store
+        .persist(&mta_subway_dataset())
         .await
         .expect("static fixture should persist");
 
@@ -75,7 +70,7 @@ async fn explicit_at_uses_final_arrival_time(pool: sqlx::PgPool) {
         .await
         .expect("retained trip should save");
 
-    let (router, _) = backend::api::router(app_state(pool, redis_pool)).split_for_parts();
+    let (router, _) = backend::api::router(app_state(pool)).split_for_parts();
     let server = TestServer::new(router);
     let trips = server
         .get(&format!("/trips/mta_subway?at={}", at.timestamp()))

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     models::{shape::Shape, source::Source},
     sources::normalize_id,
-    stores::static_cache::TripPattern,
+    static_data::index::TripPattern,
     trajectory::geometry::{
         build_shape_geometry, project_point_onto_line, project_wgs84_point_to_epsg,
     },

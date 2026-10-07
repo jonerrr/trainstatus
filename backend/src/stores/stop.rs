@@ -1,45 +1,55 @@
-use crate::{
-    models::{
-        source::Source,
-        stop::{RouteStop, Stop},
-    },
-    stores::{cache_get, cache_set_with_etag},
+use super::response::{ResponseCache, StaticResponse};
+use crate::models::{
+    source::Source,
+    stop::{RouteStop, Stop},
 };
-use bb8_redis::RedisConnectionManager;
-use gtfs_structures::StopTransfer;
-use redis::AsyncCommands;
-use sqlx::PgPool;
-use std::{collections::HashMap, time::Duration};
-
-const TTL: Duration = Duration::from_secs(86400);
+use sqlx::{PgConnection, PgPool};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct StopStore {
     pg_pool: PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    pub(crate) responses: Arc<ResponseCache<Stop>>,
 }
 
 impl StopStore {
-    pub fn new(pg_pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) -> Self {
+    pub fn new(pg_pool: PgPool) -> Self {
         Self {
             pg_pool,
-            redis_pool,
+            responses: Arc::default(),
         }
     }
 
-    fn cache_key(source: Source) -> String {
-        format!("stops:{}", source.as_str())
+    pub async fn refresh(&self, source: Source) -> anyhow::Result<()> {
+        let _guard = self.responses.refresh_locks[&source].lock().await;
+        let data = Self::query_all_on(source, &mut *self.pg_pool.acquire().await?).await?;
+        self.responses
+            .values
+            .replace(source, StaticResponse::new(data)?);
+        Ok(())
     }
 
-    /// Fetch stops from DB, populate the Redis cache (JSON + ETag), and return the hash.
-    pub async fn populate_cache(&self, source: Source) -> anyhow::Result<String> {
-        let stops = self.query_all(source).await?;
-        let key = Self::cache_key(source);
-        cache_set_with_etag(&self.redis_pool, &key, &stops, TTL).await
+    pub async fn response(&self, source: Source) -> anyhow::Result<Arc<StaticResponse<Stop>>> {
+        if let Some(response) = self.responses.values.get(source) {
+            return Ok(response);
+        }
+        let _guard = self.responses.refresh_locks[&source].lock().await;
+        if let Some(response) = self.responses.values.get(source) {
+            return Ok(response);
+        }
+        let data = Self::query_all_on(source, &mut *self.pg_pool.acquire().await?).await?;
+        Ok(self
+            .responses
+            .values
+            .replace(source, StaticResponse::new(data)?))
     }
 
     /// Raw DB query for all stops of a source (with embedded transfers and route associations).
-    async fn query_all(&self, source: Source) -> anyhow::Result<Vec<Stop>> {
+    pub(crate) async fn query_all_on(
+        source: Source,
+        connection: &mut PgConnection,
+    ) -> anyhow::Result<Vec<Stop>> {
         Ok(sqlx::query_as::<_, Stop>(
             r#"SELECT
                 s.id,
@@ -53,7 +63,7 @@ impl StopStore {
                                 'to_stop_source', st.to_stop_source,
                                 'transfer_type', st.transfer_type,
                                 'min_transfer_time', st.min_transfer_time
-                            )
+                            ) ORDER BY st.to_stop_source, st.to_stop_id
                         )
                         FROM static.stop_transfer st
                         WHERE st.from_stop_id = s.id
@@ -64,7 +74,7 @@ impl StopStore {
                 s.data,
                 COALESCE(
                     (
-                        SELECT jsonb_agg(rs.*)
+                        SELECT jsonb_agg(rs.* ORDER BY rs.route_id)
                         FROM static.route_stop rs
                         WHERE rs.stop_id = s.id
                           AND rs.source = s.source
@@ -74,31 +84,24 @@ impl StopStore {
             FROM
                 static.stop s
             WHERE
-                s.source = $1"#,
+                s.source = $1
+            ORDER BY s.id"#,
         )
         .bind(source)
-        .fetch_all(&self.pg_pool)
+        .fetch_all(connection)
         .await?)
     }
 
-    /// Gets all stops for a source. Tries Redis first; falls back to DB on miss.
     pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Stop>> {
-        let key = Self::cache_key(source);
-        if let Some(cached) = cache_get::<Vec<Stop>>(&self.redis_pool, &key).await {
-            return Ok(cached);
-        }
-        self.query_all(source).await
+        Ok(self.response(source).await?.data.clone())
     }
 
-    /// Returns the stored ETag (blake3 hex) for a source's stops cache, if present.
-    pub async fn get_etag(&self, source: Source) -> anyhow::Result<Option<String>> {
-        let key = format!("{}:etag", Self::cache_key(source));
-        let mut conn = self.redis_pool.get().await?;
-        Ok(conn.get::<_, Option<String>>(&key).await?)
-    }
-
-    /// Bulk insert stops (and invalidate cache)
-    pub async fn save_all(&self, source: Source, stops: &[Stop]) -> anyhow::Result<()> {
+    /// Persist stops inside the owning static import transaction.
+    pub(crate) async fn save_all_on(
+        connection: &mut PgConnection,
+        source: Source,
+        stops: &[Stop],
+    ) -> anyhow::Result<()> {
         // TODO: probably pass vec instead of slice so we don't need to clone
         let ids: Vec<_> = stops.iter().map(|s| s.id.to_uppercase()).collect();
         let names: Vec<_> = stops.iter().map(|s| &s.name).collect();
@@ -130,15 +133,15 @@ impl StopStore {
             &geoms,
             &datas as _,
         )
-        .execute(&self.pg_pool)
+        .execute(connection)
         .await?;
 
         Ok(())
     }
 
-    /// Bulk insert route_stops and repopulate the stops cache.
-    pub async fn save_all_route_stops(
-        &self,
+    /// Persist associations inside the owning static import transaction.
+    pub(crate) async fn save_all_route_stops_on(
+        connection: &mut PgConnection,
         source: Source,
         route_stops: &[RouteStop],
     ) -> anyhow::Result<()> {
@@ -204,61 +207,7 @@ impl StopStore {
             &stop_sequences,
             &datas,
         )
-        .execute(&self.pg_pool)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn save_all_transfers(
-        &self,
-        source: Source,
-        transfers: HashMap<String, StopTransfer>,
-    ) -> anyhow::Result<()> {
-        // TODO: refactor so its like the other bulk inserts (using iter)
-        // remove self transfers
-        let transfers: HashMap<String, StopTransfer> = transfers
-            .into_iter()
-            .filter(|(from_id, transfer)| from_id != &transfer.to_stop_id)
-            .collect();
-        let mut from_stop_ids: Vec<String> = Vec::with_capacity(transfers.len());
-        let mut from_stop_sources: Vec<Source> = Vec::with_capacity(transfers.len());
-        let mut to_stop_ids: Vec<String> = Vec::with_capacity(transfers.len());
-        let mut to_stop_sources: Vec<Source> = Vec::with_capacity(transfers.len());
-        let mut transfer_types: Vec<i16> = Vec::with_capacity(transfers.len());
-        let mut min_transfer_times: Vec<Option<i16>> = Vec::with_capacity(transfers.len());
-        for (from_stop_id, transfer) in transfers.iter() {
-            from_stop_ids.push(from_stop_id.to_uppercase());
-            from_stop_sources.push(source);
-            to_stop_ids.push(transfer.to_stop_id.to_uppercase());
-            to_stop_sources.push(source);
-            transfer_types.push(transfer.transfer_type as i16);
-            min_transfer_times.push(transfer.min_transfer_time.map(|t| t as i16));
-        }
-
-        sqlx::query!(
-            r#"
-            INSERT INTO static.stop_transfer (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type, min_transfer_time)
-            SELECT * FROM UNNEST(
-                $1::TEXT[],
-                $2::source_enum[],
-                $3::TEXT[],
-                $4::source_enum[],
-                $5::SMALLINT[],
-                $6::SMALLINT[]
-            )
-            ON CONFLICT (from_stop_id, from_stop_source, to_stop_id, to_stop_source) DO UPDATE SET
-                transfer_type = EXCLUDED.transfer_type,
-                min_transfer_time = EXCLUDED.min_transfer_time
-            "#,
-            &from_stop_ids,
-            &from_stop_sources,
-            &to_stop_ids,
-            &to_stop_sources,
-            &transfer_types,
-            &min_transfer_times as _,
-        )
-        .execute(&self.pg_pool)
+        .execute(connection)
         .await?;
 
         Ok(())
@@ -543,18 +492,11 @@ impl StopStore {
 
         // TODO: figure out why a bunch of nearby stops are missing transfers. (mta_subway has no cross-source transfers which makes no sense)
 
-        // TODO: maybe move this to parent function to make it clearer that cache is repopulated after transfers are computed?
-        // Repopulate stop caches — transfers are embedded in the stop response.
-        // We iterate through all active sources to ensure all caches are consistent.
-        // Only repopulate if we have a source specified (or all if None).
-        let sources = match source {
-            Some(s) => vec![s],
-            // TODO: create a global var for all sources instead of hardcoding here
-            None => vec![Source::MtaSubway, Source::MtaBus, Source::NjtBus],
-        };
+        // Both directions, including deleted pairs, can affect any source.
+        let sources = [Source::MtaSubway, Source::MtaBus, Source::NjtBus];
 
         for s in sources {
-            if let Err(e) = self.populate_cache(s).await {
+            if let Err(e) = self.refresh(s).await {
                 tracing::error!(source = %s, error = %e, "Failed to repopulate cache");
             }
         }

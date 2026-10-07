@@ -1,3 +1,4 @@
+use crate::static_data::dataset::StaticDataset;
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
@@ -8,16 +9,11 @@ use crate::{
     models::{
         route::{Route, RouteData},
         source::Source,
-        static_dataset::StaticDataset,
         stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
     },
     sources::{StaticAdapter, normalize_title, normalize_whitespace},
-    stores::{
-        route::RouteStore,
-        static_cache::{StaticCacheStore, TripPatternRevision},
-        stop::StopStore,
-    },
-    utils::static_cache::expand_gtfs,
+    static_data::expansion::expand_gtfs,
+    static_data::index::TripPatternRevision,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -42,12 +38,7 @@ impl StaticAdapter for NjtBusStatic {
         Duration::from_secs(60 * 60 * 24) // 24 hours
     }
 
-    async fn import(
-        &self,
-        route_store: &RouteStore,
-        stop_store: &StopStore,
-        static_cache_store: &StaticCacheStore,
-    ) -> anyhow::Result<()> {
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
         let token = super::get_token()
             .await
             .context("NJT authentication failed")?;
@@ -70,7 +61,7 @@ impl StaticAdapter for NjtBusStatic {
         .context("GTFS parse task panicked")?
         .context("Failed to parse NJT GTFS")?;
 
-        let mut cached_trips = expand_gtfs(Source::NjtBus, &gtfs);
+        let mut scheduled_trips = expand_gtfs(Source::NjtBus, &gtfs);
 
         // Collapse parent/child gate stops that share a public `stop_code` into a
         // single canonical stop, and build the `child_stop_id -> canonical_id`
@@ -79,7 +70,7 @@ impl StaticAdapter for NjtBusStatic {
 
         // Rewrite cached trip stop ids so any consumer joining to `static.stop`
         // resolves to the canonical (collapsed) stop.
-        for trip in cached_trips.iter_mut() {
+        for trip in scheduled_trips.iter_mut() {
             for st in trip.stop_times.iter_mut() {
                 if let Some(canonical) = stop_remap.get(&st.stop_id) {
                     st.stop_id = canonical.clone();
@@ -100,7 +91,7 @@ impl StaticAdapter for NjtBusStatic {
             !patterns.shapes.is_empty(),
             "No valid NJT operating patterns; retaining previous import"
         );
-        let dataset = build_static_dataset(&gtfs, patterns, cached_trips, stops, &stop_remap);
+        let dataset = build_static_dataset(&gtfs, patterns, scheduled_trips, stops, &stop_remap);
 
         // TODO: move this to a standardized print method in StaticDataset
         #[cfg(debug_assertions)]
@@ -123,12 +114,7 @@ impl StaticAdapter for NjtBusStatic {
             }
         }
 
-        dataset
-            .persist(route_store, stop_store, static_cache_store)
-            .await
-            .context("Failed to persist NJT static dataset")?;
-
-        Ok(())
+        Ok(dataset)
     }
 }
 
@@ -221,11 +207,11 @@ fn build_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
     patterns: PatternDataset,
-    mut cached_trips: Vec<crate::models::static_cache::CachedTrip>,
+    mut scheduled_trips: Vec<crate::static_data::schedule::ScheduledTrip>,
     stops: Vec<Stop>,
     stop_remap: &HashMap<String, String>,
 ) -> StaticDataset {
-    for trip in &mut cached_trips {
+    for trip in &mut scheduled_trips {
         trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
     }
 
@@ -237,7 +223,7 @@ fn build_static_dataset(
         stops,
         route_stops: build_route_stops(gtfs, stop_remap),
         shapes,
-        cached_trips,
+        scheduled_trips,
         trip_patterns: trips,
         stop_remap: stop_remap.clone(),
     }

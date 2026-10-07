@@ -1,4 +1,4 @@
-use backend::models::static_dataset::StaticDataset;
+use backend::static_data::dataset::StaticDataset;
 
 use super::TestStores;
 
@@ -17,21 +17,15 @@ pub fn assert_static_dataset_contract(dataset: &StaticDataset) {
 }
 
 pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores: &TestStores) {
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    stores
+        .static_data_store
+        .persist(&dataset)
         .await
         .expect("first static import should persist");
 
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    stores
+        .static_data_store
+        .persist(&dataset)
         .await
         .expect("second static import should be idempotent");
 
@@ -48,16 +42,17 @@ pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores:
 
     assert_eq!(routes.len(), dataset.routes.len());
     assert_eq!(stops.len(), dataset.stops.len());
-    let (patterns, remap) = stores
-        .route_store
-        .load_revision_metadata(dataset.source)
+    let revision = stores
+        .static_data_store
+        .load_revision(dataset.source)
         .await
-        .expect("stored revision metadata");
+        .unwrap()
+        .unwrap();
     assert_eq!(
-        serde_json::to_value(patterns).unwrap(),
+        serde_json::to_value(&revision.trip_patterns).unwrap(),
         serde_json::to_value(&dataset.trip_patterns).unwrap()
     );
-    assert_eq!(remap, dataset.stop_remap);
+    assert_eq!(revision.stop_remap, dataset.stop_remap);
     for expected in &dataset.route_stops {
         let stop = stops
             .iter()
@@ -73,19 +68,10 @@ pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores:
             "route-stop association persisted"
         );
     }
-    let shapes = stores
-        .route_store
-        .get_all_shapes(dataset.source)
-        .await
-        .expect("shapes load from PostgreSQL");
-    assert_eq!(shapes.len(), dataset.shapes.len());
+    assert_eq!(revision.shapes.len(), dataset.shapes.len());
     for expected in &dataset.shapes {
-        let actual = shapes
-            .iter()
-            .find(|shape| shape.id == expected.id)
-            .expect("shape ID persisted");
         assert_eq!(
-            serde_json::to_value(&actual.geom).unwrap(),
+            serde_json::to_value(&revision.shapes[&expected.id]).unwrap(),
             serde_json::to_value(&expected.geom).unwrap()
         );
     }

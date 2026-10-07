@@ -2,28 +2,30 @@
 
 ## Project Overview
 
-Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, SvelteKit frontend, PostgreSQL + PostGIS, Valkey/Redis cache. Sources: `mta_subway` (Helium), `mta_bus` (GTFS-RT/OBA), `njt_bus` (GTFS-RT).
+Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, SvelteKit frontend, PostgreSQL + PostGIS, Rust snapshots and Moka caches. Sources: `mta_subway` (Helium), `mta_bus` (GTFS-RT/OBA), `njt_bus` (GTFS-RT).
 
 ## Architecture
 
 ### Backend (`backend/src/`)
 
-**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` → `RealtimeIngestor` transaction → committed `Arc<PersistedSnapshot>` → shared `LiveSnapshots` watch channels → live stores / `TrajectoryDeriver` → Axum API. Static data and alerts retain their PostgreSQL/Redis paths.
+**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` → `RealtimeIngestor` transaction → committed `Arc<PersistedSnapshot>` → shared `LiveSnapshots` watch channels → live stores / `TrajectoryDeriver` → Axum API. Static imports are transactional; static responses and current alerts are cached in process.
 
 **Key modules**:
 
 - `sources/` — `RealtimeSource` collectors plus `AlertsAdapter` and `StaticAdapter` implementations in `mta_subway/`, `mta_bus/` and `njt_bus/`
 - `realtime/` — `RealtimeEngine` collects each source independently; `RealtimeIngestor` commits trips, stop times, positions and resolved shapes together before publishing. `LiveSnapshots` shares the latest committed Arc with stores and trajectory workers; watch channels coalesce pending generations. `TrajectoryDeriver` uses the pinned static revision without SQL readback
-- `engines/` — Background `static_data` (import lifecycle via `StaticController`) and `alerts` tasks
-- `stores/` — Default trip, stop-time and position reads use `LiveSnapshots`; their explicit historical reads use PostgreSQL. Static and alert stores retain Redis caching; `TrajectoryStore` loads historical trajectory inputs
+- `static_data/` — `StaticController`, collected datasets, transactional persistence and pinned static revisions; expanded NJT schedules persist in PostgreSQL and restore on restart
+- `alerts/` — Alert polling and shared processing; `AlertStore` persists alerts and coordinates its 30-second local cache
+- `stores/` — Default trip, stop-time and position reads use `LiveSnapshots`; their explicit historical reads use PostgreSQL. Static response snapshots pair exact JSON bytes with their ETag; `TrajectoryStore` loads historical trajectory inputs behind `TrajectoryService`
 - `api/` — Axum handlers; `AppState` holds all stores; OpenAPI docs at `/api/docs` (via utoipa/scalar)
-- `integrations/` — Shared GTFS-RT/OBA parsing helpers
+- `integrations/` — External GTFS-RT/OBA protocol helpers and the Valhalla routing-library wrapper
+- `trajectory/` — Live derivation, source builders, calculation, continuity and Arrow encoding; `TrajectoryService` owns live/historical reads and caches. Live snapshots never expire or evict
 - `models/` — DB row types; geometry decoded via `geozero` from WKB
 - `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`
 
 **`StaticController`**: `RealtimeEngine` calls `controller.ensure_updated(source)` before collection. A foreign-key violation triggers one `force_update` and one ingestion retry using the same collected snapshot.
 
-**Live and historical reads**: Default trips, stop times and positions reflect the last committed source snapshot, with route filters applied within its membership. Collection/transaction failures preserve it; a successful empty snapshot clears it; startup is empty until the first commit. These live reads use neither Redis nor retained-history fallback. Explicit `?at=` trips and stop times use retained final arrival-or-departure values in the inclusive four-hour window, without a trip update-time gate; positions and trajectories use their historical store paths.
+**Live and historical reads**: Default trips, stop times and positions reflect the last committed source snapshot, with route filters applied within its membership. Collection/transaction failures preserve it; a successful empty snapshot clears it; startup is empty until the first commit. These live reads use no retained-history fallback. Explicit `?at=` trips and stop times use retained final arrival-or-departure values in the inclusive four-hour window, without a trip update-time gate; positions and trajectories use their historical store paths.
 
 **API routes** (all under `/api/v1/`):
 

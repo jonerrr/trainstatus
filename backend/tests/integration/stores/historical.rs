@@ -11,14 +11,10 @@ use uuid::Uuid;
 
 #[sqlx::test]
 async fn final_time_queries_use_arrival_or_departure_with_inclusive_window(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let stores = test_stores(pool, _redis.pool());
-    mta_subway_dataset()
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    let stores = test_stores(pool);
+    stores
+        .static_data_store
+        .persist(&mta_subway_dataset())
         .await
         .expect("static fixture should persist");
     let at = Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap();

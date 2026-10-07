@@ -30,8 +30,10 @@ impl<V> SourceSnapshot<V> {
     }
 
     /// Atomically replace the value for `source`.
-    pub fn replace(&self, source: Source, value: V) {
-        self.inner.write().unwrap().insert(source, Arc::new(value));
+    pub fn replace(&self, source: Source, value: V) -> Arc<V> {
+        let value = Arc::new(value);
+        self.inner.write().unwrap().insert(source, value.clone());
+        value
     }
 }
 

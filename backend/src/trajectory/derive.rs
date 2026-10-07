@@ -1,9 +1,10 @@
-use super::PersistedSnapshot;
+use crate::realtime::PersistedSnapshot;
 use crate::{
     models::{position::VehiclePosition, trip::StopTime},
     trajectory::{
-        HotSnapshot, TrajectoryCache, TrajectoryConfig, TrajectoryEngine, compute_trajectory_async,
-        continuity::ContinuityStatsBatch, expand_render_units, snapshot_from_persisted_trip,
+        HotSnapshot, TrajectoryCache, TrajectoryCalculator, TrajectoryConfig,
+        compute_trajectory_async, continuity::ContinuityStatsBatch, expand_render_units,
+        snapshot_from_persisted_trip,
     },
 };
 use chrono::Utc;
@@ -14,12 +15,12 @@ use std::{borrow::Borrow, collections::HashMap, sync::Arc};
 /// belong to the source engine, which supplies only committed snapshots.
 #[derive(Clone)]
 pub struct TrajectoryDeriver {
-    engine: Arc<TrajectoryEngine>,
+    engine: Arc<TrajectoryCalculator>,
     cache: Arc<TrajectoryCache>,
 }
 
 impl TrajectoryDeriver {
-    pub fn new(engine: Arc<TrajectoryEngine>, cache: Arc<TrajectoryCache>) -> Self {
+    pub fn new(engine: Arc<TrajectoryCalculator>, cache: Arc<TrajectoryCache>) -> Self {
         Self { engine, cache }
     }
     pub async fn derive(

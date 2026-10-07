@@ -61,8 +61,6 @@ spec:
       env:
         - name: DATABASE_URL
           value: "postgres://trains:trains@127.0.0.1:5432/trains"
-        - name: REDIS_URL
-          value: "redis://127.0.0.1:6379"
         - name: ADDRESS
           value: "0.0.0.0:3055"
         - name: MTA_OBA_API_KEY
@@ -130,22 +128,6 @@ spec:
         initialDelaySeconds: 5
         periodSeconds: 5
 
-    - name: valkey
-      image: valkey/valkey:alpine
-      ports:
-        - containerPort: 6379
-          hostPort: 6379
-      volumeMounts:
-        - name: trainstatus-cache-demo
-          mountPath: /data
-      resources:
-        requests:
-          cpu: "50m"
-          memory: "64Mi"
-        limits:
-          cpu: "250m"
-          memory: "256Mi"
-
     - name: martin
       image: ghcr.io/maplibre/martin:latest
       env:
@@ -187,9 +169,6 @@ spec:
     - name: trainstatus-db-demo
       persistentVolumeClaim:
         claimName: trainstatus-db-demo
-    - name: trainstatus-cache-demo
-      persistentVolumeClaim:
-        claimName: trainstatus-cache-demo
     - name: martin-config
       configMap:
         name: martin-config
@@ -208,18 +187,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: trainstatus-cache-demo
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
 
 ---
 apiVersion: v1

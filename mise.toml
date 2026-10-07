@@ -19,7 +19,6 @@ lockfile = true
 
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
-REDIS_URL = "redis://localhost:6379"
 
 [tasks."containers:init"]
 description = "Create the pods for development."

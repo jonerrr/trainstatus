@@ -1,8 +1,5 @@
 use crate::{
-    models::source::Source,
-    stores::{
-        alert::AlertStore, route::RouteStore, static_cache::StaticCacheStore, stop::StopStore,
-    },
+    models::source::Source, static_data::dataset::StaticDataset, stores::alert::AlertStore,
 };
 use async_trait::async_trait;
 use titlecase::Titlecase;
@@ -30,12 +27,7 @@ pub trait StaticAdapter: Send + Sync {
 
     fn refresh_interval(&self) -> Duration;
 
-    async fn import(
-        &self,
-        route_store: &RouteStore,
-        stop_store: &StopStore,
-        static_cache_store: &StaticCacheStore,
-    ) -> anyhow::Result<()>;
+    async fn collect(&self) -> anyhow::Result<StaticDataset>;
 }
 
 ///// various utilities for parsing and normalizing static data

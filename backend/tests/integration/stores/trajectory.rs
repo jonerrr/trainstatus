@@ -60,15 +60,11 @@ async fn historical_trajectory_uses_final_departure_and_past_history_points(pool
         trajectory::TrajectoryCache,
     };
     use std::sync::Arc;
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    let stores = test_stores(pool.clone(), redis);
-    mta_bus_dataset()
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+
+    let stores = test_stores(pool.clone());
+    stores
+        .static_data_store
+        .persist(&mta_bus_dataset())
         .await
         .unwrap();
     let at = crate::support::fixtures::fixed_time() - chrono::Duration::hours(1);

@@ -1,11 +1,10 @@
+use crate::static_data::dataset::StaticDataset;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use geo::{CoordsIter, Geometry};
 use tracing::{debug, info, warn};
 
-use crate::models::{
-    route::RouteData, source::Source, static_dataset::StaticDataset, stop::RouteStop,
-};
+use crate::models::{route::RouteData, source::Source, stop::RouteStop};
 
 #[derive(Debug, Clone)]
 pub struct ImportReport {

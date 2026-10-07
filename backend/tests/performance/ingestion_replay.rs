@@ -14,18 +14,10 @@ async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
         fixtures::{self, FixtureKind},
         sources::mta_bus::realtime::MtaBusRealtime,
     };
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    let stores = support::test_stores(pool.clone(), redis.clone());
+
+    let stores = support::test_stores(pool.clone());
     let dataset = support::mta_bus_dataset();
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
-        .await
-        .unwrap();
+    stores.static_data_store.persist(&dataset).await.unwrap();
     let root = support::fixture_root();
     let manifest =
         fixtures::load_manifest_for(&root, Source::MtaBus, FixtureKind::Realtime, "basic").unwrap();
@@ -84,7 +76,7 @@ async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
     let ingestor = RealtimeIngestor::new(
         pool.clone(),
         stores.live_snapshots.clone(),
-        stores.static_cache_store.static_index(),
+        stores.static_data_store.static_index(),
     );
     let initial_started = std::time::Instant::now();
     let first = ingestor.ingest(input.clone()).await.unwrap();

@@ -1,3 +1,4 @@
+use crate::alerts::gtfs::{self as gtfs_alert, GtfsAlertSource};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
@@ -6,10 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     feed::{Alert as GtfsAlert, FeedMessage},
-    integrations::{
-        gtfs_alert::{self, GtfsAlertSource},
-        gtfs_realtime,
-    },
+    integrations::gtfs_realtime,
     models::{
         alert::{
             ActivePeriod, AffectedEntity, Alert, AlertData, AlertFormat, AlertSection,

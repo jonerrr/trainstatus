@@ -1,8 +1,6 @@
+use crate::alerts::gtfs::{self as gtfs_alert, GtfsAlertSource};
 use crate::feed::{Alert as GtfsAlert, FeedMessage};
-use crate::integrations::{
-    gtfs_alert::{self, GtfsAlertSource},
-    gtfs_realtime,
-};
+use crate::integrations::gtfs_realtime;
 use crate::models::alert::{
     ActivePeriod, AffectedEntity, Alert, AlertData, AlertFormat, AlertSection, AlertTranslation,
     MtaAlertData,

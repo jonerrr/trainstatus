@@ -1,3 +1,4 @@
+use crate::static_data::dataset::StaticDataset;
 use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
@@ -10,14 +11,12 @@ use crate::{
         route::{Route, RouteData},
         shape::Shape,
         source::Source,
-        static_dataset::StaticDataset,
         stop::{
             CarMarker, EgressPoint, EgressType, MtaSubwayStopData, PlatformDirection, PlatformEdge,
             RouteStop, RouteStopData, Stop, StopData, StopType, VerticalDirection,
         },
     },
     sources::StaticAdapter,
-    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
 };
 
 #[cfg(feature = "fixture-capture")]
@@ -177,20 +176,13 @@ impl StaticAdapter for MtaSubwayStatic {
         Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
-    async fn import(
-        &self,
-        route_store: &RouteStore,
-        stop_store: &StopStore,
-        static_cache_store: &StaticCacheStore,
-    ) -> anyhow::Result<()> {
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
         let client = reqwest::Client::new();
         let infra = fetch_infrastructure(&client).await?;
 
         let exit_data = fetch_exit_strategy(&client).await?;
         let dataset = build_static_dataset(infra, exit_data);
-        dataset
-            .persist(route_store, stop_store, static_cache_store)
-            .await
+        Ok(dataset)
     }
 }
 
@@ -412,7 +404,7 @@ fn build_static_dataset(
         stops,
         route_stops,
         shapes,
-        cached_trips: vec![],
+        scheduled_trips: vec![],
         trip_patterns: HashMap::new(),
         stop_remap: HashMap::new(),
     }

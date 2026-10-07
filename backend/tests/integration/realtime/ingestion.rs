@@ -11,19 +11,14 @@ use backend::{
 use chrono::{Duration, TimeZone, Utc};
 use uuid::Uuid;
 
-async fn ingestor(pool: &sqlx::PgPool) -> (RealtimeIngestor, LiveSnapshots, support::TestRedis) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    let stores = support::test_stores(pool.clone(), redis.clone());
-    support::mta_subway_dataset()
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+async fn ingestor(pool: &sqlx::PgPool) -> (RealtimeIngestor, LiveSnapshots) {
+    let stores = support::test_stores(pool.clone());
+    stores
+        .static_data_store
+        .persist(&support::mta_subway_dataset())
         .await
         .unwrap();
-    (stores.ingestor, stores.live_snapshots, _redis)
+    (stores.ingestor, stores.live_snapshots)
 }
 
 fn snapshot() -> CollectedSnapshot {
@@ -89,7 +84,7 @@ async fn versions(pool: &sqlx::PgPool, trip_id: Uuid) -> Vec<(String, String)> {
 async fn commits_all_entities_with_persistent_linkage_and_all_duplicate_aliases(
     pool: sqlx::PgPool,
 ) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     let first = ingestor.ingest(snapshot()).await.unwrap();
     let id = first.trips[0].id;
     let mut second = snapshot();
@@ -115,7 +110,7 @@ async fn commits_all_entities_with_persistent_linkage_and_all_duplicate_aliases(
 
 #[sqlx::test]
 async fn unchanged_stops_keep_tuple_versions_and_one_arrival_changes_one_row(pool: sqlx::PgPool) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     let first = ingestor.ingest(snapshot()).await.unwrap();
     let before = versions(&pool, first.trips[0].id).await;
     let replay = ingestor.ingest(snapshot()).await.unwrap();
@@ -136,7 +131,7 @@ async fn unchanged_stops_keep_tuple_versions_and_one_arrival_changes_one_row(poo
 
 #[sqlx::test]
 async fn empty_shapes_preserve_and_nonempty_shapes_replace_stored_shape(pool: sqlx::PgPool) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     let mut first = snapshot();
     first.trips[0].0.shape_ids = vec!["initial".into()];
     ingestor.ingest(first).await.unwrap();
@@ -169,7 +164,7 @@ async fn empty_shapes_preserve_and_nonempty_shapes_replace_stored_shape(pool: sq
 
 #[sqlx::test]
 async fn invalid_stop_rolls_back_entire_snapshot(pool: sqlx::PgPool) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     let mut broken = snapshot();
     broken.trips[0].1[1].stop_id = "missing-stop".into();
     assert!(ingestor.ingest(broken).await.is_err());
@@ -179,7 +174,7 @@ async fn invalid_stop_rolls_back_entire_snapshot(pool: sqlx::PgPool) {
 
 #[sqlx::test]
 async fn older_position_returns_and_publishes_stored_state(pool: sqlx::PgPool) {
-    let (ingestor, live, _redis) = ingestor(&pool).await;
+    let (ingestor, live) = ingestor(&pool).await;
     let first = ingestor.ingest(snapshot()).await.unwrap();
     let mut stale = snapshot();
     stale.positions[0].updated_at -= Duration::minutes(1);
@@ -197,7 +192,7 @@ async fn older_position_returns_and_publishes_stored_state(pool: sqlx::PgPool) {
 
 #[sqlx::test]
 async fn position_failure_rolls_back_existing_trip_and_stop_changes(pool: sqlx::PgPool) {
-    let (ingestor, live, _redis) = ingestor(&pool).await;
+    let (ingestor, live) = ingestor(&pool).await;
     let first = ingestor.ingest(snapshot()).await.unwrap();
     let before = versions(&pool, first.trips[0].id).await;
     let mut broken = snapshot();
@@ -222,19 +217,11 @@ async fn position_failure_rolls_back_existing_trip_and_stop_changes(pool: sqlx::
 
 #[sqlx::test]
 async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sqlx::PgPool) {
-    use backend::{models::geom::Geom, static_index::StaticTransitRevision};
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    let stores = support::test_stores(pool.clone(), redis.clone());
+    use backend::{models::geom::Geom, static_data::index::StaticTransitRevision};
+
+    let stores = support::test_stores(pool.clone());
     let dataset = support::mta_subway_dataset();
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
-        .await
-        .unwrap();
+    stores.static_data_store.persist(&dataset).await.unwrap();
     let mut revision = StaticTransitRevision::from_dataset(&dataset);
     revision.routes.get_mut("A").unwrap().shape_ids = vec!["far".into(), "near".into()];
     revision.shapes.insert(
@@ -251,7 +238,7 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
     revision
         .route_stop_shapes
         .insert(("A".into(), "101".into()), vec!["far".into()]);
-    let index = stores.static_cache_store.static_index();
+    let index = stores.static_data_store.static_index();
     index.publish(revision.clone());
     let ingestor = RealtimeIngestor::new(pool, stores.live_snapshots.clone(), index.clone());
     let first = ingestor.ingest(snapshot()).await.unwrap();
@@ -305,71 +292,8 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
 }
 
 #[sqlx::test]
-async fn ingestion_and_live_reads_are_independent_of_redis_availability(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    let stores = support::test_stores(pool.clone(), redis);
-    support::mta_subway_dataset()
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
-        .await
-        .unwrap();
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let manager = bb8_redis::RedisConnectionManager::new(format!(
-        "redis://{}",
-        listener.local_addr().unwrap()
-    ))
-    .unwrap();
-    let unavailable = bb8::Pool::builder()
-        .connection_timeout(std::time::Duration::from_millis(100))
-        .build_unchecked(manager);
-    let disconnected = support::test_stores(pool.clone(), unavailable);
-    disconnected.static_cache_store.static_index().publish(
-        backend::static_index::StaticTransitRevision::from_dataset(&support::mta_subway_dataset()),
-    );
-    let saved = disconnected
-        .ingestor
-        .ingest(snapshot())
-        .await
-        .expect("ingestion has no Redis dependency");
-    assert_eq!(saved.stop_times.len(), 2);
-    assert_eq!(
-        disconnected
-            .trip_store
-            .get_all(Source::MtaSubway, None)
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
-    assert_eq!(
-        disconnected
-            .stop_time_store
-            .get_all(Source::MtaSubway, None, None)
-            .await
-            .unwrap()
-            .len(),
-        2
-    );
-    assert_eq!(
-        disconnected
-            .position_store
-            .get_all(Source::MtaSubway, None)
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
-    let counts: (i64, i64, i64) = sqlx::query_as("SELECT (SELECT count(*) FROM realtime.trip), (SELECT count(*) FROM realtime.stop_time), (SELECT count(*) FROM realtime.vehicle_position)").fetch_one(&pool).await.unwrap();
-    assert_eq!(counts, (1, 2, 1));
-}
-
-#[sqlx::test]
 async fn omitted_rows_remain_retained_but_are_absent_from_current_snapshot(pool: sqlx::PgPool) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     ingestor.ingest(snapshot()).await.unwrap();
     let empty = ingestor
         .ingest(CollectedSnapshot {
@@ -386,7 +310,7 @@ async fn omitted_rows_remain_retained_but_are_absent_from_current_snapshot(pool:
 
 #[sqlx::test]
 async fn correlation_mapping_survives_postgres_timestamp_precision(pool: sqlx::PgPool) {
-    let (ingestor, _, _redis) = ingestor(&pool).await;
+    let (ingestor, _) = ingestor(&pool).await;
     let mut input = snapshot();
     input.trips[0].0.created_at += Duration::nanoseconds(123);
     let saved = ingestor.ingest(input).await.unwrap();
@@ -401,7 +325,7 @@ async fn correlation_mapping_survives_postgres_timestamp_precision(pool: sqlx::P
 
 #[sqlx::test]
 async fn stop_time_shared_snapshot_matches_committed_microseconds_on_replay(pool: sqlx::PgPool) {
-    let (ingestor, live, _redis) = ingestor(&pool).await;
+    let (ingestor, live) = ingestor(&pool).await;
     let mut input = snapshot();
     input.trips[0].1[0].arrival += Duration::nanoseconds(123_456_789);
     input.trips[0].1[0].departure += Duration::nanoseconds(987_654_321);

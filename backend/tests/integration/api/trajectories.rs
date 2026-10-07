@@ -4,12 +4,12 @@ use axum_test::TestServer;
 use backend::models::source::Source;
 
 async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: usize) {
-    let (stores, _cache) = ingest_case(pool.clone(), source).await;
+    let stores = ingest_case(pool.clone(), source).await;
     let trip_id = stores.live_snapshots.get(source).unwrap().trips[0]
         .id
         .to_string();
     let state = app_state_from_stores(pool, stores);
-    let cache = state.trajectory_cache.clone();
+    let trajectories = state.trajectories.clone();
     let server = TestServer::new(backend::api::router(state).split_for_parts().0);
     let response = server
         .get(&format!(
@@ -105,8 +105,11 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
         }
     }
     // Exercise the live transport/filter path using the computed render generation.
-    let hot = cache.get_historical(source, fixed_time()).await.unwrap();
-    cache.set_hot(source, hot).await;
+    let hot = trajectories
+        .snapshot(source, Some(fixed_time()))
+        .await
+        .unwrap();
+    trajectories.publish_live(source, (*hot).clone()).await;
     let live = server.get(&format!("/trajectories/{source}")).await;
     live.assert_status_ok();
     let live_count =

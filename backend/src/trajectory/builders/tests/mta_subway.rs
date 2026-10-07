@@ -36,7 +36,7 @@ fn match_platform_edge_picks_best_candidate() {
         ),
     ];
 
-    let matched = MtaSubwayBuilder::match_platform_edge(&edges, 1, 146.304).unwrap();
+    let matched = crate::trajectory::platform::select_platform(&edges, 1, 146.304).unwrap();
     assert_eq!(matched.platform_edge_id, "exact");
 }
 

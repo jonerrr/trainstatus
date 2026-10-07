@@ -4,7 +4,7 @@ use crate::models::{
     position::VehiclePosition as VehiclePositionModel,
     trip::{StopTime, Trip},
 };
-use crate::static_index::StaticTransitRevision;
+use crate::static_data::index::StaticTransitRevision;
 use futures::future::BoxFuture;
 use prost::Message;
 use prost::bytes;

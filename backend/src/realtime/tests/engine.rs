@@ -1,23 +1,18 @@
-#[path = "../../../tests/support/services.rs"]
-mod services;
-
 use crate::realtime::engine::{RealtimeEngine, trajectory_worker};
 use crate::realtime::{
     CollectedSnapshot, LiveSnapshots, RealtimeIngestor, RealtimeSource, RealtimeSourceConfig,
-    TrajectoryDeriver,
 };
 use crate::{
-    engines::static_data,
     models::{
         route::{Route, RouteData},
         source::Source,
-        static_dataset::StaticDataset,
         trip::{NjtBusData, Trip, TripData},
     },
     sources::StaticAdapter,
-    static_index::StaticTransitIndex,
-    stores::{route::RouteStore, static_cache::StaticCacheStore, stop::StopStore},
-    trajectory::{HotSnapshot, TrajectoryCache, TrajectoryEngine},
+    static_data::index::StaticTransitIndex,
+    static_data::{controller as static_data, dataset::StaticDataset, store::StaticDataStore},
+    stores::{route::RouteStore, stop::StopStore},
+    trajectory::{HotSnapshot, TrajectoryService},
 };
 use std::{
     sync::{
@@ -88,12 +83,7 @@ impl StaticAdapter for LiteralStatic {
     fn refresh_interval(&self) -> Duration {
         Duration::from_secs(3600)
     }
-    async fn import(
-        &self,
-        routes: &RouteStore,
-        stops: &StopStore,
-        cache: &StaticCacheStore,
-    ) -> anyhow::Result<()> {
+    async fn collect(&self) -> anyhow::Result<StaticDataset> {
         let import = self.imports.fetch_add(1, Ordering::SeqCst);
         let mut dataset = StaticDataset::new(Source::NjtBus);
         let route_id = if !self.always_missing && (!self.fix_on_refresh || import > 0) {
@@ -119,7 +109,7 @@ impl StaticAdapter for LiteralStatic {
                 stop_code: "10001".into(),
             }),
         });
-        dataset.persist(routes, stops, cache).await
+        Ok(dataset)
     }
 }
 
@@ -132,17 +122,18 @@ async fn setup(
     Arc<LiteralSource>,
     Arc<AtomicUsize>,
     LiveSnapshots,
-    services::TestRedis,
 ) {
-    let redis_service = services::TestRedis::start().await.unwrap();
-    let redis = redis_service.pool();
-    let routes = RouteStore::new(pool.clone(), redis.clone());
-    let stops = StopStore::new(pool.clone(), redis.clone());
-    let static_cache = StaticCacheStore::new(redis.clone());
+    let routes = RouteStore::new(pool.clone());
+    let stops = StopStore::new(pool.clone());
+    let static_cache = StaticDataStore::new(
+        pool.clone(),
+        StaticTransitIndex::new(),
+        routes.clone(),
+        stops.clone(),
+    );
     let imports = Arc::new(AtomicUsize::new(0));
     let controller = static_data::run(
         pool,
-        &routes,
         &stops,
         &static_cache,
         vec![Arc::new(LiteralStatic {
@@ -157,22 +148,20 @@ async fn setup(
         fail: false,
         calls: AtomicUsize::new(0),
     });
-    let hot_cache = Arc::new(TrajectoryCache::new());
     let live = LiveSnapshots::default();
     let engine = RealtimeEngine::new(
         RealtimeIngestor::new(pool.clone(), live.clone(), controller.static_index()),
         controller,
-        TrajectoryDeriver::new(Arc::new(TrajectoryEngine::new()), hot_cache.clone()),
-        hot_cache,
+        TrajectoryService::new(pool.clone()),
     );
-    (engine, source, imports, live, redis_service)
+    (engine, source, imports, live)
 }
 
 #[sqlx::test]
 async fn collection_publishes_only_committed_snapshot_before_derivation(pool: sqlx::PgPool) {
-    let (engine, source, _, live, _redis) = setup(&pool, false, false).await;
+    let (engine, source, _, live) = setup(&pool, false, false).await;
     let rx = live.subscribe(Source::NjtBus);
-    let cache = Arc::new(TrajectoryCache::new());
+    let cache = TrajectoryService::new(pool.clone());
     let (done, mut derived) = mpsc::unbounded_channel();
     let worker = tokio::spawn(trajectory_worker(Source::NjtBus, rx, cache, {
         let pool = pool.clone();
@@ -209,7 +198,7 @@ async fn collection_publishes_only_committed_snapshot_before_derivation(pool: sq
 
 #[sqlx::test]
 async fn collection_error_does_not_publish_or_derive(pool: sqlx::PgPool) {
-    let (engine, mut source, _, live, _redis) = setup(&pool, false, false).await;
+    let (engine, mut source, _, live) = setup(&pool, false, false).await;
     Arc::get_mut(&mut source).unwrap().fail = true;
     let mut rx = live.subscribe(Source::NjtBus);
     let collector = tokio::spawn(engine.collect_source(source.clone()));
@@ -237,7 +226,7 @@ async fn count_attempts(pool: &sqlx::PgPool) {
 
 #[sqlx::test]
 async fn foreign_key_failure_forces_one_static_refresh_and_one_ingest_retry(pool: sqlx::PgPool) {
-    let (engine, source, imports, _, _redis) = setup(&pool, true, false).await;
+    let (engine, source, imports, _) = setup(&pool, true, false).await;
     count_attempts(&pool).await;
     let snapshot = engine.collect_once(source.as_ref()).await.unwrap();
     assert_eq!(snapshot.trips.len(), 1);
@@ -260,7 +249,7 @@ async fn foreign_key_failure_forces_one_static_refresh_and_one_ingest_retry(pool
 
 #[sqlx::test]
 async fn repeated_foreign_key_failure_stops_after_one_retry(pool: sqlx::PgPool) {
-    let (engine, source, imports, _, _redis) = setup(&pool, true, true).await;
+    let (engine, source, imports, _) = setup(&pool, true, true).await;
     count_attempts(&pool).await;
     assert!(engine.collect_once(source.as_ref()).await.is_err());
     assert_eq!(imports.load(Ordering::SeqCst), 2);
@@ -278,7 +267,7 @@ async fn repeated_foreign_key_failure_stops_after_one_retry(pool: sqlx::PgPool) 
 
 #[sqlx::test]
 async fn collection_failure_preserves_last_committed_live_generation(pool: sqlx::PgPool) {
-    let (engine, mut source, _, live, _redis) = setup(&pool, false, false).await;
+    let (engine, mut source, _, live) = setup(&pool, false, false).await;
     let mut rx = live.subscribe(Source::NjtBus);
     let committed = engine.collect_once(source.as_ref()).await.unwrap();
     rx.changed().await.unwrap();

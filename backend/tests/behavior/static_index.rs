@@ -1,7 +1,7 @@
 use crate::support::mta_bus_dataset;
 use backend::{
     models::source::Source,
-    static_index::{StaticTransitIndex, StaticTransitRevision},
+    static_data::index::{StaticTransitIndex, StaticTransitRevision},
 };
 
 #[test]

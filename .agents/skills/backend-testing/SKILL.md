@@ -11,7 +11,7 @@ Identify the production contract and inspect coverage under its owner. Keep priv
 
 Choose the smallest sufficient test. For timestamp or linkage bugs, exercise the affected persistence boundary with fixed inputs and assert stored and published values, not just successful ingestion. Keep historical selection, live membership and HTTP dispatch under their respective owners.
 
-Use committed captures and explicit service dates. The fast suite must work without SQL, cache, provider credentials or a runtime tile extract. Service-backed tests reuse the existing PostgreSQL server through a maintenance connection; SQLx creates and migrates isolated per-test databases. Use the mise tasks rather than migrating the development `trains` database. Cache-using tests own a `TestRedis` guard; retain it for the test's lifetime. Never flush the development cache or serialize tests to hide shared-cache interference.
+Use committed captures and explicit service dates. The fast suite must work without SQL, external services, provider credentials or a runtime tile extract. Service-backed tests reuse the existing PostgreSQL server through a maintenance connection; SQLx creates and migrates isolated per-test databases. Use the mise tasks rather than migrating the development `trains` database. Construct fresh stores/services for independent local caches; ordinary tests need no cache containers.
 
 `SQLX_OFFLINE` governs compile-time macro metadata, not runtime SQL. Keep ordinary offline compilation while legacy macros exist; validate metadata with the dedicated task. Follow the existing runtime query convention for new code.
 

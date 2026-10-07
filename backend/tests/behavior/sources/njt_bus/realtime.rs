@@ -1,20 +1,17 @@
 use backend::{
     fixtures::{self, FixtureKind},
-    models::{source::Source, static_cache::CachedTrip},
+    models::source::Source,
     realtime::CollectedSnapshot,
     sources::njt_bus::realtime::NjtBusRealtime,
-    static_index::StaticTransitRevision,
-    stores::static_cache::StaticCacheStore,
+    static_data::index::StaticTransitIndex,
+    static_data::index::StaticTransitRevision,
+    static_data::schedule::ScheduledTrip,
 };
 
 use crate::support::{fixture_root, njt_bus_dataset};
 
 #[tokio::test]
 async fn realtime_fixture_maps_trips() {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis_pool = _redis.pool();
-    _redis.flush().await.unwrap();
-    let cache = StaticCacheStore::new(redis_pool);
     let root = fixture_root();
     let manifest =
         fixtures::load_manifest_for(&root, Source::NjtBus, FixtureKind::Realtime, "basic")
@@ -23,10 +20,6 @@ async fn realtime_fixture_maps_trips() {
         .expect("NJT bus realtime fixture should decode");
     let vehicles = fixtures::read_gtfs_realtime_payload(&root, &manifest, "vehicle_positions")
         .expect("NJT positions fixture should decode");
-    let index = cache.static_index();
-    index.publish(StaticTransitRevision::from_dataset(&njt_bus_dataset()));
-    let adapter = NjtBusRealtime::new(index, cache.clone());
-
     // The capture is fixed; give missing dates a fixed service day rather than today.
     for entity in &mut fixture.entity {
         if let Some(update) = &mut entity.trip_update {
@@ -36,13 +29,13 @@ async fn realtime_fixture_maps_trips() {
                 .get_or_insert_with(|| "20260528".into());
         }
     }
-    let cached_trips = fixture
+    let scheduled_trips = fixture
         .entity
         .iter()
         .filter_map(|entity| {
             let update = entity.trip_update.as_ref()?;
             let trip_id = update.trip.trip_id.clone()?;
-            Some(CachedTrip {
+            Some(ScheduledTrip {
                 trip_id,
                 route_id: update
                     .trip
@@ -58,10 +51,11 @@ async fn realtime_fixture_maps_trips() {
         })
         .collect::<Vec<_>>();
 
-    cache
-        .cache_trips(Source::NjtBus, &cached_trips)
-        .await
-        .expect("static cache seed should succeed");
+    let mut dataset = njt_bus_dataset();
+    dataset.scheduled_trips = scheduled_trips;
+    let index = StaticTransitIndex::new();
+    index.publish(StaticTransitRevision::from_dataset(&dataset));
+    let adapter = NjtBusRealtime::new(index);
 
     let snapshot: CollectedSnapshot = adapter
         .build_snapshot(vec![fixture, vehicles])

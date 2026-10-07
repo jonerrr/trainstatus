@@ -6,9 +6,7 @@ async fn trajectory_live_hot_miss_returns_empty_without_database() {
         .acquire_timeout(std::time::Duration::from_millis(100))
         .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
         .unwrap();
-    let redis = bb8::Pool::builder()
-        .build_unchecked(bb8_redis::RedisConnectionManager::new("redis://127.0.0.1:1").unwrap());
-    let state = support::app_state(pool.clone(), redis);
+    let state = support::app_state(pool.clone());
     let (router, _) = utoipa_axum::router::OpenApiRouter::new()
         .nest("/api/v1", backend::api::router(state))
         .split_for_parts();
