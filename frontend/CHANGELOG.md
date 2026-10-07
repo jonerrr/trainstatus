@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.3...frontend-v1.4.0) (2026-10-07)
+
+
+### Features
+
+* **e2e:** add navigation and pins end-to-end tests ([bb298bc](https://github.com/jonerrr/trainstatus/commit/bb298bcd83ecd46eefb0fdf39cdd0e132e810ee0))
+
+
+### Bug Fixes
+
+* improve list scrolling behavior and height adjustment ([bef568e](https://github.com/jonerrr/trainstatus/commit/bef568ea0be15c8865c45ca5e5fe130998226210))
+* PWA viewport issues ([e220dc6](https://github.com/jonerrr/trainstatus/commit/e220dc64f84839ab1074a55d1cdf7fe77627172a))
+* settings page scroll ([eea6d46](https://github.com/jonerrr/trainstatus/commit/eea6d46b8b2d855b3768890fdee213f2546d65f6))
+* various code improvements and bug fixes ([bb298bc](https://github.com/jonerrr/trainstatus/commit/bb298bcd83ecd46eefb0fdf39cdd0e132e810ee0))
+
 ## [1.3.3](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.2...frontend-v1.3.3) (2026-10-06)
 
 
