@@ -8,6 +8,43 @@ use uuid::Uuid;
 /// `B940017`. Used to build a synthetic realtime trip whose stop sequence
 /// unambiguously belongs to that shape.
 const B94_STOP_IDS: [&str; 5] = ["504409", "901701", "904218", "904219", "904979"];
+
+#[sqlx::test]
+async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
+    let service = backend::trajectory::TrajectoryService::new(pool);
+    let at = crate::support::fixtures::fixed_time();
+    let results =
+        futures::future::join_all((0..8).map(|_| service.snapshot(Source::MtaBus, Some(at)))).await;
+    let snapshots: Vec<_> = results.into_iter().map(Result::unwrap).collect();
+    for snapshot in &snapshots[1..] {
+        assert!(
+            std::sync::Arc::ptr_eq(&snapshots[0], snapshot),
+            "concurrent misses must return the same computed snapshot"
+        );
+    }
+    let cached = service
+        .snapshot(Source::MtaBus, Some(at + chrono::Duration::seconds(1)))
+        .await
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&snapshots[0], &cached));
+}
+
+#[sqlx::test]
+async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
+    let service = backend::trajectory::TrajectoryService::new(pool.clone());
+    let at = crate::support::fixtures::fixed_time();
+    sqlx::query("ALTER TABLE realtime.trip RENAME TO unavailable_trip")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(service.snapshot(Source::MtaBus, Some(at)).await.is_err());
+    sqlx::query("ALTER TABLE realtime.unavailable_trip RENAME TO trip")
+        .execute(&pool)
+        .await
+        .unwrap();
+    service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
+}
+
 fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::realtime::CollectedSnapshot {
     use backend::models::trip::{MtaBusData, StopTime, StopTimeData, Trip, TripData};
     let id = Uuid::now_v7();

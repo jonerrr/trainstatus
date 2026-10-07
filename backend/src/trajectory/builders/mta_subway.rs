@@ -6,11 +6,10 @@ use crate::models::trip::StopTimeData;
 use super::super::builder::{
     TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
 };
-use super::super::cache::{PlatformMatch, TrajectoryCache};
+use super::super::cache::PlatformMatch;
 use super::super::geometry::{ShapeGeometry, project_point_onto_line, project_wgs84_point_to_epsg};
 use super::super::types::{
-    GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryState, TrajectoryStop,
-    TripSnapshot,
+    GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryStop, TripSnapshot,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -146,9 +145,7 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
-        _prev_state: Option<TrajectoryState>,
         shape_geom: &ShapeGeometry,
-        caches: &TrajectoryCache,
     ) -> anyhow::Result<GeneratedKnots> {
         let consist_length_m = trip
             .consist_length_m
@@ -162,12 +159,10 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
                 _ => return Err(anyhow::anyhow!("Expected MTA subway stop data")),
             };
             let platform_edges = Self::platform_edges_for_stop(stop, &stop_data_mta.platform_edges);
-            let platform_match = caches.match_platform(
-                Source::MtaSubway,
-                &stop.stop_id,
+            let platform_match = crate::trajectory::platform::select_platform(
+                &platform_edges,
                 trip.direction,
                 consist_length_m,
-                &platform_edges,
             );
 
             let platform_match = match platform_match {
@@ -178,7 +173,6 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
                     let default_platform_length_m = 182.88;
                     let position_m = (default_platform_length_m + consist_length_m) / 2.0;
                     PlatformMatch {
-                        platform_edge_id: format!("{}-FALLBACK", stop.stop_id),
                         position_m,
                         platform_edge_length_m: default_platform_length_m,
                     }

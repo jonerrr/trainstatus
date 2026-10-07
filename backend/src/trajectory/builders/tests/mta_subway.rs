@@ -12,7 +12,6 @@ use crate::models::stop::{
 use crate::models::trip::{MtaSubwayStopTimeData, StopTimeData};
 use crate::trajectory::builder::TrajectoryBuilder;
 use crate::trajectory::builders::mta_subway::MtaSubwayBuilder;
-use crate::trajectory::cache::TrajectoryCache;
 use crate::trajectory::continuity::apply;
 use crate::trajectory::geometry::{build_shape_geometry, distance_to_coord};
 use crate::trajectory::types::{
@@ -37,7 +36,8 @@ fn match_platform_edge_picks_best_candidate() {
     ];
 
     let matched = crate::trajectory::platform::select_platform(&edges, 1, 146.304).unwrap();
-    assert_eq!(matched.platform_edge_id, "exact");
+    // The exact consist marker is at 120 feet, rather than the fallback's 50 feet.
+    assert!((matched.position_m - 36.576).abs() < 1e-6);
 }
 
 #[test]
@@ -66,9 +66,7 @@ fn live_anchor_prevents_prev_state_discard_when_next_stop_is_far() {
     );
 
     let builder = MtaSubwayBuilder;
-    let generated = builder
-        .generate_knots(&trip, None, &shape_geom, &TrajectoryCache::new())
-        .expect("knots");
+    let generated = builder.generate_knots(&trip, &shape_geom).expect("knots");
     let prev = TrajectoryState {
         t_unix: 95.0,
         s_m: 305.0,
@@ -147,9 +145,7 @@ fn at_stop_anchor_produces_zero_velocity_knot_and_monotone_path() {
     );
 
     let builder = MtaSubwayBuilder;
-    let generated = builder
-        .generate_knots(&trip, None, &shape_geom, &TrajectoryCache::new())
-        .expect("knots");
+    let generated = builder.generate_knots(&trip, &shape_geom).expect("knots");
 
     assert!(
         generated
@@ -195,9 +191,7 @@ fn overlapping_station_profiles_stay_monotone_with_anchor() {
     );
 
     let builder = MtaSubwayBuilder;
-    let generated = builder
-        .generate_knots(&trip, None, &shape_geom, &TrajectoryCache::new())
-        .expect("knots");
+    let generated = builder.generate_knots(&trip, &shape_geom).expect("knots");
     assert!(generated.stats.backtracking_knots_removed > 0);
 
     let prev = TrajectoryState {
@@ -218,7 +212,7 @@ fn overlapping_station_profiles_stay_monotone_with_anchor() {
 }
 
 #[test]
-fn trajectory_platform_cache_respects_pinned_marker_data() {
+fn trajectory_platform_selection_respects_pinned_marker_data() {
     let (mut trip, shape) = trip_with_anchor(
         "EN_ROUTE",
         vec![stop(
@@ -235,13 +229,12 @@ fn trajectory_platform_cache_respects_pinned_marker_data() {
         0.0,
     );
     trip.positions.clear();
-    let cache = TrajectoryCache::new();
     let builder = MtaSubwayBuilder;
-    let first = builder.generate_knots(&trip, None, &shape, &cache).unwrap();
+    let first = builder.generate_knots(&trip, &shape).unwrap();
     if let StopData::MtaSubway(data) = &mut trip.stops[0].stop_data {
         data.platform_edges[0].car_markers[0].position_ft = 200.0;
     }
-    let second = builder.generate_knots(&trip, None, &shape, &cache).unwrap();
+    let second = builder.generate_knots(&trip, &shape).unwrap();
     let marker = |knots: &crate::trajectory::types::GeneratedKnots| {
         knots.knots.iter().find(|k| k.t_event == 200.0).unwrap().s_m
     };

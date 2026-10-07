@@ -61,9 +61,7 @@ fn position(trip: &TripSnapshot, at: i64, lon: f64) -> VehiclePosition {
     }
 }
 fn knots(t: &TripSnapshot, g: &ShapeGeometry) -> GeneratedKnots {
-    NjtBusBuilder
-        .generate_knots(t, None, g, &TrajectoryCache::new())
-        .unwrap()
+    NjtBusBuilder.generate_knots(t, g).unwrap()
 }
 #[test]
 fn schedule_fallback_preserves_reported_dwell_and_motion() {
@@ -78,7 +76,6 @@ fn schedule_fallback_preserves_reported_dwell_and_motion() {
         &t,
         None,
         &g,
-        &TrajectoryCache::new(),
         &PchipMethod,
         &TrajectoryConfig::for_source(Source::NjtBus),
     )
@@ -139,27 +136,20 @@ fn newest_usable_fix_wins_and_behind_stop_does_not_truncate() {
 fn continuity_is_monotonic_and_bad_trip_does_not_poison_builder() {
     let (mut t, g) = trip();
     let config = TrajectoryConfig::for_source(Source::NjtBus);
-    let cache = TrajectoryCache::new();
-    let first =
-        compute_trajectory(&NjtBusBuilder, &t, None, &g, &cache, &PchipMethod, &config).unwrap();
+    let first = compute_trajectory(&NjtBusBuilder, &t, None, &g, &PchipMethod, &config).unwrap();
     t.as_of += chrono::Duration::seconds(30);
     let next = compute_trajectory(
         &NjtBusBuilder,
         &t,
         Some(first.end_state),
         &g,
-        &cache,
         &PchipMethod,
         &config,
     )
     .unwrap();
     assert!(next.trajectory.distances_m.windows(2).all(|w| w[1] >= w[0]));
     t.stops[0].arrival_unix = f64::NAN;
-    assert!(NjtBusBuilder.generate_knots(&t, None, &g, &cache).is_err());
+    assert!(NjtBusBuilder.generate_knots(&t, &g).is_err());
     let (valid, _) = trip();
-    assert!(
-        NjtBusBuilder
-            .generate_knots(&valid, None, &g, &cache)
-            .is_ok()
-    );
+    assert!(NjtBusBuilder.generate_knots(&valid, &g).is_ok());
 }

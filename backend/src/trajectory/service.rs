@@ -45,9 +45,16 @@ impl TrajectoryService {
                 .await
                 .unwrap_or_else(|| Arc::new(HotSnapshot::empty())));
         };
-        if let Some(hist) = self.cache.get_historical(source, at).await {
-            return Ok(hist);
-        }
+        self.cache
+            .get_historical_with(source, at, self.derive_historical(source, at))
+            .await
+    }
+
+    async fn derive_historical(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+    ) -> anyhow::Result<Arc<HotSnapshot>> {
         let inputs = self.store.load_historical_inputs(source, at).await?;
         let config = TrajectoryConfig::for_source(source);
         let engine = self.calculator.clone();
@@ -86,10 +93,6 @@ impl TrajectoryService {
             render_units.insert(unit.render_unit_id.clone(), unit);
         }
 
-        let snapshot = Arc::new(HotSnapshot::historical_from(render_units));
-        self.cache
-            .set_historical(source, at, snapshot.clone())
-            .await;
-        Ok(snapshot)
+        Ok(Arc::new(HotSnapshot::historical_from(render_units)))
     }
 }

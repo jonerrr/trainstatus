@@ -4,7 +4,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use moka::future::Cache;
 
-use crate::models::{source::Source, stop::PlatformEdge};
+use crate::models::source::Source;
 
 use super::geometry::{ShapeGeometry, build_shape_geometry};
 use super::types::{HotSnapshot, round_to_5min_bucket, source_projected_epsg_code};
@@ -23,18 +23,8 @@ pub struct StopProjKey {
     pub stop_id: String,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct PlatformMatchKey {
-    pub platform_content_hash: [u8; 32],
-    pub source: Source,
-    pub stop_id: String,
-    pub trip_direction: i16,
-    pub consist_length_bits: u64,
-}
-
 #[derive(Debug, Clone)]
 pub struct PlatformMatch {
-    pub platform_edge_id: String,
     pub position_m: f64,
     pub platform_edge_length_m: f64,
 }
@@ -50,7 +40,6 @@ pub struct TrajectoryCache {
     historical: Cache<HistKey, Arc<HotSnapshot>>,
     shape_geom: Cache<ShapeKey, Arc<ShapeGeometry>>,
     stop_proj: Cache<StopProjKey, f64>,
-    platform_match: moka::sync::Cache<PlatformMatchKey, PlatformMatch>,
 }
 
 impl TrajectoryCache {
@@ -72,10 +61,6 @@ impl TrajectoryCache {
                 .max_capacity(100_000)
                 .time_to_live(Duration::from_secs(48 * 3600))
                 .build(),
-            platform_match: moka::sync::Cache::builder()
-                .max_capacity(100_000)
-                .time_to_live(Duration::from_secs(48 * 3600))
-                .build(),
         }
     }
 
@@ -87,31 +72,22 @@ impl TrajectoryCache {
         self.hot.replace(source, snapshot);
     }
 
-    pub async fn get_historical(
+    /// Coalesces same-bucket loads and retains only successful snapshots.
+    pub async fn get_historical_with(
         &self,
         source: Source,
         at: DateTime<Utc>,
-    ) -> Option<Arc<HotSnapshot>> {
+        init: impl std::future::Future<Output = anyhow::Result<Arc<HotSnapshot>>>,
+    ) -> anyhow::Result<Arc<HotSnapshot>> {
         let bucket = round_to_5min_bucket(at.timestamp());
         let key = HistKey {
             source,
             bucket_unix: bucket,
         };
-        self.historical.get(&key).await
-    }
-
-    pub async fn set_historical(
-        &self,
-        source: Source,
-        at: DateTime<Utc>,
-        snapshot: Arc<HotSnapshot>,
-    ) {
-        let bucket = round_to_5min_bucket(at.timestamp());
-        let key = HistKey {
-            source,
-            bucket_unix: bucket,
-        };
-        self.historical.insert(key, snapshot).await;
+        self.historical
+            .try_get_with(key, init)
+            .await
+            .map_err(|error| anyhow::anyhow!(error))
     }
 
     pub async fn get_shape_geometry(
@@ -164,41 +140,6 @@ impl TrajectoryCache {
         )?;
         self.stop_proj.insert(key, dist).await;
         Some(dist)
-    }
-
-    pub fn match_platform(
-        &self,
-        source: Source,
-        stop_id: &str,
-        direction: i16,
-        consist_length_m: f64,
-        edges: &[PlatformEdge],
-    ) -> Option<PlatformMatch> {
-        if edges.is_empty() {
-            return None;
-        }
-        let key = Self::platform_match_key(source, stop_id, direction, consist_length_m, edges);
-        self.platform_match.optionally_get_with(key, || {
-            super::platform::select_platform(edges, direction, consist_length_m)
-        })
-    }
-
-    fn platform_match_key(
-        source: Source,
-        stop_id: &str,
-        trip_direction: i16,
-        consist_length_m: f64,
-        platform_edges: &[PlatformEdge],
-    ) -> PlatformMatchKey {
-        // The key depends only on pinned inputs, never a process-global import counter.
-        let platform_data = serde_json::to_vec(platform_edges).unwrap_or_default();
-        PlatformMatchKey {
-            platform_content_hash: *blake3::hash(&platform_data).as_bytes(),
-            source,
-            stop_id: stop_id.to_string(),
-            trip_direction,
-            consist_length_bits: consist_length_m.to_bits(),
-        }
     }
 }
 

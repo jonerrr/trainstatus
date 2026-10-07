@@ -81,15 +81,23 @@ impl AlertStore {
             return self.query_all_alerts(source, at).await;
         }
 
-        // A source's miss and write-through refresh share one lock, so an
-        // earlier SQL read cannot overwrite a result from a later commit.
-        let _guard = self.refresh_locks[&source].lock().await;
         if let Some(alerts) = self.cache.get(&source).await {
             return Ok((*alerts).clone());
         }
-        let alerts = self.query_all_alerts(source, Utc::now()).await?;
-        self.cache.insert(source, Arc::new(alerts.clone())).await;
-        Ok(alerts)
+        // A source's miss and write-through refresh share one lock, so an
+        // earlier SQL read cannot overwrite a result from a later commit.
+        let cached = {
+            let _guard = self.refresh_locks[&source].lock().await;
+            match self.cache.get(&source).await {
+                Some(alerts) => alerts,
+                None => {
+                    let alerts = Arc::new(self.query_all_alerts(source, Utc::now()).await?);
+                    self.cache.insert(source, alerts.clone()).await;
+                    alerts
+                }
+            }
+        };
+        Ok((*cached).clone())
     }
 
     async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {

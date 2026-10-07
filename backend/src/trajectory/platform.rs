@@ -21,7 +21,7 @@ pub(super) fn select_platform(
         return None;
     }
     let consist_length_ft = consist_length_m / 0.3048;
-    let mut candidates: Vec<(PlatformEdge, f64, f64, u8)> = Vec::new();
+    let mut candidates: Vec<(f64, f64, u8)> = Vec::new();
 
     for edge in edges {
         let platform_length_m = edge.length_ft as f64 * 0.3048;
@@ -44,16 +44,16 @@ pub(super) fn select_platform(
                 .map(|len| ((len as f64) - consist_length_ft).abs() < 0.1)
                 .unwrap_or(false);
             let rank = if consist_match { 0 } else { 1 };
-            candidates.push((edge.clone(), position_m, platform_length_m, rank));
+            candidates.push((position_m, platform_length_m, rank));
         }
     }
 
     candidates.sort_by(|a, b| {
-        if a.3 != b.3 {
-            a.3.cmp(&b.3)
+        if a.2 != b.2 {
+            a.2.cmp(&b.2)
         } else {
-            let pos_a = (a.1 - consist_length_m).abs();
-            let pos_b = (b.1 - consist_length_m).abs();
+            let pos_a = (a.0 - consist_length_m).abs();
+            let pos_b = (b.0 - consist_length_m).abs();
             pos_a
                 .partial_cmp(&pos_b)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -62,8 +62,7 @@ pub(super) fn select_platform(
 
     candidates
         .first()
-        .map(|(edge, position_m, platform_length_m, _)| PlatformMatch {
-            platform_edge_id: edge.id.clone(),
+        .map(|(position_m, platform_length_m, _)| PlatformMatch {
             position_m: *position_m,
             platform_edge_length_m: *platform_length_m,
         })

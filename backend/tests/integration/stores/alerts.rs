@@ -76,6 +76,55 @@ async fn alert_cache_expires_and_explicit_time_bypasses_it(pool: sqlx::PgPool) {
 }
 
 #[sqlx::test]
+async fn warm_alert_reads_remain_available_during_write(pool: sqlx::PgPool) {
+    let store = AlertStore::new(pool.clone());
+    let (alert, period, mut text) = seed(&pool, &store).await;
+    let mut blocker = pool.begin().await.unwrap();
+    sqlx::query("LOCK TABLE realtime.alert IN ACCESS EXCLUSIVE MODE")
+        .execute(&mut *blocker)
+        .await
+        .unwrap();
+    let writer_store = store.clone();
+    text.text = "Committed update".into();
+    let writer = tokio::spawn(async move {
+        writer_store
+            .save_all(Source::NjtBus, &[alert], &[text], &[period], &[], &[])
+            .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let waiting: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE relation = 'realtime.alert'::regclass AND mode = 'RowExclusiveLock' AND NOT granted)",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            if waiting {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("writer must reach the blocked transaction");
+    let warm = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        store.get_all(Source::NjtBus, None),
+    )
+    .await;
+    blocker.rollback().await.unwrap();
+    writer.await.unwrap().unwrap();
+    assert_eq!(
+        warm.expect("warm reads must not wait for writes").unwrap()[0].translations[0].text,
+        "Original"
+    );
+    assert_eq!(
+        store.get_all(Source::NjtBus, None).await.unwrap()[0].translations[0].text,
+        "Committed update"
+    );
+}
+
+#[sqlx::test]
 async fn concurrent_alert_misses_share_one_query(pool: sqlx::PgPool) {
     let seeded = AlertStore::new(pool.clone());
     let (alert, _, _) = seed(&pool, &seeded).await;

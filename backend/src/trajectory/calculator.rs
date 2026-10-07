@@ -62,11 +62,10 @@ pub fn compute_trajectory(
     trip: &TripSnapshot,
     prev_state: Option<TrajectoryState>,
     shape_geom: &ShapeGeometry,
-    caches: &TrajectoryCache,
     method: &dyn InterpolationMethod,
     config: &TrajectoryConfig,
 ) -> anyhow::Result<ComputedTrajectory> {
-    let generated = builder.generate_knots(trip, prev_state, shape_geom, caches)?;
+    let generated = builder.generate_knots(trip, shape_geom)?;
     let raw_knots = generated.knots;
     let t_now = trip.as_of.timestamp() as f64;
     let (knots, mut continuity_stats) = continuity::apply(raw_knots, prev_state, config, t_now);
@@ -189,7 +188,6 @@ pub async fn compute_trajectory_async(
         trip,
         prev_state,
         shape_geom.as_ref(),
-        caches,
         engine.method.as_ref(),
         config,
     )

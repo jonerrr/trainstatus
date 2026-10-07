@@ -138,13 +138,10 @@ fn does_not_overshoot_reported_next_stop() {
     trip.positions = vec![make_position("A", -74.0, 40.7)];
 
     let builder = MtaBusBuilder;
-    let cache = crate::trajectory::TrajectoryCache::new();
     use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
 
-    let result = builder
-        .generate_knots(&trip, None, &shape_geom, &cache)
-        .unwrap();
+    let result = builder.generate_knots(&trip, &shape_geom).unwrap();
 
     let max_s = result
         .knots
@@ -172,12 +169,9 @@ fn live_anchor_is_kept_when_the_next_stop_is_already_late() {
     trip.positions = vec![make_position("B", -74.0, 40.7)];
 
     let builder = MtaBusBuilder;
-    let cache = crate::trajectory::TrajectoryCache::new();
     use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
-    let result = builder
-        .generate_knots(&trip, None, &shape_geom, &cache)
-        .unwrap();
+    let result = builder.generate_knots(&trip, &shape_geom).unwrap();
 
     let anchor_t = trip.as_of.timestamp() as f64;
     let anchor = result
@@ -197,13 +191,10 @@ fn knots_are_time_ordered() {
     let stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1200.0, 300.0)];
     let trip = make_trip(stops, 500.0);
     let builder = MtaBusBuilder;
-    let cache = crate::trajectory::TrajectoryCache::new();
     use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
 
-    let result = builder
-        .generate_knots(&trip, None, &shape_geom, &cache)
-        .unwrap();
+    let result = builder.generate_knots(&trip, &shape_geom).unwrap();
 
     for pair in result.knots.windows(2) {
         assert!(
