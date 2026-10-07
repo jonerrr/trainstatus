@@ -204,6 +204,19 @@
 		const last_idx = total_items - 1;
 		return (offsets[last_idx] ?? 0) + height_calc(items[last_idx]);
 	});
+
+	// Pin lists that show every row should size to those rows. The estimated
+	// height is a few pixels short of the rendered border box, which otherwise
+	// leaves a scrollbar on a single pin.
+	const FITTED_LIST_SLACK_PX = 8;
+
+	const fits_without_scroll = $derived(
+		items_before_scroll !== undefined && items.length > 0 && items.length <= items_before_scroll
+	);
+
+	const preview_height = $derived(
+		items_before_scroll !== undefined && !fits_without_scroll ? `${total_height}px` : undefined
+	);
 </script>
 
 <!-- TODO: back to top button in header -->
@@ -277,9 +290,15 @@
 			scroll_top = e.currentTarget.scrollTop;
 		}}
 		style="-webkit-overflow-scrolling: touch;"
-		class="relative min-h-0 flex-1 overflow-y-auto text-base {list_class ?? ''}"
+		style:height={preview_height}
+		style:padding-bottom={fits_without_scroll ? `${FITTED_LIST_SLACK_PX}px` : undefined}
+		class={[
+			'relative overflow-y-auto text-base',
+			list_class,
+			items_before_scroll ? 'flex-none' : 'min-h-0 flex-1'
+		]}
 	>
-		<div style:height="{total_height}px" class="relative">
+		<div style:height={fits_without_scroll ? undefined : `${total_height}px`} class="relative">
 			<div
 				class="will-change-transform"
 				style:transform="translateY({getItemOffset(start_index)}px)"
