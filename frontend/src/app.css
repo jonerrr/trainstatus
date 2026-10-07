@@ -7,6 +7,36 @@
 	--font-sans: Inter, sans-serif;
 }
 
+@media (forced-colors: none) {
+	::selection {
+		background-color: #23d5ab;
+		color: #0a0a0a;
+	}
+
+	:root {
+		scrollbar-color: #408579 #171717;
+	}
+
+	/* Fallback for browsers without the standard scrollbar properties. */
+	@supports not (scrollbar-color: #408579 #171717) {
+		::-webkit-scrollbar {
+			width: 12px;
+			height: 12px;
+		}
+
+		::-webkit-scrollbar-track,
+		::-webkit-scrollbar-corner {
+			background-color: #171717;
+		}
+
+		::-webkit-scrollbar-thumb {
+			border: 2px solid #171717;
+			border-radius: 999px;
+			background-color: #408579;
+		}
+	}
+}
+
 /* ── Modal View Transitions ─────────────────────────────────────────────────
    Triggered by [data-modal-direction] set on <html> in Modal.svelte.
    We suppress the default root crossfade so only the named modal element
