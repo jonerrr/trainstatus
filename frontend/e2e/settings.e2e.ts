@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('source preferences persist after a reload and keep at least one source enabled', async ({
 	page
@@ -33,4 +33,14 @@ test('all agency icons load at their displayed size', async ({ page }) => {
 		const width = await image.evaluate((element: HTMLImageElement) => element.naturalWidth);
 		expect(width).toBeLessThanOrEqual(72);
 	}
+});
+
+test('setting the time sets at and a reload keeps it', async ({ page }) => {
+	await page.goto('/settings');
+	await page.locator('input[type="datetime-local"]').fill('2026-10-01T12:00');
+	await expect(page).toHaveURL(/[?&]at=\d+/);
+	const at = new URL(page.url()).searchParams.get('at');
+	expect(at).toBeTruthy();
+	await page.reload();
+	await expect(page).toHaveURL(new RegExp(`[?&]at=${at}(?:&|$)`));
 });

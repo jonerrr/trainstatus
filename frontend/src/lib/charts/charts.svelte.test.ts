@@ -2,16 +2,17 @@ import type { Source } from '#lib/client/index.js';
 
 import '../../app.css';
 
+import { page } from '#lib/test/page.svelte.js';
+
 import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
 
 import ChartsPage from '../../routes/charts/+page.svelte';
-import { page, resources, setFixture, stopResources } from './test-page.svelte.js';
+import { resources, setFixture, stopResources } from './set-fixture.svelte.js';
 
-vi.mock('$app/state', async () => await import('./test-page.svelte.js'));
 vi.mock('#lib/url_params.svelte.js', async () => ({
-	...(await import('./test-page.svelte.js')),
+	...(await import('./set-fixture.svelte.js')),
 	open_modal: () => {}
 }));
 vi.mock('#lib/resources/trips.svelte.js', () => ({ trip_context: { get: () => resources } }));

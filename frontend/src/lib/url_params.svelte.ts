@@ -65,9 +65,9 @@ export function open_modal(state: ModalData) {
 }
 
 /**
- * Close the currently open modal by replacing the current history entry,
- * removing the modal search param from the URL.
- * Works for both push-opened and fresh-load modals.
+ * Close the currently open modal and remove its search params.
+ * A list-opened modal pushed a history entry, so closing pushes the dismissed
+ * entry and Back restores the modal. A fresh load replaces the current entry.
  */
 export function close_modal() {
 	const url = new SvelteURL(page.url.href);
@@ -82,5 +82,10 @@ export function close_modal() {
 	} else {
 		url.searchParams.delete('at');
 	}
-	goto(url.pathname + url.search, { shallow: true, replace: true, state: { modal: null } });
+	const opened_from_list = (page.state?.index ?? 0) > 0;
+	goto(url.pathname + url.search, {
+		shallow: true,
+		replace: !opened_from_list,
+		state: { modal: null }
+	});
 }

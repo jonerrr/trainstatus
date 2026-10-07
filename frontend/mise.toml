@@ -11,5 +11,30 @@ depends = ["pnpm-install"]
 [tasks.build]
 run = "podman build -f Dockerfile -t ghcr.io/jonerrr/trainstatus-frontend ."
 
+[tasks.test]
+description = "Run unit and component tests. Does not call the API."
+depends = ["pnpm-install"]
+run = "pnpm test"
+
+[tasks."test:unit"]
+description = "Run colocated Vitest node tests"
+depends = ["pnpm-install"]
+run = "pnpm test:unit"
+
+[tasks."test:component"]
+description = "Run Vitest browser component tests"
+depends = ["pnpm-install"]
+run = "pnpm test:component"
+
+[tasks."test:integration"]
+description = "Audit live chart itineraries. Requires the API on :3055."
+depends = ["pnpm-install"]
+run = "pnpm test:integration"
+
+[tasks."test:e2e"]
+description = "Run Playwright against preview. Requires the API on :3055."
+depends = ["pnpm-install"]
+run = "pnpm test:e2e"
+
 [env]
 # VITE_ALLOWED_HOSTS = ""

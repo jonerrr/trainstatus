@@ -82,7 +82,7 @@
 			throttled_search_input.current,
 			selected_source.current
 		);
-		// TODO: maybe add some kind of "no results found" state when search_results is empty (and search input isn't empty)
+		// TODO: no-match fallback is unfinished; see frontend/TESTING.md
 		return {
 			...page.data.stops,
 			[selected_source.current]:

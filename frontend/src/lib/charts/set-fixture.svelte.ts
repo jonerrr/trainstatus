@@ -1,18 +1,10 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
+import { page } from '#lib/test/page.svelte.js';
 
 import { chartFixture, chartNow } from './fixtures.js';
 
-export const page = $state<{ data: App.PageData }>({
-	data: {
-		selected_sources: [],
-		stops: {},
-		stops_by_id: {},
-		routes: {},
-		routes_by_id: {}
-	}
-});
 export const current_time = { ms: chartNow };
 export const resources: Record<string, { current: Map<string, unknown>; status: string }> = {};
 export const stopResources: Record<

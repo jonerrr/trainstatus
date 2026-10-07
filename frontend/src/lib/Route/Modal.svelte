@@ -86,6 +86,7 @@
 
 <header class="flex items-center gap-1 p-1">
 	<Icon width={36} height={36} link={false} {route} />
+	<span class="sr-only">{route.short_name}</span>
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if route_alerts.length && idx < route_alerts.length}

@@ -34,6 +34,7 @@
 	{@const is_active = href === $state.eager(page.url.pathname)}
 	<a
 		aria-label={label}
+		aria-current={is_active ? 'page' : undefined}
 		title={label}
 		href="{href}{current_time.value ? `?at=${current_time.value}` : ''}"
 		class={[

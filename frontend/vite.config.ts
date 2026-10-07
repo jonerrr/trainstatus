@@ -54,6 +54,11 @@ export default defineConfig(({ mode }) => {
 				'/api': {
 					target: process.env.API_ORIGIN ?? 'http://localhost:3055',
 					changeOrigin: true
+				},
+				'/martin': {
+					target: 'http://127.0.0.1:3000',
+					changeOrigin: true,
+					xfwd: true
 				}
 			}
 		},
@@ -69,18 +74,26 @@ export default defineConfig(({ mode }) => {
 							provider: playwright(),
 							instances: [{ browser: 'chromium', headless: true }]
 						},
-						include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-						exclude: ['src/lib/server/**']
+						include: ['src/**/*.svelte.test.ts'],
+						exclude: ['src/lib/server/**'],
+						setupFiles: ['src/lib/test/client-setup.ts']
 					}
 				},
-
 				{
 					extends: './vite.config.ts',
 					test: {
 						name: 'server',
 						environment: 'node',
-						include: ['src/**/*.{test,spec}.{js,ts}'],
-						exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+						include: ['src/**/*.test.ts'],
+						exclude: ['src/**/*.svelte.test.ts', 'tests/integration/**']
+					}
+				},
+				{
+					extends: './vite.config.ts',
+					test: {
+						name: 'integration',
+						environment: 'node',
+						include: ['tests/integration/**/*.test.ts']
 					}
 				}
 			]
