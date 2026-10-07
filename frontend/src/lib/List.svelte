@@ -208,8 +208,6 @@
 	// Pin lists that show every row should size to those rows. The estimated
 	// height is a few pixels short of the rendered border box, which otherwise
 	// leaves a scrollbar on a single pin.
-	const FITTED_LIST_SLACK_PX = 8;
-
 	const fits_without_scroll = $derived(
 		items_before_scroll !== undefined && items.length > 0 && items.length <= items_before_scroll
 	);
@@ -291,7 +289,6 @@
 		}}
 		style="-webkit-overflow-scrolling: touch;"
 		style:height={preview_height}
-		style:padding-bottom={fits_without_scroll ? `${FITTED_LIST_SLACK_PX}px` : undefined}
 		class={[
 			'relative overflow-y-auto text-base',
 			list_class,
