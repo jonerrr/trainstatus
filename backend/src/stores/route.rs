@@ -1,41 +1,51 @@
-use crate::{
-    models::{route::Route, shape::Shape, source::Source},
-    stores::{cache_get, cache_set_with_etag},
-};
-use bb8_redis::RedisConnectionManager;
-use redis::AsyncCommands;
-use sqlx::PgPool;
-use std::time::Duration;
-
-const TTL: Duration = Duration::from_secs(86400);
+use super::response::{ResponseCache, StaticResponse};
+use crate::models::{route::Route, shape::Shape, source::Source};
+use sqlx::{PgConnection, PgPool};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct RouteStore {
     pg_pool: PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    pub(crate) responses: Arc<ResponseCache<Route>>,
 }
 
 impl RouteStore {
-    pub fn new(pg_pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) -> Self {
+    pub fn new(pg_pool: PgPool) -> Self {
         Self {
             pg_pool,
-            redis_pool,
+            responses: Arc::default(),
         }
     }
 
-    fn cache_key(source: Source) -> String {
-        format!("routes:{}", source.as_str())
+    pub async fn refresh(&self, source: Source) -> anyhow::Result<()> {
+        let _guard = self.responses.refresh_locks[&source].lock().await;
+        let data = Self::query_all_on(source, &mut *self.pg_pool.acquire().await?).await?;
+        self.responses
+            .values
+            .replace(source, StaticResponse::new(data)?);
+        Ok(())
     }
 
-    /// Fetch routes from DB, populate the Redis cache (JSON + ETag), and return the hash.
-    pub async fn populate_cache(&self, source: Source) -> anyhow::Result<String> {
-        let routes = self.query_all(source).await?;
-        let key = Self::cache_key(source);
-        cache_set_with_etag(&self.redis_pool, &key, &routes, TTL).await
+    pub async fn response(&self, source: Source) -> anyhow::Result<Arc<StaticResponse<Route>>> {
+        if let Some(response) = self.responses.values.get(source) {
+            return Ok(response);
+        }
+        let _guard = self.responses.refresh_locks[&source].lock().await;
+        if let Some(response) = self.responses.values.get(source) {
+            return Ok(response);
+        }
+        let data = Self::query_all_on(source, &mut *self.pg_pool.acquire().await?).await?;
+        Ok(self
+            .responses
+            .values
+            .replace(source, StaticResponse::new(data)?))
     }
 
     /// Raw DB query for all routes of a source.
-    async fn query_all(&self, source: Source) -> anyhow::Result<Vec<Route>> {
+    pub(crate) async fn query_all_on(
+        source: Source,
+        connection: &mut PgConnection,
+    ) -> anyhow::Result<Vec<Route>> {
         Ok(sqlx::query_as::<_, Route>(
             r#"SELECT
                 id,
@@ -49,31 +59,23 @@ impl RouteStore {
                 static.route
             WHERE
                 source = $1
-            ORDER BY short_name"#,
+            ORDER BY short_name, id"#,
         )
         .bind(source)
-        .fetch_all(&self.pg_pool)
+        .fetch_all(connection)
         .await?)
     }
 
-    /// Gets all routes for a source. Tries Redis first; falls back to DB on miss.
     pub async fn get_all(&self, source: Source) -> anyhow::Result<Vec<Route>> {
-        let key = Self::cache_key(source);
-        if let Some(cached) = cache_get::<Vec<Route>>(&self.redis_pool, &key).await {
-            return Ok(cached);
-        }
-        self.query_all(source).await
+        Ok(self.response(source).await?.data.clone())
     }
 
-    /// Returns the stored ETag (blake3 hex) for a source's routes cache, if present.
-    pub async fn get_etag(&self, source: Source) -> anyhow::Result<Option<String>> {
-        let key = format!("{}:etag", Self::cache_key(source));
-        let mut conn = self.redis_pool.get().await?;
-        Ok(conn.get::<_, Option<String>>(&key).await?)
-    }
-
-    /// Bulk insert routes (and invalidate cache)
-    pub async fn save_all(&self, source: Source, routes: &[Route]) -> anyhow::Result<()> {
+    /// Persist routes inside the owning static import transaction.
+    pub(crate) async fn save_all_on(
+        connection: &mut PgConnection,
+        source: Source,
+        routes: &[Route],
+    ) -> anyhow::Result<()> {
         // ensure all ids are uppercase for consistency (and frontend search)
         let ids: Vec<_> = routes.iter().map(|r| r.id.to_uppercase()).collect();
         let sources: Vec<_> = routes.iter().map(|_| source).collect();
@@ -130,70 +132,17 @@ impl RouteStore {
             &text_colors as _,
             &datas as _,
         )
-        .execute(&self.pg_pool)
+        .execute(connection)
         .await?;
-
-        self.populate_cache(source).await?;
 
         Ok(())
     }
 
-    /// Persist the index fields that the normalized static tables do not store.
-    ///
-    /// MTA sources save empty maps. NJT saves one pattern per scheduled trip and
-    /// the child-stop remap. A restart reads these back instead of downloading
-    /// the upstream files again.
-    pub async fn save_revision_metadata(
-        &self,
+    pub(crate) async fn save_all_shapes_on(
+        connection: &mut PgConnection,
         source: Source,
-        trip_patterns: &std::collections::HashMap<String, crate::static_index::TripPattern>,
-        stop_remap: &std::collections::HashMap<String, String>,
+        shapes: &[Shape],
     ) -> anyhow::Result<()> {
-        let patterns = serde_json::to_value(trip_patterns)?;
-        let remap = serde_json::to_value(stop_remap)?;
-        sqlx::query(
-            r#"
-            INSERT INTO source (id, name, updated_at, trip_patterns, stop_remap)
-            VALUES ($1, $2, 'epoch'::timestamptz, $3, $4)
-            ON CONFLICT (id) DO UPDATE SET
-                trip_patterns = EXCLUDED.trip_patterns,
-                stop_remap = EXCLUDED.stop_remap
-            "#,
-        )
-        .bind(source)
-        .bind(source.as_str())
-        .bind(patterns)
-        .bind(remap)
-        .execute(&self.pg_pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn load_revision_metadata(
-        &self,
-        source: Source,
-    ) -> anyhow::Result<(
-        std::collections::HashMap<String, crate::static_index::TripPattern>,
-        std::collections::HashMap<String, String>,
-    )> {
-        let row: Option<(serde_json::Value, serde_json::Value)> =
-            sqlx::query_as("SELECT trip_patterns, stop_remap FROM source WHERE id = $1")
-                .bind(source)
-                .fetch_optional(&self.pg_pool)
-                .await?;
-        let Some((patterns, remap)) = row else {
-            return Ok((
-                std::collections::HashMap::new(),
-                std::collections::HashMap::new(),
-            ));
-        };
-        Ok((
-            serde_json::from_value(patterns)?,
-            serde_json::from_value(remap)?,
-        ))
-    }
-
-    pub async fn save_all_shapes(&self, source: Source, shapes: &[Shape]) -> anyhow::Result<()> {
         let ids: Vec<_> = shapes.iter().map(|s| &s.id).collect();
         let sources: Vec<_> = vec![source; shapes.len()];
         let geoms: Vec<_> = shapes.iter().map(|s| s.geom.clone()).collect();
@@ -216,17 +165,20 @@ impl RouteStore {
             &geoms,
             &datas as _,
         )
-        .execute(&self.pg_pool)
+        .execute(connection)
         .await?;
         Ok(())
     }
 
-    pub async fn get_all_shapes(&self, source: Source) -> anyhow::Result<Vec<Shape>> {
+    pub(crate) async fn get_all_shapes_on(
+        source: Source,
+        connection: &mut PgConnection,
+    ) -> anyhow::Result<Vec<Shape>> {
         Ok(sqlx::query_as::<_, Shape>(
             "SELECT id, source, geom, data FROM static.shape WHERE source = $1",
         )
         .bind(source)
-        .fetch_all(&self.pg_pool)
+        .fetch_all(connection)
         .await?)
     }
 }

@@ -3,16 +3,16 @@ use chrono_tz::America::New_York;
 use gtfs_structures::Exception;
 
 use crate::models::source::Source;
-use crate::models::static_cache::{CachedStopTime, CachedTrip};
+use crate::static_data::schedule::{ScheduledStopTime, ScheduledTrip};
 
-pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedTrip> {
+pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<ScheduledTrip> {
     // TODO: don't hardcode timezone
     let now = Utc::now().with_timezone(&New_York);
     let today = now.date_naive();
     let tomorrow = today.succ_opt().unwrap();
     let dates = vec![today, tomorrow];
 
-    let mut cached_trips = Vec::new();
+    let mut scheduled_trips = Vec::new();
 
     for trip in gtfs.trips.values() {
         for &date in &dates {
@@ -36,7 +36,7 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
                         let arrival = calculate_datetime(date, st.arrival_time?)?;
                         let departure = calculate_datetime(date, st.departure_time?)?;
 
-                        Some(CachedStopTime {
+                        Some(ScheduledStopTime {
                             stop_id: st.stop.id.clone(),
                             arrival,
                             departure,
@@ -45,7 +45,7 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
                     })
                     .collect();
 
-                cached_trips.push(CachedTrip {
+                scheduled_trips.push(ScheduledTrip {
                     trip_id: trip.id.clone(),
                     route_id: trip.route_id.clone(),
                     headsign: trip.trip_headsign.clone().unwrap_or_default(),
@@ -58,7 +58,7 @@ pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<CachedT
         }
     }
 
-    cached_trips
+    scheduled_trips
 }
 
 fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs) -> bool {

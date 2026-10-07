@@ -8,7 +8,7 @@ use crate::{
     models::{geom::Geom, source::Source},
 };
 
-#[derive(Serialize, Deserialize, ToSchema, FromRow, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow, Debug, Clone)]
 pub struct Stop {
     #[schema(example = "101")]
     pub id: String,
@@ -33,7 +33,7 @@ pub struct Stop {
     pub routes: Vec<RouteStop>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema, FromRow, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow, Debug, Clone)]
 pub struct Transfer {
     pub to_stop_id: String,
     pub to_stop_source: Source,

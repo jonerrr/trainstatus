@@ -8,32 +8,28 @@ use backend::{
         patterns::PatternFeature, realtime::NjtBusRealtime,
         static_data::build_static_dataset_from_patterns,
     },
-    static_index::StaticTransitRevision,
-    stores::static_cache::StaticCacheStore,
+    static_data::index::StaticTransitRevision,
+    static_data::store::StaticDataStore,
 };
 use chrono::Utc;
 use std::{collections::HashMap, sync::Arc};
 
 struct Scenario {
     stores: support::TestStores,
-    dataset: backend::models::static_dataset::StaticDataset,
+    dataset: backend::static_data::dataset::StaticDataset,
     feed: FeedMessage,
     update: TripUpdate,
-    patterns: HashMap<String, backend::static_index::TripPattern>,
+    patterns: HashMap<String, backend::static_data::index::TripPattern>,
     scheduled_id: String,
     route_id: String,
     now: chrono::DateTime<Utc>,
     collector: NjtBusRealtime,
     ingestor: RealtimeIngestor,
-    restarted: StaticCacheStore,
-    _redis: support::TestRedis,
+    restarted: StaticDataStore,
 }
 
 async fn scenario(pool: sqlx::PgPool) -> Scenario {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    _redis.flush().await.unwrap();
-    let stores = support::test_stores(pool.clone(), redis.clone());
+    let stores = support::test_stores(pool.clone());
     let gtfs = gtfs_structures::Gtfs::from_path(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/njt_bus/static/basic/raw/patterns_gtfs.zip"
@@ -62,18 +58,15 @@ async fn scenario(pool: sqlx::PgPool) -> Scenario {
     built.dataset.stop_remap = gate_remap.clone();
     let dataset = &built.dataset;
     assert_eq!(dataset.shapes.len(), 3);
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
-        .await
-        .unwrap();
-    let restarted = StaticCacheStore::new(redis.clone());
-    restarted
-        .static_index()
-        .publish(StaticTransitRevision::from_dataset(dataset));
+    stores.static_data_store.persist(&dataset).await.unwrap();
+    let restarted = support::test_stores(pool.clone()).static_data_store;
+    restarted.static_index().publish(
+        restarted
+            .load_revision(dataset.source)
+            .await
+            .unwrap()
+            .unwrap(),
+    );
     let update = TripUpdate {
         trip: feed::TripDescriptor {
             trip_id: Some(scheduled.id.clone()),
@@ -148,7 +141,7 @@ async fn scenario(pool: sqlx::PgPool) -> Scenario {
             },
         ],
     };
-    let collector = NjtBusRealtime::new(restarted.static_index(), restarted.clone());
+    let collector = NjtBusRealtime::new(restarted.static_index());
     let ingestor = RealtimeIngestor::new(
         pool.clone(),
         stores.live_snapshots.clone(),
@@ -167,7 +160,6 @@ async fn scenario(pool: sqlx::PgPool) -> Scenario {
         collector,
         ingestor,
         restarted,
-        _redis,
     }
 }
 
@@ -306,17 +298,14 @@ async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction(pool: 
     unmatched_revision.stop_remap = HashMap::new();
     scenario
         .stores
-        .static_cache_store
+        .static_data_store
         .static_index()
         .publish(unmatched_revision);
     let mut incomplete = scenario.update.clone();
     incomplete.trip.route_id = None;
     incomplete.trip.direction_id = None;
     incomplete.trip.start_date = Some("19990101".into());
-    let source = NjtBusRealtime::new(
-        scenario.stores.static_cache_store.static_index(),
-        scenario.stores.static_cache_store.clone(),
-    );
+    let source = NjtBusRealtime::new(scenario.stores.static_data_store.static_index());
     let mut incomplete_feed = scenario.feed.clone();
     incomplete_feed.entity[0].trip_update = Some(incomplete);
     let snapshot = source.build_snapshot(vec![incomplete_feed]).await.unwrap();
@@ -335,7 +324,7 @@ async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction(pool: 
     mismatched_revision.stop_remap = HashMap::new();
     scenario
         .stores
-        .static_cache_store
+        .static_data_store
         .static_index()
         .publish(mismatched_revision);
     let mut mismatched_feed = scenario.feed;

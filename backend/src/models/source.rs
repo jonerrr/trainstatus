@@ -16,6 +16,8 @@ pub enum Source {
 }
 
 impl Source {
+    pub const ALL: [Self; 3] = [Self::MtaSubway, Self::MtaBus, Self::NjtBus];
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Source::MtaSubway => "mta_subway",

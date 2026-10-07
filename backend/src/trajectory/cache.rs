@@ -1,27 +1,13 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use moka::future::Cache;
-use uuid::Uuid;
 
-use crate::models::{source::Source, stop::PlatformEdge};
+use crate::models::source::Source;
 
-use super::geometry::{ShapeGeometry, build_shape_geometry, shape_key_from_line};
-use super::types::{
-    HotSnapshot, TrajectoryState, round_to_5min_bucket, source_projected_epsg_code,
-};
-
-static PLATFORM_STATIC_VERSION: AtomicU64 = AtomicU64::new(1);
-
-pub fn bump_platform_static_version() {
-    PLATFORM_STATIC_VERSION.fetch_add(1, Ordering::SeqCst);
-}
-
-fn platform_static_version() -> u64 {
-    PLATFORM_STATIC_VERSION.load(Ordering::SeqCst)
-}
+use super::geometry::{ShapeGeometry, build_shape_geometry};
+use super::types::{HotSnapshot, round_to_5min_bucket, source_projected_epsg_code};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShapeKey {
@@ -37,20 +23,8 @@ pub struct StopProjKey {
     pub stop_id: String,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct PlatformMatchKey {
-    pub platform_content_hash: [u8; 32],
-    pub source: Source,
-    pub stop_id: String,
-    pub trip_direction: i16,
-    pub consist_length_ft: i32,
-    pub platform_hint: Option<String>,
-    pub static_version: u64,
-}
-
 #[derive(Debug, Clone)]
 pub struct PlatformMatch {
-    pub platform_edge_id: String,
     pub position_m: f64,
     pub platform_edge_length_m: f64,
 }
@@ -62,11 +36,10 @@ pub struct HistKey {
 }
 
 pub struct TrajectoryCache {
-    hot: Cache<Source, HotSnapshot>,
-    historical: Cache<HistKey, HotSnapshot>,
+    hot: crate::utils::source_snapshot::SourceSnapshot<HotSnapshot>,
+    historical: Cache<HistKey, Arc<HotSnapshot>>,
     shape_geom: Cache<ShapeKey, Arc<ShapeGeometry>>,
     stop_proj: Cache<StopProjKey, f64>,
-    platform_match: moka::sync::Cache<PlatformMatchKey, PlatformMatch>,
 }
 
 impl TrajectoryCache {
@@ -75,7 +48,7 @@ impl TrajectoryCache {
             // One entry per source, replaced when derivation finishes. A TTL
             // here drops every vehicle if a collection cycle runs long, while
             // LiveSnapshots keeps serving the last committed generation.
-            hot: Cache::builder().build(),
+            hot: crate::utils::source_snapshot::SourceSnapshot::new(),
             historical: Cache::builder()
                 .max_capacity(500)
                 .time_to_live(Duration::from_secs(3600))
@@ -88,37 +61,33 @@ impl TrajectoryCache {
                 .max_capacity(100_000)
                 .time_to_live(Duration::from_secs(48 * 3600))
                 .build(),
-            platform_match: moka::sync::Cache::builder()
-                .max_capacity(100_000)
-                .time_to_live(Duration::from_secs(48 * 3600))
-                .build(),
         }
     }
 
-    pub async fn get_hot(&self, source: Source) -> Option<HotSnapshot> {
-        self.hot.get(&source).await
+    pub async fn get_hot(&self, source: Source) -> Option<Arc<HotSnapshot>> {
+        self.hot.get(source)
     }
 
     pub async fn set_hot(&self, source: Source, snapshot: HotSnapshot) {
-        self.hot.insert(source, snapshot).await;
+        self.hot.replace(source, snapshot);
     }
 
-    pub async fn get_historical(&self, source: Source, at: DateTime<Utc>) -> Option<HotSnapshot> {
+    /// Coalesces same-bucket loads and retains only successful snapshots.
+    pub async fn get_historical_with(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+        init: impl std::future::Future<Output = anyhow::Result<Arc<HotSnapshot>>>,
+    ) -> anyhow::Result<Arc<HotSnapshot>> {
         let bucket = round_to_5min_bucket(at.timestamp());
         let key = HistKey {
             source,
             bucket_unix: bucket,
         };
-        self.historical.get(&key).await
-    }
-
-    pub async fn set_historical(&self, source: Source, at: DateTime<Utc>, snapshot: HotSnapshot) {
-        let bucket = round_to_5min_bucket(at.timestamp());
-        let key = HistKey {
-            source,
-            bucket_unix: bucket,
-        };
-        self.historical.insert(key, snapshot).await;
+        self.historical
+            .try_get_with(key, init)
+            .await
+            .map_err(|error| anyhow::anyhow!(error))
     }
 
     pub async fn get_shape_geometry(
@@ -172,66 +141,10 @@ impl TrajectoryCache {
         self.stop_proj.insert(key, dist).await;
         Some(dist)
     }
-
-    // TODO: rename this
-    pub fn get_platform_match_sync(
-        &self,
-        key: PlatformMatchKey,
-        compute: impl FnOnce() -> Option<PlatformMatch>,
-    ) -> Option<PlatformMatch> {
-        // `optionally_get_with` caches only `Some` results and dedupes concurrent
-        // computes for the same key, matching the previous read-then-write behavior.
-        self.platform_match.optionally_get_with(key, compute)
-    }
-
-    pub fn platform_match_key(
-        source: Source,
-        stop_id: &str,
-        trip_direction: i16,
-        consist_length_m: f64,
-        platform_edges: &[PlatformEdge],
-    ) -> PlatformMatchKey {
-        let consist_length_ft = (consist_length_m / 0.3048).round() as i32;
-        let platform_hint = if platform_edges.is_empty() {
-            None
-        } else {
-            let mut ids: Vec<String> = platform_edges
-                .iter()
-                .map(|edge| edge.id.to_uppercase())
-                .collect();
-            ids.sort();
-            Some(ids.join(","))
-        };
-        // Pinned revisions can be derived after another static import bumps the
-        // global version. Their platform IDs may match while marker data differs.
-        let platform_data = serde_json::to_vec(platform_edges).unwrap_or_default();
-        PlatformMatchKey {
-            platform_content_hash: *blake3::hash(&platform_data).as_bytes(),
-            source,
-            stop_id: stop_id.to_string(),
-            trip_direction,
-            consist_length_ft,
-            platform_hint,
-            static_version: platform_static_version(),
-        }
-    }
-
-    pub fn shape_key_for_line(line: &geo::LineString<f64>) -> String {
-        shape_key_from_line(line)
-    }
 }
 
 impl Default for TrajectoryCache {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl TrajectoryCache {
-    pub async fn get_prev_state(&self, source: Source, trip_id: Uuid) -> Option<TrajectoryState> {
-        self.hot
-            .get(&source)
-            .await
-            .and_then(|s| s.prev_states.get(&trip_id).copied())
     }
 }

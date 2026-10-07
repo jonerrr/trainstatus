@@ -1,3 +1,4 @@
+use crate::static_data::dataset::StaticDataset;
 use std::{
     fmt,
     path::{Path, PathBuf},
@@ -14,7 +15,6 @@ use crate::{
     models::{
         position::VehiclePosition,
         source::Source,
-        static_dataset::StaticDataset,
         trip::{StopTime, Trip},
     },
 };
@@ -318,8 +318,8 @@ pub fn static_dataset_expected_value(dataset: &StaticDataset) -> serde_json::Val
         .collect::<Vec<_>>();
     shapes.sort_by_key(|value| value["id"].as_str().unwrap_or_default().to_string());
 
-    let mut cached_trips = dataset
-        .cached_trips
+    let mut scheduled_trips = dataset
+        .scheduled_trips
         .iter()
         .map(|trip| {
             json!({
@@ -332,7 +332,7 @@ pub fn static_dataset_expected_value(dataset: &StaticDataset) -> serde_json::Val
             })
         })
         .collect::<Vec<_>>();
-    cached_trips.sort_by_key(|value| value["trip_id"].as_str().unwrap_or_default().to_string());
+    scheduled_trips.sort_by_key(|value| value["trip_id"].as_str().unwrap_or_default().to_string());
 
     json!({
         "source": dataset.source,
@@ -348,7 +348,8 @@ pub fn static_dataset_expected_value(dataset: &StaticDataset) -> serde_json::Val
         "stops": stops,
         "route_stops": route_stops,
         "shapes": shapes,
-        "cached_trips": cached_trips,
+        // Keep the committed capture format compatible with existing bundles.
+        "cached_trips": scheduled_trips,
     })
 }
 

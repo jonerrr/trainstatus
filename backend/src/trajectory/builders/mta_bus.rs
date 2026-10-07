@@ -5,11 +5,10 @@ use crate::models::stop::StopData;
 use super::super::builder::{
     TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
 };
-use super::super::cache::TrajectoryCache;
 use super::super::geometry::{ShapeGeometry, project_point_onto_line, project_wgs84_point_to_epsg};
 use super::super::types::{
-    GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryState, TrajectoryStop,
-    TripSnapshot, source_projected_epsg_code,
+    GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryStop, TripSnapshot,
+    source_projected_epsg_code,
 };
 
 /// Slack allowed above the reported next-stop distance when truncating the
@@ -161,9 +160,7 @@ impl TrajectoryBuilder for MtaBusBuilder {
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
-        _prev_state: Option<TrajectoryState>,
         shape_geom: &ShapeGeometry,
-        _caches: &TrajectoryCache,
     ) -> anyhow::Result<GeneratedKnots> {
         let kinematics = BusKinematicsConfig::default();
         let mut all_knots = Vec::new();

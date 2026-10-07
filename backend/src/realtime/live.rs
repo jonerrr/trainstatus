@@ -5,7 +5,7 @@ use super::PersistedSnapshot;
 use crate::models::source::Source;
 
 /// Last committed generation for each source. Live API reads and trajectory
-/// scheduling share the same immutable snapshot, independent of Redis/history.
+/// scheduling share the same immutable snapshot, independent of retained history.
 #[derive(Clone)]
 pub struct LiveSnapshots {
     sources: Arc<HashMap<Source, watch::Sender<Option<Arc<PersistedSnapshot>>>>>,

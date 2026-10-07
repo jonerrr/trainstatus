@@ -10,13 +10,8 @@ async fn startup_live_reads_are_empty_without_database_or_cache() {
         .acquire_timeout(std::time::Duration::from_millis(100))
         .connect_lazy(&format!("postgres://unused:unused@{address}/unused"))
         .unwrap();
-    let cache = bb8::Pool::builder()
-        .connection_timeout(std::time::Duration::from_millis(100))
-        .build_unchecked(
-            bb8_redis::RedisConnectionManager::new(format!("redis://{address}")).unwrap(),
-        );
     let server = TestServer::new(
-        backend::api::router(app_state(pg.clone(), cache))
+        backend::api::router(app_state(pg.clone()))
             .split_for_parts()
             .0,
     );

@@ -1,5 +1,5 @@
+pub mod alerts;
 pub mod api;
-pub mod engines;
 #[cfg(feature = "fixture-capture")]
 pub mod fixtures;
 pub mod integrations;
@@ -7,7 +7,7 @@ pub mod macros;
 pub mod models;
 pub mod realtime;
 pub mod sources;
-pub mod static_index;
+pub mod static_data;
 pub mod stores;
 pub mod trajectory;
 pub mod utils;
@@ -30,10 +30,7 @@ pub struct AppState {
     pub stop_time_store: crate::stores::stop_time::StopTimeStore,
     pub position_store: crate::stores::position::PositionStore,
     pub alert_store: crate::stores::alert::AlertStore,
-    pub static_cache_store: crate::stores::static_cache::StaticCacheStore,
-    pub trajectory_store: crate::stores::trajectory::TrajectoryStore,
-    pub trajectory_engine: std::sync::Arc<crate::trajectory::TrajectoryEngine>,
-    pub trajectory_cache: std::sync::Arc<crate::trajectory::TrajectoryCache>,
+    pub trajectories: crate::trajectory::TrajectoryService,
 }
 
 // pub fn mta_api_url() -> &'static str {

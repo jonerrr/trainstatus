@@ -22,7 +22,7 @@ run = "cargo run --features fixture-capture --bin fixtures -- $@"
 
 # Offline applies to compile-time query! metadata; SQLx tests still execute real SQL.
 [tasks.test]
-description = "Run the ordinary backend suite using existing PostgreSQL and isolated test caches"
+description = "Run the ordinary backend suite using existing PostgreSQL"
 run = "mise run test:services full"
 
 [tasks."test:unit"]
@@ -31,7 +31,7 @@ env = { SQLX_OFFLINE = "true" }
 run = "cargo test --features fixture-capture --lib --test behavior"
 
 [tasks."test:integration"]
-description = "Run database, cache, and private realtime engine integration tests"
+description = "Run database and private realtime engine integration tests"
 run = "mise run test:services integration"
 
 [tasks."test:performance"]
@@ -47,10 +47,9 @@ sqlx migrate run
 cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests
 """
 
-# TODO: if we keep redis, refactor the tests to use a mock redis client instead of relying on a real Redis instance (see https://crates.io/crates/redis-test)
 [tasks."test:services"]
 description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
-env = { SQLX_OFFLINE = "true", TEST_VALKEY_IMAGE = "docker.io/valkey/valkey:alpine", RUST_TEST_THREADS = "4" }
+env = { SQLX_OFFLINE = "true", RUST_TEST_THREADS = "4" }
 usage = """
 arg "<suite>" {
   choices "full" "integration" "performance"
@@ -62,20 +61,6 @@ run = '''
 set -euo pipefail
 # SQLx creates and migrates each test database; reuse the running dev server.
 export DATABASE_URL="${TEST_DATABASE_URL:-postgres://trains:trains@localhost:5432/postgres}"
-export TEST_SERVICE_RUN_ID="$(cat /proc/sys/kernel/random/uuid)"
-cleanup() {
-  task_status=$?
-  trap - EXIT
-  # Rust Drop handles normal cache cleanup; sweep this run after interruption.
-  test_cache_ids=$(podman ps --all --quiet --filter "label=trainstatus-test-run=$TEST_SERVICE_RUN_ID") || task_status=1
-  if [ -n "$test_cache_ids" ]; then
-    if ! podman rm --force $test_cache_ids >/dev/null; then task_status=1; fi
-  fi
-  exit "$task_status"
-}
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 case "$usage_suite" in
   full)
     cargo test --features fixture-capture,integration-tests --lib --test behavior --test integration "$usage_filter"

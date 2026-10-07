@@ -16,12 +16,12 @@ use super::types::{
     ComputedTrajectory, Trajectory, TrajectoryConfig, TrajectoryState, TripSnapshot,
 };
 
-pub struct TrajectoryEngine {
+pub struct TrajectoryCalculator {
     builders: HashMap<Source, Arc<dyn TrajectoryBuilder>>,
     method: Arc<dyn InterpolationMethod>,
 }
 
-impl TrajectoryEngine {
+impl TrajectoryCalculator {
     pub fn new() -> Self {
         let mut builders: HashMap<Source, Arc<dyn TrajectoryBuilder>> = HashMap::new();
         builders.insert(
@@ -47,7 +47,7 @@ impl TrajectoryEngine {
     }
 }
 
-impl Default for TrajectoryEngine {
+impl Default for TrajectoryCalculator {
     fn default() -> Self {
         Self::new()
     }
@@ -62,11 +62,10 @@ pub fn compute_trajectory(
     trip: &TripSnapshot,
     prev_state: Option<TrajectoryState>,
     shape_geom: &ShapeGeometry,
-    caches: &TrajectoryCache,
     method: &dyn InterpolationMethod,
     config: &TrajectoryConfig,
 ) -> anyhow::Result<ComputedTrajectory> {
-    let generated = builder.generate_knots(trip, prev_state, shape_geom, caches)?;
+    let generated = builder.generate_knots(trip, shape_geom)?;
     let raw_knots = generated.knots;
     let t_now = trip.as_of.timestamp() as f64;
     let (knots, mut continuity_stats) = continuity::apply(raw_knots, prev_state, config, t_now);
@@ -170,7 +169,7 @@ pub fn compute_trajectory(
 }
 
 pub async fn compute_trajectory_async(
-    engine: &TrajectoryEngine,
+    engine: &TrajectoryCalculator,
     source: Source,
     trip: &TripSnapshot,
     prev_state: Option<TrajectoryState>,
@@ -189,7 +188,6 @@ pub async fn compute_trajectory_async(
         trip,
         prev_state,
         shape_geom.as_ref(),
-        caches,
         engine.method.as_ref(),
         config,
     )

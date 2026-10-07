@@ -4,11 +4,10 @@ use super::super::{
     builder::{
         TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
     },
-    cache::TrajectoryCache,
     geometry::{
         ShapeGeometry, distance_to_coord, project_point_onto_line, project_wgs84_point_to_epsg,
     },
-    types::{GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryState, TripSnapshot},
+    types::{GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TripSnapshot},
 };
 use crate::models::{position::PositionData, source::Source, stop::StopData};
 
@@ -90,9 +89,7 @@ impl TrajectoryBuilder for NjtBusBuilder {
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
-        _prev: Option<TrajectoryState>,
         geometry: &ShapeGeometry,
-        _cache: &TrajectoryCache,
     ) -> anyhow::Result<GeneratedKnots> {
         let mut knots = Vec::new();
         for stop in &trip.stops {

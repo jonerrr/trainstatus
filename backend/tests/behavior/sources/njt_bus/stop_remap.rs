@@ -6,7 +6,7 @@ use backend::{
         source::Source,
         trip::{NjtBusData, StopTime, StopTimeData, Trip, TripData},
     },
-    static_index::{StaticTransitIndex, StaticTransitRevision},
+    static_data::index::{StaticTransitIndex, StaticTransitRevision},
 };
 use chrono::Utc;
 use uuid::Uuid;
@@ -93,7 +93,7 @@ fn remaps_child_stop_ids_to_canonical() {
     assert_eq!(positions[1].stop_id.as_deref(), Some("500"));
     assert_eq!(positions[2].stop_id, None, "None stop_id stays None");
     let identity = StaticTransitRevision::from_dataset(
-        &backend::models::static_dataset::StaticDataset::new(Source::MtaBus),
+        &backend::static_data::dataset::StaticDataset::new(Source::MtaBus),
     );
     let before = data[0].1[0].stop_id.clone();
     remap_realtime_stop_ids(&identity, &mut data, &mut positions);

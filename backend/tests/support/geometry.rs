@@ -1,11 +1,11 @@
-//! Matched geometry inputs for output contracts. Adapter normalization has separate coverage.
+use backend::static_data::dataset::StaticDataset;
+// Matched geometry inputs for output contracts. Adapter normalization has separate coverage.
 
 use backend::{
     models::{
         geom::Geom,
         shape::Shape,
         source::Source,
-        static_dataset::StaticDataset,
         trip::{
             Consist, MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, NjtBusData, StopTime,
             StopTimeData, Trip, TripData,
@@ -15,23 +15,12 @@ use backend::{
 };
 use chrono::Duration;
 
-pub async fn ingest_case(
-    pool: sqlx::PgPool,
-    source: Source,
-) -> (super::TestStores, super::TestRedis) {
-    let cache = super::TestRedis::start().await.unwrap();
-    let stores = super::test_stores(pool, cache.pool());
+pub async fn ingest_case(pool: sqlx::PgPool, source: Source) -> super::TestStores {
+    let stores = super::test_stores(pool);
     let (dataset, input) = input(source);
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
-        .await
-        .unwrap();
+    stores.static_data_store.persist(&dataset).await.unwrap();
     stores.ingestor.ingest(input).await.unwrap();
-    (stores, cache)
+    stores
 }
 
 fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {

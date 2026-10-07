@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CachedStopTime {
+pub struct ScheduledStopTime {
     pub stop_id: String,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,
@@ -10,7 +10,7 @@ pub struct CachedStopTime {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CachedTrip {
+pub struct ScheduledTrip {
     // TODO: make some fields optional (like headsign)
     pub trip_id: String,
     pub route_id: String,
@@ -18,5 +18,13 @@ pub struct CachedTrip {
     pub direction_id: i16,
     pub start_date: String, // YYYYMMDD
     pub start_time: DateTime<Utc>,
-    pub stop_times: Vec<CachedStopTime>,
+    pub stop_times: Vec<ScheduledStopTime>,
+}
+
+/// Expiration belongs to each service-date entry so a new import does not extend
+/// the lifetime of retained overnight schedules.
+#[derive(Debug, Clone)]
+pub struct ScheduledTripEntry {
+    pub trip: ScheduledTrip,
+    pub expires_at: DateTime<Utc>,
 }

@@ -36,7 +36,7 @@ struct Value {
 }
 
 async fn assert_tile(pool: sqlx::PgPool, source: Source) {
-    let (_stores, _cache) = ingest_case(pool.clone(), source).await;
+    let _stores = ingest_case(pool.clone(), source).await;
     // This function intentionally uses the database clock's five-minute window.
     sqlx::query("UPDATE realtime.trip SET updated_at = NOW() WHERE source = $1")
         .bind(source)

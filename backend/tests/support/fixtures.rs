@@ -1,10 +1,10 @@
 use backend::{
-    models::static_dataset::StaticDataset,
     sources::{
         mta_bus::static_data as mta_bus_static,
         mta_subway::static_data as mta_subway_static,
         njt_bus::{patterns::PatternFeature, static_data as njt_bus_static},
     },
+    static_data::dataset::StaticDataset,
 };
 
 pub fn mta_subway_dataset() -> StaticDataset {

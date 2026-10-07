@@ -6,9 +6,9 @@ use backend::{
         source::Source,
         trip::{MtaBusData, StopTime, StopTimeData, Trip, TripData},
     },
-    realtime::{IngestionChanges, PersistedSnapshot, TrajectoryDeriver},
-    static_index::StaticTransitRevision,
-    trajectory::{TrajectoryCache, TrajectoryEngine},
+    realtime::{IngestionChanges, PersistedSnapshot},
+    static_data::index::StaticTransitRevision,
+    trajectory::{TrajectoryCache, TrajectoryCalculator, TrajectoryDeriver},
 };
 use chrono::{Duration, Utc};
 use std::{collections::HashSet, sync::Arc};
@@ -75,7 +75,7 @@ async fn trajectory_from_persisted_snapshot() {
     let snapshot = fixture();
     let id = snapshot.trips[0].id;
     let deriver = TrajectoryDeriver::new(
-        Arc::new(TrajectoryEngine::new()),
+        Arc::new(TrajectoryCalculator::new()),
         Arc::new(TrajectoryCache::new()),
     );
     let hot = deriver
@@ -142,7 +142,7 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
     snapshot.static_revision = Arc::new(revision);
     snapshot.trips.push(malformed);
     let cache = Arc::new(TrajectoryCache::new());
-    let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryEngine::new()), cache.clone());
+    let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
     let hot = deriver.derive(snapshot).await.unwrap();
     assert_eq!(hot.render_units.len(), 1);
     assert!(hot.prev_states.contains_key(&valid_id));
@@ -176,7 +176,7 @@ async fn trajectory_preserves_previous_hot_state_continuity() {
         },
     );
     cache.set_hot(Source::MtaBus, previous).await;
-    let hot = TrajectoryDeriver::new(Arc::new(TrajectoryEngine::new()), cache)
+    let hot = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache)
         .derive(snapshot)
         .await
         .unwrap();
@@ -276,7 +276,7 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         changes: IngestionChanges::default(),
         static_revision: Arc::new(revision),
     };
-    let hot = TrajectoryDeriver::new(Arc::new(TrajectoryEngine::new()), cache)
+    let hot = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache)
         .derive(snapshot)
         .await
         .unwrap();
@@ -344,7 +344,7 @@ async fn trajectory_nonfinite_position_does_not_hide_other_trips() {
     snapshot.trips.push(broken);
     snapshot.positions.push(position);
     let hot = TrajectoryDeriver::new(
-        Arc::new(TrajectoryEngine::new()),
+        Arc::new(TrajectoryCalculator::new()),
         Arc::new(TrajectoryCache::new()),
     )
     .derive(snapshot)

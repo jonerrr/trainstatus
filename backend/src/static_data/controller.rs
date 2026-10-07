@@ -7,9 +7,8 @@ use tracing::{error, info, instrument};
 
 use crate::models::source::Source;
 use crate::sources::StaticAdapter;
-use crate::static_index::StaticTransitIndex;
-use crate::stores::route::RouteStore;
-use crate::stores::static_cache::StaticCacheStore;
+use crate::static_data::index::StaticTransitIndex;
+use crate::static_data::store::StaticDataStore;
 use crate::stores::stop::StopStore;
 
 type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
@@ -74,12 +73,11 @@ impl StaticController {
 
 pub async fn run(
     pool: &PgPool,
-    route_store: &RouteStore,
     stop_store: &StopStore,
-    static_cache_store: &StaticCacheStore,
+    static_data_store: &StaticDataStore,
     adapters: Vec<Arc<dyn StaticAdapter>>,
 ) -> StaticController {
-    let static_index = static_cache_store.static_index();
+    let static_index = static_data_store.static_index();
     let mut senders = HashMap::new();
     let mut tasks = Vec::new();
 
@@ -88,18 +86,16 @@ pub async fn run(
         senders.insert(adapter.source(), tx);
 
         let pool = pool.clone();
-        let route_store = route_store.clone();
         let stop_store = stop_store.clone();
-        let static_cache_store = static_cache_store.clone();
+        let static_data_store = static_data_store.clone();
         let source_static_index = static_index.clone();
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
             run_source_handler(
                 pool,
-                route_store,
                 stop_store,
-                static_cache_store,
+                static_data_store,
                 source_static_index,
                 adapter,
                 rx,
@@ -117,9 +113,8 @@ pub async fn run(
 #[instrument(skip_all, fields(source = %adapter.source()))]
 async fn run_source_handler(
     pool: PgPool,
-    route_store: RouteStore,
     stop_store: StopStore,
-    static_cache_store: StaticCacheStore,
+    static_data_store: StaticDataStore,
     static_index: StaticTransitIndex,
     adapter: Arc<dyn StaticAdapter>,
     mut rx: mpsc::Receiver<UpdateRequest>,
@@ -152,8 +147,7 @@ async fn run_source_handler(
                             &pool,
                             adapter.as_ref(),
                             &static_index,
-                            &route_store,
-                            &stop_store,
+                            &static_data_store,
                         )
                         .await;
 
@@ -171,7 +165,7 @@ async fn run_source_handler(
                                     });
                                 }
 
-                                spawn_import(&pool, &route_store, &stop_store, &static_cache_store, &adapter, &import_tx, &mut import_in_progress);
+                                spawn_import(&stop_store, &static_data_store, &adapter, &import_tx, &mut import_in_progress);
                             }
                             Ok(true) if import_in_progress => {
                                 // Update already in progress - queue this waiter
@@ -204,7 +198,7 @@ async fn run_source_handler(
                                 });
                             }
 
-                            spawn_import(&pool, &route_store, &stop_store, &static_cache_store, &adapter, &import_tx, &mut import_in_progress);
+                            spawn_import(&stop_store, &static_data_store, &adapter, &import_tx, &mut import_in_progress);
                         }
                     }
                 }
@@ -218,41 +212,32 @@ async fn run_source_handler(
 
 #[instrument(skip_all, fields(source = %adapter.source()))]
 fn spawn_import(
-    pool: &PgPool,
-    route_store: &RouteStore,
     stop_store: &StopStore,
-    static_cache_store: &StaticCacheStore,
+    static_data_store: &StaticDataStore,
     adapter: &Arc<dyn StaticAdapter>,
     import_tx: &mpsc::Sender<anyhow::Result<()>>,
     import_in_progress: &mut bool,
 ) {
     *import_in_progress = true;
 
-    let pool_clone = pool.clone();
-    let route_store_clone = route_store.clone();
     let stop_store_clone = stop_store.clone();
-    let static_cache_store_clone = static_cache_store.clone();
+    let static_data_store_clone = static_data_store.clone();
     let adapter_clone = adapter.clone();
     let import_tx_clone = import_tx.clone();
 
     tokio::spawn(async move {
-        let result = adapter_clone
-            .import(
-                &route_store_clone,
-                &stop_store_clone,
-                &static_cache_store_clone,
-            )
-            .await;
+        let result = async {
+            let dataset = adapter_clone.collect().await?;
+            anyhow::ensure!(
+                dataset.source == adapter_clone.source(),
+                "Static adapter returned another source"
+            );
+            static_data_store_clone.persist(&dataset).await
+        }
+        .await;
 
         if result.is_ok() {
             info!(source = %adapter_clone.source(), "Import successful");
-            let _ = sqlx::query!(
-                "UPDATE source SET updated_at = NOW() WHERE id = $1",
-                adapter_clone.source() as Source
-            )
-            .execute(&pool_clone)
-            .await;
-
             // Compute proximity-based transfers across all sources after every successful
             // import. Runs source-agnostically so cross-source proximity pairs are always
             // up to date. Errors are non-fatal — import waiters are still notified Ok.
@@ -261,10 +246,6 @@ fn spawn_import(
                 .await
             {
                 error!(source = %adapter_clone.source(), error = %e, "Failed to compute proximity transfers");
-            }
-
-            if adapter_clone.source() == crate::models::source::Source::MtaSubway {
-                crate::trajectory::bump_platform_static_version();
             }
         } else if let Err(e) = &result {
             // `{:#}` prints the full anyhow context chain (e.g. the underlying DB
@@ -281,8 +262,7 @@ async fn check_needs_update(
     pool: &PgPool,
     adapter: &dyn StaticAdapter,
     static_index: &StaticTransitIndex,
-    route_store: &RouteStore,
-    stop_store: &StopStore,
+    static_data_store: &StaticDataStore,
 ) -> anyhow::Result<bool> {
     // Ensure the source exists in the table, inserting if needed.
     // Use epoch time so it triggers an immediate update on first run.
@@ -307,7 +287,7 @@ async fn check_needs_update(
         // is still inside the refresh window, rebuild it from Postgres instead
         // of downloading the upstream static files again.
         if !source_timestamp_is_stale(pool, adapter).await?
-            && let Some(revision) = load_persisted_revision(source, route_store, stop_store).await?
+            && let Some(revision) = static_data_store.load_revision(source).await?
         {
             info!(source = %source, "Loaded static revision from the database");
             static_index.publish(revision);
@@ -339,40 +319,4 @@ async fn source_timestamp_is_stale(
         .num_seconds();
     let refresh_secs = adapter.refresh_interval().as_secs() as i64;
     Ok(elapsed > refresh_secs)
-}
-
-// TODO: shouldn't need to return a Result<Option<>>?
-/// Read the last imported routes, stops, and shapes back into a revision.
-///
-/// A missing or incomplete revision returns `Ok(None)` so the caller downloads
-/// the upstream files. Unreadable revision metadata does the same.
-async fn load_persisted_revision(
-    source: Source,
-    route_store: &RouteStore,
-    stop_store: &StopStore,
-) -> anyhow::Result<Option<crate::static_index::StaticTransitRevision>> {
-    let (trip_patterns, stop_remap) = match route_store.load_revision_metadata(source).await {
-        Ok(metadata) => metadata,
-        Err(error) => {
-            tracing::warn!(
-                source = %source,
-                error = %error,
-                "Static revision metadata could not be read; downloading static data"
-            );
-            return Ok(None);
-        }
-    };
-    let routes = route_store.get_all(source).await?;
-    let stops = stop_store.get_all(source).await?;
-    let shapes = route_store.get_all_shapes(source).await?;
-    Ok(
-        crate::static_index::StaticTransitRevision::try_from_persisted(
-            source,
-            routes,
-            stops,
-            shapes,
-            trip_patterns,
-            stop_remap,
-        ),
-    )
 }

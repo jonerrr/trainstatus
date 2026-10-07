@@ -1,3 +1,4 @@
+use super::dataset::StaticDataset;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
@@ -6,7 +7,6 @@ use crate::{
         route::{Route, RouteData},
         shape::Shape,
         source::Source,
-        static_dataset::StaticDataset,
         stop::{RouteStopData, Stop, StopData},
     },
     utils::source_snapshot::SourceSnapshot,
@@ -17,6 +17,12 @@ pub struct TripPattern {
     pub route_id: String,
     pub direction: i16,
     pub shape_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct TripPatternRevision {
+    pub patterns: HashMap<String, TripPattern>,
+    pub stop_remap: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,10 +46,26 @@ pub struct StaticTransitRevision {
     pub route_stop_shapes: HashMap<(String, String), Vec<String>>,
     pub trip_patterns: HashMap<String, TripPattern>,
     pub stop_remap: HashMap<String, String>,
+    pub scheduled_trips: HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>>,
 }
 
 impl StaticTransitRevision {
     pub fn from_dataset(dataset: &StaticDataset) -> Self {
+        let expires_at = chrono::Utc::now() + chrono::Duration::hours(48);
+        Self::from_dataset_with_schedules(
+            dataset,
+            dataset
+                .scheduled_trips
+                .iter()
+                .cloned()
+                .map(|trip| super::schedule::ScheduledTripEntry { trip, expires_at }),
+        )
+    }
+
+    pub(crate) fn from_dataset_with_schedules(
+        dataset: &StaticDataset,
+        schedules: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
+    ) -> Self {
         let routes = dataset
             .routes
             .iter()
@@ -102,7 +124,24 @@ impl StaticTransitRevision {
             route_stop_shapes,
             trip_patterns: dataset.trip_patterns.clone(),
             stop_remap: dataset.stop_remap.clone(),
+            scheduled_trips: schedule_index(schedules),
         }
+    }
+
+    pub fn set_schedules(
+        &mut self,
+        trips: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
+    ) {
+        self.scheduled_trips = schedule_index(trips);
+    }
+
+    pub fn scheduled_trip(
+        &self,
+        trip_id: &str,
+        service_date: &str,
+    ) -> Option<&super::schedule::ScheduledTrip> {
+        let entry = self.scheduled_trips.get(trip_id)?.get(service_date)?;
+        (entry.expires_at > chrono::Utc::now()).then_some(&entry.trip)
     }
 
     /// Rebuild the in-memory revision from rows already stored by the last import.
@@ -134,12 +173,27 @@ impl StaticTransitRevision {
             stops,
             route_stops,
             shapes,
-            cached_trips: Vec::new(),
+            scheduled_trips: Vec::new(),
             trip_patterns,
             stop_remap,
         };
         Some(Self::from_dataset(&dataset))
     }
+}
+
+fn schedule_index(
+    trips: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
+) -> HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>> {
+    let mut index: HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>> =
+        HashMap::new();
+    for entry in trips {
+        let trip = &entry.trip;
+        index
+            .entry(trip.trip_id.clone())
+            .or_default()
+            .insert(trip.start_date.clone(), entry);
+    }
+    index
 }
 
 #[derive(Clone, Default)]
@@ -162,5 +216,5 @@ impl StaticTransitIndex {
 }
 
 #[cfg(test)]
-#[path = "tests/static_index.rs"]
+#[path = "tests/index.rs"]
 mod tests;

@@ -7,7 +7,7 @@ use crate::{
     models::{source::Source, stop::Borough},
 };
 
-#[derive(Serialize, Deserialize, ToSchema, FromRow)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow, Clone)]
 pub struct Route {
     #[schema(example = "1")]
     pub id: String,
@@ -68,7 +68,7 @@ pub struct MtaBusRouteData {
 }
 
 /// Stop data changes based on the `Source`
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum RouteData {
     MtaBus(MtaBusRouteData),

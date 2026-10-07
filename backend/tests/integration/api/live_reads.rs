@@ -1,5 +1,6 @@
 use crate::support;
 use axum_test::TestServer;
+use backend::static_data::dataset::StaticDataset;
 use backend::{
     AppState,
     models::{
@@ -7,15 +8,12 @@ use backend::{
         position::VehiclePosition,
         route::Route,
         source::Source,
-        static_dataset::StaticDataset,
         stop::Stop,
         trip::{StopTime, Trip},
     },
     realtime::CollectedSnapshot,
-    trajectory::{TrajectoryCache, TrajectoryEngine},
 };
 use chrono::{Duration, Utc};
-use std::sync::Arc;
 use uuid::Uuid;
 
 fn dataset(source: Source) -> StaticDataset {
@@ -105,7 +103,6 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
     s
 }
 fn server(pool: sqlx::PgPool, s: &support::TestStores) -> TestServer {
-    let cache = Arc::new(TrajectoryCache::new());
     let state = AppState {
         route_store: s.route_store.clone(),
         stop_store: s.stop_store.clone(),
@@ -113,10 +110,7 @@ fn server(pool: sqlx::PgPool, s: &support::TestStores) -> TestServer {
         stop_time_store: s.stop_time_store.clone(),
         position_store: s.position_store.clone(),
         alert_store: s.alert_store.clone(),
-        static_cache_store: s.static_cache_store.clone(),
-        trajectory_store: backend::stores::trajectory::TrajectoryStore::new(pool, cache.clone()),
-        trajectory_engine: Arc::new(TrajectoryEngine::new()),
-        trajectory_cache: cache,
+        trajectories: backend::trajectory::TrajectoryService::new(pool),
     };
     TestServer::new(backend::api::router(state).split_for_parts().0)
 }
@@ -147,23 +141,17 @@ async fn assert_live(
 }
 
 async fn membership_case(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis = _redis.pool();
-    _redis.flush().await.unwrap();
-    let stores = support::test_stores(pool.clone(), redis);
+    let stores = support::test_stores(pool.clone());
     let server = server(pool, &stores);
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
         let static_data = dataset(source);
-        static_data
-            .persist(
-                &stores.route_store,
-                &stores.stop_store,
-                &stores.static_cache_store,
-            )
+        stores
+            .static_data_store
+            .persist(&static_data)
             .await
             .unwrap();
-        stores.static_cache_store.static_index().publish(
-            backend::static_index::StaticTransitRevision::from_dataset(&static_data),
+        stores.static_data_store.static_index().publish(
+            backend::static_data::index::StaticTransitRevision::from_dataset(&static_data),
         );
         let now = crate::support::fixtures::fixed_time();
         let full = generation(source, now);
@@ -224,16 +212,12 @@ async fn live_route_filters_follow_committed_membership(pool: sqlx::PgPool) {
 
 #[sqlx::test]
 async fn populated_live_reads_work_without_database_or_cache(pool: sqlx::PgPool) {
-    let cache = support::TestRedis::start().await.unwrap();
-    let stores = support::test_stores(pool.clone(), cache.pool());
+    let stores = support::test_stores(pool.clone());
     let now = support::fixtures::fixed_time();
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
-        dataset(source)
-            .persist(
-                &stores.route_store,
-                &stores.stop_store,
-                &stores.static_cache_store,
-            )
+        stores
+            .static_data_store
+            .persist(&dataset(source))
             .await
             .unwrap();
         stores
@@ -263,7 +247,6 @@ async fn populated_live_reads_work_without_database_or_cache(pool: sqlx::PgPool)
     );
     let server = server(unavailable_pg.clone(), &disconnected);
     // Remove the owned cache entirely; every populated live endpoint still works.
-    drop(cache);
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
         assert_live(&server, source, 3, 4, 3).await;
     }

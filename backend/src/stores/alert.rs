@@ -1,17 +1,16 @@
-use crate::{
-    models::{
-        alert::{
-            ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, ApiAlertTranslation,
-        },
-        source::Source,
+use crate::models::{
+    alert::{
+        ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, ApiAlertTranslation,
     },
-    stores::{cache_get, cache_set},
+    source::Source,
 };
-use bb8_redis::RedisConnectionManager;
 use chrono::{DateTime, Utc};
+use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, prelude::FromRow};
 use std::time::Duration;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -53,14 +52,21 @@ pub struct ApiAlertEntity {
 #[derive(Clone)]
 pub struct AlertStore {
     pg_pool: PgPool,
-    redis_pool: bb8::Pool<RedisConnectionManager>,
+    cache: Cache<Source, Arc<Vec<ApiAlert>>>,
+    refresh_locks: Arc<HashMap<Source, Mutex<()>>>,
 }
 
 impl AlertStore {
-    pub fn new(pg_pool: PgPool, redis_pool: bb8::Pool<RedisConnectionManager>) -> Self {
+    pub fn new(pg_pool: PgPool) -> Self {
         Self {
             pg_pool,
-            redis_pool,
+            cache: Cache::builder().max_capacity(3).time_to_live(TTL).build(),
+            refresh_locks: Arc::new(
+                Source::ALL
+                    .into_iter()
+                    .map(|s| (s, Mutex::new(())))
+                    .collect(),
+            ),
         }
     }
 
@@ -75,18 +81,30 @@ impl AlertStore {
             return self.query_all_alerts(source, at).await;
         }
 
-        let key = format!("alerts:{}", source.as_str());
-        if let Some(cached) = cache_get::<Vec<ApiAlert>>(&self.redis_pool, &key).await {
-            return Ok(cached);
+        if let Some(alerts) = self.cache.get(&source).await {
+            return Ok((*alerts).clone());
         }
-        self.query_all_alerts(source, Utc::now()).await
+        // A source's miss and write-through refresh share one lock, so an
+        // earlier SQL read cannot overwrite a result from a later commit.
+        let cached = {
+            let _guard = self.refresh_locks[&source].lock().await;
+            match self.cache.get(&source).await {
+                Some(alerts) => alerts,
+                None => {
+                    let alerts = Arc::new(self.query_all_alerts(source, Utc::now()).await?);
+                    self.cache.insert(source, alerts.clone()).await;
+                    alerts
+                }
+            }
+        };
+        Ok((*cached).clone())
     }
 
-    /// Populate the alerts Redis cache by re-querying from DB.
     async fn populate_cache(&self, source: Source) -> anyhow::Result<()> {
-        let key = format!("alerts:{}", source.as_str());
+        self.cache.invalidate(&source).await;
         let alerts = self.query_all_alerts(source, Utc::now()).await?;
-        cache_set(&self.redis_pool, &key, &alerts, TTL).await
+        self.cache.insert(source, Arc::new(alerts)).await;
+        Ok(())
     }
 
     /// Internal helper function to query alerts without caching
@@ -198,6 +216,8 @@ impl AlertStore {
             tracing::debug!("No alerts to insert");
             return Ok(());
         }
+
+        let _guard = self.refresh_locks[&source].lock().await;
 
         // Use a transaction for consistency
         let mut tx = self.pg_pool.begin().await?;

@@ -2,14 +2,19 @@
 
 ## Structure
 
-TODO: Discuss backend structure
+`sources/` fetches and normalizes provider data. `integrations/` wraps external protocols and Valhalla. `static_data/`, `alerts/`, and `realtime/` each own their background lifecycle; static adapters return datasets rather than writing stores directly.
+
+PostgreSQL is the durable store. Static imports commit routes, stops, associations, shapes, NJT schedules, metadata, and their timestamp together, then publish an immutable revision. NJT schedules preserve today/tomorrow expansion and per-entry 48-hour expiration, retaining unexpired earlier service dates for overnight trips. Complete empty imports clear the schedule set. An existing installation imports NJT static data once to initialize schedule persistence; later restarts restore fresh revisions from PostgreSQL.
+
+Routes and stops use local response snapshots with matching JSON bytes and ETags. Proximity-transfer updates refresh every source's stop response. Current alerts use a coordinated 30-second Moka cache; explicit historical reads bypass it. `trajectory/` owns calculation and derivation; `TrajectoryService` hides live publication, historical loading, and evictable computation caches. Authoritative realtime and live trajectory snapshots never evict.
+
+This architecture targets one backend process owning ingestion and serving the API. API and historical response formats remain unchanged.
 
 ## Config
 
 | Environment Variable    | Usage                                                                                            | Required | Default                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------ | -------- | -------------------------- |
 | `DATABASE_URL`          | PostgreSQL connection URL used to create the sqlx pool and run migrations on startup.            | Yes      | None                       |
-| `REDIS_URL`             | Redis/Valkey connection URL used for cache reads/writes and startup connectivity checks.         | Yes      | None                       |
 | `ADDRESS`               | Bind address for the Axum HTTP server listener.                                                  | No       | `127.0.0.1:3055`           |
 | `MTA_OBA_API_KEY`       | API key for MTA Bus Time OBA endpoints used by the MTA bus source.                               | Yes      | None                       |
 | `NJT_USERNAME`          | NJ Transit API username used to authenticate and fetch access tokens.                            | Yes      | None                       |

@@ -3,13 +3,11 @@ use std::{future::Future, sync::Arc};
 use tokio::{sync::watch, time::sleep};
 use tracing::{error, warn};
 
-use super::{
-    CollectedSnapshot, PersistedSnapshot, RealtimeIngestor, RealtimeSource, TrajectoryDeriver,
-};
+use super::{CollectedSnapshot, PersistedSnapshot, RealtimeIngestor, RealtimeSource};
 use crate::{
-    engines::static_data::StaticController,
     models::source::Source,
-    trajectory::{HotSnapshot, TrajectoryCache},
+    static_data::controller::StaticController,
+    trajectory::{HotSnapshot, TrajectoryService},
 };
 
 /// Each source collects and commits independently of its newest-value trajectory
@@ -19,22 +17,19 @@ use crate::{
 pub struct RealtimeEngine {
     ingestor: RealtimeIngestor,
     static_controller: StaticController,
-    deriver: TrajectoryDeriver,
-    trajectory_cache: Arc<TrajectoryCache>,
+    trajectories: TrajectoryService,
 }
 
 impl RealtimeEngine {
     pub fn new(
         ingestor: RealtimeIngestor,
         static_controller: StaticController,
-        deriver: TrajectoryDeriver,
-        trajectory_cache: Arc<TrajectoryCache>,
+        trajectories: TrajectoryService,
     ) -> Self {
         Self {
             ingestor,
             static_controller,
-            deriver,
-            trajectory_cache,
+            trajectories,
         }
     }
 
@@ -42,11 +37,11 @@ impl RealtimeEngine {
         for source in sources {
             let config = source.config();
             let rx = self.ingestor.live_snapshots.subscribe(config.source);
-            let deriver = self.deriver.clone();
+            let deriver = self.trajectories.clone();
             tokio::spawn(trajectory_worker(
                 config.source,
                 rx,
-                self.trajectory_cache.clone(),
+                self.trajectories.clone(),
                 move |snapshot| {
                     let deriver = deriver.clone();
                     async move { deriver.derive(snapshot).await }
@@ -111,7 +106,7 @@ impl RealtimeEngine {
 pub(super) async fn trajectory_worker<F, Fut>(
     source: Source,
     mut rx: watch::Receiver<Option<Arc<PersistedSnapshot>>>,
-    cache: Arc<TrajectoryCache>,
+    trajectories: TrajectoryService,
     derive: F,
 ) where
     F: Fn(Arc<PersistedSnapshot>) -> Fut,
@@ -123,7 +118,7 @@ pub(super) async fn trajectory_worker<F, Fut>(
         let snapshot = { rx.borrow_and_update().clone() };
         let Some(snapshot) = snapshot else { continue };
         match derive(snapshot).await {
-            Ok(hot) => cache.set_hot(source, hot).await,
+            Ok(hot) => trajectories.publish_live(source, hot).await,
             Err(error) => warn!(%source, %error, "Committed snapshot trajectory derivation failed"),
         }
     }

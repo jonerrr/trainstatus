@@ -73,67 +73,6 @@ where
         .collect())
 }
 
-// impl AppState {
-//     // wrapper for redis get that handles when the cache is reset
-//     // only use for getting static data
-//     pub async fn get_from_cache(&self, key: &str) -> Result<String, errors::ServerError> {
-//         let mut conn = self.redis_pool.get().await?;
-//         let value: String = match conn.get(key).await {
-//             Ok(value) => value,
-//             Err(err) => {
-//                 // if theres a type error, that means the cache probably got reset
-//                 if err.kind() == redis::ErrorKind::UnexpectedReturnType {
-//                     // recache static data
-//                     cache_all(&self.pg_pool, &self.redis_pool).await?;
-
-//                     // conn.get(key).await?
-//                     return Box::pin(self.get_from_cache(key)).await;
-//                 }
-//                 return Err(errors::ServerError::Redis(err));
-//             }
-//         };
-//         Ok(value)
-//     }
-
-//     // same as above but for mget
-//     // currently only used for getting stop/route and hash
-//     pub async fn mget_from_cache(
-//         &self,
-//         keys: &[&str; 2],
-//     ) -> Result<(String, String), errors::ServerError> {
-//         let mut conn = self.redis_pool.get().await?;
-//         let values: (String, String) = match conn.mget(keys).await {
-//             Ok(values) => values,
-//             Err(err) => {
-//                 // if theres a type error, that means the cache probably got reset
-//                 if err.kind() == redis::ErrorKind::UnexpectedReturnType {
-//                     // recache static data
-//                     cache_all(&self.pg_pool, &self.redis_pool).await?;
-
-//                     // conn.mget(keys).await?
-//                     return Box::pin(self.mget_from_cache(keys)).await;
-//                 }
-//                 return Err(errors::ServerError::Redis(err));
-//             }
-//         };
-//         Ok(values)
-//     }
-// }
-
-// #[derive(Deserialize, IntoParams)]
-// pub struct Parameters {
-//     /// Data source
-//     source: Source,
-//     // /// Return in GeoJSON format instead of JSON
-//     // #[serde(default)]
-//     // geojson: bool,
-//     // /// Filter by route type. If none provided, all routes are returned.
-//     // #[serde(default)]
-//     // route_type: Option<route::RouteType>,
-// }
-
-// this represents the current time to use for sql queries. default is current time, bool represents if user specified a time
-// #[derive(Debug)]
 pub struct CurrentTime {
     pub time: DateTime<Utc>,
     pub user_specified: bool,

@@ -16,7 +16,7 @@ use crate::{
         source::Source,
         trip::{StopTime, Trip},
     },
-    static_index::{StaticTransitIndex, StaticTransitRevision},
+    static_data::index::{StaticTransitIndex, StaticTransitRevision},
 };
 
 #[derive(Clone, Copy, Debug, Default)]

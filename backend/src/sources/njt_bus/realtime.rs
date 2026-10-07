@@ -16,15 +16,13 @@ use crate::{
         trip::{StopTime, StopTimeData, Trip, TripData},
     },
     realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig},
-    static_index::{StaticTransitIndex, StaticTransitRevision},
-    stores::static_cache::StaticCacheStore,
+    static_data::index::{StaticTransitIndex, StaticTransitRevision},
 };
 
 use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
 pub struct NjtBusRealtime {
     static_index: StaticTransitIndex,
-    static_cache_store: StaticCacheStore,
 }
 
 #[cfg(feature = "fixture-capture")]
@@ -43,11 +41,8 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 }
 
 impl NjtBusRealtime {
-    pub fn new(static_index: StaticTransitIndex, static_cache_store: StaticCacheStore) -> Self {
-        Self {
-            static_index,
-            static_cache_store,
-        }
+    pub fn new(static_index: StaticTransitIndex) -> Self {
+        Self { static_index }
     }
 
     async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
@@ -80,7 +75,7 @@ impl NjtBusRealtime {
         for feed in feeds {
             for entity in feed.entity {
                 if let Some(update) = entity.trip_update {
-                    let (trip, times) = self.process_trip(update, &revision).await;
+                    let (trip, times) = self.process_trip(update, &revision);
                     if let Some(trip) = trip {
                         trips.push((trip, times));
                     }
@@ -107,7 +102,7 @@ impl NjtBusRealtime {
         })
     }
 
-    async fn process_trip(
+    fn process_trip(
         &self,
         update: TripUpdate,
         revision: &StaticTransitRevision,
@@ -131,11 +126,7 @@ impl NjtBusRealtime {
                 .to_string()
         });
 
-        let cached_trip = self
-            .static_cache_store
-            .get_trip(Source::NjtBus, &trip_id, &start_date_str)
-            .await
-            .unwrap_or(None);
+        let cached_trip = revision.scheduled_trip(&trip_id, &start_date_str);
 
         let route_id = trip_desc
             .route_id

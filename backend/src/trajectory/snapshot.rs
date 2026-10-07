@@ -9,7 +9,7 @@ use crate::{
         source::Source,
         trip::{StopTime, Trip, TripData},
     },
-    static_index::StaticTransitRevision,
+    static_data::index::StaticTransitRevision,
 };
 use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};

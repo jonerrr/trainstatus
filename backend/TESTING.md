@@ -6,12 +6,12 @@ Run commands from `backend/`, prefixed with `mise exec --`.
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `mise run test:unit`                        | Private unit and public behavior tests; no running services or tile extract required |
 | `mise run test`                             | Ordinary suite on existing PostgreSQL, including integration tests and doctests      |
-| `mise run test:integration`                 | SQL, cache, HTTP persistence and private engine tests                                |
+| `mise run test:integration`                 | SQL, HTTP persistence and private engine tests                                |
 | `mise run test:services integration <name>` | Focused integration filter                                                           |
-| `mise run test:performance`                 | Ignored ingestion WAL benchmark; run separately on an idle machine                   |
+| `mise run test:performance`                 | Opt-in ingestion WAL and static import/restart benchmarks; use an idle machine       |
 | `mise run sqlx:check`                       | Verify committed SQLx metadata in the separate trainstatus_sqlx_check database       |
 
-For a focused service-free test, use `SQLX_OFFLINE=true cargo test --features fixture-capture --lib --test behavior <name>` through `mise exec --`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Podman is used only for isolated test caches; the first cache run may download its Valkey image.
+For a focused service-free test, use `SQLX_OFFLINE=true cargo test --features fixture-capture --lib --test behavior <name>` through `mise exec --`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
 
 ## Placement and ownership
 
@@ -22,6 +22,8 @@ Cargo has three explicit public test targets:
 - `tests/behavior/`: source normalization, static validation, live trajectory derivation, and service-free HTTP behavior.
 - `tests/integration/`: ingestion transactions, historical stores, static import lifecycle and persistence, service-backed source scenarios, and HTTP/geometry output.
 - `tests/performance/`: opt-in benchmarks, never part of the ordinary suite.
+
+For captured NJT schedule import/restart memory, run `mise exec -- mise run test:services performance njt_static_import_and_restart_memory` on an idle PostgreSQL server. This reports expanded trip count, import/restart timing, RSS during overlapping pinned revisions, and peak RSS with the executable's jemalloc allocator. The capture's calendar must include today; the test fails explicitly when it has expired. It uses the full captured GTFS but a small captured GIS pattern set, so it does not measure the complete production workload.
 
 The large captured NJT GTFS import remains an ignored library test. Run it explicitly by its name with `--ignored` when checking the full import; the ordinary suite uses smaller committed cases.
 
@@ -35,7 +37,7 @@ Tests accepting `PgPool` through `#[sqlx::test]` get a fresh database with migra
 
 `sqlx:check` is separate because it is a CLI schema check, not a `#[sqlx::test]`. It creates/migrates the dedicated `trainstatus_sqlx_check` database on the same server. Override its URL with `SQLX_CHECK_DATABASE_URL`; this must point to a metadata-check database, not `trains`. The check database is retained for reuse.
 
-SQLx does not manage Redis. Each cache-using test still owns a `TestRedis` guard and its own Valkey container, because production keys and `FLUSHDB` would interfere in a shared cache. Keep the guard alive until the test finishes. The task removes labeled leftover caches after interruption. Never flush a development cache or reset the development pod for tests.
+Each store/service owns its in-memory caches. Construct fresh stores for test isolation; no external cache or container cleanup is required. Never reset the development pod for tests.
 
 Use fixed historical timestamps and explicit fixture service dates. Live derivation reads the real clock, so its inputs remain relative to that clock; tile activity uses PostgreSQL's five-minute `NOW()` window. Do not add a public test-only clock API just to relocate tests.
 

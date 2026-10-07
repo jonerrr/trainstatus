@@ -1,6 +1,6 @@
 use crate::support::alerts::{assert_links, fixture_alert_where};
 use backend::{
-    integrations::gtfs_alert::GtfsAlertSource,
+    alerts::gtfs::GtfsAlertSource,
     models::{
         alert::{AlertFormat, AlertSection},
         source::Source,

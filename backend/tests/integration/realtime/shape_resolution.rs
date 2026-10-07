@@ -61,21 +61,16 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::realtime::Colle
 /// distance-closer decoy.
 #[sqlx::test]
 async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis_pool = _redis.pool();
-    let stores = test_stores(pool.clone(), redis_pool);
+    let stores = test_stores(pool.clone());
 
     let dataset = mta_bus_dataset();
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    stores
+        .static_data_store
+        .persist(&dataset)
         .await
         .expect("fixture should persist");
 
-    let mut revision = backend::static_index::StaticTransitRevision::from_dataset(&dataset);
+    let mut revision = backend::static_data::index::StaticTransitRevision::from_dataset(&dataset);
     revision.shapes.insert(
         DECOY_SHAPE.into(),
         backend::models::geom::Geom::from(geo::LineString::from(B94_STOP_COORDS.to_vec())),
@@ -86,7 +81,7 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         .unwrap()
         .shape_ids
         .push(DECOY_SHAPE.into());
-    stores.static_cache_store.static_index().publish(revision);
+    stores.static_data_store.static_index().publish(revision);
     let committed = stores
         .ingestor
         .ingest(collected_trip("B94", &B94_STOP_IDS))
@@ -105,23 +100,18 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
 /// distance ranking rather than erroring or dropping the trip.
 #[sqlx::test]
 async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
-    let _redis = crate::support::TestRedis::start().await.unwrap();
-    let redis_pool = _redis.pool();
-    let stores = test_stores(pool.clone(), redis_pool);
+    let stores = test_stores(pool.clone());
 
     let dataset = mta_bus_dataset();
-    dataset
-        .persist(
-            &stores.route_store,
-            &stores.stop_store,
-            &stores.static_cache_store,
-        )
+    stores
+        .static_data_store
+        .persist(&dataset)
         .await
         .expect("fixture should persist");
 
-    let mut revision = backend::static_index::StaticTransitRevision::from_dataset(&dataset);
+    let mut revision = backend::static_data::index::StaticTransitRevision::from_dataset(&dataset);
     revision.route_stop_shapes.clear();
-    stores.static_cache_store.static_index().publish(revision);
+    stores.static_data_store.static_index().publish(revision);
     let committed = stores
         .ingestor
         .ingest(collected_trip("B94", &B94_STOP_IDS))

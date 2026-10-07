@@ -1,8 +1,7 @@
 use crate::models::source::Source;
 
-use super::cache::TrajectoryCache;
 use super::geometry::ShapeGeometry;
-use super::types::{GeneratedKnots, TrajectoryKnot, TrajectoryState, TripSnapshot};
+use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
 
 pub const KNOT_COLLAPSE_TOLERANCE_M: f64 = 0.5;
 
@@ -37,9 +36,7 @@ pub trait TrajectoryBuilder: Send + Sync {
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
-        _prev_state: Option<TrajectoryState>,
         shape_geom: &ShapeGeometry,
-        caches: &TrajectoryCache,
     ) -> anyhow::Result<GeneratedKnots>;
 }
 
