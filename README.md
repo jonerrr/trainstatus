@@ -64,9 +64,10 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 2. Run `mise i` to ensure all tools are installed
 3. Set the environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml` you create.
    - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`.
-4. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
-5. Run `mise //geo:export` to export the Valhalla tile extract.
-6. Start the required services with `mise start-containers`.
-7. Once everything is up, start the backend and frontend with `mise dev`.
+4. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
+5. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
+6. Run `mise //geo:export` to export the Valhalla tile extract.
+7. Start the required services with `mise start-containers`.
+8. Once everything is up, start the backend and frontend with `mise dev`.
 
 To stop and clean up the local dev pod, run `podman kube down dev.pod.yml`. You can also run `mise //backend:reset-db` to remove volumes created by the `dev.pod.yml`.
