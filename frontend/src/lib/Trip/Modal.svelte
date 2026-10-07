@@ -146,9 +146,9 @@
 <div class="flex items-center gap-1 p-1">
 	<div class="flex flex-col items-start gap-1">
 		{#if trip.data.source === 'mta_bus'}
-			{@const position = position_context
-				.getSource(trip.data.source)
-				?.current?.get(trip.vehicle_id)}
+			{const position = $derived(
+				position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
+			)}
 			<VehicleCapacity {position} />
 			<div>#{trip.vehicle_id}</div>
 		{/if}
@@ -234,7 +234,7 @@
 {:else}
 	<ModalList>
 		{#each stop_times as st (`${st.stop_id}:${st.arrival.toISOString()}`)}
-			{@const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id]}
+			{const stop = $derived(page.data.stops_by_id[st.data.source]?.[st.stop_id])}
 			{#if stop}
 				<div class="relative text-base">
 					{#if transfer_stop_times[st.stop_id]?.length}

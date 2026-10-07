@@ -116,8 +116,8 @@
 		<div class="h-5 w-px shrink-0 bg-neutral-700"></div>
 		<div class="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Data sources">
 			{#each page.data.selected_sources as source (source)}
-				{@const info = source_info[source]}
-				{@const enabled = filters.isSourceEnabled(source)}
+				{const info = $derived(source_info[source])}
+				{const enabled = $derived(filters.isSourceEnabled(source))}
 				<button
 					type="button"
 					class={`flex h-9 shrink-0 items-center gap-1 rounded-md border px-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-400 ${enabled ? 'border-blue-400 bg-blue-500/20' : 'border-neutral-700 text-neutral-400'}`}

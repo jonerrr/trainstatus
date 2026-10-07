@@ -84,8 +84,7 @@
 		<!-- {@render alert_icon()} -->
 	</div>
 {:else}
-	<!-- {@const icon_name = express ? route.id + 'X' : route.id} -->
-	{@const icon = icons.find((i) => i.name === route.id)!}
+	{const icon = $derived(icons.find((i) => i.name === route.id)!)}
 	<div
 		role={link ? 'button' : undefined}
 		aria-label={link ? route.short_name : undefined}

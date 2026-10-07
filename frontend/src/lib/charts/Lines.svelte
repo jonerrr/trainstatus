@@ -27,14 +27,17 @@
 
 <!-- Draw a path for each train trip -->
 {#each cake.data as group (`${group.trip.data.source}:${group.trip.id}`)}
-	{@const tripColor = routes.find(
-		(r) => r.id === group.trip.route_id && r.data.source === group.trip.data.source
-	)!.color}
+	{const tripColor = $derived(
+		routes.find((r) => r.id === group.trip.route_id && r.data.source === group.trip.data.source)!
+			.color
+	)}
+
+	{const tripPath = $derived(path(group.points))}
 
 	<!-- Invisible wider path for easier clicking -->
 	<path
 		class="path-hitarea"
-		d={path(group.points)}
+		d={tripPath}
 		fill="none"
 		stroke="transparent"
 		stroke-width="15"
@@ -49,7 +52,7 @@
 	<!-- Visible path for display only -->
 	<path
 		class="path-line"
-		d={path(group.points)}
+		d={tripPath}
 		fill="none"
 		stroke={tripColor}
 		stroke-width="2"

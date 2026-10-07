@@ -42,9 +42,6 @@
 	function handleStringChange(inputValue: string) {
 		onChange?.(inputValue.length > 0 ? inputValue : undefined);
 	}
-
-	// Determine if we should use multi-select for enum (when there are multiple options)
-	const isMultiSelect = $derived(fieldDef.type === 'enum' && (fieldDef.options?.length ?? 0) > 2);
 </script>
 
 <div class="flex flex-col gap-1.5">
@@ -60,17 +57,19 @@
 			/>
 		</label>
 	{:else if fieldDef.type === 'enum'}
+		{const isMultiSelect = $derived((fieldDef.options?.length ?? 0) > 2)}
 		<div class="flex flex-col gap-1">
 			<span class="text-sm">{label}</span>
 			{#if isMultiSelect}
 				<!-- Multi-select: checkboxes -->
 				<div class="ml-1.5 flex flex-col gap-0.5">
+					{const stringValues = $derived(
+						Array.isArray(value) && value.length > 0 && typeof value[0] === 'string'
+							? (value as string[])
+							: []
+					)}
 					{#each fieldDef.options ?? [] as option (option)}
-						{@const stringValues =
-							Array.isArray(value) && value.length > 0 && typeof value[0] === 'string'
-								? (value as string[])
-								: []}
-						{@const isChecked = stringValues.includes(option)}
+						{const isChecked = $derived(stringValues.includes(option))}
 						<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded px-1">
 							<span class="text-xs">{option}</span>
 							<input
@@ -108,6 +107,12 @@
 			/>
 		</label>
 	{:else if fieldDef.type === 'number'}
+		{const min = $derived(
+			Array.isArray(value) && typeof value[0] === 'number' ? value[0] : (fieldDef.min ?? 0)
+		)}
+		{const max = $derived(
+			Array.isArray(value) && typeof value[1] === 'number' ? value[1] : (fieldDef.max ?? 100)
+		)}
 		<div class="flex flex-col gap-1">
 			<span class="text-sm">{label}</span>
 			<div class="flex gap-1.5">
@@ -115,15 +120,9 @@
 					type="number"
 					min={fieldDef.min}
 					max={fieldDef.max}
-					value={Array.isArray(value) && typeof value[0] === 'number'
-						? value[0]
-						: (fieldDef.min ?? 0)}
+					value={min}
 					onchange={(e) => {
 						const min = Number(e.currentTarget.value);
-						const max =
-							Array.isArray(value) && typeof value[1] === 'number'
-								? value[1]
-								: (fieldDef.max ?? 100);
 						const newValue: FilterValue =
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
@@ -135,13 +134,9 @@
 					type="number"
 					min={fieldDef.min}
 					max={fieldDef.max}
-					value={Array.isArray(value) && typeof value[1] === 'number'
-						? value[1]
-						: (fieldDef.max ?? 100)}
+					value={max}
 					onchange={(e) => {
 						const max = Number(e.currentTarget.value);
-						const min =
-							Array.isArray(value) && typeof value[0] === 'number' ? value[0] : (fieldDef.min ?? 0);
 						const newValue: FilterValue =
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);

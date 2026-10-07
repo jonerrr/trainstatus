@@ -39,15 +39,15 @@
 
 				<div class="flex flex-col gap-3 pl-6">
 					{#each all_sources as source (source)}
-						{@const info = source_info[source]}
+						{const info = $derived(source_info[source])}
+						{const enabled = $derived(source_preferences.current.includes(source))}
 						<label
 							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"
 						>
 							<input
 								type="checkbox"
-								checked={source_preferences.current.includes(source)}
-								disabled={source_preferences.current.length === 1 &&
-									source_preferences.current.includes(source)}
+								checked={enabled}
+								disabled={source_preferences.current.length === 1 && enabled}
 								onchange={() => {
 									source_preferences.toggle(source);
 									refreshAll();

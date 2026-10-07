@@ -71,7 +71,7 @@
 					<BusArrow direction={stop.data.direction} size="1rem" />
 				{/if}
 				{#each transfer_routes(stop) as route_stop (route_stop.route_id)}
-					{@const route = page.data.routes_by_id[to_stop_source]?.[route_stop.route_id]}
+					{const route = $derived(page.data.routes_by_id[to_stop_source]?.[route_stop.route_id])}
 					{#if route}
 						<Icon width={24} height={24} link={false} {route} />
 					{/if}

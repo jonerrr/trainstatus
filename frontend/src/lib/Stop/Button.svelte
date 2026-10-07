@@ -114,7 +114,7 @@
 </script>
 
 {#snippet eta(n: number)}
-	{@const eta = parseInt(n.toFixed(0))}
+	{const eta = $derived(parseInt(n.toFixed(0)))}
 	{#key eta}
 		<span class="rounded-sm bg-neutral-800/70 px-1.5 py-0.5 text-sm font-medium">
 			{eta}m
@@ -154,14 +154,16 @@
 		</div>
 		<div class="grid grid-cols-2 gap-8">
 			{#each stop_times_by_direction as [direction, stop_times_by_route] (direction)}
-				{@const headsign = direction === 1 ? stop.data.north_headsign : stop.data.south_headsign}
+				{const headsign = $derived(
+					direction === 1 ? stop.data.north_headsign : stop.data.south_headsign
+				)}
 				<div class="mt-auto flex flex-col">
 					<div class="table-cell max-w-[85%] text-left font-semibold">
 						{headsign}
 					</div>
 					<div class="flex flex-col gap-1">
 						{#each stop_times_by_route as [route_id, route_stop_times] (route_id)}
-							{@const route = routes[route_id]}
+							{const route = $derived(routes[route_id])}
 							<div class="flex items-center gap-1">
 								<Icon height={20} width={20} link={false} {route} />
 								<div class="flex items-center gap-1">
@@ -189,11 +191,11 @@
 
 		<div class="flex flex-col">
 			{#each stop.routes as route_stop (route_stop.route_id)}
-				{@const route = routes[route_stop.route_id]}
-				{@const next = next_direction(route_stop.route_id)}
+				{const route = $derived(routes[route_stop.route_id])}
+				{const next = $derived(next_direction(route_stop.route_id))}
 				<!-- TODO: simplify this -->
-				{@const next_st = next?.times.reduce((a, b) => (a.eta <= b.eta ? a : b))}
-				{@const next_trip = next_st?.trip}
+				{const next_st = $derived(next?.times.reduce((a, b) => (a.eta <= b.eta ? a : b)))}
+				{const next_trip = $derived(next_st?.trip)}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
 					<Icon {route} link={false} />
 					<div class="flex flex-col">

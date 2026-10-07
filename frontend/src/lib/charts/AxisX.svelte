@@ -34,19 +34,13 @@
 
 <g class="axis x-axis" transform="translate(0, {cake.height})">
 	{#each ticks as tick (tick.getTime())}
-		<g transform="translate({cake.xScale(tick)}, 0)">
+		{const x = $derived(cake.xScale(tick))}
+		<g transform="translate({x}, 0)">
 			<text y={20} text-anchor="middle" fill="#e5e5e5" font-size="12px">
 				{formatTime(tick)}
 			</text>
 		</g>
-		<line
-			x1={cake.xScale(tick)}
-			y1={0}
-			x2={cake.xScale(tick)}
-			y2={-cake.height}
-			stroke="#e5e5e5"
-			class="gridline"
-		/>
+		<line x1={x} y1={0} x2={x} y2={-cake.height} stroke="#e5e5e5" class="gridline" />
 	{/each}
 </g>
 

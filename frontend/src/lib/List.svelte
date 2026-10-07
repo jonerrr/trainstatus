@@ -239,10 +239,9 @@
 		{#if available_sources.length > 1}
 			<div class="rounded-md border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
 				<div class="flex gap-1">
-					{#each source_entries as { source } (source)}
-						{@const source_data = sources[source] ?? []}
+					{#each source_entries as { source, data: source_data } (source)}
+						{const info = $derived(source_info[source])}
 						{#if source_data.length > 0}
-							<!-- {@const Icon = source_info[source].icon} -->
 							<div transition:slide={{ axis: 'x', duration: 250 }}>
 								<button
 									class={[
@@ -255,10 +254,10 @@
 									onclick={() => {
 										selected_source.current = source;
 									}}
-									aria-label={`Show ${source_info[source].name} items`}
+									aria-label={`Show ${info.name} items`}
 								>
 									<!-- TODO: improve icons (they are kinda ugly rn) -->
-									<enhanced:img alt="" src={source_info[source].icon} sizes="20px" class="size-5" />
+									<enhanced:img alt="" src={info.icon} sizes="20px" class="size-5" />
 									<!-- <Icon class="h-4 w-4" /> -->
 									<!-- TODO: only show text if theres enough room -->
 									<!-- <span>{source_info[source].name}</span> -->

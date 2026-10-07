@@ -90,7 +90,7 @@
 
 	<div class="flex items-center gap-1 text-xl font-semibold">
 		{#if route_alerts.length && idx < route_alerts.length}
-			{@const alert_data = route_alerts[idx].data}
+			{const alert_data = $derived(route_alerts[idx].data)}
 			{#if alert_data.source === 'mta_subway' || alert_data.source === 'mta_bus'}
 				{alert_data.alert_type}
 			{:else}
@@ -120,8 +120,8 @@
 	{@attach manage_scroll}
 >
 	{#each route_alerts as alert (alert.id)}
-		{@const header = alert.translations.find((t) => t.section === 'header')}
-		{@const description = alert.translations.find((t) => t.section === 'description')}
+		{const header = $derived(alert.translations.find((t) => t.section === 'header'))}
+		{const description = $derived(alert.translations.find((t) => t.section === 'description'))}
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
@@ -138,7 +138,7 @@
 			</div>
 
 			{#snippet alert_time(time: Date)}
-				{@const dt = dayjs(time)}
+				{const dt = $derived(dayjs(time))}
 				{#if time_format === 'countdown'}
 					{dt.fromNow()}
 				{:else if !dt.isSame(dayjs(), 'day')}

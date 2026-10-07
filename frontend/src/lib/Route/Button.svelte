@@ -30,9 +30,10 @@
 	{#if alerts_loading}
 		<Skeleton lines={1} class="w-24" />
 	{:else if route_alerts.length}
+		{const alert_data = $derived(route_alerts[0].data)}
 		<div class="font-semibold">
-			{#if 'alert_type' in route_alerts[0].data}
-				{route_alerts[0].data.alert_type}
+			{#if 'alert_type' in alert_data}
+				{alert_data.alert_type}
 			{:else}
 				Alert
 			{/if}

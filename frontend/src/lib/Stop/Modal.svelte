@@ -105,7 +105,7 @@
 	<div class="flex max-h-36 max-w-40 flex-wrap items-center gap-1 md:max-w-xs">
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route_stop (route_stop.route_id)}
-				{@const route = routes?.[route_stop.route_id]}
+				{const route = $derived(routes?.[route_stop.route_id])}
 				{#if route}
 					<Icon width={36} height={36} link={true} {route} show_alerts />
 				{/if}
@@ -113,7 +113,7 @@
 			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{route_stops.length - 5}</div>
 		{:else}
 			{#each route_stops as route_stop (route_stop.route_id)}
-				{@const route = routes?.[route_stop.route_id]}
+				{const route = $derived(routes?.[route_stop.route_id])}
 				{#if route}
 					<Icon width={36} height={36} link={true} {route} show_alerts />
 				{/if}
@@ -143,8 +143,8 @@
 {:else}
 	<ModalList>
 		{#each selected_stop_times as st (`${st.trip_id}:${st.arrival.getTime()}`)}
-			{@const position = positions?.current?.get(st.trip.vehicle_id)}
-			{@const route = routes?.[st.trip.route_id]}
+			{const position = $derived(positions?.current?.get(st.trip.vehicle_id))}
+			{const route = $derived(routes?.[st.trip.route_id])}
 			<Button state={{ type: 'trip', ...st.trip }}>
 				<div class="flex items-center gap-1">
 					<div class="flex flex-col items-center">
@@ -191,7 +191,7 @@
 {/if}
 
 {#if stop.data.source === 'mta_subway'}
-	{@const stop_data = stop.data}
+	{const stop_data = $derived(stop.data)}
 
 	{#snippet direction_tab(direction: number, name: string)}
 		<button
