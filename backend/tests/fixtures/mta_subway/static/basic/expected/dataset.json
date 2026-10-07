@@ -7880,6 +7880,10 @@
       "source": "mta_subway"
     },
     {
+      "id": "133-92",
+      "source": "mta_subway"
+    },
+    {
       "id": "134-133",
       "source": "mta_subway"
     },
@@ -11997,6 +12001,10 @@
     },
     {
       "id": "91-92",
+      "source": "mta_subway"
+    },
+    {
+      "id": "92-133",
       "source": "mta_subway"
     },
     {
@@ -19722,226 +19730,323 @@
           {
             "car_markers": [
               {
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 469.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 548.0
+              },
+              {
                 "consist_length_ft": 300.0,
                 "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 510.0
+                "marked_as": "6",
+                "position_ft": 589.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 575.0
+                "position_ft": 649.0
               },
               {
                 "consist_length_ft": 600.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 610.0
+                "position_ft": 649.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 0,
-                "position_ft": 615.0,
+                "id": 1373,
+                "position_ft": 197.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "ELEVATOR",
-                "id": 1,
-                "position_ft": 485.0,
+                "id": 1356,
+                "position_ft": 499.0,
                 "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 2,
-                "position_ft": 430.0,
+                "id": 1361,
+                "position_ft": 440.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 3,
-                "position_ft": 310.0,
+                "id": 1385,
+                "position_ft": 333.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 263,
+                "position_ft": 631.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 262,
+                "position_ft": 631.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "161-PB-A1",
-            "length_ft": 660.0
+            "length_ft": 662.0
           },
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
-                "direction": "NORTH",
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 150.0
+                "marked_as": "4",
+                "position_ft": 465.0
               },
-              {
-                "consist_length_ft": 480.0,
-                "direction": "NORTH",
-                "is_opto": false,
-                "marked_as": "8",
-                "position_ft": 90.0
-              },
-              {
-                "consist_length_ft": 600.0,
-                "direction": "NORTH",
-                "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 30.0
-              }
-            ],
-            "egress_points": [
-              {
-                "egress_type": "STAIRCASE",
-                "id": 4,
-                "position_ft": 220.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "ELEVATOR",
-                "id": 5,
-                "position_ft": 270.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 6,
-                "position_ft": 320.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "ELEVATOR",
-                "id": 7,
-                "position_ft": 570.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 8,
-                "position_ft": 620.0,
-                "vertical_direction": "UP"
-              }
-            ],
-            "id": "161-PX-A2",
-            "length_ft": 660.0
-          },
-          {
-            "car_markers": [
               {
                 "consist_length_ft": 300.0,
                 "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 515.0
+                "marked_as": "6",
+                "position_ft": 527.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 527.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 575.0
+                "position_ft": 589.0
               },
               {
                 "consist_length_ft": 600.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 610.0
+                "position_ft": 627.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 9,
-                "position_ft": 615.0,
+                "id": 1373,
+                "position_ft": 197.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "ELEVATOR",
-                "id": 10,
-                "position_ft": 485.0,
+                "id": 1356,
+                "position_ft": 499.0,
                 "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 11,
-                "position_ft": 430.0,
+                "id": 1361,
+                "position_ft": 440.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 12,
-                "position_ft": 310.0,
+                "id": 1385,
+                "position_ft": 334.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 263,
+                "position_ft": 630.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 262,
+                "position_ft": 630.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "161-PB-A3",
-            "length_ft": 660.0
+            "length_ft": 643.0
           },
           {
             "car_markers": [
               {
+                "consist_length_ft": 600.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 40.0
+              },
+              {
                 "consist_length_ft": 300.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 150.0
+                "marked_as": "6",
+                "position_ft": 163.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 163.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 221.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 798,
+                "position_ft": 194.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 852,
+                "position_ft": 570.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 847,
+                "position_ft": 536.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 817,
+                "position_ft": 330.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 811,
+                "position_ft": 284.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 792,
+                "position_ft": 219.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 292,
+                "position_ft": 626.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "161-PX-A4",
+            "length_ft": 640.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 600.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 44.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "NORTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 90.0
+                "position_ft": 100.0
               },
               {
-                "consist_length_ft": 600.0,
+                "consist_length_ft": 300.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 30.0
+                "marked_as": "6",
+                "position_ft": 164.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 220.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 220.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 13,
-                "position_ft": 220.0,
+                "id": 798,
+                "position_ft": 192.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "ELEVATOR",
-                "id": 14,
-                "position_ft": 270.0,
+                "id": 852,
+                "position_ft": 571.0,
                 "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 15,
-                "position_ft": 320.0,
+                "id": 847,
+                "position_ft": 537.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 817,
+                "position_ft": 330.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "ELEVATOR",
-                "id": 16,
-                "position_ft": 570.0,
+                "id": 811,
+                "position_ft": 283.0,
                 "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 17,
-                "position_ft": 620.0,
+                "id": 792,
+                "position_ft": 218.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 292,
+                "position_ft": 629.0,
                 "vertical_direction": "UP"
               }
             ],
-            "id": "161-PX-A4",
-            "length_ft": 660.0
+            "id": "161-PX-A2",
+            "length_ft": 639.0
           }
         ],
         "source": "mta_subway",
@@ -21878,64 +21983,11 @@
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 580.0
-              },
-              {
-                "consist_length_ft": 480.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "8",
-                "position_ft": 585.0
-              },
-              {
                 "consist_length_ft": 600.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 645.0
-              }
-            ],
-            "egress_points": [
-              {
-                "egress_type": "STAIRCASE",
-                "id": 0,
-                "position_ft": 659.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 1,
-                "position_ft": 525.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 2,
-                "position_ft": 270.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 3,
-                "position_ft": 60.0,
-                "vertical_direction": "UP"
-              }
-            ],
-            "id": "170-P-A3",
-            "length_ft": 660.0
-          },
-          {
-            "car_markers": [
-              {
-                "consist_length_ft": 300.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 200.0
+                "marked_as": "10",
+                "position_ft": 14.0
               },
               {
                 "consist_length_ft": 480.0,
@@ -21945,41 +21997,139 @@
                 "position_ft": 70.0
               },
               {
-                "consist_length_ft": 600.0,
+                "consist_length_ft": 300.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 10.0
+                "marked_as": "6",
+                "position_ft": 193.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 304.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 607.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 4,
-                "position_ft": 50.0,
+                "id": 1584,
+                "position_ft": 650.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 5,
-                "position_ft": 270.0,
+                "id": 2584,
+                "position_ft": 574.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 6,
-                "position_ft": 530.0,
+                "id": 2530,
+                "position_ft": 278.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 7,
-                "position_ft": 660.0,
+                "id": 2517,
+                "position_ft": 57.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2535,
+                "position_ft": 408.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1585,
+                "position_ft": 650.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "170-P-A4",
-            "length_ft": 660.0
+            "length_ft": 650.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 579.0
+              },
+              {
+                "consist_length_ft": 300.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 579.0
+              },
+              {
+                "consist_length_ft": 480.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 579.0
+              },
+              {
+                "consist_length_ft": 600.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 639.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1584,
+                "position_ft": 649.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2584,
+                "position_ft": 573.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2530,
+                "position_ft": 277.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2517,
+                "position_ft": 56.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2535,
+                "position_ft": 406.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1585,
+                "position_ft": 649.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "170-P-A3",
+            "length_ft": 649.0
           }
         ],
         "source": "mta_subway",
@@ -22000,120 +22150,75 @@
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
+                "consist_length_ft": null,
                 "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 640.0
-              },
-              {
-                "consist_length_ft": 480.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "8",
-                "position_ft": 640.0
-              },
-              {
-                "consist_length_ft": 600.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 640.0
+                "marked_as": "S",
+                "position_ft": 623.0
               }
             ],
             "egress_points": [
               {
-                "egress_type": "FARE_CONTROL",
-                "id": 0,
-                "position_ft": 640.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "UNKNOWN",
-                "id": 1,
-                "position_ft": 639.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "UNKNOWN",
-                "id": 2,
-                "position_ft": 639.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "RAMP",
-                "id": 3,
-                "position_ft": 639.0,
-                "vertical_direction": "NONE"
-              },
-              {
                 "egress_type": "STAIRCASE",
-                "id": 4,
-                "position_ft": 30.0,
+                "id": 2492,
+                "position_ft": 0.0,
                 "vertical_direction": "UP"
-              }
-            ],
-            "id": "171-P-A1",
-            "length_ft": 660.0
-          },
-          {
-            "car_markers": [
-              {
-                "consist_length_ft": 300.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 640.0
-              },
-              {
-                "consist_length_ft": 480.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "8",
-                "position_ft": 640.0
-              },
-              {
-                "consist_length_ft": 600.0,
-                "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 640.0
-              }
-            ],
-            "egress_points": [
-              {
-                "egress_type": "UNKNOWN",
-                "id": 5,
-                "position_ft": 640.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "RAMP",
-                "id": 6,
-                "position_ft": 640.0,
-                "vertical_direction": "NONE"
               },
               {
                 "egress_type": "UNKNOWN",
-                "id": 7,
-                "position_ft": 640.0,
-                "vertical_direction": "NONE"
-              },
-              {
-                "egress_type": "FARE_CONTROL",
-                "id": 8,
-                "position_ft": 639.0,
+                "id": 1730,
+                "position_ft": 632.0,
                 "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 9,
-                "position_ft": 30.0,
+                "id": 3587,
+                "position_ft": 111.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "171-P-A2",
-            "length_ft": 660.0
+            "length_ft": 632.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 427.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 623.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 2492,
+                "position_ft": 0.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "UNKNOWN",
+                "id": 1730,
+                "position_ft": 634.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 3587,
+                "position_ft": 110.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "171-P-A1",
+            "length_ft": 634.0
           }
         ],
         "source": "mta_subway",
@@ -24776,84 +24881,144 @@
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
-                "direction": "SOUTH",
+                "consist_length_ft": 600.0,
+                "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 550.0
+                "marked_as": "10",
+                "position_ft": 15.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 76.0
+              },
+              {
+                "consist_length_ft": 300.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 76.0
               },
               {
                 "consist_length_ft": 480.0,
-                "direction": "SOUTH",
+                "direction": "NORTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 550.0
+                "position_ft": 76.0
               },
               {
-                "consist_length_ft": 600.0,
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 76.0
+              },
+              {
+                "consist_length_ft": null,
                 "direction": "SOUTH",
-                "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 640.0
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 310.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 0,
-                "position_ft": 607.0,
+                "id": 99,
+                "position_ft": 604.0,
                 "vertical_direction": "DOWN"
               },
               {
+                "egress_type": "FARE_CONTROL",
+                "id": 1201,
+                "position_ft": 30.0,
+                "vertical_direction": "NONE"
+              },
+              {
                 "egress_type": "STAIRCASE",
-                "id": 1,
-                "position_ft": 94.0,
+                "id": 18,
+                "position_ft": 93.0,
                 "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 1202,
+                "position_ft": 37.0,
+                "vertical_direction": "NONE"
               }
             ],
-            "id": "192-PQ-K1",
+            "id": "192-PM-K2",
             "length_ft": 675.0
           },
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
+                "consist_length_ft": null,
                 "direction": "NORTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 224.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 75.0
+                "marked_as": "4",
+                "position_ft": 368.0
+              },
+              {
+                "consist_length_ft": 300.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 519.0
               },
               {
                 "consist_length_ft": 480.0,
-                "direction": "NORTH",
+                "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 75.0
+                "position_ft": 519.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": true,
+                "marked_as": "OPTO S",
+                "position_ft": 519.0
               },
               {
                 "consist_length_ft": 600.0,
-                "direction": "NORTH",
+                "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 13.0
+                "position_ft": 614.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 2,
-                "position_ft": 69.0,
+                "id": 80,
+                "position_ft": 578.0,
                 "vertical_direction": "DOWN"
               },
               {
+                "egress_type": "UNKNOWN",
+                "id": 73,
+                "position_ft": 26.0,
+                "vertical_direction": "NONE"
+              },
+              {
                 "egress_type": "STAIRCASE",
-                "id": 3,
-                "position_ft": 574.0,
+                "id": 135,
+                "position_ft": 64.0,
                 "vertical_direction": "DOWN"
               }
             ],
-            "id": "192-PM-K2",
-            "length_ft": 675.0
+            "id": "192-PQ-K1",
+            "length_ft": 649.0
           }
         ],
         "source": "mta_subway",
@@ -28674,84 +28839,126 @@
           {
             "car_markers": [
               {
+                "consist_length_ft": 600.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 6.0
+              },
+              {
+                "consist_length_ft": 480.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 68.0
+              },
+              {
                 "consist_length_ft": 300.0,
                 "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 498.0
+                "marked_as": "6",
+                "position_ft": 490.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 490.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 608.0
+                "position_ft": 544.0
               },
               {
                 "consist_length_ft": 600.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 608.0
+                "position_ft": 603.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 0,
-                "position_ft": 528.0,
+                "id": 951,
+                "position_ft": 248.0,
                 "vertical_direction": "UP"
               },
               {
-                "egress_type": "STAIRCASE",
-                "id": 1,
-                "position_ft": 74.0,
-                "vertical_direction": "UP"
+                "egress_type": "ELEVATOR",
+                "id": 1120,
+                "position_ft": 415.0,
+                "vertical_direction": "NONE"
               }
             ],
             "id": "224-P-B5",
-            "length_ft": 615.0
+            "length_ft": 609.0
           },
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
+                "consist_length_ft": 600.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 117.0
+                "marked_as": "10",
+                "position_ft": 6.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "NORTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 77.0
+                "position_ft": 68.0
+              },
+              {
+                "consist_length_ft": 240.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "4",
+                "position_ft": 495.0
+              },
+              {
+                "consist_length_ft": 300.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 495.0
+              },
+              {
+                "consist_length_ft": 480.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 555.0
               },
               {
                 "consist_length_ft": 600.0,
-                "direction": "NORTH",
+                "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 14.0
+                "position_ft": 599.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 2,
-                "position_ft": 74.0,
+                "id": 951,
+                "position_ft": 249.0,
                 "vertical_direction": "UP"
               },
               {
-                "egress_type": "STAIRCASE",
-                "id": 3,
-                "position_ft": 528.0,
-                "vertical_direction": "UP"
+                "egress_type": "ELEVATOR",
+                "id": 1120,
+                "position_ft": 415.0,
+                "vertical_direction": "NONE"
               }
             ],
             "id": "224-P-B6",
-            "length_ft": 615.0
+            "length_ft": 609.0
           }
         ],
         "source": "mta_subway",
@@ -40229,7 +40436,140 @@
         "is_major": true,
         "line": "Broadway/7 Av",
         "north_headsign": "Uptown",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 516.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 84,
+                "position_ft": 381.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1609,
+                "position_ft": 314.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1768,
+                "position_ft": 121.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "313-PM-2",
+            "length_ft": 549.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 525.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 84,
+                "position_ft": 363.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1609,
+                "position_ft": 296.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1768,
+                "position_ft": 102.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "313-PM-1",
+            "length_ft": 531.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 0.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 162,
+                "position_ft": 179.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1334,
+                "position_ft": 193.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1420,
+                "position_ft": 0.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "313-PX-3",
+            "length_ft": 523.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 0.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 162,
+                "position_ft": 216.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1334,
+                "position_ft": 231.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1420,
+                "position_ft": 36.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "313-PX-4",
+            "length_ft": 526.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Downtown",
         "station_group_id": "313"
@@ -40344,7 +40684,92 @@
         "is_major": false,
         "line": "Broadway/7 Av",
         "north_headsign": "Uptown",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 536.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1311,
+                "position_ft": 436.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 408,
+                "position_ft": 446.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 398,
+                "position_ft": 460.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "UNKNOWN",
+                "id": 413,
+                "position_ft": 457.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 443,
+                "position_ft": 235.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 455,
+                "position_ft": 189.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "315-PB-1",
+            "length_ft": 536.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 0.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "UNKNOWN",
+                "id": 533,
+                "position_ft": 136.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 504,
+                "position_ft": 413.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "UNKNOWN",
+                "id": 534,
+                "position_ft": 114.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "315-PX-4",
+            "length_ft": 500.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Downtown",
         "station_group_id": "161-315"
@@ -42026,7 +42451,69 @@
         "is_major": false,
         "line": "Clark St",
         "north_headsign": "Uptown",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 523.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 873,
+                "position_ft": 155.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 21,
+                "position_ft": 521.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "331-P-2",
+            "length_ft": 523.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 459.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "9",
+                "position_ft": 3.0
+              },
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 3.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 873,
+                "position_ft": 155.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 21,
+                "position_ft": 521.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "331-P-3",
+            "length_ft": 524.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Brooklyn",
         "station_group_id": "331"
@@ -45302,7 +45789,128 @@
         "is_major": true,
         "line": "Pelham",
         "north_headsign": "The Bronx",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 522.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1109,
+                "position_ft": 276.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 1073,
+                "position_ft": 327.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 355,
+                "position_ft": 219.0,
+                "vertical_direction": "DOWN"
+              }
+            ],
+            "id": "366-PM-2",
+            "length_ft": 531.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 519.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1109,
+                "position_ft": 238.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 1073,
+                "position_ft": 289.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 355,
+                "position_ft": 181.0,
+                "vertical_direction": "DOWN"
+              }
+            ],
+            "id": "366-PM-M",
+            "length_ft": 526.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 5.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 492,
+                "position_ft": 241.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 1086,
+                "position_ft": 290.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "366-PX-M",
+            "length_ft": 521.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 5.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 492,
+                "position_ft": 241.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 1086,
+                "position_ft": 290.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "366-PX-3",
+            "length_ft": 521.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Manhattan",
         "station_group_id": "366"
@@ -47950,7 +48558,7 @@
         "station_group_id": "390-435"
       },
       "id": "390",
-      "name": "149 St-Grand Concourse"
+      "name": "149 St-Hostos"
     },
     {
       "data": {
@@ -48542,7 +49150,137 @@
         "is_major": true,
         "line": "Lexington",
         "north_headsign": "Uptown",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 408.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 476.0
+              },
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 521.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 19,
+                "position_ft": 147.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 28,
+                "position_ft": 255.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "397-PMU-1",
+            "length_ft": 521.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 7.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 75,
+                "position_ft": 146.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 95,
+                "position_ft": 263.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "397-PXU-4",
+            "length_ft": 513.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 5.0
+              },
+              {
+                "consist_length_ft": 408.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 54.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 143,
+                "position_ft": 117.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 166,
+                "position_ft": 265.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "397-PXL-3",
+            "length_ft": 512.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 408.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 470.0
+              },
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 518.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 220,
+                "position_ft": 117.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 242,
+                "position_ft": 264.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "397-PML-2",
+            "length_ft": 518.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Downtown",
         "station_group_id": "397"
@@ -48974,7 +49712,186 @@
         "is_major": true,
         "line": "Lexington",
         "north_headsign": "Uptown",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 306.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 410.0
+              },
+              {
+                "consist_length_ft": 408.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 461.0
+              },
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 514.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 269,
+                "position_ft": 363.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 309,
+                "position_ft": 166.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 275,
+                "position_ft": 318.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 989,
+                "position_ft": 179.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 259,
+                "position_ft": 396.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "400-PBU-1",
+            "length_ft": 520.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 4.0
+              },
+              {
+                "consist_length_ft": 408.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "8",
+                "position_ft": 56.0
+              },
+              {
+                "consist_length_ft": 306.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 110.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 685,
+                "position_ft": 324.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 613,
+                "position_ft": 101.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 668,
+                "position_ft": 281.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 638,
+                "position_ft": 128.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "FARE_CONTROL",
+                "id": 619,
+                "position_ft": 100.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "400-PXU-4",
+            "length_ft": 520.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 519.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "ESCALATOR",
+                "id": 1190,
+                "position_ft": 374.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1210,
+                "position_ft": 146.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "400-PBL-2",
+            "length_ft": 524.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 0.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1251,
+                "position_ft": 147.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "ESCALATOR",
+                "id": 1276,
+                "position_ft": 373.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1237,
+                "position_ft": 70.0,
+                "vertical_direction": "UP"
+              }
+            ],
+            "id": "400-PXL-3",
+            "length_ft": 524.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Downtown",
         "station_group_id": "7-400"
@@ -50561,6 +51478,13 @@
           {
             "car_markers": [
               {
+                "consist_length_ft": 510.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 1.0
+              },
+              {
                 "consist_length_ft": 408.0,
                 "direction": "NORTH",
                 "is_opto": false,
@@ -50742,7 +51666,7 @@
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 537.0
+                "position_ft": 543.0
               }
             ],
             "egress_points": [
@@ -50751,6 +51675,12 @@
                 "id": 629,
                 "position_ft": 139.0,
                 "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "UNKNOWN",
+                "id": 634,
+                "position_ft": 177.0,
+                "vertical_direction": "NONE"
               },
               {
                 "egress_type": "STAIRCASE",
@@ -50769,7 +51699,7 @@
                 "direction": "NORTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 13.0
+                "position_ft": 7.0
               },
               {
                 "consist_length_ft": 408.0,
@@ -50795,9 +51725,21 @@
               },
               {
                 "egress_type": "UNKNOWN",
+                "id": 766,
+                "position_ft": 164.0,
+                "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "UNKNOWN",
                 "id": 743,
                 "position_ft": 372.0,
                 "vertical_direction": "NONE"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 761,
+                "position_ft": 208.0,
+                "vertical_direction": "UP"
               }
             ],
             "id": "415-PM-3",
@@ -52879,7 +53821,7 @@
         "station_group_id": "390-435"
       },
       "id": "435",
-      "name": "149 St-Grand Concourse"
+      "name": "149 St-Hostos"
     },
     {
       "data": {
@@ -55170,7 +56112,29 @@
         "is_major": false,
         "line": "Flushing",
         "north_headsign": "Manhattan",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 566.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 27,
+                "position_ft": 212.0,
+                "vertical_direction": "DOWN"
+              }
+            ],
+            "id": "455-PM-1",
+            "length_ft": 566.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Queens",
         "station_group_id": "455"
@@ -55185,7 +56149,69 @@
         "is_major": true,
         "line": "Flushing",
         "north_headsign": "Manhattan",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 564.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 238,
+                "position_ft": 271.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 23,
+                "position_ft": 168.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "456-PM-1",
+            "length_ft": 564.0
+          },
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 0.0
+              },
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 564.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 238,
+                "position_ft": 271.0,
+                "vertical_direction": "DOWN"
+              },
+              {
+                "egress_type": "ELEVATOR",
+                "id": 23,
+                "position_ft": 168.0,
+                "vertical_direction": "NONE"
+              }
+            ],
+            "id": "456-PM-M",
+            "length_ft": 564.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Queens",
         "station_group_id": "456"
@@ -55200,7 +56226,29 @@
         "is_major": false,
         "line": "Flushing",
         "north_headsign": "Manhattan",
-        "platform_edges": [],
+        "platform_edges": [
+          {
+            "car_markers": [
+              {
+                "consist_length_ft": null,
+                "direction": "SOUTH",
+                "is_opto": false,
+                "marked_as": "S",
+                "position_ft": 571.0
+              }
+            ],
+            "egress_points": [
+              {
+                "egress_type": "STAIRCASE",
+                "id": 69,
+                "position_ft": 401.0,
+                "vertical_direction": "DOWN"
+              }
+            ],
+            "id": "457-PM-1",
+            "length_ft": 571.0
+          }
+        ],
         "source": "mta_subway",
         "south_headsign": "Queens",
         "station_group_id": "457"
@@ -60060,108 +61108,122 @@
           {
             "car_markers": [
               {
+                "consist_length_ft": 600.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "10",
+                "position_ft": 4.0
+              },
+              {
                 "consist_length_ft": 300.0,
                 "direction": "SOUTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 515.0
+                "marked_as": "6",
+                "position_ft": 493.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 575.0
+                "position_ft": 554.0
               },
               {
                 "consist_length_ft": 600.0,
                 "direction": "SOUTH",
                 "is_opto": false,
                 "marked_as": "10",
-                "position_ft": 627.0
+                "position_ft": 605.0
               }
             ],
             "egress_points": [
               {
                 "egress_type": "STAIRCASE",
-                "id": 0,
-                "position_ft": 540.0,
+                "id": 1090,
+                "position_ft": 506.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 1,
-                "position_ft": 430.0,
+                "id": 1106,
+                "position_ft": 418.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 2,
-                "position_ft": 425.0,
+                "id": 1107,
+                "position_ft": 399.0,
                 "vertical_direction": "DOWN"
               },
               {
                 "egress_type": "ESCALATOR",
-                "id": 3,
-                "position_ft": 10.0,
+                "id": 1068,
+                "position_ft": 2.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "7-P-G1",
-            "length_ft": 640.0
+            "length_ft": 610.0
           },
           {
             "car_markers": [
               {
-                "consist_length_ft": 300.0,
+                "consist_length_ft": 600.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "5",
-                "position_ft": 200.0
+                "marked_as": "10",
+                "position_ft": 5.0
               },
               {
                 "consist_length_ft": 480.0,
                 "direction": "NORTH",
                 "is_opto": false,
                 "marked_as": "8",
-                "position_ft": 125.0
+                "position_ft": 100.0
               },
               {
-                "consist_length_ft": 600.0,
+                "consist_length_ft": 240.0,
                 "direction": "NORTH",
                 "is_opto": false,
-                "marked_as": "10",
-                "position_ft": 28.0
+                "marked_as": "4",
+                "position_ft": 186.0
+              },
+              {
+                "consist_length_ft": 300.0,
+                "direction": "NORTH",
+                "is_opto": false,
+                "marked_as": "6",
+                "position_ft": 186.0
               }
             ],
             "egress_points": [
               {
-                "egress_type": "ESCALATOR",
-                "id": 4,
-                "position_ft": 15.0,
+                "egress_type": "STAIRCASE",
+                "id": 1090,
+                "position_ft": 507.0,
                 "vertical_direction": "UP"
               },
               {
                 "egress_type": "STAIRCASE",
-                "id": 5,
-                "position_ft": 420.0,
+                "id": 1106,
+                "position_ft": 419.0,
+                "vertical_direction": "UP"
+              },
+              {
+                "egress_type": "STAIRCASE",
+                "id": 1107,
+                "position_ft": 399.0,
                 "vertical_direction": "DOWN"
               },
               {
-                "egress_type": "STAIRCASE",
-                "id": 6,
-                "position_ft": 440.0,
-                "vertical_direction": "UP"
-              },
-              {
-                "egress_type": "STAIRCASE",
-                "id": 7,
-                "position_ft": 530.0,
+                "egress_type": "ESCALATOR",
+                "id": 1068,
+                "position_ft": 3.0,
                 "vertical_direction": "UP"
               }
             ],
             "id": "7-P-G2",
-            "length_ft": 640.0
+            "length_ft": 616.0
           }
         ],
         "source": "mta_subway",
@@ -63191,7 +64253,7 @@
     "orphaned_stops": [],
     "route_stops": 808,
     "routes": 29,
-    "shapes": 1134,
+    "shapes": 1136,
     "stops": 493
   }
 }

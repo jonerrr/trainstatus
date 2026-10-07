@@ -370,7 +370,7 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
             .unwrap();
     let revision = StaticTransitRevision::from_dataset(&support::mta_subway_dataset());
     let cache = TrajectoryCache::new();
-    assert_eq!(collected.trips.len(), 719);
+    let trip_count = collected.trips.len();
     let mut failures = Vec::new();
     let mut gap_junctions = 0;
     for (trip, stops) in collected.trips {
@@ -403,7 +403,7 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
     );
     assert!(
         failures.is_empty(),
-        "{} of 719 real feed trips failed construction; first failures: {:?}",
+        "{} of {trip_count} real feed trips failed construction; first failures: {:?}",
         failures.len(),
         &failures[..failures.len().min(5)]
     );

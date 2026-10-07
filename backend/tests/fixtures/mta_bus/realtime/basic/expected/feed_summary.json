@@ -1,22 +1,22 @@
 {
   "alert_count": 0,
-  "entity_count": 4058,
+  "entity_count": 2001,
   "sample_entity_ids": {
     "alerts": [],
     "trip_updates": [
-      "MV_C6-Weekday-SDon-061600_M4_425",
-      "MV_C6-Weekday-SDon-075300_M4_432",
-      "GH_C6-Weekday-SDon-068500_BX5_103",
-      "GH_C6-Weekday-SDon-072000_BX5_103",
-      "MV_C6-Weekday-SDon-066800_M98_901",
-      "MV_C6-Weekday-SDon-070900_M98_901",
-      "EN_C6-Weekday-SDon-063000_B25_211",
-      "EN_C6-Weekday-SDon-070600_Q56_459",
-      "JA_C6-Weekday-SDon-065600_Q17_302",
-      "JA_C6-Weekday-SDon-071900_Q17_302"
+      "JA_D6-Weekday-SDon-136000_Q3_11",
+      "MQ_D6-Weekday-SDon-131500_M20_164",
+      "MQ_D6-Weekday-SDon-138000_M20_164",
+      "EN_D6-Weekday-SDon-133500_B65_863",
+      "MQ_D6-Weekday-SDon-134500_M12_106",
+      "JA_D6-Weekday-SDon-133000_MISC_899",
+      "JA_D6-Weekday-SDon-138800_MISC_899",
+      "MV_D6-Weekday-SDon-134500_M5_541",
+      "MV_D6-Weekday-SDon-142000_M5_541",
+      "EN_D6-Weekday-SDon-132300_B15_143"
     ],
     "vehicles": []
   },
-  "trip_update_count": 4058,
+  "trip_update_count": 2001,
   "vehicle_count": 0
 }

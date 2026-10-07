@@ -558,26 +558,26 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 0,
-                  "positionFt": 540.0,
+                  "id": 1090,
+                  "positionFt": 506.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 1,
-                  "positionFt": 430.0,
+                  "id": 1106,
+                  "positionFt": 418.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 2,
-                  "positionFt": 425.0,
+                  "id": 1107,
+                  "positionFt": 399.0,
                   "verticalDirection": "DOWN"
                 },
                 {
                   "egressType": "ESCALATOR",
-                  "id": 3,
-                  "positionFt": 10.0,
+                  "id": 1068,
+                  "positionFt": 2.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -585,54 +585,61 @@
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 600.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 4.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 515.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 493.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 575.0
+                    "positionFt": 554.0
                   },
                   {
                     "consistLengthFt": 600.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 627.0
+                    "positionFt": 605.0
                   }
                 ],
-                "lengthFt": 640.0
+                "lengthFt": 610.0
               }
             },
             {
               "egressPoints": [
                 {
-                  "egressType": "ESCALATOR",
-                  "id": 4,
-                  "positionFt": 15.0,
+                  "egressType": "STAIRCASE",
+                  "id": 1090,
+                  "positionFt": 507.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 5,
-                  "positionFt": 420.0,
+                  "id": 1106,
+                  "positionFt": 419.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1107,
+                  "positionFt": 399.0,
                   "verticalDirection": "DOWN"
                 },
                 {
-                  "egressType": "STAIRCASE",
-                  "id": 6,
-                  "positionFt": 440.0,
-                  "verticalDirection": "UP"
-                },
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 7,
-                  "positionFt": 530.0,
+                  "egressType": "ESCALATOR",
+                  "id": 1068,
+                  "positionFt": 3.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -640,28 +647,35 @@
               "spec": {
                 "carMarkers": [
                   {
-                    "consistLengthFt": 300.0,
+                    "consistLengthFt": 600.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 200.0
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 5.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "NORTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 125.0
+                    "positionFt": 100.0
                   },
                   {
-                    "consistLengthFt": 600.0,
+                    "consistLengthFt": 240.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 28.0
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 186.0
+                  },
+                  {
+                    "consistLengthFt": 300.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 186.0
                   }
                 ],
-                "lengthFt": 640.0
+                "lengthFt": 616.0
               }
             }
           ]
@@ -16521,26 +16535,38 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 0,
-                  "positionFt": 615.0,
+                  "id": 1373,
+                  "positionFt": 197.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "ELEVATOR",
-                  "id": 1,
-                  "positionFt": 485.0,
+                  "id": 1356,
+                  "positionFt": 499.0,
                   "verticalDirection": "NONE"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 2,
-                  "positionFt": 430.0,
+                  "id": 1361,
+                  "positionFt": 440.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 3,
-                  "positionFt": 310.0,
+                  "id": 1385,
+                  "positionFt": 333.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 263,
+                  "positionFt": 631.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 262,
+                  "positionFt": 631.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -16548,115 +16574,80 @@
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 469.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 548.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 510.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 589.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 575.0
+                    "positionFt": 649.0
                   },
                   {
                     "consistLengthFt": 600.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 610.0
+                    "positionFt": 649.0
                   }
                 ],
-                "lengthFt": 660.0
+                "lengthFt": 662.0
               }
             },
             {
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 4,
-                  "positionFt": 220.0,
+                  "id": 1373,
+                  "positionFt": 197.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "ELEVATOR",
-                  "id": 5,
-                  "positionFt": 270.0,
+                  "id": 1356,
+                  "positionFt": 499.0,
                   "verticalDirection": "NONE"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 6,
-                  "positionFt": 320.0,
-                  "verticalDirection": "UP"
-                },
-                {
-                  "egressType": "ELEVATOR",
-                  "id": 7,
-                  "positionFt": 570.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 8,
-                  "positionFt": 620.0,
-                  "verticalDirection": "UP"
-                }
-              ],
-              "platformEdgeId": "161-PX-A2",
-              "spec": {
-                "carMarkers": [
-                  {
-                    "consistLengthFt": 300.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 150.0
-                  },
-                  {
-                    "consistLengthFt": 480.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "8",
-                    "positionFt": 90.0
-                  },
-                  {
-                    "consistLengthFt": 600.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 30.0
-                  }
-                ],
-                "lengthFt": 660.0
-              }
-            },
-            {
-              "egressPoints": [
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 9,
-                  "positionFt": 615.0,
-                  "verticalDirection": "UP"
-                },
-                {
-                  "egressType": "ELEVATOR",
-                  "id": 10,
-                  "positionFt": 485.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 11,
-                  "positionFt": 430.0,
+                  "id": 1361,
+                  "positionFt": 440.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 12,
-                  "positionFt": 310.0,
+                  "id": 1385,
+                  "positionFt": 334.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 263,
+                  "positionFt": 630.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 262,
+                  "positionFt": 630.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -16664,60 +16655,86 @@
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 465.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 515.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 527.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 527.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 575.0
+                    "positionFt": 589.0
                   },
                   {
                     "consistLengthFt": 600.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 610.0
+                    "positionFt": 627.0
                   }
                 ],
-                "lengthFt": 660.0
+                "lengthFt": 643.0
               }
             },
             {
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 13,
-                  "positionFt": 220.0,
+                  "id": 798,
+                  "positionFt": 194.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "ELEVATOR",
-                  "id": 14,
-                  "positionFt": 270.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 15,
-                  "positionFt": 320.0,
-                  "verticalDirection": "UP"
-                },
-                {
-                  "egressType": "ELEVATOR",
-                  "id": 16,
+                  "id": 852,
                   "positionFt": 570.0,
                   "verticalDirection": "NONE"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 17,
-                  "positionFt": 620.0,
+                  "id": 847,
+                  "positionFt": 536.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 817,
+                  "positionFt": 330.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 811,
+                  "positionFt": 284.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 792,
+                  "positionFt": 219.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 292,
+                  "positionFt": 626.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -16725,28 +16742,122 @@
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 600.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 40.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 150.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 163.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 163.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 221.0
+                  }
+                ],
+                "lengthFt": 640.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 798,
+                  "positionFt": 192.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 852,
+                  "positionFt": 571.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 847,
+                  "positionFt": 537.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 817,
+                  "positionFt": 330.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 811,
+                  "positionFt": 283.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 792,
+                  "positionFt": 218.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 292,
+                  "positionFt": 629.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "161-PX-A2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 600.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 44.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "NORTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 90.0
+                    "positionFt": 100.0
                   },
                   {
-                    "consistLengthFt": 600.0,
+                    "consistLengthFt": 300.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 30.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 164.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 220.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 220.0
                   }
                 ],
-                "lengthFt": 660.0
+                "lengthFt": 639.0
               }
             }
           ]
@@ -18564,81 +18675,38 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 0,
-                  "positionFt": 659.0,
+                  "id": 1584,
+                  "positionFt": 650.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 1,
-                  "positionFt": 525.0,
+                  "id": 2584,
+                  "positionFt": 574.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 2,
-                  "positionFt": 270.0,
+                  "id": 2530,
+                  "positionFt": 278.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 3,
-                  "positionFt": 60.0,
-                  "verticalDirection": "UP"
-                }
-              ],
-              "platformEdgeId": "170-P-A3",
-              "spec": {
-                "carMarkers": [
-                  {
-                    "consistLengthFt": 300.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 580.0
-                  },
-                  {
-                    "consistLengthFt": 480.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "8",
-                    "positionFt": 585.0
-                  },
-                  {
-                    "consistLengthFt": 600.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 645.0
-                  }
-                ],
-                "lengthFt": 660.0
-              }
-            },
-            {
-              "egressPoints": [
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 4,
-                  "positionFt": 50.0,
+                  "id": 2517,
+                  "positionFt": 57.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 5,
-                  "positionFt": 270.0,
+                  "id": 2535,
+                  "positionFt": 408.0,
                   "verticalDirection": "UP"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 6,
-                  "positionFt": 530.0,
-                  "verticalDirection": "UP"
-                },
-                {
-                  "egressType": "STAIRCASE",
-                  "id": 7,
-                  "positionFt": 660.0,
+                  "id": 1585,
+                  "positionFt": 650.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -18646,28 +18714,116 @@
               "spec": {
                 "carMarkers": [
                   {
-                    "consistLengthFt": 300.0,
+                    "consistLengthFt": 600.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 200.0
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 14.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "NORTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
                     "positionFt": 70.0
                   },
                   {
-                    "consistLengthFt": 600.0,
+                    "consistLengthFt": 300.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 10.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 193.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 304.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 607.0
                   }
                 ],
-                "lengthFt": 660.0
+                "lengthFt": 650.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1584,
+                  "positionFt": 649.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 2584,
+                  "positionFt": 573.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 2530,
+                  "positionFt": 277.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 2517,
+                  "positionFt": 56.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 2535,
+                  "positionFt": 406.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1585,
+                  "positionFt": 649.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "170-P-A3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 579.0
+                  },
+                  {
+                    "consistLengthFt": 300.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 579.0
+                  },
+                  {
+                    "consistLengthFt": 480.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 579.0
+                  },
+                  {
+                    "consistLengthFt": 600.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 639.0
+                  }
+                ],
+                "lengthFt": 649.0
               }
             }
           ]
@@ -18678,94 +18834,21 @@
             {
               "egressPoints": [
                 {
-                  "egressType": "FARE_CONTROL",
-                  "id": 0,
-                  "positionFt": 640.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "UNKNOWN",
-                  "id": 1,
-                  "positionFt": 639.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "UNKNOWN",
-                  "id": 2,
-                  "positionFt": 639.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "RAMP",
-                  "id": 3,
-                  "positionFt": 639.0,
-                  "verticalDirection": "NONE"
-                },
-                {
                   "egressType": "STAIRCASE",
-                  "id": 4,
-                  "positionFt": 30.0,
+                  "id": 2492,
+                  "positionFt": 0.0,
                   "verticalDirection": "UP"
-                }
-              ],
-              "platformEdgeId": "171-P-A1",
-              "spec": {
-                "carMarkers": [
-                  {
-                    "consistLengthFt": 300.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 640.0
-                  },
-                  {
-                    "consistLengthFt": 480.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "8",
-                    "positionFt": 640.0
-                  },
-                  {
-                    "consistLengthFt": 600.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 640.0
-                  }
-                ],
-                "lengthFt": 660.0
-              }
-            },
-            {
-              "egressPoints": [
-                {
-                  "egressType": "UNKNOWN",
-                  "id": 5,
-                  "positionFt": 640.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "RAMP",
-                  "id": 6,
-                  "positionFt": 640.0,
-                  "verticalDirection": "NONE"
                 },
                 {
                   "egressType": "UNKNOWN",
-                  "id": 7,
-                  "positionFt": 640.0,
-                  "verticalDirection": "NONE"
-                },
-                {
-                  "egressType": "FARE_CONTROL",
-                  "id": 8,
-                  "positionFt": 639.0,
+                  "id": 1730,
+                  "positionFt": 632.0,
                   "verticalDirection": "NONE"
                 },
                 {
                   "egressType": "STAIRCASE",
-                  "id": 9,
-                  "positionFt": 30.0,
+                  "id": 3587,
+                  "positionFt": 111.0,
                   "verticalDirection": "UP"
                 }
               ],
@@ -18773,28 +18856,56 @@
               "spec": {
                 "carMarkers": [
                   {
-                    "consistLengthFt": 300.0,
+                    "consistLengthFt": null,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 640.0
-                  },
-                  {
-                    "consistLengthFt": 480.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "8",
-                    "positionFt": 640.0
-                  },
-                  {
-                    "consistLengthFt": 600.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 640.0
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 623.0
                   }
                 ],
-                "lengthFt": 660.0
+                "lengthFt": 632.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 2492,
+                  "positionFt": 0.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "UNKNOWN",
+                  "id": 1730,
+                  "positionFt": 634.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 3587,
+                  "positionFt": 110.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "171-P-A1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 427.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 623.0
+                  }
+                ],
+                "lengthFt": 634.0
               }
             }
           ]
@@ -21108,40 +21219,73 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 0,
-                  "positionFt": 607.0,
+                  "id": 99,
+                  "positionFt": 604.0,
                   "verticalDirection": "DOWN"
                 },
                 {
+                  "egressType": "FARE_CONTROL",
+                  "id": 1201,
+                  "positionFt": 30.0,
+                  "verticalDirection": "NONE"
+                },
+                {
                   "egressType": "STAIRCASE",
-                  "id": 1,
-                  "positionFt": 94.0,
+                  "id": 18,
+                  "positionFt": 93.0,
                   "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 1202,
+                  "positionFt": 37.0,
+                  "verticalDirection": "NONE"
                 }
               ],
-              "platformEdgeId": "192-PQ-K1",
+              "platformEdgeId": "192-PM-K2",
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 600.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 15.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 76.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 550.0
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 76.0
                   },
                   {
                     "consistLengthFt": 480.0,
-                    "direction": "SOUTH",
-                    "isOpto": null,
+                    "direction": "NORTH",
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 550.0
+                    "positionFt": 76.0
                   },
                   {
-                    "consistLengthFt": 600.0,
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 76.0
+                  },
+                  {
+                    "consistLengthFt": null,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "10",
-                    "positionFt": 640.0
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 310.0
                   }
                 ],
                 "lengthFt": 675.0
@@ -21151,43 +21295,70 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 2,
-                  "positionFt": 69.0,
+                  "id": 80,
+                  "positionFt": 578.0,
                   "verticalDirection": "DOWN"
                 },
                 {
+                  "egressType": "UNKNOWN",
+                  "id": 73,
+                  "positionFt": 26.0,
+                  "verticalDirection": "NONE"
+                },
+                {
                   "egressType": "STAIRCASE",
-                  "id": 3,
-                  "positionFt": 574.0,
+                  "id": 135,
+                  "positionFt": 64.0,
                   "verticalDirection": "DOWN"
                 }
               ],
-              "platformEdgeId": "192-PM-K2",
+              "platformEdgeId": "192-PQ-K1",
               "spec": {
                 "carMarkers": [
                   {
-                    "consistLengthFt": 300.0,
+                    "consistLengthFt": null,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 75.0
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 224.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 368.0
+                  },
+                  {
+                    "consistLengthFt": 300.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 519.0
                   },
                   {
                     "consistLengthFt": 480.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 75.0
+                    "positionFt": 519.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": true,
+                    "markedAs": "OPTO S",
+                    "positionFt": 519.0
                   },
                   {
                     "consistLengthFt": 600.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 13.0
+                    "positionFt": 614.0
                   }
                 ],
-                "lengthFt": 675.0
+                "lengthFt": 649.0
               }
             }
           ]
@@ -24368,86 +24539,128 @@
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 0,
-                  "positionFt": 528.0,
+                  "id": 951,
+                  "positionFt": 248.0,
                   "verticalDirection": "UP"
                 },
                 {
-                  "egressType": "STAIRCASE",
-                  "id": 1,
-                  "positionFt": 74.0,
-                  "verticalDirection": "UP"
+                  "egressType": "ELEVATOR",
+                  "id": 1120,
+                  "positionFt": 415.0,
+                  "verticalDirection": "NONE"
                 }
               ],
               "platformEdgeId": "224-P-B5",
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 600.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 6.0
+                  },
+                  {
+                    "consistLengthFt": 480.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 68.0
+                  },
+                  {
                     "consistLengthFt": 300.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 498.0
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 490.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 490.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 608.0
+                    "positionFt": 544.0
                   },
                   {
                     "consistLengthFt": 600.0,
                     "direction": "SOUTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 608.0
+                    "positionFt": 603.0
                   }
                 ],
-                "lengthFt": 615.0
+                "lengthFt": 609.0
               }
             },
             {
               "egressPoints": [
                 {
                   "egressType": "STAIRCASE",
-                  "id": 2,
-                  "positionFt": 74.0,
+                  "id": 951,
+                  "positionFt": 249.0,
                   "verticalDirection": "UP"
                 },
                 {
-                  "egressType": "STAIRCASE",
-                  "id": 3,
-                  "positionFt": 528.0,
-                  "verticalDirection": "UP"
+                  "egressType": "ELEVATOR",
+                  "id": 1120,
+                  "positionFt": 415.0,
+                  "verticalDirection": "NONE"
                 }
               ],
               "platformEdgeId": "224-P-B6",
               "spec": {
                 "carMarkers": [
                   {
-                    "consistLengthFt": 300.0,
+                    "consistLengthFt": 600.0,
                     "direction": "NORTH",
-                    "isOpto": null,
-                    "markedAs": "5",
-                    "positionFt": 117.0
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 6.0
                   },
                   {
                     "consistLengthFt": 480.0,
                     "direction": "NORTH",
-                    "isOpto": null,
+                    "isOpto": false,
                     "markedAs": "8",
-                    "positionFt": 77.0
+                    "positionFt": 68.0
+                  },
+                  {
+                    "consistLengthFt": 240.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "4",
+                    "positionFt": 495.0
+                  },
+                  {
+                    "consistLengthFt": 300.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 495.0
+                  },
+                  {
+                    "consistLengthFt": 480.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 555.0
                   },
                   {
                     "consistLengthFt": 600.0,
-                    "direction": "NORTH",
-                    "isOpto": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 14.0
+                    "positionFt": 599.0
                   }
                 ],
-                "lengthFt": 615.0
+                "lengthFt": 609.0
               }
             }
           ]
@@ -34077,6 +34290,151 @@
           ]
         },
         {
+          "mrn": 313,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 84,
+                  "positionFt": 381.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1609,
+                  "positionFt": 314.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1768,
+                  "positionFt": 121.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "313-PM-2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 516.0
+                  }
+                ],
+                "lengthFt": 549.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 84,
+                  "positionFt": 363.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1609,
+                  "positionFt": 296.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1768,
+                  "positionFt": 102.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "313-PM-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 525.0
+                  }
+                ],
+                "lengthFt": 531.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 162,
+                  "positionFt": 179.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1334,
+                  "positionFt": 193.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1420,
+                  "positionFt": 0.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "313-PX-3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 0.0
+                  }
+                ],
+                "lengthFt": 523.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 162,
+                  "positionFt": 216.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1334,
+                  "positionFt": 231.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1420,
+                  "positionFt": 36.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "313-PX-4",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 0.0
+                  }
+                ],
+                "lengthFt": 526.0
+              }
+            }
+          ]
+        },
+        {
           "mrn": 314,
           "platformEdges": [
             {
@@ -34165,6 +34523,99 @@
                   }
                 ],
                 "lengthFt": 508.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 315,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1311,
+                  "positionFt": 436.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 408,
+                  "positionFt": 446.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 398,
+                  "positionFt": 460.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "UNKNOWN",
+                  "id": 413,
+                  "positionFt": 457.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 443,
+                  "positionFt": 235.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 455,
+                  "positionFt": 189.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "315-PB-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 536.0
+                  }
+                ],
+                "lengthFt": 536.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "UNKNOWN",
+                  "id": 533,
+                  "positionFt": 136.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 504,
+                  "positionFt": 413.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "UNKNOWN",
+                  "id": 534,
+                  "positionFt": 114.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "315-PX-4",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 0.0
+                  }
+                ],
+                "lengthFt": 500.0
               }
             }
           ]
@@ -35493,6 +35944,76 @@
                   }
                 ],
                 "lengthFt": 551.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 331,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 873,
+                  "positionFt": 155.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 21,
+                  "positionFt": 521.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "331-P-2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 523.0
+                  }
+                ],
+                "lengthFt": 523.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 873,
+                  "positionFt": 155.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 21,
+                  "positionFt": 521.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "331-P-3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 459.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "9",
+                    "positionFt": 3.0
+                  },
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 3.0
+                  }
+                ],
+                "lengthFt": 524.0
               }
             }
           ]
@@ -38128,6 +38649,139 @@
                   }
                 ],
                 "lengthFt": 532.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 366,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1109,
+                  "positionFt": 276.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 1073,
+                  "positionFt": 327.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 355,
+                  "positionFt": 219.0,
+                  "verticalDirection": "DOWN"
+                }
+              ],
+              "platformEdgeId": "366-PM-2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 522.0
+                  }
+                ],
+                "lengthFt": 531.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1109,
+                  "positionFt": 238.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 1073,
+                  "positionFt": 289.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 355,
+                  "positionFt": 181.0,
+                  "verticalDirection": "DOWN"
+                }
+              ],
+              "platformEdgeId": "366-PM-M",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 519.0
+                  }
+                ],
+                "lengthFt": 526.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 492,
+                  "positionFt": 241.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 1086,
+                  "positionFt": 290.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "366-PX-M",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 5.0
+                  }
+                ],
+                "lengthFt": 521.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 492,
+                  "positionFt": 241.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 1086,
+                  "positionFt": 290.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "366-PX-3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 5.0
+                  }
+                ],
+                "lengthFt": 521.0
               }
             }
           ]
@@ -40884,6 +41538,148 @@
           ]
         },
         {
+          "mrn": 397,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 19,
+                  "positionFt": 147.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 28,
+                  "positionFt": 255.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "397-PMU-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 408.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 476.0
+                  },
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 521.0
+                  }
+                ],
+                "lengthFt": 521.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 75,
+                  "positionFt": 146.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 95,
+                  "positionFt": 263.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "397-PXU-4",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 7.0
+                  }
+                ],
+                "lengthFt": 513.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 143,
+                  "positionFt": 117.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 166,
+                  "positionFt": 265.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "397-PXL-3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 5.0
+                  },
+                  {
+                    "consistLengthFt": 408.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 54.0
+                  }
+                ],
+                "lengthFt": 512.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 220,
+                  "positionFt": 117.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 242,
+                  "positionFt": 264.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "397-PML-2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 408.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 470.0
+                  },
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 518.0
+                  }
+                ],
+                "lengthFt": 518.0
+              }
+            }
+          ]
+        },
+        {
           "mrn": 398,
           "platformEdges": [
             {
@@ -41064,6 +41860,197 @@
                     "isOpto": false,
                     "markedAs": "6",
                     "positionFt": 106.0
+                  }
+                ],
+                "lengthFt": 524.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 400,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 269,
+                  "positionFt": 363.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 309,
+                  "positionFt": 166.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 275,
+                  "positionFt": 318.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 989,
+                  "positionFt": 179.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 259,
+                  "positionFt": 396.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "400-PBU-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 306.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 410.0
+                  },
+                  {
+                    "consistLengthFt": 408.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 461.0
+                  },
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 514.0
+                  }
+                ],
+                "lengthFt": 520.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 685,
+                  "positionFt": 324.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 613,
+                  "positionFt": 101.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 668,
+                  "positionFt": 281.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 638,
+                  "positionFt": 128.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "FARE_CONTROL",
+                  "id": 619,
+                  "positionFt": 100.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "400-PXU-4",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 4.0
+                  },
+                  {
+                    "consistLengthFt": 408.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "8",
+                    "positionFt": 56.0
+                  },
+                  {
+                    "consistLengthFt": 306.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "6",
+                    "positionFt": 110.0
+                  }
+                ],
+                "lengthFt": 520.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "ESCALATOR",
+                  "id": 1190,
+                  "positionFt": 374.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1210,
+                  "positionFt": 146.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "400-PBL-2",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 519.0
+                  }
+                ],
+                "lengthFt": 524.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1251,
+                  "positionFt": 147.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "ESCALATOR",
+                  "id": 1276,
+                  "positionFt": 373.0,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 1237,
+                  "positionFt": 70.0,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "platformEdgeId": "400-PXL-3",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 0.0
                   }
                 ],
                 "lengthFt": 524.0
@@ -42517,6 +43504,13 @@
               "spec": {
                 "carMarkers": [
                   {
+                    "consistLengthFt": 510.0,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "10",
+                    "positionFt": 1.0
+                  },
+                  {
                     "consistLengthFt": 408.0,
                     "direction": "NORTH",
                     "isOpto": false,
@@ -42649,6 +43643,12 @@
                   "verticalDirection": "UP"
                 },
                 {
+                  "egressType": "UNKNOWN",
+                  "id": 634,
+                  "positionFt": 177.0,
+                  "verticalDirection": "NONE"
+                },
+                {
                   "egressType": "STAIRCASE",
                   "id": 642,
                   "positionFt": 258.0,
@@ -42670,7 +43670,7 @@
                     "direction": "SOUTH",
                     "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 537.0
+                    "positionFt": 543.0
                   }
                 ],
                 "lengthFt": 547.0
@@ -42686,9 +43686,21 @@
                 },
                 {
                   "egressType": "UNKNOWN",
+                  "id": 766,
+                  "positionFt": 164.0,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "UNKNOWN",
                   "id": 743,
                   "positionFt": 372.0,
                   "verticalDirection": "NONE"
+                },
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 761,
+                  "positionFt": 208.0,
+                  "verticalDirection": "UP"
                 }
               ],
               "platformEdgeId": "415-PM-3",
@@ -42699,7 +43711,7 @@
                     "direction": "NORTH",
                     "isOpto": false,
                     "markedAs": "10",
-                    "positionFt": 13.0
+                    "positionFt": 7.0
                   },
                   {
                     "consistLengthFt": 408.0,
@@ -46278,6 +47290,132 @@
                   }
                 ],
                 "lengthFt": 573.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 455,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 27,
+                  "positionFt": 212.0,
+                  "verticalDirection": "DOWN"
+                }
+              ],
+              "platformEdgeId": "455-PM-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 566.0
+                  }
+                ],
+                "lengthFt": 566.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 456,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 238,
+                  "positionFt": 271.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 23,
+                  "positionFt": 168.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "456-PM-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 564.0
+                  }
+                ],
+                "lengthFt": 564.0
+              }
+            },
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 238,
+                  "positionFt": 271.0,
+                  "verticalDirection": "DOWN"
+                },
+                {
+                  "egressType": "ELEVATOR",
+                  "id": 23,
+                  "positionFt": 168.0,
+                  "verticalDirection": "NONE"
+                }
+              ],
+              "platformEdgeId": "456-PM-M",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "NORTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 0.0
+                  },
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 564.0
+                  }
+                ],
+                "lengthFt": 564.0
+              }
+            }
+          ]
+        },
+        {
+          "mrn": 457,
+          "platformEdges": [
+            {
+              "egressPoints": [
+                {
+                  "egressType": "STAIRCASE",
+                  "id": 69,
+                  "positionFt": 401.0,
+                  "verticalDirection": "DOWN"
+                }
+              ],
+              "platformEdgeId": "457-PM-1",
+              "spec": {
+                "carMarkers": [
+                  {
+                    "consistLengthFt": null,
+                    "direction": "SOUTH",
+                    "isOpto": false,
+                    "markedAs": "S",
+                    "positionFt": 571.0
+                  }
+                ],
+                "lengthFt": 571.0
               }
             }
           ]

@@ -7,7 +7,10 @@ use backend::{
     },
 };
 
-pub fn fixture_alert(source: Source, id: &str) -> GtfsAlert {
+pub fn fixture_alert_where<F>(source: Source, predicate: F) -> (String, GtfsAlert)
+where
+    F: Fn(&GtfsAlert) -> bool,
+{
     let root = super::fixture_root();
     let manifest =
         fixtures::load_manifest_for(&root, source, FixtureKind::Alerts, "basic").unwrap();
@@ -15,10 +18,12 @@ pub fn fixture_alert(source: Source, id: &str) -> GtfsAlert {
         .unwrap()
         .entity
         .into_iter()
-        .find(|entity| entity.id == id)
-        .unwrap()
-        .alert
-        .unwrap()
+        .filter_map(|entity| {
+            let alert = entity.alert?;
+            predicate(&alert).then_some((entity.id, alert))
+        })
+        .next()
+        .expect("fixture should contain a matching alert")
 }
 
 pub fn assert_links(

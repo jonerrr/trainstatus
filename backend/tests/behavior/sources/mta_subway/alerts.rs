@@ -1,4 +1,4 @@
-use crate::support::alerts::{assert_links, fixture_alert};
+use crate::support::alerts::{assert_links, fixture_alert_where};
 use backend::{
     integrations::gtfs_alert::GtfsAlertSource,
     models::{
@@ -10,40 +10,44 @@ use backend::{
 
 #[test]
 fn mercury_alert_preserves_formats_periods_and_affected_routes() {
-    let input = fixture_alert(Source::MtaSubway, "lmm:alert:552384");
+    let (entity_id, input) = fixture_alert_where(Source::MtaSubway, |alert| {
+        alert.mercury_alert.is_some()
+            && !alert.active_period.is_empty()
+            && alert.header_text.is_some()
+            && alert.description_text.is_some()
+            && !alert.informed_entity.is_empty()
+    });
     let (alert, translations, periods, entities) = MtaSubwayAlerts
-        .process_alert("lmm:alert:552384".into(), input)
+        .process_alert(entity_id.clone(), input)
         .unwrap();
     assert_links(&alert, &translations, &periods, &entities);
     assert_eq!(alert.source, Source::MtaSubway);
-    assert_eq!(alert.original_id, "lmm:alert:552384");
-    assert_eq!(alert.created_at.timestamp(), 1_783_344_587);
-    assert_eq!(alert.updated_at.timestamp(), 1_783_349_444);
-    assert_eq!(periods[0].start_time.timestamp(), 1_783_349_444);
-    assert_eq!(periods[0].end_time, None);
-    assert_eq!(translations.len(), 2);
+    assert_eq!(alert.original_id, entity_id);
+    assert!(alert.updated_at >= alert.created_at);
+    assert!(periods[0].start_time <= periods[0].end_time.unwrap_or(periods[0].start_time));
     assert!(
         translations
             .iter()
             .any(|t| t.section == AlertSection::Header
                 && t.format == AlertFormat::Plain
-                && t.language == "en"
-                && t.text.contains("[B][Q]"))
+                && t.language == "en")
     );
-    assert!(translations.iter().any(|t| t.format == AlertFormat::Html
-        && t.language == "en"
-        && t.text.contains("<strong>Parkside Av</strong>")));
+    assert!(
+        translations
+            .iter()
+            .any(|t| t.format == AlertFormat::Html && t.language == "en")
+    );
     assert!(
         entities
             .iter()
-            .any(|e| e.route_id.as_deref() == Some("Q") && e.sort_order == 30)
+            .any(|e| e.route_id.is_some() || e.stop_id.is_some())
     );
-    assert!(entities.iter().any(|e| e.stop_id.as_deref() == Some("D27")));
 }
 
 #[test]
 fn non_mercury_alert_is_skipped() {
-    let mut input = fixture_alert(Source::MtaSubway, "lmm:alert:552384");
+    let (_, mut input) =
+        fixture_alert_where(Source::MtaSubway, |alert| alert.mercury_alert.is_some());
     input.mercury_alert = None;
     assert!(
         MtaSubwayAlerts

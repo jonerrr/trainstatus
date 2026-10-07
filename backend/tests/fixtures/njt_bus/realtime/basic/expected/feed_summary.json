@@ -1,6 +1,6 @@
 {
   "alert_count": 0,
-  "entity_count": 721,
+  "entity_count": 464,
   "sample_entity_ids": {
     "alerts": [],
     "trip_updates": [
@@ -17,6 +17,6 @@
     ],
     "vehicles": []
   },
-  "trip_update_count": 721,
+  "trip_update_count": 464,
   "vehicle_count": 0
 }

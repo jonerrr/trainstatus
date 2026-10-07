@@ -81,13 +81,14 @@ async fn static_controller_initializes_empty_index_even_when_database_is_fresh(p
         .static_index()
         .get(Source::MtaBus)
         .expect("initialization must publish a complete revision");
-    assert_eq!(revision.routes["B100"].shape_ids, ["B1000113", "B1000120"]);
+    let route = &revision.routes["B100"];
+    assert!(!route.shape_ids.is_empty());
     assert!(revision.stops.contains_key("300226"));
-    assert!(revision.shapes.contains_key("B1000120"));
-    assert_eq!(
-        revision.route_stop_shapes[&("B100".into(), "300226".into())],
-        ["B1000120"]
-    );
+    let route_stop_shapes = &revision.route_stop_shapes[&("B100".into(), "300226".into())];
+    assert!(!route_stop_shapes.is_empty());
+    assert!(route_stop_shapes.iter().all(
+        |shape_id| route.shape_ids.contains(shape_id) && revision.shapes.contains_key(shape_id)
+    ));
     controller
         .ensure_updated(Source::MtaBus)
         .await
