@@ -59,6 +59,15 @@ See README.md for detailed development setup instructions, including environment
 
 ## Conventions
 
+### Pull requests and commits
+
+- Use a Conventional Commit subject for every PR title and commit: `<type>(<scope>): <imperative description>`. Keep the description concise and lowercase after the colon.
+- Use the repository's scopes when applicable: `backend`, `frontend`, `database`, `api`, or `deps`. Omit the scope when no single scope fits.
+- Use `feat` for user-visible functionality, `fix` for bug fixes, `perf` for performance improvements, and `refactor` for behavior-preserving restructuring. Use `docs`, `test`, `build`, `ci`, or `chore` for changes that do not affect the released runtime.
+- Mark breaking changes with `!` before the colon, for example `feat(api)!: replace the trip response format`, and explain the migration in the commit body or `BREAKING CHANGE:` footer.
+- Prefer squash merging. The PR title becomes the squash commit subject, so verify that the title is a valid Conventional Commit before merging. Release Please uses `feat` and `fix` commits to determine releases; non-conventional merge titles are ignored.
+- Write commit bodies only when context is needed. Wrap paragraphs normally and include issue references or trailers in the footer.
+
 ### Backend
 
 - When adding, changing, reviewing, or running backend tests, read [.agents/skills/backend-testing/SKILL.md](.agents/skills/backend-testing/SKILL.md) and follow the linked testing policy.
