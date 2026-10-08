@@ -31,7 +31,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /app && chown 10001:10001 /app
+
 WORKDIR /app
 COPY --from=build /src/target/release/backend /backend
+
+USER 10001:10001
 
 ENTRYPOINT [ "/backend" ]
