@@ -32,7 +32,9 @@
 	} = $props();
 	const fixedAt = $derived.by(() => {
 		const value = page.url.searchParams.get('at');
-		return value !== null && Number.isFinite(Number(value)) ? Number(value) : null;
+		if (value === null || value.trim() === '') return null;
+		const at = Number(value);
+		return Number.isFinite(at) ? at : null;
 	});
 	let snapshot = $state.raw<TrajectorySnapshot>({ tables: new Map(), errors: new Map() });
 	const invalidTables = new WeakSet<RenderUnitTable>();

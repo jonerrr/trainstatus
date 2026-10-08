@@ -54,6 +54,7 @@
 			class="route-badge bus-badge"
 			style:--badge-size={`${size}px`}
 			style:background-color={route.color || '#526173'}
+			style:color={route.text_color || 'white'}
 			aria-label={label}
 		>
 			{#if parts?.[2]}<span class="prefix">{parts[1]}</span>{parts[2]}{:else}{label}{/if}
@@ -93,7 +94,6 @@
 		font-size: calc(var(--badge-size) * 0.52);
 		line-height: 1.4;
 		font-weight: 750;
-		color: white;
 		white-space: nowrap;
 		text-shadow: 0 1px 2px #0009;
 	}
