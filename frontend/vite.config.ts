@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
 					directives: {
 						'default-src': ['self'],
 						'base-uri': ['self'],
-						'connect-src': ['self', 'https://cloudflareinsights.com'],
+						'connect-src': ['self', 'data:', 'https://cloudflareinsights.com'],
 						'font-src': ['self'],
 						'frame-ancestors': ['none'],
 						'form-action': ['self'],

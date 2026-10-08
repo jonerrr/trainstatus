@@ -10,7 +10,7 @@ test('serves a CSP and renders representative routes without violations', async 
 		});
 	});
 
-	for (const path of ['/', '/stops', '/charts', '/settings']) {
+	for (const path of ['/', '/stops', '/charts', '/map', '/settings']) {
 		const response = await page.goto(path);
 		expect(response).not.toBeNull();
 		expect(response?.headers()['content-security-policy']).toContain("default-src 'self'");
