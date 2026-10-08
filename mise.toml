@@ -20,24 +20,166 @@ lockfile = true
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
 
-[tasks."containers:init"]
-description = "Create the pods for development."
-run = "podman kube play dev.pod.yml --replace"
+[tasks."podman-installed"]
+description = "Check that the podman command is on PATH."
+hide = true
+run = '''
+if ! command -v podman >/dev/null 2>&1; then
+  echo "podman is not on PATH." >&2
+  exit 1
+fi
+'''
+
+[tasks."containers:up"]
+extends = "containers"
+description = "Start the trainstatus-<suffix> pod if it is not running, then wait for Postgres."
+run = '''
+#!/usr/bin/env bash
+{% raw %}
+set -euo pipefail
+
+suffix="${usage_suffix}"
+pod="trainstatus-${suffix}"
+file="${suffix}.pod.yml"
+
+if [[ ! -f "$file" ]]; then
+  echo "Pod file not found: ${file}" >&2
+  exit 1
+fi
+
+if podman pod exists "$pod"; then
+  state="$(podman pod inspect "$pod" --format '{{.State}}')"
+  if [[ "$state" == "Running" ]]; then
+    echo "${pod} is already running."
+  else
+    echo "Starting ${pod} (${state})."
+    podman pod start "$pod"
+  fi
+else
+  echo "Creating ${pod}."
+  args=(kube play "$file")
+  if [[ "$suffix" == "demo" ]]; then
+    configmap="demo.configmap.yml"
+    if [[ ! -f "$configmap" ]]; then
+      echo "Missing ${configmap}. Copy demo.configmap.yml.example and fill it in." >&2
+      exit 1
+    fi
+    args+=(--configmap "$configmap")
+  fi
+  podman "${args[@]}"
+fi
+
+container="${pod}-postgis"
+for attempt in $(seq 1 120); do
+  if podman exec "$container" pg_isready -U trains -d trains >/dev/null 2>&1; then
+    if ((attempt > 1)); then
+      echo "Postgres in ${pod} is accepting connections."
+    fi
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "Timed out waiting for Postgres in ${pod}." >&2
+exit 1
+{% endraw %}
+'''
+
+[tasks."containers:down"]
+extends = "containers"
+description = "Stop and remove the trainstatus-<suffix> pod. Keeps its volumes."
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+file="${usage_suffix}.pod.yml"
+if [[ ! -f "$file" ]]; then
+  echo "Pod file not found: ${file}" >&2
+  exit 1
+fi
+podman kube down "$file"
+echo "Removed trainstatus-${usage_suffix}. Volumes were kept."
+'''
+
+[tasks.reset]
+extends = "containers"
+description = "Delete the trainstatus-<suffix> pod and its volumes, then recreate them."
+confirm = "Delete the pod and its volumes, then recreate them?"
+depends_post = [{ task = "containers:up", args = ["{{usage.suffix}}"] }]
+run = '''
+#!/usr/bin/env bash
+{% raw %}
+set -euo pipefail
+
+suffix="${usage_suffix}"
+pod="trainstatus-${suffix}"
+file="${suffix}.pod.yml"
+
+if [[ ! -f "$file" ]]; then
+  echo "Pod file not found: ${file}" >&2
+  exit 1
+fi
+
+collected=()
+if podman pod exists "$pod"; then
+  mapfile -t ids < <(podman ps -aq --filter "pod=${pod}")
+  if ((${#ids[@]} > 0)); then
+    while IFS= read -r volume; do
+      [[ -n "$volume" ]] && collected+=("$volume")
+    done < <(podman inspect --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}{{"\n"}}{{end}}{{end}}' "${ids[@]}")
+  fi
+fi
+
+while IFS= read -r volume; do
+  [[ -n "$volume" ]] && collected+=("$volume")
+done < <(awk '
+  $0 ~ /^kind:/ { kind = $2; in_meta = 0 }
+  $0 ~ /^metadata:/ { in_meta = 1; next }
+  in_meta && $0 ~ /^  name:/ {
+    if (kind == "PersistentVolumeClaim" || kind == "ConfigMap") print $2
+    in_meta = 0
+  }
+' "$file")
+
+volumes=()
+if ((${#collected[@]} > 0)); then
+  mapfile -t volumes < <(printf '%s\n' "${collected[@]}" | sed '/^$/d' | sort -u)
+fi
+
+# kube down keeps volumes. --force only removes volumes named in the current
+# file, so also remove named volumes still mounted from an older spec.
+podman kube down "$file"
+echo "Removed ${pod}."
+if ((${#volumes[@]} > 0)); then
+  echo "Removing volumes: ${volumes[*]}"
+  for volume in "${volumes[@]}"; do
+    if podman volume exists "$volume"; then
+      podman volume rm -f "$volume"
+    fi
+  done
+fi
+
+echo "Run mise //backend:migrate if this database is empty."
+{% endraw %}
+'''
 
 [tasks.dev]
-# broken since it the sqlx mig fails because the database isn't ready yet. need to add a wait-for step or something.
-# depends = ["start-containers"]
+description = "Start the dev pod if needed, then run the backend and frontend."
+depends = ["containers:up"]
 run = { tasks = ["//backend:dev", "//frontend:dev"] }
 
-[tasks.reset-db]
-confirm = "Are you sure?"
-run = """
-podman kube down dev.pod.yml --force || true
-podman kube play --replace dev.pod.yml
-"""
-
 [tasks.build]
+description = "Build the backend and frontend container images."
+depends = ["podman-installed"]
 run = { tasks = ["//backend:build", "//frontend:build"] }
 
 [tasks.demo]
-run = "podman kube play --replace demo.pod.yml --configmap demo.configmap.yml"
+description = "Start the demo pod if it is not already running."
+depends = [{ task = "containers:up", args = ["demo"] }]
+
+[task_templates.containers]
+depends = ["podman-installed"]
+usage = """
+arg "[suffix]" default="dev" help="Pod suffix (dev or demo). Selects SUFFIX.pod.yml and pod trainstatus-SUFFIX." {
+  choices "dev" "demo"
+}
+"""

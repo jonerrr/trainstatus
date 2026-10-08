@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: trainstatus-app
+  name: trainstatus-demo
 spec:
   # restartPolicy: Always
   containers:

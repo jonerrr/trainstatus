@@ -56,7 +56,7 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 2. Geo styles in `geo/styles/*.json` use relative URLs. Martin reads the `X-Forwarded-Host`/`X-Forwarded-Proto` headers to resolve the public URL, so make sure your reverse proxy forwards them (see the `traefik` service in `demo.pod.yml`).
 3. See `demo.pod.yml` for an example deployment with traefik.
 4. Copy `demo.configmap.yml.example` to `demo.configmap.yml` and fill in the required values.
-5. Launch it with `mise demo`.
+5. Launch it with `mise demo`. This starts the `trainstatus-demo` pod when it is not already running.
 
 ### Local Development Setup
 
@@ -67,7 +67,7 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 4. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
 5. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
 6. Run `mise //geo:export` to export the Valhalla tile extract.
-7. Start the required services with `mise start-containers`.
-8. Once everything is up, start the backend and frontend with `mise dev`.
+7. Start Postgres and Martin with `mise containers:up`.
+8. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
 
-To stop and clean up the local dev pod, run `podman kube down dev.pod.yml`. You can also run `mise //backend:reset-db` to remove volumes created by the `dev.pod.yml`.
+`mise containers:down` stops the dev pod and keeps its volumes. `mise reset` deletes that pod and its volumes, then creates them again. Both commands take an optional suffix, `dev` by default: `mise reset demo` targets the `trainstatus-demo` pod from `demo.pod.yml`.

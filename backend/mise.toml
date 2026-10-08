@@ -76,14 +76,6 @@ case "$usage_suite" in
 esac
 '''
 
-[tasks.reset-db]
-confirm = "Are you sure?"
-run = """
-podman kube down ../dev.pod.yml --force || true
-podman kube play --replace ../dev.pod.yml
-echo "Run DB migrations after the database is ready."
-"""
-
 # Host deps for compiling the valhalla crate (vendored C++).
 # Install with: mise bootstrap packages apply
 [bootstrap.packages]
