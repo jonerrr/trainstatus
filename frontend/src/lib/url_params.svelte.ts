@@ -3,6 +3,16 @@ import { SvelteURL } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 
+/**
+ * Unix seconds from `?at=`. Blank and non-numeric values mean live, so callers
+ * keep using {@link current_time} instead of parsing the param again.
+ */
+export function atParamToUnixSeconds(value: string | null | undefined): number | undefined {
+	if (value == null || value.trim() === '') return undefined;
+	const at = Number(value);
+	return Number.isFinite(at) ? at : undefined;
+}
+
 // if user specified unix timestamp, it is stored here.
 function currentTime() {
 	let time = $state<number | undefined>();
@@ -19,7 +29,7 @@ function currentTime() {
 
 		set value(newValue: number | undefined) {
 			// js time is in milliseconds
-			time = newValue;
+			time = typeof newValue === 'number' && Number.isFinite(newValue) ? newValue : undefined;
 		}
 	};
 }

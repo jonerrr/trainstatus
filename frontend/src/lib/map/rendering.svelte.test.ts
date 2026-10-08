@@ -41,6 +41,20 @@ test('filters and chooser allow the initiating drag to move the real map', async
 	expect(document.querySelector('.chooser-panel')).toBeNull();
 });
 
+test('chooser pointer dismissal restores its trigger', async () => {
+	await page.viewport(1100, 800);
+	const view = await render(MapHarness);
+	await view.getByRole('button', { name: 'Choose features' }).click();
+	await expect.element(view.getByRole('dialog', { name: 'Choose a map feature' })).toBeVisible();
+	const outside = document.createElement('div');
+	outside.textContent = 'Outside';
+	document.body.append(outside);
+	await userEvent.click(outside);
+	expect(document.querySelector('.chooser-panel')).toBeNull();
+	await expect.poll(() => document.activeElement?.textContent).toBe('Choose features');
+	outside.remove();
+});
+
 test('chooser keyboard dismissal restores its trigger without trapping focus', async () => {
 	await page.viewport(1100, 800);
 	const view = await render(MapHarness);

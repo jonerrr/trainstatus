@@ -37,7 +37,16 @@
 		previous?.focus({ preventScroll: true });
 	}
 	function outside(event: PointerEvent) {
-		if (event.target instanceof Node && !panel?.contains(event.target)) ondismiss();
+		if (!(event.target instanceof Node) || panel?.contains(event.target)) return;
+		const focusable =
+			event.target instanceof Element &&
+			event.target.closest(
+				'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+		ondismiss();
+		// The click's own focus move happens after pointerdown. Put the trigger
+		// back once that settles, unless the click landed on another control.
+		if (!focusable) setTimeout(() => previous?.focus({ preventScroll: true }));
 	}
 </script>
 

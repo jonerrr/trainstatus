@@ -1,18 +1,13 @@
-<script module lang="ts">
-	import type { Route } from '#lib/client/index.js';
-
-	export interface FeaturePresentation {
-		route?: Route;
-		title: string;
-		subtitle?: string;
-		detail?: string;
-	}
-</script>
-
 <script lang="ts">
 	import Icon from '#lib/Route/Icon.svelte';
 
-	let { feature, link = false }: { feature: FeaturePresentation; link?: boolean } = $props();
+	import type { FeaturePresentation } from './map/presentation';
+
+	let {
+		feature,
+		link = false,
+		show_alerts = false
+	}: { feature: FeaturePresentation; link?: boolean; show_alerts?: boolean } = $props();
 </script>
 
 <div
@@ -23,7 +18,7 @@
 	data-feature-summary
 >
 	{#if feature.route}
-		<Icon route={feature.route} width={28} height={28} {link} />
+		<Icon route={feature.route} width={28} height={28} {link} {show_alerts} />
 	{/if}
 	<div class="min-w-0 flex-1">
 		<div class="text-sm leading-snug font-semibold wrap-anywhere text-neutral-100">

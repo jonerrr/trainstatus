@@ -12,7 +12,7 @@
 	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
 	import SEO from '#lib/SEO.svelte';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { atParamToUnixSeconds, current_time } from '#lib/url_params.svelte.js';
 
 	import '@fontsource/inter';
 	import '../app.css';
@@ -21,8 +21,9 @@
 
 	// Initialize current_time from URL param on page load
 	// If we don't initialize here, the syncing $effect will error out when running replaceState on page load (since router isn't initialized)
-	// TODO: maybe add error handling for invalid at param. for example if its a huge number and becomes NaN, the sync $effect runs and errors out
-	if (page.data.at) current_time.value = parseInt(page.data.at);
+	// Blank and non-numeric ?at= stay live. The setter ignores non-finite numbers.
+	const at = atParamToUnixSeconds(page.data.at);
+	if (at !== undefined) current_time.value = at;
 	// TODO: fix clearing time not working
 
 	trip_context.set(

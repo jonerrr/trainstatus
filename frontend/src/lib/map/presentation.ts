@@ -1,8 +1,14 @@
 import type { Route, Stop, StopTime, Trip } from '#lib/client/index.js';
-import type { FeaturePresentation } from '#lib/FeatureSummary.svelte';
-import { trip_headsign } from '#lib/util.svelte.js';
+import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 
 import type { MapTarget } from './interactions';
+
+export interface FeaturePresentation {
+	route?: Route;
+	title: string;
+	subtitle?: string;
+	detail?: string;
+}
 
 export function presentFeature(
 	target: MapTarget,
@@ -33,14 +39,11 @@ export function presentFeature(
 	if (target.kind === 'stop') return { title: stop?.name ?? 'Stop unavailable', subtitle };
 	if (target.kind === 'route')
 		return { route, title: route?.long_name || route?.short_name || 'Route unavailable', subtitle };
-	const destination = trip && trip_headsign(trip, route, stopTimes, stops);
+	const destination = trip ? trip_headsign(trip, route, stopTimes, stops) : undefined;
 	const next = stopTimes.find((time) => time.arrival.getTime() > at);
 	return {
 		route,
-		title:
-			destination && destination !== 'Unknown'
-				? destination
-				: route?.long_name || 'Destination unavailable',
+		title: trip_destination_title(destination, route),
 		subtitle,
 		detail: !trip
 			? 'Trip details unavailable'

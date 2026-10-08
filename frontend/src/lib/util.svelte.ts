@@ -50,6 +50,13 @@ export function trip_headsign(
 	return (last_stop && stops[last_stop.stop_id]?.name) || 'Unknown';
 }
 
+/** Title shared by trip modals and map cards when a headsign is missing. */
+export function trip_destination_title(destination: string | undefined, route?: Route): string {
+	return destination && destination !== 'Unknown'
+		? destination
+		: route?.long_name || 'Destination unavailable';
+}
+
 // from https://www.geeksforgeeks.org/haversine-formula-to-find-distance-between-two-points-on-a-sphere/
 export function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 	// distance between latitudes and longitudes

@@ -19,7 +19,7 @@ export const BODY_HEAD_RGB: [number, number, number] = [255, 255, 255];
 export const STOP_FILL = '#ffffff';
 export const BUS_STOP_FILL = '#aeb8c4';
 
-/** Used when a route has no usable color. */
+/** Used when a route line has no usable color. Route pills use their own fallback. */
 export const FALLBACK_ROUTE_COLOR = '#8b95a1';
 
 /**
@@ -32,11 +32,6 @@ export const ROUTE_COLOR: maplibregl.ExpressionSpecification = [
 	['get', 'color'],
 	FALLBACK_ROUTE_COLOR
 ];
-
-/** DOM-side counterpart of {@link ROUTE_COLOR}, for tooltips and route pills. */
-export function normalizeRouteColor(color: string | null | undefined): string {
-	return color?.trim() || FALLBACK_ROUTE_COLOR;
-}
 
 /**
  * Base route line width. This ramp is deliberately *constant* with respect to
@@ -193,6 +188,12 @@ export const BUS_STOP_HIT_RADIUS: maplibregl.ExpressionSpecification = [
 	20,
 	12
 ];
+
+/** Zoom where subway vehicles switch from a puck to a meter-scaled consist. */
+export const RAIL_DETAIL_ZOOM = 14.1;
+
+/** Zoom where bus vehicles switch from a puck to a meter-scaled body. */
+export const BUS_DETAIL_ZOOM = 16.7;
 
 /**
  * `beforeId` anchors, so layer stacking is independent of the order components

@@ -2618,7 +2618,13 @@
       "layout": {
         "symbol-placement": "line",
         "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
-        "text-font": ["Open Sans Regular"],
+        "text-font": [
+          "Montserrat Regular",
+          "Open Sans Regular",
+          "Noto Sans Regular",
+          "HanWangHeiLight Regular",
+          "NanumBarunGothic Regular"
+        ],
         "text-size": ["interpolate", ["linear"], ["zoom"], 16, 10, 19, 12],
         "text-max-angle": 30,
         "symbol-spacing": 300
@@ -2630,6 +2636,6 @@
       }
     }
   ],
-  "id": "voyager",
+  "id": "transit-dark",
   "owner": "martin"
 }

@@ -4,6 +4,7 @@
 	import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
 	import { LineLayer, VectorTileSource } from 'svelte-maplibre-gl';
 
+	import type { MapFeatureKey } from './interactions';
 	import {
 		CASING,
 		ROUTE_CASING_WIDTH,
@@ -12,13 +13,12 @@
 		ROUTE_HIGHLIGHT_WIDTH,
 		ROUTE_HIT_WIDTH,
 		ROUTE_WIDTH,
-		SLOT
+		SLOT,
+		SUBWAY_SOURCE_FILTER
 	} from './mapTheme';
 
-	let {
-		filter,
-		activeRoute
-	}: { filter: FilterSpecification; activeRoute: { id: string; source: string } | null } = $props();
+	let { filter, activeRoute }: { filter: FilterSpecification; activeRoute: MapFeatureKey | null } =
+		$props();
 	const match: ExpressionSpecification = $derived([
 		'all',
 		['==', ['get', 'id'], activeRoute?.id ?? ''],
@@ -37,9 +37,9 @@
 		['linear'],
 		['zoom'],
 		10,
-		dimmed(['case', ['==', ['get', 'source'], 'mta_subway'], 0.95, 0.25]),
+		dimmed(['case', SUBWAY_SOURCE_FILTER, 0.95, 0.25]),
 		14,
-		dimmed(['case', ['==', ['get', 'source'], 'mta_subway'], 1, 0.65]),
+		dimmed(['case', SUBWAY_SOURCE_FILTER, 1, 0.65]),
 		17,
 		dimmed(1)
 	]);

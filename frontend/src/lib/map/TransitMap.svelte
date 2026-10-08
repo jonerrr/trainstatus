@@ -5,7 +5,7 @@
 
 	import type { Source } from '#lib/client/index.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
-	import { open_modal } from '#lib/url_params.svelte.js';
+	import { current_time, open_modal } from '#lib/url_params.svelte.js';
 
 	import type { Map as MapInstance, MapMouseEvent } from 'maplibre-gl';
 	import { AttributionControl, GeolocateControl, MapLibre } from 'svelte-maplibre-gl';
@@ -17,8 +17,14 @@
 	import FeaturePreview from './FeaturePreview.svelte';
 	import Filters from './Filters.svelte';
 	import { MapFilters } from './filters.svelte';
-	import { MapInteractionController, type MapTarget, type ScreenPoint } from './interactions';
+	import {
+		MapInteractionController,
+		type MapFeatureKey,
+		type MapTarget,
+		type ScreenPoint
+	} from './interactions';
 	import MapFeatureSummary from './MapFeatureSummary.svelte';
+	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './mapTheme';
 	import RouteLayers from './RouteLayers.svelte';
 	import StopLayers from './StopLayers.svelte';
 	import TripMarkersLoader from './TripMarkersLoader.svelte';
@@ -42,24 +48,28 @@
 	onDestroy(() => {
 		selectionVersion++;
 	});
-	const activeRoute = $derived(
+	const activeRoute = $derived<MapFeatureKey | null>(
 		hover?.target.kind === 'route'
 			? { id: hover.target.id, source: hover.target.source }
 			: hover?.target.routeId
 				? { id: hover.target.routeId, source: hover.target.source }
 				: null
 	);
-	const selectedTrip = $derived(
-		hover?.target.kind === 'trip' ? `${hover.target.source}:${hover.target.id}` : null
+	const selectedTrip = $derived<MapFeatureKey | null>(
+		hover?.target.kind === 'trip' ? { id: hover.target.id, source: hover.target.source } : null
 	);
+	// New object whenever the visible network or the selected time changes.
+	const interactionScope = $derived({
+		route: filters.route,
+		stop: filters.stop,
+		trip: filters.trip,
+		routeLayer: filters.layers.route,
+		stopLayer: filters.layers.stop,
+		tripLayer: filters.layers.trip,
+		at: current_time.value
+	});
 	$effect(() => {
-		void filters.route;
-		void filters.stop;
-		void filters.trip;
-		void filters.layers.route;
-		void filters.layers.stop;
-		void filters.layers.trip;
-		void page.url.searchParams.get('at');
+		void interactionScope;
 		hover = null;
 		chooser = null;
 		selectionVersion++;
@@ -205,8 +215,8 @@
 		{#if filters.layers.trip && filters.sources.length}
 			<TripMarkersLoader
 				sources={filters.sources}
-				railDetail={settledZoom >= 14.1}
-				busDetail={settledZoom >= 16.7}
+				railDetail={settledZoom >= RAIL_DETAIL_ZOOM}
+				busDetail={settledZoom >= BUS_DETAIL_ZOOM}
 				{selectedTrip}
 				onPickerReady={(picker) => interactions.registerVehiclePicker(picker)}
 			/>

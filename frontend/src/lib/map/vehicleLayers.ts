@@ -1,5 +1,6 @@
 import { IconLayer } from '@deck.gl/layers';
 
+import type { MapFeatureKey } from './interactions';
 import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from './mapTheme';
 import { normalizeBearingForIcon, type ActiveVehicle } from './trajectoryArrow';
 import {
@@ -20,12 +21,18 @@ export function isRailVehicle(vehicle: ActiveVehicle) {
 
 export function vehicleLayers(
 	partitions: { detail: ActiveVehicle[]; puck: ActiveVehicle[] },
-	selectedTrip: string | null,
+	selectedTrip: MapFeatureKey | null,
 	frameVersion: number,
 	dataVersion: number
 ) {
+	const selectedKey = selectedTrip ? `${selectedTrip.source}:${selectedTrip.id}` : null;
+
+	function isSelected(vehicle: ActiveVehicle) {
+		return selectedTrip?.source === vehicle.source && selectedTrip.id === vehicle.tripId;
+	}
+
 	function alphaFor(vehicle: ActiveVehicle, base: number) {
-		const dim = selectedTrip && `${vehicle.source}:${vehicle.tripId}` !== selectedTrip ? DIMMED : 1;
+		const dim = selectedKey && !isSelected(vehicle) ? DIMMED : 1;
 		return Math.round(base * dim);
 	}
 
@@ -90,50 +97,42 @@ export function vehicleLayers(
 						getPosition: frameVersion,
 						getAngle: frameVersion,
 						getIcon: dataVersion,
-						getColor: [dataVersion, selectedTrip],
-						getSize: [dataVersion, selectedTrip]
+						getColor: [dataVersion, selectedKey],
+						getSize: [dataVersion, selectedKey]
 					}
 				})
 		);
 	}
 
-	function build() {
-		const { detail, puck } = partitions;
-		const layers: IconLayer<ActiveVehicle>[] = [];
+	const { detail, puck } = partitions;
+	const layers: IconLayer<ActiveVehicle>[] = [];
 
-		if (puck.length > 0) {
-			layers.push(
-				...iconLayers(
-					'trip-markers-puck',
-					puck,
-					(vehicle) => {
-						const base = isRailVehicle(vehicle) ? RAIL_PUCK_PX : BUS_PUCK_PX;
-						return `${vehicle.source}:${vehicle.tripId}` === selectedTrip
-							? base * HOVER_SCALE
-							: base;
-					},
-					'pixels',
-					true
-				)
-			);
-		}
-
-		if (detail.length > 0) {
-			layers.push(
-				...iconLayers(
-					'trip-markers-detail',
-					detail,
-					(vehicle) =>
-						`${vehicle.source}:${vehicle.tripId}` === selectedTrip
-							? vehicle.lengthM * HOVER_SCALE
-							: vehicle.lengthM,
-					'meters',
-					false
-				)
-			);
-		}
-
-		return layers;
+	if (puck.length > 0) {
+		layers.push(
+			...iconLayers(
+				'trip-markers-puck',
+				puck,
+				(vehicle) => {
+					const base = isRailVehicle(vehicle) ? RAIL_PUCK_PX : BUS_PUCK_PX;
+					return isSelected(vehicle) ? base * HOVER_SCALE : base;
+				},
+				'pixels',
+				true
+			)
+		);
 	}
-	return build();
+
+	if (detail.length > 0) {
+		layers.push(
+			...iconLayers(
+				'trip-markers-detail',
+				detail,
+				(vehicle) => (isSelected(vehicle) ? vehicle.lengthM * HOVER_SCALE : vehicle.lengthM),
+				'meters',
+				false
+			)
+		);
+	}
+
+	return layers;
 }

@@ -3,12 +3,11 @@
 
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { page } from '$app/state';
-
 	import type { Source } from '#lib/client/index.js';
+	import { current_time } from '#lib/url_params.svelte.js';
 
 	import DeckOverlay from './DeckOverlay.svelte';
-	import type { VehiclePicker } from './interactions';
+	import type { MapFeatureKey, VehiclePicker } from './interactions';
 	import { watchTrajectories, type TrajectorySnapshot } from './trajectories';
 	import {
 		buildActiveVehiclesAtTime,
@@ -27,15 +26,10 @@
 		sources: Source[];
 		railDetail?: boolean;
 		busDetail?: boolean;
-		selectedTrip?: string | null;
+		selectedTrip?: MapFeatureKey | null;
 		onPickerReady: (picker: VehiclePicker | null) => void;
 	} = $props();
-	const fixedAt = $derived.by(() => {
-		const value = page.url.searchParams.get('at');
-		if (value === null || value.trim() === '') return null;
-		const at = Number(value);
-		return Number.isFinite(at) ? at : null;
-	});
+	const fixedAt = $derived(current_time.value ?? null);
 	let snapshot = $state.raw<TrajectorySnapshot>({ tables: new Map(), errors: new Map() });
 	const invalidTables = new WeakSet<RenderUnitTable>();
 	const identities = new WeakMap<ActiveVehicle[], string[]>();

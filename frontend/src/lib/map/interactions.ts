@@ -10,6 +10,9 @@ export interface MapTarget {
 	routeId?: string;
 }
 
+/** Identity of a route or trip, without a picked feature kind. */
+export type MapFeatureKey = Pick<MapTarget, 'id' | 'source'>;
+
 export interface ScreenPoint {
 	x: number;
 	y: number;
