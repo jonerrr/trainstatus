@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.5.0...frontend-v1.5.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* map drag issues and improve overall ui/ux of map ([#439](https://github.com/jonerrr/trainstatus/issues/439)) ([1710fa7](https://github.com/jonerrr/trainstatus/commit/1710fa768a6f2f5b795f82259402354c43f6eb5e))
+
 ## [1.5.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.4.0...frontend-v1.5.0) (2026-10-08)
 
 
