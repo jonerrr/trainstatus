@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Route } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 
 	interface Props {
@@ -26,7 +26,7 @@
 </script>
 
 <section class="flex items-center gap-1">
-	<Icon height={36} width={36} link={true} route={data} />
+	<Icon height={36} width={36} link={false} route={data} />
 	{#if alerts_loading}
 		<Skeleton lines={1} class="w-24" />
 	{:else if route_alerts.length}

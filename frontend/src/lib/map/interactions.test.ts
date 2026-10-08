@@ -6,15 +6,13 @@ import type { ActiveVehicle } from './trajectoryArrow';
 const trip: MapTarget = {
 	kind: 'trip',
 	id: 'trip-1',
-	source: 'mta_subway',
-	label: 'A train'
+	source: 'mta_subway'
 };
 
 const route: MapTarget = {
 	kind: 'route',
 	id: 'A',
-	source: 'mta_subway',
-	label: 'A · Eighth Avenue Express'
+	source: 'mta_subway'
 };
 
 function mockVehicle(overrides: Partial<ActiveVehicle> = {}): ActiveVehicle {
@@ -65,8 +63,7 @@ describe('resolveMapTargets', () => {
 					kind: 'trip',
 					id: 'trip-1',
 					source: 'mta_subway',
-					label: 'A vehicle',
-					subtitle: 'trip-1'
+					routeId: 'A'
 				},
 				route
 			]

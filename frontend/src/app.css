@@ -87,10 +87,15 @@
 	}
 }
 
-/* Suppress the full-page root crossfade for all modal transitions */
-:root[data-modal-direction]::view-transition-old(root),
-:root[data-modal-direction]::view-transition-new(root) {
-	animation: none;
+/* Animate only the modal, keeping the map live and interactive underneath. */
+:root[data-modal-direction] {
+	view-transition-name: none;
+}
+
+:root[data-modal-direction]::view-transition {
+	/* The live modal owns focus and inertness. Its animation must not swallow
+	   the first map gesture after the modal has closed. */
+	pointer-events: none;
 }
 
 /* `both` holds the last keyframe. Without it, the outgoing snapshot snaps back

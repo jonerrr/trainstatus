@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Attachment } from 'svelte/attachments';
+	import { onMount, type Snippet } from 'svelte';
 
-	import { dismissOnEscape } from './dialog';
+	import { X } from '@lucide/svelte';
+
 	import type { MapTarget, ScreenPoint } from './interactions';
-	import MapBackdrop from './MapBackdrop.svelte';
 
 	let {
 		targets,
@@ -11,7 +11,8 @@
 		viewportWidth,
 		viewportHeight,
 		onselect,
-		ondismiss
+		ondismiss,
+		children
 	}: {
 		targets: MapTarget[];
 		point: ScreenPoint;
@@ -19,110 +20,102 @@
 		viewportHeight: number;
 		onselect: (target: MapTarget) => void;
 		ondismiss: () => void;
+		children: Snippet<[MapTarget]>;
 	} = $props();
-
-	const left = $derived(Math.min(Math.max(8, point.x), Math.max(8, viewportWidth - 288)));
-	const top = $derived(Math.min(Math.max(8, point.y), Math.max(8, viewportHeight - 260)));
-
-	const focusFirstTarget: Attachment<HTMLDivElement> = (node) => {
-		queueMicrotask(() => node.querySelector<HTMLButtonElement>('button')?.focus());
-	};
+	let panel = $state<HTMLDivElement>();
+	let width = $state(288);
+	let height = $state(0);
+	let previous: HTMLElement | null = null;
+	const left = $derived(Math.max(8, Math.min(point.x, viewportWidth - width - 8)));
+	const top = $derived(Math.max(8, Math.min(point.y, viewportHeight - height - 8)));
+	onMount(() => {
+		previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		panel?.querySelector<HTMLButtonElement>('[data-map-target]')?.focus();
+	});
+	function dismiss() {
+		ondismiss();
+		previous?.focus({ preventScroll: true });
+	}
+	function outside(event: PointerEvent) {
+		if (!(event.target instanceof Node) || panel?.contains(event.target)) return;
+		const focusable =
+			event.target instanceof Element &&
+			event.target.closest(
+				'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+		ondismiss();
+		// The click's own focus move happens after pointerdown. Put the trigger
+		// back once that settles, unless the click landed on another control.
+		if (!focusable) setTimeout(() => previous?.focus({ preventScroll: true }));
+	}
 </script>
 
 <svelte:window
+	onpointerdown={outside}
 	onkeydown={(event) => {
-		dismissOnEscape(event, ondismiss);
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			dismiss();
+		}
 	}}
 />
-
-<MapBackdrop class="chooser-backdrop" label="Dismiss feature chooser" {ondismiss} />
-
 <div
-	{@attach focusFirstTarget}
+	bind:this={panel}
+	bind:clientWidth={width}
+	bind:clientHeight={height}
 	class="chooser-panel"
-	style:--chooser-left={`${left}px`}
-	style:--chooser-top={`${top}px`}
+	style:--panel-left={`${left}px`}
+	style:--panel-top={`${top}px`}
 	role="dialog"
-	aria-modal="true"
 	aria-label="Choose a map feature"
+	data-map-control
 >
-	<div class="px-3 pt-3 pb-2 text-xs font-semibold tracking-wide text-neutral-400 uppercase">
-		Choose a feature
-	</div>
-	<div class="flex flex-col px-1.5 pb-1.5">
+	<header class="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
+		<h2 class="text-xs font-medium text-neutral-400">Choose a feature</h2>
+		<button
+			type="button"
+			aria-label="Close feature chooser"
+			onclick={dismiss}
+			class="rounded-md p-1 text-neutral-300 hover:bg-neutral-800"><X size={16} /></button
+		>
+	</header>
+	<div class="flex flex-col gap-1 p-1.5">
 		{#each targets as target (`${target.kind}:${target.source}:${target.id}`)}
 			<button
 				type="button"
-				aria-label={`Open ${target.kind} ${target.label}`}
-				class="flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-400"
+				class="min-h-11 rounded-lg p-2.5 hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400"
+				data-map-target
 				onclick={() => onselect(target)}
 			>
-				<span
-					class="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-[10px] font-bold tracking-wide text-neutral-200 uppercase"
-				>
-					{target.kind.slice(0, 2)}
-				</span>
-				<span class="min-w-0">
-					<span class="block truncate text-sm font-medium text-white">{target.label}</span>
-					<span class="block truncate text-xs text-neutral-400">
-						{target.subtitle ?? target.source.replace('_', ' ')}
-					</span>
-				</span>
+				{@render children(target)}
 			</button>
 		{/each}
 	</div>
 </div>
 
 <style>
-	:global(.chooser-backdrop) {
-		position: absolute;
-		inset: 0;
-		z-index: 60;
-		background: transparent;
-	}
-
 	.chooser-panel {
 		position: absolute;
-		z-index: 81;
-		left: var(--chooser-left);
-		top: var(--chooser-top);
-		width: min(18rem, calc(100% - 1rem));
-		max-height: min(22rem, calc(100% - 1rem));
-		overflow-y: auto;
-		border: 1px solid rgb(64 64 64);
+		left: var(--panel-left);
+		top: var(--panel-top);
+		z-index: 40;
+		width: min(20rem, calc(100% - 1rem));
+		max-height: calc(100% - 1rem);
+		overflow: auto;
+		border: 1px solid #404040;
 		border-radius: 0.75rem;
-		background: rgb(10 10 10 / 0.96);
-		box-shadow: 0 20px 45px rgb(0 0 0 / 0.45);
-		backdrop-filter: blur(12px);
+		background: #0a0a0af5;
+		box-shadow: 0 8px 24px #0005;
 	}
-
 	@media (max-width: 639px) {
 		.chooser-panel {
-			position: fixed;
+			top: auto;
 			left: 0.5rem;
 			right: 0.5rem;
-			top: auto;
-			bottom: calc(4.5rem + env(safe-area-inset-bottom));
+			bottom: 0.5rem;
 			width: auto;
-			max-height: min(45vh, 22rem);
-		}
-
-		:global(.chooser-backdrop) {
-			position: fixed;
-			background: rgb(0 0 0 / 0.22);
-		}
-	}
-
-	@media (prefers-reduced-motion: no-preference) {
-		.chooser-panel {
-			animation: chooser-in 120ms ease-out;
-		}
-	}
-
-	@keyframes chooser-in {
-		from {
-			opacity: 0;
-			transform: translateY(5px) scale(0.98);
+			max-height: 40dvh;
 		}
 	}
 </style>

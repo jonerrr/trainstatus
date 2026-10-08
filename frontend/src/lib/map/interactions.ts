@@ -7,9 +7,11 @@ export interface MapTarget {
 	kind: MapTargetKind;
 	id: string;
 	source: Source;
-	label: string;
-	subtitle?: string;
+	routeId?: string;
 }
+
+/** Identity of a route or trip, without a picked feature kind. */
+export type MapFeatureKey = Pick<MapTarget, 'id' | 'source'>;
 
 export interface ScreenPoint {
 	x: number;
@@ -43,8 +45,7 @@ export class MapInteractionController {
 				kind: 'trip',
 				id: vehicle.tripId,
 				source: vehicle.source,
-				label: vehicle.routeId ? `${vehicle.routeId} vehicle` : 'Vehicle',
-				subtitle: vehicle.tripId
+				routeId: vehicle.routeId
 			});
 		}
 

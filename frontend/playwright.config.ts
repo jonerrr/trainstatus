@@ -13,7 +13,11 @@ export default defineConfig({
 		// Keep each test independent of cached responses from the app's service worker.
 		serviceWorkers: 'block'
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	projects: [
+		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+		{ name: 'map-firefox', testMatch: '**/map.e2e.ts', use: { ...devices['Desktop Firefox'] } },
+		{ name: 'map-touch', testMatch: '**/map.e2e.ts', use: { ...devices['Pixel 7'] } }
+	],
 	webServer: {
 		command: 'pnpm build && pnpm preview --host 127.0.0.1 --port 4173 --strictPort',
 		url: 'http://127.0.0.1:4173',

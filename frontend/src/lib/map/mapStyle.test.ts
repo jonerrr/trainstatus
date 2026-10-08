@@ -42,17 +42,16 @@ describe('transit-first basemap style', () => {
 		}
 	});
 
-	it('contains no building geometry or street-name labels', () => {
+	it('keeps building clutter out and restores street labels only at close zoom', () => {
 		const competingLayers = style.layers.filter((layer) => {
 			const identity = `${layer.id} ${layer['source-layer'] ?? ''}`.toLowerCase();
-			return (
-				/building|housenumber/.test(identity) ||
-				layer['source-layer'] === 'transportation_name' ||
-				(layer.type === 'symbol' && /roadname|street/.test(identity))
-			);
+			return /building|housenumber/.test(identity);
 		});
 
 		expect(competingLayers.map((layer) => layer.id)).toEqual([]);
+		const streets = style.layers.filter((layer) => layer['source-layer'] === 'transportation_name');
+		expect(streets.length).toBeGreaterThan(0);
+		expect(streets.every((layer) => (layer.minzoom ?? 0) >= 16)).toBe(true);
 	});
 
 	it('defers local street geometry until useful zooms', () => {

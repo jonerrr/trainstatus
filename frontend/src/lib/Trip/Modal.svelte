@@ -6,7 +6,7 @@
 
 	import Button from '#lib/Button.svelte';
 	import type { StopTime, Trip } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
+	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
@@ -15,10 +15,10 @@
 	import Skeleton from '#lib/Skeleton.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
-	import { trip_headsign } from '#lib/util.svelte.js';
+	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
-	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
+	import { ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {
 		show_previous: boolean;
@@ -63,8 +63,18 @@
 		)
 	);
 
-	const last_stop = $derived(
+	const headsign = $derived(
 		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
+	);
+	const busPosition = $derived(
+		trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'
+			? position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
+			: undefined
+	);
+	const deviationMinutes = $derived(
+		trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
+			? trip.data.deviation / 60
+			: undefined
 	);
 
 	type StopTransfers = Record<string, StopTime[]>;
@@ -143,30 +153,30 @@
 	const subway_consist_model = $derived(subway_consist_cars[0]?.type);
 </script>
 
-<div class="flex items-center gap-1 p-1">
-	<div class="flex flex-col items-start gap-1">
-		{#if trip.data.source === 'mta_bus'}
-			{const position = $derived(
-				position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
-			)}
-			<VehicleCapacity {position} />
-			<div>#{trip.vehicle_id}</div>
-		{/if}
-
-		{#if route}
-			<Icon width={36} height={36} {route} link show_alerts />
+<div class="p-3">
+	<div class="flex items-center justify-between gap-3">
+		<FeatureSummary
+			link={!!route}
+			show_alerts
+			feature={{
+				route,
+				title: trip_destination_title(headsign, route)
+			}}
+		/>
+		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
+			<span class="shrink-0 text-xs text-neutral-400">Bus #{trip.vehicle_id}</span>
 		{/if}
 	</div>
-
-	<ArrowBigRight class="w-8" />
-
-	<div class="text-xl font-semibold">
-		{last_stop}
-	</div>
-
-	{#if trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120}
-		<div class="ml-auto text-sm {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
-			{trip.data.deviation > 0 ? '+' : ''}{(trip.data.deviation / 60).toFixed(0)}m
+	{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
+		<div
+			class="mt-2 flex items-center divide-x divide-neutral-600 *:pl-3 first:*:pl-0 [&:not(:has(*))]:hidden"
+		>
+			<VehicleCapacity position={busPosition} />
+			{#if deviationMinutes !== undefined}
+				<div class="shrink-0 text-sm text-neutral-300">
+					{Math.abs(deviationMinutes).toFixed(0)} min {deviationMinutes > 0 ? 'late' : 'early'}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

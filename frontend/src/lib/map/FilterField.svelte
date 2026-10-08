@@ -86,7 +86,7 @@
 				<select
 					value={typeof value === 'string' ? value : ''}
 					onchange={(e) => handleEnumChange(e.currentTarget.value, false)}
-					class="min-h-10 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+					class="min-h-10 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
 				>
 					<option value="">All</option>
 					{#each fieldDef.options ?? [] as option (option)}
@@ -103,7 +103,7 @@
 				value={typeof value === 'string' ? value : ''}
 				onchange={(e) => handleStringChange(e.currentTarget.value)}
 				placeholder="Search..."
-				class="min-h-10 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+				class="min-h-10 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
 			/>
 		</label>
 	{:else if fieldDef.type === 'number'}
@@ -127,7 +127,7 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="min-h-10 w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+					class="min-h-10 w-20 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
 				/>
 				<span class="self-center text-sm">to</span>
 				<input
@@ -141,7 +141,7 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="min-h-10 w-20 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+					class="min-h-10 w-20 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
 				/>
 			</div>
 		</div>

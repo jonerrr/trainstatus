@@ -4,9 +4,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 import tailwindcss from '@tailwindcss/vite';
-import { playwright } from '@vitest/browser-playwright';
-import { loadEnv } from 'vite';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd());
@@ -79,42 +77,6 @@ export default defineConfig(({ mode }) => {
 					xfwd: true
 				}
 			}
-		},
-		test: {
-			expect: { requireAssertions: true },
-			projects: [
-				{
-					extends: './vite.config.ts',
-					test: {
-						name: 'client',
-						browser: {
-							enabled: true,
-							provider: playwright(),
-							instances: [{ browser: 'chromium', headless: true }]
-						},
-						include: ['src/**/*.svelte.test.ts'],
-						exclude: ['src/lib/server/**'],
-						setupFiles: ['src/lib/test/client-setup.ts']
-					}
-				},
-				{
-					extends: './vite.config.ts',
-					test: {
-						name: 'server',
-						environment: 'node',
-						include: ['src/**/*.test.ts'],
-						exclude: ['src/**/*.svelte.test.ts', 'tests/integration/**']
-					}
-				},
-				{
-					extends: './vite.config.ts',
-					test: {
-						name: 'integration',
-						environment: 'node',
-						include: ['tests/integration/**/*.test.ts']
-					}
-				}
-			]
 		}
 	};
 });
