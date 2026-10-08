@@ -123,6 +123,7 @@ async fn main() {
     #[derive(OpenApi)]
     #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
     tags(
+        (name = "HEALTH", description = "Liveness and readiness probes"),
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
         (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
     ),
@@ -132,6 +133,7 @@ async fn main() {
     struct ApiDoc;
 
     let state = AppState {
+        pg_pool,
         route_store,
         stop_store,
         trip_store,

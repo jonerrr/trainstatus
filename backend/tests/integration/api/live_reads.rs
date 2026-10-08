@@ -104,6 +104,7 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
 }
 fn server(pool: sqlx::PgPool, s: &support::TestStores) -> TestServer {
     let state = AppState {
+        pg_pool: pool.clone(),
         route_store: s.route_store.clone(),
         stop_store: s.stop_store.clone(),
         trip_store: s.trip_store.clone(),

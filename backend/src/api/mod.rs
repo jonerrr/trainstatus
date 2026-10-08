@@ -12,6 +12,7 @@ use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 // pub mod websocket;
+pub mod health;
 pub mod realtime;
 pub mod static_data;
 pub mod trajectory;
@@ -40,7 +41,9 @@ where
 
 pub fn router(state: AppState) -> OpenApiRouter {
     OpenApiRouter::new()
-        .route("/health", axum::routing::get(|| async { "OK" }))
+        .route("/health", axum::routing::get(health::liveness_handler))
+        .routes(routes!(health::liveness_handler))
+        .routes(routes!(health::readiness_handler))
         .routes(routes!(static_data::routes_handler))
         .routes(routes!(static_data::stops_handler))
         .routes(routes!(realtime::trips_handler))

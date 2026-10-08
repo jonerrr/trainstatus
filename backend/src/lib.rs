@@ -24,6 +24,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone)]
 pub struct AppState {
+    pub pg_pool: sqlx::PgPool,
     pub route_store: crate::stores::route::RouteStore,
     pub stop_store: crate::stores::stop::StopStore,
     pub trip_store: crate::stores::trip::TripStore,

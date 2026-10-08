@@ -1,6 +1,7 @@
 use crate::support::app_state;
 use axum_test::TestServer;
 
+mod health;
 mod live_reads;
 mod realtime;
 mod static_data;

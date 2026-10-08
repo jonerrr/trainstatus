@@ -8,6 +8,7 @@ pub fn app_state(pool: sqlx::PgPool) -> AppState {
 
 pub fn app_state_from_stores(pool: sqlx::PgPool, stores: TestStores) -> AppState {
     AppState {
+        pg_pool: pool.clone(),
         route_store: stores.route_store,
         stop_store: stores.stop_store,
         trip_store: stores.trip_store,
