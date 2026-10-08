@@ -35,12 +35,16 @@ fn etag_matches(request_headers: &HeaderMap, etag_hash: &str) -> bool {
     get,
     path = "/routes/{source}",
     tag = "STATIC",
+    summary = "List routes",
+    description = "Returns the current static route snapshot for the specified source. Responses include an ETag and long-lived cache headers. Send the ETag in `If-None-Match` to receive `304 Not Modified` when the snapshot has not changed.",
     params(
         ("source" = Source, Path, description = "Data source")
     ),
     responses(
-        (status = 200, description = "Subway and bus routes. WARNING: W train geometry is missing.", body = [Route]),
-        (status = 304, description = "If no parameters are provided and the etag matches the request")
+        (status = 200, description = "Routes for the specified source", body = [Route]),
+        (status = 304, description = "The supplied `If-None-Match` value matches the current snapshot ETag"),
+        (status = 400, description = "Invalid source path"),
+        (status = 500, description = "Database or internal service error")
     )
 )]
 pub async fn routes_handler(
@@ -59,12 +63,16 @@ pub async fn routes_handler(
     get,
     path = "/stops/{source}",
     tag = "STATIC",
+    summary = "List stops",
+    description = "Returns the current static stop snapshot for the specified source. Responses include an ETag and long-lived cache headers. Send the ETag in `If-None-Match` to receive `304 Not Modified` when the snapshot has not changed.",
     params(
         ("source" = Source, Path, description = "Data source")
     ),
     responses(
-        (status = 200, description = "Source stops", body = [Stop]),
-        (status = 304, description = "If no parameters are provided and the etag matches the request")
+        (status = 200, description = "Stops for the specified source", body = [Stop]),
+        (status = 304, description = "The supplied `If-None-Match` value matches the current snapshot ETag"),
+        (status = 400, description = "Invalid source path"),
+        (status = 500, description = "Database or internal service error")
     )
 )]
 pub async fn stops_handler(

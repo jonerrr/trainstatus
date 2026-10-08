@@ -86,7 +86,7 @@ pub struct CurrentTime {
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct TimeParams {
-    /// Unix timestamp to use as the current time. If not specified, the current time is used.
+    /// Unix timestamp used for a historical query. If omitted, the latest committed realtime snapshot is returned.
     #[serde(default)]
     pub at: Option<i64>,
 }

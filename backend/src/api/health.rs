@@ -5,6 +5,7 @@ use axum::{extract::State, http::StatusCode};
 #[utoipa::path(
     get,
     path = "/health/live",
+    summary = "Check liveness",
     responses(
         (status = 200, description = "The backend process is alive")
     ),
@@ -18,6 +19,7 @@ pub async fn liveness_handler() -> &'static str {
 #[utoipa::path(
     get,
     path = "/health/ready",
+    summary = "Check readiness",
     responses(
         (status = 200, description = "The backend is ready"),
         (status = 503, description = "A required dependency is unavailable")

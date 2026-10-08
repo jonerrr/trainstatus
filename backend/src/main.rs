@@ -121,11 +121,11 @@ async fn main() {
     alerts::worker::run(&alert_store, alert_adapters).await;
 
     #[derive(OpenApi)]
-    #[openapi(info(title = "Train Status API", description = "The Train Status API is the simplest way to get MTA subway and bus data. Realtime data comes from the MTA's GTFS and SIRI feeds.", contact(email = "jonah@trainstat.us")),
+    #[openapi(info(title = "Train Status API", version = VERSION, description = "Realtime and static transit data for MTA subway, MTA bus, and NJ Transit bus services. Realtime endpoints serve the latest committed snapshot by default and support optional historical queries with `at`.", contact(email = "jonah@trainstat.us")),
     tags(
         (name = "HEALTH", description = "Liveness and readiness probes"),
         (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
-        (name = "REALTIME", description = "Data that changes around every 30 seconds (trips, stop times, and alerts). This will return data between current time and 4 hours + current time. By default, the current time is the time of the request, but you can specify the `at` parameter to get historical data.")
+        (name = "REALTIME", description = "Live trips, stop times, vehicle positions, alerts, and rendered trajectories. Omit `at` for the latest committed snapshot; provide `at` as a Unix timestamp for retained historical data where supported.")
     ),
     // TODO: maybe add route, stop, and shape models here
     components(schemas(models::source::Source))

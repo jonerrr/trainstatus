@@ -16,6 +16,7 @@ use crate::trajectory::{
 
 #[derive(Deserialize, IntoParams)]
 pub struct TrajectoriesParameters {
+    /// Comma-separated list of route IDs to include.
     #[serde(deserialize_with = "parse_list", default)]
     pub route_ids: Vec<String>,
     /// Viewport bounds: min_lon,min_lat,max_lon,max_lat
@@ -67,7 +68,8 @@ fn filter_render_units<'a>(
     get,
     path = "/trajectories/{source}",
     tag = "REALTIME",
-    description = "Returns interpolated trip trajectories as Apache Arrow IPC for animated map rendering.",
+    summary = "Get rendered trajectories",
+    description = "Returns interpolated trip trajectories as an Apache Arrow IPC stream for animated map rendering. All currently supported sources are accepted. Results can be filtered by route and viewport; historical requests use `at`.",
     params(
         ("source" = Source, Path, description = "Data source"),
         TrajectoriesParameters,
@@ -75,7 +77,8 @@ fn filter_render_units<'a>(
     ),
     responses(
         (status = 200, description = "Arrow IPC stream of trajectories"),
-        (status = 400, description = "Invalid bbox parameter")
+        (status = 400, description = "Invalid source path or query parameter"),
+        (status = 500, description = "Trajectory calculation, database, or internal service error")
     )
 )]
 pub async fn trajectories_handler(
