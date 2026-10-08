@@ -3,9 +3,9 @@
 
 	import type { Source, Stop, Transfer } from '#lib/client/index.js';
 	import { COMPASS_DIRECTIONS } from '#lib/compassDirections.js';
-	import Icon from '#lib/Icon.svelte';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import { get_stop_arrivals } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import { current_time, open_modal } from '#lib/url_params.svelte.js';

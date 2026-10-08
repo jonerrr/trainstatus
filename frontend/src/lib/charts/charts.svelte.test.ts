@@ -118,7 +118,9 @@ test('multiple sources keep colliding trip/stop/route IDs separate and use their
 	};
 	await renderChart();
 	for (const source of ['mta_bus', 'njt_bus']) {
-		await userEvent.click(document.querySelector('[aria-label="Add routes"]')!);
+		// Activate the trigger itself, not a removable chip at its geometric center.
+		document.querySelector<HTMLButtonElement>('[aria-label="Add routes"]')!.focus();
+		await userEvent.keyboard('{Enter}');
 		const option = [...document.querySelectorAll('[role="option"]')].find((option) =>
 			option.textContent?.includes(`${source} route`)
 		)!;

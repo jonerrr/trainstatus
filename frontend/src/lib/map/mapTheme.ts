@@ -6,10 +6,9 @@ import * as maplibregl from 'maplibre-gl';
  * pull from here so their proportions stay in sync when one of them is tweaked.
  */
 
-/** Dark casing drawn under route lines and around vehicles. Darker than the
- * `#0e0e0e` dark-matter background so it reads as a cut-out at every zoom. */
-export const CASING_RGB: [number, number, number] = [8, 9, 12];
-export const CASING = '#08090c';
+/** Background-colored casing separates transit geometry from the street network. */
+export const CASING_RGB: [number, number, number] = [17, 24, 32];
+export const CASING = '#111820';
 
 /** Vehicle body fill. Head cars are pushed to pure white so the front of a
  * consist is distinguishable from its trailing cars. */
@@ -90,7 +89,7 @@ export const ROUTE_HIGHLIGHT_WIDTH: maplibregl.ExpressionSpecification = [
 ];
 
 /** Opacity applied to routes that are *not* the active one while something is hovered. */
-export const ROUTE_DIMMED_OPACITY = 0.28;
+export const ROUTE_DIMMED_OPACITY = 0.6;
 
 /**
  * Width of the transparent layer that actually receives route hover and clicks.
@@ -163,7 +162,7 @@ export const BUS_STOP_RADIUS: maplibregl.ExpressionSpecification = [
 
 /**
  * Grab radii for the transparent stop hit layers. Kept deliberately modest:
- * stops outrank routes in {@link import('./hover.svelte').MapHover}, so an
+ * stops outrank routes during picking, so an
  * over-large stop target would make the route line hard to grab near a station.
  *
  * Each hit layer must mirror its visible layer's filter *and* minzoom — a hit

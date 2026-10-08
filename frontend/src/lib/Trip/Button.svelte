@@ -2,9 +2,9 @@
 	import { page } from '$app/state';
 
 	import type { Trip } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';

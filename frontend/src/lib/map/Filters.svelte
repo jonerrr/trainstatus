@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 
-	import type { Attachment } from 'svelte/attachments';
-
 	import { page } from '$app/state';
 
 	import { source_info } from '#lib/resources/index.svelte.js';
@@ -11,13 +9,7 @@
 
 	import { dismissOnEscape } from './dialog';
 	import { layer_data, type FilterValue, type MapFilters } from './filters.svelte';
-	import MapBackdrop from './MapBackdrop.svelte';
 	import SourceFilterGroup from './SourceFilterGroup.svelte';
-
-	// TODO: simplify the code and improve the ui
-	// there should be less padding, i dont like how its called filters but the title is "map settings"
-	// it also doesn't look fully aligned with the dropdown. maybe it should be connected to the sidebar (or bottom nav on mobile)
-	// and (on desktop at least), the dropdown shouldnt close until they click close
 
 	interface Props {
 		filters: MapFilters;
@@ -32,20 +24,6 @@
 	let trigger = $state<HTMLButtonElement>();
 	let panel = $state<HTMLDivElement>();
 
-	const captureTrigger: Attachment<HTMLButtonElement> = (node) => {
-		trigger = node;
-		return () => {
-			if (trigger === node) trigger = undefined;
-		};
-	};
-
-	const capturePanel: Attachment<HTMLDivElement> = (node) => {
-		panel = node;
-		return () => {
-			if (panel === node) panel = undefined;
-		};
-	};
-
 	async function openFilters() {
 		filtersOpen = true;
 		await tick();
@@ -59,44 +37,28 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (!filtersOpen) return;
-		if (dismissOnEscape(event, () => closeFilters())) return;
-		if (event.key !== 'Tab') return;
-
-		const focusable = Array.from(
-			panel?.querySelectorAll<HTMLElement>(
-				'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-			) ?? []
-		).filter((element) => element.offsetParent !== null);
-		if (focusable.length === 0) return;
-		const first = focusable[0];
-		const last = focusable.at(-1)!;
-		if (event.shiftKey && document.activeElement === first) {
-			event.preventDefault();
-			last.focus();
-		} else if (!event.shiftKey && document.activeElement === last) {
-			event.preventDefault();
-			first.focus();
+		if (
+			filtersOpen &&
+			!event.defaultPrevented &&
+			!page.state.modal &&
+			(panel?.contains(document.activeElement) || trigger === document.activeElement)
+		) {
+			dismissOnEscape(event, () => closeFilters());
 		}
-	}
-
-	function handleOutsideClick(event: PointerEvent) {
-		const target = event.target as Node;
-		if (filtersOpen && !panel?.contains(target) && !trigger?.contains(target)) closeFilters();
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} onpointerdown={handleOutsideClick} />
+<svelte:window onkeydown={handleKeydown} />
 
-<div class="pointer-events-none absolute top-1.5 left-1.5 z-70 max-w-[calc(100%-4.25rem)]">
+<div class="pointer-events-none absolute top-1.5 left-1.5 z-30 max-w-[calc(100%-4.25rem)]">
 	<div
 		class="pointer-events-auto flex max-w-full items-center gap-1 rounded-lg border border-neutral-700/70 bg-neutral-950/88 p-1 text-white shadow-lg backdrop-blur-md"
 	>
 		<button
-			{@attach captureTrigger}
+			bind:this={trigger}
 			type="button"
 			class="relative flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-semibold hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-400"
-			aria-label="Map settings"
+			aria-label="Filters"
 			aria-expanded={filtersOpen}
 			aria-controls="map-filter-panel"
 			onclick={() => (filtersOpen ? closeFilters() : void openFilters())}
@@ -134,30 +96,24 @@
 </div>
 
 {#if filtersOpen}
-	<MapBackdrop
-		class="filter-backdrop"
-		label="Close map settings"
-		ondismiss={() => closeFilters()}
-	/>
 	<div
-		{@attach capturePanel}
+		bind:this={panel}
 		id="map-filter-panel"
 		class="filter-panel"
 		role="dialog"
-		aria-modal="true"
-		aria-label="Map settings"
+		aria-label="Filters"
 	>
 		<header
 			class="flex min-h-11 shrink-0 items-center justify-between border-b border-neutral-800 px-3"
 		>
 			<div class="flex items-center gap-1.5">
 				<Layers size={18} aria-hidden="true" />
-				<h2 class="text-base font-semibold">Map settings</h2>
+				<h2 class="text-base font-semibold">Filters</h2>
 			</div>
 			<button
 				type="button"
 				class="flex size-9 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400"
-				aria-label="Close map settings"
+				aria-label="Close filters"
 				onclick={() => closeFilters()}
 			>
 				<X size={20} aria-hidden="true" />
@@ -235,25 +191,18 @@
 {/if}
 
 <style>
-	:global(.filter-backdrop) {
-		position: fixed;
-		inset: 0;
-		z-index: 71;
-		background: rgb(0 0 0 / 0.35);
-	}
-
 	.filter-panel {
-		position: fixed;
-		z-index: 72;
-		right: 0;
-		bottom: 0;
-		left: 0;
+		position: absolute;
+		z-index: 30;
+		right: 0.5rem;
+		bottom: 0.5rem;
+		left: 0.5rem;
 		display: flex;
-		max-height: min(75vh, 42rem);
+		max-height: min(48dvh, 30rem);
 		flex-direction: column;
 		border: 1px solid rgb(64 64 64);
-		border-bottom: 0;
-		border-radius: 0.75rem 0.75rem 0 0;
+		border-bottom: 1px solid rgb(64 64 64);
+		border-radius: 0.75rem;
 		background: rgb(10 10 10 / 0.97);
 		color: white;
 		box-shadow: 0 -20px 50px rgb(0 0 0 / 0.42);
@@ -261,16 +210,11 @@
 	}
 
 	@media (min-width: 768px) {
-		:global(.filter-backdrop) {
-			left: 5rem;
-			background: transparent;
-		}
-
 		.filter-panel {
 			top: 3.25rem;
 			right: auto;
 			bottom: auto;
-			left: 5.375rem;
+			left: 0.375rem;
 			width: 20rem;
 			max-height: calc(100% - 3.625rem);
 			border-bottom: 1px solid rgb(64 64 64);

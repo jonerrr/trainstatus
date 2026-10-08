@@ -2,7 +2,7 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	import type { Route } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
+	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
 	import { debounce } from '#lib/util.svelte.js';
 
@@ -84,11 +84,10 @@
 	// $inspect(alerts);
 </script>
 
-<header class="flex items-center gap-1 p-1">
-	<Icon width={36} height={36} link={false} {route} />
-	<span class="sr-only">{route.short_name}</span>
+<header class="flex flex-col gap-3 p-3">
+	<FeatureSummary feature={{ route, title: route.long_name }} />
 
-	<div class="flex items-center gap-1 text-xl font-semibold">
+	<div class="flex items-center gap-1 text-lg font-semibold text-neutral-100">
 		{#if route_alerts.length && idx < route_alerts.length}
 			{const alert_data = $derived(route_alerts[idx].data)}
 			{#if alert_data.source === 'mta_subway' || alert_data.source === 'mta_bus'}
@@ -125,15 +124,22 @@
 		<article
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
-			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-1">
+			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-3 py-2">
 				{#if header}
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
-					{@html header.text}
+					<div
+						class="mb-3 text-base leading-snug font-semibold text-neutral-100"
+						role="heading"
+						aria-level="2"
+					>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
+						{@html header.text}
+					</div>
 				{/if}
-				<!-- TODO: maybe add divider between header and description -->
 				{#if description}
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
-					{@html description.text}
+					<div class="text-sm leading-relaxed text-neutral-300">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
+						{@html description.text}
+					</div>
 				{/if}
 			</div>
 

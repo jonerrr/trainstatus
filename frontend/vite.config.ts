@@ -8,6 +8,8 @@ import { playwright } from '@vitest/browser-playwright';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { dragMap } from './src/lib/test/map-commands.ts';
+
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd());
 	const allowedHosts = env.VITE_ALLOWED_HOSTS?.split(',');
@@ -90,6 +92,7 @@ export default defineConfig(({ mode }) => {
 						browser: {
 							enabled: true,
 							provider: playwright(),
+							commands: { dragMap },
 							instances: [{ browser: 'chromium', headless: true }]
 						},
 						include: ['src/**/*.svelte.test.ts'],

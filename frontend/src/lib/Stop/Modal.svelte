@@ -3,7 +3,6 @@
 
 	import Button from '#lib/Button.svelte';
 	import type { Stop } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
 	import {
@@ -14,6 +13,7 @@
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { get_stop_arrivals } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
@@ -101,13 +101,25 @@
 	);
 </script>
 
-<div class="flex items-center gap-1 p-1">
-	<div class="flex max-h-36 max-w-40 flex-wrap items-center gap-1 md:max-w-xs">
+<div class="flex flex-col items-start gap-3 p-3">
+	<div class="flex w-full items-center gap-2">
+		{#if (stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus') && 'direction' in stop.data}
+			<BusArrow direction={stop.data.direction} />
+		{/if}
+		<div class="min-w-0">
+			<h2 class="text-lg leading-snug font-semibold">{stop.name}</h2>
+		</div>
+
+		{#if show_alert_icon}
+			<CircleAlert size="1.5rem" class="text-red-800" />
+		{/if}
+	</div>
+	<div class="flex flex-wrap items-center gap-1">
 		{#if route_stops.length > 6}
 			{#each route_stops.slice(0, 5) as route_stop (route_stop.route_id)}
 				{const route = $derived(routes?.[route_stop.route_id])}
 				{#if route}
-					<Icon width={36} height={36} link={true} {route} show_alerts />
+					<Icon width={28} height={28} link={true} {route} show_alerts />
 				{/if}
 			{/each}
 			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{route_stops.length - 5}</div>
@@ -115,19 +127,9 @@
 			{#each route_stops as route_stop (route_stop.route_id)}
 				{const route = $derived(routes?.[route_stop.route_id])}
 				{#if route}
-					<Icon width={36} height={36} link={true} {route} show_alerts />
+					<Icon width={28} height={28} link={true} {route} show_alerts />
 				{/if}
 			{/each}
-		{/if}
-	</div>
-	<div class="flex items-center gap-1 text-xl font-semibold">
-		{#if (stop.data.source === 'mta_bus' || stop.data.source === 'njt_bus') && 'direction' in stop.data}
-			<BusArrow direction={stop.data.direction} />
-		{/if}
-		{stop.name}
-
-		{#if show_alert_icon}
-			<CircleAlert size="1.5rem" class="text-red-800" />
 		{/if}
 	</div>
 </div>
@@ -154,7 +156,12 @@
 							<VehicleCapacity position={position as TypedVehiclePosition<'njt_bus'>} />
 						{/if}
 						{#if route}
-							<Icon width={20} height={20} link={false} {route} />
+							<Icon
+								width={stop.data.source === 'mta_subway' ? 20 : 32}
+								height={stop.data.source === 'mta_subway' ? 20 : 32}
+								link={false}
+								{route}
+							/>
 						{/if}
 					</div>
 

@@ -4,10 +4,10 @@
 	import { page } from '$app/state';
 
 	import type { Stop } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import { get_stop_arrivals, type StopArrival } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
@@ -197,7 +197,7 @@
 				{const next_st = $derived(next?.times.reduce((a, b) => (a.eta <= b.eta ? a : b)))}
 				{const next_trip = $derived(next_st?.trip)}
 				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
-					<Icon {route} link={false} />
+					<Icon {route} link={false} width={32} height={32} />
 					<div class="flex flex-col">
 						<div>
 							{#if next_trip}

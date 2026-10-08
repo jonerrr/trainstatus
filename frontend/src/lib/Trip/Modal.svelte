@@ -6,7 +6,7 @@
 
 	import Button from '#lib/Button.svelte';
 	import type { StopTime, Trip } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
+	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
@@ -18,7 +18,7 @@
 	import { trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
-	import { ArrowBigRight, ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
+	import { ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	interface Props {
 		show_previous: boolean;
@@ -63,8 +63,8 @@
 		)
 	);
 
-	const last_stop = $derived(
-		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
+	const headsign = $derived(
+		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id[trip.data.source])
 	);
 
 	type StopTransfers = Record<string, StopTime[]>;
@@ -143,30 +143,33 @@
 	const subway_consist_model = $derived(subway_consist_cars[0]?.type);
 </script>
 
-<div class="flex items-center gap-1 p-1">
-	<div class="flex flex-col items-start gap-1">
-		{#if trip.data.source === 'mta_bus'}
-			{const position = $derived(
-				position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
-			)}
-			<VehicleCapacity {position} />
-			<div>#{trip.vehicle_id}</div>
-		{/if}
-
-		{#if route}
-			<Icon width={36} height={36} {route} link show_alerts />
+<div class="p-3">
+	<div class="flex items-center justify-between gap-3">
+		<FeatureSummary
+			link={!!route}
+			feature={{
+				route,
+				title: headsign !== 'Unknown' ? headsign : route?.long_name || 'Destination unavailable'
+			}}
+		/>
+		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
+			<span class="shrink-0 text-xs text-neutral-400">Bus #{trip.vehicle_id}</span>
 		{/if}
 	</div>
-
-	<ArrowBigRight class="w-8" />
-
-	<div class="text-xl font-semibold">
-		{last_stop}
-	</div>
-
-	{#if trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120}
-		<div class="ml-auto text-sm {trip.data.deviation > 0 ? 'text-red-400' : 'text-green-400'}">
-			{trip.data.deviation > 0 ? '+' : ''}{(trip.data.deviation / 60).toFixed(0)}m
+	{#if trip.data.source === 'mta_bus'}
+		<div class="mt-2 flex items-center gap-3">
+			<div class="capacity">
+				<VehicleCapacity
+					position={position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)}
+				/>
+			</div>
+			{#if trip.data.deviation && Math.abs(trip.data.deviation) > 120}
+				<div class="deviation shrink-0 text-sm text-neutral-300">
+					{Math.abs(trip.data.deviation / 60).toFixed(0)} min {trip.data.deviation > 0
+						? 'late'
+						: 'early'}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -293,3 +296,13 @@
 		{/each}
 	</ModalList>
 {/if}
+
+<style>
+	.capacity:not(:has(> :global(*))) {
+		display: none;
+	}
+	.capacity:has(> :global(*)) + .deviation {
+		border-left: 1px solid var(--color-neutral-600);
+		padding-left: 0.75rem;
+	}
+</style>

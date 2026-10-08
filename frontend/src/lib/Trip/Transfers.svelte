@@ -2,8 +2,8 @@
 	import { page } from '$app/state';
 
 	import type { StopTime } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import { current_time, open_modal } from '#lib/url_params.svelte.js';
 
 	interface Props {

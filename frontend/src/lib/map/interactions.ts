@@ -7,8 +7,7 @@ export interface MapTarget {
 	kind: MapTargetKind;
 	id: string;
 	source: Source;
-	label: string;
-	subtitle?: string;
+	routeId?: string;
 }
 
 export interface ScreenPoint {
@@ -43,8 +42,7 @@ export class MapInteractionController {
 				kind: 'trip',
 				id: vehicle.tripId,
 				source: vehicle.source,
-				label: vehicle.routeId ? `${vehicle.routeId} vehicle` : 'Vehicle',
-				subtitle: vehicle.tripId
+				routeId: vehicle.routeId
 			});
 		}
 

@@ -8,10 +8,10 @@
 	import { buildChartData, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { Route, Source } from '#lib/client/index.js';
-	import Icon from '#lib/Icon.svelte';
 	import { source_info, type SourceMap } from '#lib/resources/index.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { current_time } from '#lib/url_params.svelte.js';
 
