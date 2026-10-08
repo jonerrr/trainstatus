@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.4.0...frontend-v1.5.0) (2026-10-08)
+
+
+### Features
+
+* **backend:** remove Redis and improve backend structure ([e1f1284](https://github.com/jonerrr/trainstatus/commit/e1f1284ed5fed9bb5980fd159565f8812965bc18))
+* **csp:** add Content Security Policy configuration and related tests ([28349d9](https://github.com/jonerrr/trainstatus/commit/28349d9450cf9f89de338e5c50ab00420daa1e5e)), closes [#391](https://github.com/jonerrr/trainstatus/issues/391)
+
+
+### Bug Fixes
+
+* **csp:** update connect-src so maplibre works ([afe6e0b](https://github.com/jonerrr/trainstatus/commit/afe6e0bde48f5a50c89c1f200ec0bdaa4736275f))
+* **List:** remove extra padding ([763bd9f](https://github.com/jonerrr/trainstatus/commit/763bd9f6854779a2e588ed530516b0c38f03bb48))
+* **styles:** enhance scrollbar and selection styles ([8defac7](https://github.com/jonerrr/trainstatus/commit/8defac70de3bd45873bada81d56ed6fff976dd3d))
+
 ## [1.4.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.3.3...frontend-v1.4.0) (2026-10-07)
 
 
