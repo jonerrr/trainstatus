@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0](https://github.com/jonerrr/trainstatus/compare/backend-v1.4.0...backend-v1.5.0) (2026-10-08)
+
+
+### Features
+
+* **backend:** remove Redis and improve backend structure ([e1f1284](https://github.com/jonerrr/trainstatus/commit/e1f1284ed5fed9bb5980fd159565f8812965bc18))
+* **health:** add liveness and readiness endpoints with tests ([f06917f](https://github.com/jonerrr/trainstatus/commit/f06917f9709cfa15502ce82d553970a81ebec7d5)), closes [#378](https://github.com/jonerrr/trainstatus/issues/378)
+
+
+### Bug Fixes
+
+* **api:** bring utoapi docs up to date ([1600b0f](https://github.com/jonerrr/trainstatus/commit/1600b0ffb6f8c72a3aff388041dcc6259833858e))
+* **backend:** update fixtures ([83e0763](https://github.com/jonerrr/trainstatus/commit/83e07630a39e5e149714ffcd48d1176a395538c1))
+* **Dockerfile:** ensure /app directory ownership and set user for backend ([e147a85](https://github.com/jonerrr/trainstatus/commit/e147a85a3e49f00a6b637e8622b507d1cd70a754))
+
 ## [1.4.0](https://github.com/jonerrr/trainstatus/compare/backend-v1.3.3...backend-v1.4.0) (2026-10-07)
 
 
