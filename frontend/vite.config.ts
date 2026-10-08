@@ -24,6 +24,24 @@ export default defineConfig(({ mode }) => {
 				// Consult https://kit.svelte.dev/docs/integrations#preprocessors
 				// for more information about preprocessors
 				preprocess: vitePreprocess(),
+				csp: {
+					mode: 'auto',
+					directives: {
+						'default-src': ['self'],
+						'base-uri': ['self'],
+						'connect-src': ['self', 'https://cloudflareinsights.com'],
+						'font-src': ['self'],
+						'frame-ancestors': ['none'],
+						'form-action': ['self'],
+						'img-src': ['self', 'data:', 'blob:'],
+						'object-src': ['none'],
+						'script-src': ['self', 'https://static.cloudflareinsights.com'],
+						'style-src': ['self'],
+						'style-src-attr': ['unsafe-inline'],
+						'worker-src': ['self', 'blob:'],
+						'upgrade-insecure-requests': true
+					}
+				},
 				compilerOptions: {
 					runes: ({ filename }) =>
 						filename.split(/[/\\]/).includes('node_modules') ? undefined : true,
