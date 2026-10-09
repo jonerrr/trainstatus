@@ -5,7 +5,8 @@ import { page } from '#lib/test/page.svelte.js';
 
 import { chartFixture, chartNow } from './fixtures.js';
 
-export const current_time = { ms: chartNow };
+const current_time = { ms: chartNow };
+export const getCurrentTime = () => current_time;
 export const resources: Record<string, { current: Map<string, unknown>; status: string }> = {};
 export const stopResources: Record<
 	string,

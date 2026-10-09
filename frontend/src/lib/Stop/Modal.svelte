@@ -19,11 +19,13 @@
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import Transfers from '#lib/Stop/Transfers.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
 	import { CircleAlert } from '@lucide/svelte';
+
+	const current_time = getCurrentTime();
 
 	interface Props {
 		show_previous: boolean;

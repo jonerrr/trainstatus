@@ -1,3 +1,5 @@
+import { createContext } from 'svelte';
+
 import { SvelteURL } from 'svelte/reactivity';
 
 import { goto } from '$app/navigation';
@@ -5,7 +7,7 @@ import { page } from '$app/state';
 
 /**
  * Unix seconds from `?at=`. Blank and non-numeric values mean live, so callers
- * keep using {@link current_time} instead of parsing the param again.
+ * use the layout's current-time context instead of parsing the param again.
  */
 export function atParamToUnixSeconds(value: string | null | undefined): number | undefined {
 	if (value == null || value.trim() === '') return undefined;
@@ -13,9 +15,10 @@ export function atParamToUnixSeconds(value: string | null | undefined): number |
 	return Number.isFinite(at) ? at : undefined;
 }
 
-// if user specified unix timestamp, it is stored here.
-function currentTime() {
-	let time = $state<number | undefined>();
+export function createCurrentTime(initial?: number) {
+	let time = $state<number | undefined>(
+		typeof initial === 'number' && Number.isFinite(initial) ? initial : undefined
+	);
 
 	return {
 		// returns undefined here bc some components need to know if it was user specified
@@ -24,7 +27,7 @@ function currentTime() {
 		},
 
 		get ms(): number {
-			return time ? time * 1000 : new Date().getTime();
+			return time !== undefined ? time * 1000 : Date.now();
 		},
 
 		set value(newValue: number | undefined) {
@@ -33,8 +36,8 @@ function currentTime() {
 		}
 	};
 }
-// TODO: ensure this doesn't cause ssr issues
-export const current_time = currentTime();
+export const [getCurrentTime, setCurrentTime] =
+	createContext<ReturnType<typeof createCurrentTime>>();
 
 export type ModalData = Exclude<App.PageState['modal'], null>;
 
@@ -79,16 +82,13 @@ export function open_modal(state: ModalData) {
  * A list-opened modal pushed a history entry, so closing pushes the dismissed
  * entry and Back restores the modal. A fresh load replaces the current entry.
  */
-export function close_modal() {
+export function close_modal(at: number | undefined) {
 	const url = new SvelteURL(page.url.href);
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
 	url.searchParams.delete('src');
-	// Explicitly sync ?at from the source of truth so we don't lose it due to
-	// a race with the layout's $effect.
-	// TODO: maybe just manually add ?at to URL instead of using existing url and deleting other params?
-	// since there isn't any other possible params right now.
-	if (current_time.value !== undefined) {
-		url.searchParams.set('at', current_time.value.toString());
+	// Modal callers pass their layout's time to preserve changes before URL sync.
+	if (at !== undefined) {
+		url.searchParams.set('at', at.toString());
 	} else {
 		url.searchParams.delete('at');
 	}

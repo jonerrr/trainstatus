@@ -3,7 +3,7 @@
 
 	import { all_sources, source_info } from '#lib/resources/index.svelte.js';
 	import { source_preferences } from '#lib/source_preferences.svelte.js';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import {
 		BookText,
@@ -15,6 +15,8 @@
 		Layers
 	} from '@lucide/svelte';
 	import dayjs from 'dayjs';
+
+	const current_time = getCurrentTime();
 
 	// TODO: improve ui
 	// TODO: add 'debug' mode that logs data in console and shows extra info about data sources
@@ -88,12 +90,14 @@
 						type="datetime-local"
 						bind:value={
 							() =>
-								current_time.value ? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm') : '',
+								current_time.value !== undefined
+									? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm')
+									: '',
 							(v) => (current_time.value = dayjs(v).unix())
 						}
 						class="min-w-50 rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
 					/>
-					{#if current_time.value}
+					{#if current_time.value !== undefined}
 						<button
 							title="Clear time"
 							onclick={() => {
@@ -105,7 +109,7 @@
 						</button>
 					{/if}
 				</div>
-				{#if current_time.value}
+				{#if current_time.value !== undefined}
 					<p class="mt-2 text-xs text-fuchsia-400">
 						Currently viewing data from: {dayjs
 							.unix(current_time.value)

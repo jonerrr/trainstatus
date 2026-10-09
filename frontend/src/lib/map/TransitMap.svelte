@@ -5,7 +5,7 @@
 
 	import type { Source } from '#lib/client/index.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
-	import { current_time, open_modal } from '#lib/url_params.svelte.js';
+	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	import type { Map as MapInstance, MapMouseEvent } from 'maplibre-gl';
 	import { AttributionControl, GeolocateControl, MapLibre } from 'svelte-maplibre-gl';
@@ -28,6 +28,8 @@
 	import RouteLayers from './RouteLayers.svelte';
 	import StopLayers from './StopLayers.svelte';
 	import TripMarkersLoader from './TripMarkersLoader.svelte';
+
+	const current_time = getCurrentTime();
 
 	let map = $state.raw<MapInstance>();
 	let center = $state<[number, number]>([-74.006, 40.7128]);

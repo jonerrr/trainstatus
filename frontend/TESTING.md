@@ -35,7 +35,7 @@ Playwright tests import `test` and `expect` from [e2e/fixtures.ts](e2e/fixtures.
 
 ## Assertions
 
-Navbar links set `aria-current="page"` when the link path equals `page.url.pathname`, and omit the attribute otherwise. That check ignores `?at=`. The header Settings link does the same on `/settings`. End-to-end navigation checks the navbar attribute and the URL. It does not check Tailwind classes or the header link.
+Navbar links set `aria-current="page"` when the link path equals `page.url.pathname`, and omit the attribute otherwise. That check ignores `?at=`. End-to-end navigation checks the navbar attribute and the URL. It does not check Tailwind classes.
 
 Unit and component tests keep synthetic fixtures. The integration audit checks itinerary invariants (trip membership, order, and surviving visits), not fixed live ids. Stops E2E checks mounted route results and scrolls to the final stop instead of equating virtualized DOM row counts with total matches.
 

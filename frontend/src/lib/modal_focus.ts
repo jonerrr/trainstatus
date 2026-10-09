@@ -1,5 +1,8 @@
+import type { Attachment } from 'svelte/attachments';
+import { on } from 'svelte/events';
+
 /** Supply modal interaction without a native dialog's browser close watcher. */
-export function contain_modal_focus(node: HTMLElement) {
+export const contain_modal_focus: Attachment<HTMLElement> = (node) => {
 	const previous_focus = document.activeElement;
 	const previous_overflow = document.body.style.overflow;
 	const inert_elements: Array<{ element: HTMLElement; inert: boolean }> = [];
@@ -56,17 +59,17 @@ export function contain_modal_focus(node: HTMLElement) {
 		}
 	}
 
-	document.addEventListener('focusin', handle_focus);
-	node.addEventListener('keydown', handle_tab);
+	const stop_focus = on(document, 'focusin', handle_focus);
+	const stop_tab = on(node, 'keydown', handle_tab);
 	focus_inside();
 
 	return () => {
-		document.removeEventListener('focusin', handle_focus);
-		node.removeEventListener('keydown', handle_tab);
+		stop_focus();
+		stop_tab();
 		for (const { element, inert } of inert_elements) element.inert = inert;
 		document.body.style.overflow = previous_overflow;
 		if (previous_focus instanceof HTMLElement && previous_focus.isConnected) {
 			previous_focus.focus({ preventScroll: true });
 		}
 	};
-}
+};

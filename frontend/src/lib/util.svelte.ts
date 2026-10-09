@@ -76,16 +76,20 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
-// TODO: remove since not used i think
 export function debounce<T extends (...args: never[]) => void>(func: T, wait: number = 75) {
-	let timeout: ReturnType<typeof setTimeout> | null;
-	return function (...args: Parameters<T>) {
-		if (timeout) clearTimeout(timeout);
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	const cancel = () => {
+		clearTimeout(timeout);
+		timeout = undefined;
+	};
+	const debounced = (...args: Parameters<T>) => {
+		cancel();
 		timeout = setTimeout(() => {
-			timeout = null;
+			timeout = undefined;
 			func(...args);
 		}, wait);
 	};
+	return Object.assign(debounced, { cancel });
 }
 
 // Get main routes for a stop, optionally hiding express variants without service.

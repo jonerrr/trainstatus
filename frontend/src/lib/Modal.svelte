@@ -14,7 +14,7 @@
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
-	import { close_modal, type ModalData } from '#lib/url_params.svelte.js';
+	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
 
 	import {
 		AlarmClock,
@@ -24,6 +24,8 @@
 		Share,
 		Timer
 	} from '@lucide/svelte';
+
+	const current_time = getCurrentTime();
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
@@ -84,20 +86,21 @@
 		// A native dialog registers a CloseWatcher even with closedby="none".
 		// Firefox Android consumes back for that disabled watcher. Keep the sheet
 		// in the page so history owns back, and supply modal focus/inertness here.
-		$effect(() => {
-			if (has_modal) return contain_modal_focus(node);
-		});
 
+		// The focus attachment owns opening/restoration. Only refocus here when
+		// replacing an already-open modal removes its focused content.
+		let was_open = false;
 		$effect(() => {
 			void current_page_state.modal;
-			if (has_modal && !node.contains(document.activeElement)) node.focus();
+			if (was_open && has_modal && !node.contains(document.activeElement)) node.focus();
+			was_open = has_modal;
 		});
 
 		// Add keyboard handler for Escape key
 		function handle_keydown(event: KeyboardEvent) {
 			if (has_modal && event.key === 'Escape') {
 				event.preventDefault();
-				close_modal();
+				close_modal(current_time.value);
 			}
 		}
 
@@ -120,7 +123,7 @@
 			const diffY = Math.abs(event.pageY - start.y);
 
 			if (diffX < delta && diffY < delta) {
-				close_modal();
+				close_modal(current_time.value);
 			}
 		}
 
@@ -162,7 +165,7 @@
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
-				close_modal();
+				close_modal(current_time.value);
 			}}
 			aria-label="Close modal"
 			title="Close modal"
@@ -270,6 +273,7 @@
 		aria-modal="true"
 		aria-label="Transit details"
 		tabindex="-1"
+		{@attach has_modal && contain_modal_focus}
 		{@attach modal}
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 	>

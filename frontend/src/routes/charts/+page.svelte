@@ -13,11 +13,13 @@
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { flatten, LayerCake, Svg } from 'layercake';
+
+	const current_time = getCurrentTime();
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 

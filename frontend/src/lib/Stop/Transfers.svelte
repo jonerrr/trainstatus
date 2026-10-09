@@ -8,8 +8,10 @@
 	import Icon from '#lib/Route/Icon.svelte';
 	import { get_stop_arrivals } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { current_time, open_modal } from '#lib/url_params.svelte.js';
+	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 	import { main_route_stops } from '#lib/util.svelte.js';
+
+	const current_time = getCurrentTime();
 
 	interface Props {
 		stop_source: Source;

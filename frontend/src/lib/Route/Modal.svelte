@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	import type { Attachment } from 'svelte/attachments';
 
 	import type { Route } from '#lib/client/index.js';
@@ -67,12 +69,11 @@
 		// console.log(i);
 		if (!scroll_area) return;
 		const alert_els = Array.from(scroll_area.querySelectorAll('.alert')) as HTMLDivElement[];
-		alert_els[i].scrollIntoView({ behavior: 'smooth' });
+		alert_els[i]?.scrollIntoView({ behavior: 'smooth' });
 	}
 
-	function debounce_scroll_to_alert(i: number) {
-		debounce(scroll_to_alert)(i);
-	}
+	const debounce_scroll_to_alert = debounce(scroll_to_alert);
+	onDestroy(debounce_scroll_to_alert.cancel);
 
 	$effect(() => {
 		// remove href from all links in alert-text id. I don't want people leaving my website ):<

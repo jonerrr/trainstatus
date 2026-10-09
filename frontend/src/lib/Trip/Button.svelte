@@ -6,10 +6,12 @@
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
 
 	import { ArrowBigRight } from '@lucide/svelte';
+
+	const current_time = getCurrentTime();
 
 	interface Props {
 		data: Trip;

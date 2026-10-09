@@ -9,7 +9,7 @@ import {
 	type TripResources,
 	type TypedTrip
 } from '#lib/resources/index.svelte.js';
-import { current_time } from '#lib/url_params.svelte.js';
+import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResource<S> {
 	return new SvelteMap(
@@ -25,12 +25,13 @@ export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResourc
 }
 
 export function createTripResource<S extends Source>(source: S) {
+	const current_time = getCurrentTime();
 	const resource = new LiveResource<TripResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} trips`);
 
 			const at = current_time.value;
-			const query_params = at ? `?at=${at}` : '';
+			const query_params = at !== undefined ? `?at=${at}` : '';
 			const res = await fetch(`/api/v1/trips/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');

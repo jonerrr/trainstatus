@@ -14,11 +14,13 @@
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
 
 	import { ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
+
+	const current_time = getCurrentTime();
 
 	interface Props {
 		show_previous: boolean;

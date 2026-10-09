@@ -10,8 +10,10 @@
 	import Icon from '#lib/Route/Icon.svelte';
 	import { get_stop_arrivals, type StopArrival } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
+
+	const current_time = getCurrentTime();
 
 	type StopTimesByRoute = SvelteMap<string, StopArrival[]>;
 

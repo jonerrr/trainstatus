@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { chart_context } from '#lib/charts/context.js';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { timeMinute } from 'd3-time';
 	import dayjs from 'dayjs';
+
+	const current_time = getCurrentTime();
 
 	const cake = chart_context();
 

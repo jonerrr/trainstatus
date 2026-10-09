@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
+
+	const current_time = getCurrentTime();
 
 	interface Routes {
 		[key: string]: [
@@ -36,7 +38,7 @@
 		aria-label={label}
 		aria-current={is_active ? 'page' : undefined}
 		title={label}
-		href="{href}{current_time.value ? `?at=${current_time.value}` : ''}"
+		href="{href}{current_time.value !== undefined ? `?at=${current_time.value}` : ''}"
 		class={[
 			'nav-button',
 			{

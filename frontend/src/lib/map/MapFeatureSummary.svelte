@@ -4,10 +4,12 @@
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import type { MapTarget } from './interactions';
 	import { presentFeature } from './presentation';
+
+	const current_time = getCurrentTime();
 
 	let { target }: { target: MapTarget } = $props();
 	const trips = trip_context.get();

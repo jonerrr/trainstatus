@@ -12,19 +12,18 @@
 	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
 	import SEO from '#lib/SEO.svelte';
-	import { atParamToUnixSeconds, current_time } from '#lib/url_params.svelte.js';
+	import {
+		atParamToUnixSeconds,
+		createCurrentTime,
+		setCurrentTime
+	} from '#lib/url_params.svelte.js';
 
 	import '@fontsource/inter';
 	import '../app.css';
 
 	let { children } = $props();
 
-	// Initialize current_time from URL param on page load
-	// If we don't initialize here, the syncing $effect will error out when running replaceState on page load (since router isn't initialized)
-	// Blank and non-numeric ?at= stay live. The setter ignores non-finite numbers.
-	const at = atParamToUnixSeconds(page.data.at);
-	if (at !== undefined) current_time.value = at;
-	// TODO: fix clearing time not working
+	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
 
 	trip_context.set(
 		Object.fromEntries(
@@ -131,7 +130,6 @@
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->
 <div class="app-shell flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
-	<!-- <Header {offline} /> -->
 	<main class="relative min-h-0 flex-1 overflow-hidden text-white">
 		<Modal />
 

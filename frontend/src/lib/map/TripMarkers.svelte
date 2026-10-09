@@ -4,7 +4,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import type { Source } from '#lib/client/index.js';
-	import { current_time } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import DeckOverlay from './DeckOverlay.svelte';
 	import type { MapFeatureKey, VehiclePicker } from './interactions';
@@ -15,6 +15,8 @@
 		type RenderUnitTable
 	} from './trajectoryArrow';
 	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
+
+	const current_time = getCurrentTime();
 
 	let {
 		sources,

@@ -9,7 +9,7 @@ import {
 	type PositionResources,
 	type TypedVehiclePosition
 } from '#lib/resources/index.svelte.js';
-import { current_time } from '#lib/url_params.svelte.js';
+import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 export function index_positions<S extends Source>(
 	data: TypedVehiclePosition<S>[]
@@ -25,12 +25,13 @@ export function index_positions<S extends Source>(
 	);
 }
 export function createPositionResource<S extends Source>(source: S) {
+	const current_time = getCurrentTime();
 	const resource = new LiveResource<PositionResource<S>>(
 		async (signal) => {
 			console.log(`updating ${source} positions`);
 
 			const at = current_time.value;
-			const query_params = at ? `?at=${at}` : '';
+			const query_params = at !== undefined ? `?at=${at}` : '';
 			const res = await fetch(`/api/v1/positions/${source}${query_params}`, { signal });
 
 			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');

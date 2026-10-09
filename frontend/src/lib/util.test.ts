@@ -1,7 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { Route, RouteStop } from './client';
-import { bus_headsign, main_route_stops } from './util.svelte';
+import { bus_headsign, debounce, main_route_stops } from './util.svelte';
+
+it('debounces rapid calls to the latest target and cancels pending work', () => {
+	vi.useFakeTimers();
+	try {
+		const scroll = vi.fn<(target: number) => void>();
+		const debounced = debounce(scroll);
+		debounced(1);
+		vi.advanceTimersByTime(50);
+		debounced(2);
+		vi.advanceTimersByTime(75);
+		expect(scroll.mock.calls).toEqual([[2]]);
+		debounced(3);
+		debounced.cancel();
+		vi.runAllTimers();
+		expect(scroll.mock.calls).toEqual([[2]]);
+	} finally {
+		vi.useRealTimers();
+	}
+});
 
 describe('main_route_stops', () => {
 	const routes: RouteStop[] = ['6', '6X', '7', '7X', 'FX'].map((route_id) => ({
