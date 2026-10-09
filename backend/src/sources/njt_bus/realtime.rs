@@ -47,7 +47,7 @@ impl NjtBusRealtime {
 
     async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
         let token = get_token().await?;
-        let feeds = gtfs_realtime::fetch_feeds(vec![
+        gtfs_realtime::fetch_feeds(vec![
             (
                 "njt_bus_getTripUpdates".into(),
                 njt_post_future(NJT_TRIP_UPDATES_URL, token.clone()),
@@ -57,9 +57,7 @@ impl NjtBusRealtime {
                 njt_post_future(NJT_VEHICLE_POSITIONS_URL, token),
             ),
         ])
-        .await;
-        anyhow::ensure!(!feeds.is_empty(), "No NJT bus GTFS-RT feeds returned");
-        Ok(feeds)
+        .await
     }
 
     pub async fn build_snapshot(

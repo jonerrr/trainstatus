@@ -15,7 +15,7 @@ For a focused service-free test, use `SQLX_OFFLINE=true cargo test --features fi
 
 ## Placement and ownership
 
-Private tests live in an owning module's `tests/` directory and are registered with `#[cfg(test)]` in that module. This preserves access to private functions without test bodies in production files. The five private realtime engine tests additionally require `integration-tests` because they use services. The old, inactive `integrations/gtfs_static` module remains inactive; relocating its tests does not enable legacy production code.
+Private tests live in an owning module's `tests/` directory and are registered with `#[cfg(test)]` in that module. This preserves access to private functions without test bodies in production files. The five private realtime engine tests additionally require `integration-tests` because they use services.
 
 Cargo has three explicit public test targets:
 

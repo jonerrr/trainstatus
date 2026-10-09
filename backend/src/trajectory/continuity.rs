@@ -157,7 +157,7 @@ pub fn apply(
 
     knots.retain(|k| k.t_event >= t_now - 1.0 || k.s_m >= prev.s_m - 1.0);
 
-    let bridge = TrajectoryKnot::new(t_now, prev.s_m, Some(prev.v_mps.max(0.0)));
+    let bridge = TrajectoryKnot::new(t_now, prev.s_m);
     let mut out = vec![bridge];
     out.extend(knots);
     out = enforce_monotonic_distance(out);
@@ -222,7 +222,7 @@ fn apply_hold_strategy(knots: Vec<TrajectoryKnot>, s_floor: f64) -> Vec<Trajecto
     let mut current_s = s_floor;
     for knot in knots {
         if knot.s_m < current_s - 1e-6 {
-            out.push(TrajectoryKnot::new(knot.t_event, current_s, Some(0.0)));
+            out.push(TrajectoryKnot::new(knot.t_event, current_s));
         } else {
             current_s = knot.s_m;
             out.push(knot);

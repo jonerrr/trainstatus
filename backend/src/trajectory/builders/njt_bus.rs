@@ -72,7 +72,6 @@ impl NjtBusBuilder {
                 TrajectoryKnot::new(
                     position.updated_at.timestamp_millis() as f64 / 1000.0,
                     distance.clamp(0.0, trip.shape_length_m),
-                    None,
                 ),
                 ceiling,
             ));
@@ -109,17 +108,9 @@ impl TrajectoryBuilder for NjtBusBuilder {
             );
             let distance = stop.stop_distance_m.clamp(0.0, trip.shape_length_m);
             let dwell = stop.departure_unix > stop.arrival_unix;
-            knots.push(TrajectoryKnot::new(
-                stop.arrival_unix,
-                distance,
-                dwell.then_some(0.0),
-            ));
+            knots.push(TrajectoryKnot::new(stop.arrival_unix, distance));
             if dwell {
-                knots.push(TrajectoryKnot::new(
-                    stop.departure_unix,
-                    distance,
-                    Some(0.0),
-                ));
+                knots.push(TrajectoryKnot::new(stop.departure_unix, distance));
             }
         }
         let mut stats = KnotGenerationStats::default();

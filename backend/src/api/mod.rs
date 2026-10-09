@@ -4,14 +4,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, TimeZone, Utc};
-use http::{HeaderMap, StatusCode, request::Parts};
+use http::{StatusCode, request::Parts};
 use serde::{Deserialize, Deserializer};
-use std::sync::OnceLock;
 use tracing::error;
 use utoipa::IntoParams;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-// pub mod websocket;
 pub mod health;
 pub mod realtime;
 pub mod static_data;
@@ -52,16 +50,6 @@ pub fn router(state: AppState) -> OpenApiRouter {
         .routes(routes!(realtime::alerts_handler))
         .routes(routes!(trajectory::trajectories_handler))
         .with_state(state)
-}
-
-// not sure if its better to do a oncelock headermap and clone or to just create headermap everytime
-pub fn json_headers() -> &'static HeaderMap {
-    static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
-    HEADERS.get_or_init(|| {
-        let mut headers = HeaderMap::new();
-        headers.insert("content-type", "application/json".parse().unwrap());
-        headers
-    })
 }
 
 pub fn parse_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>

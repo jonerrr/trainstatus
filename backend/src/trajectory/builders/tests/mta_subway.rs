@@ -127,7 +127,7 @@ fn expand_render_units_emits_one_row_per_subway_car() {
 }
 
 #[test]
-fn at_stop_anchor_produces_zero_velocity_knot_and_monotone_path() {
+fn at_stop_anchor_is_projected_and_keeps_monotone_path() {
     let (trip, shape_geom) = trip_with_anchor(
         "AT_STOP",
         vec![stop(
@@ -151,7 +151,7 @@ fn at_stop_anchor_produces_zero_velocity_knot_and_monotone_path() {
         generated
             .knots
             .iter()
-            .any(|k| (k.t_event - 100.0).abs() < 1e-6 && k.v_clamp == Some(0.0))
+            .any(|k| (k.t_event - 100.0).abs() < 1e-6)
     );
 
     for i in 1..generated.knots.len() {

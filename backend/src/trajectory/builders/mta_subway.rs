@@ -1,4 +1,3 @@
-use crate::models::position::PositionData;
 use crate::models::source::Source;
 use crate::models::stop::{PlatformEdge, StopData};
 use crate::models::trip::StopTimeData;
@@ -70,10 +69,10 @@ impl MtaSubwayBuilder {
         let t_4 = t_3 + dt_accel_s;
 
         vec![
-            TrajectoryKnot::new(t_1, s_start, None),
-            TrajectoryKnot::new(t_2, s_mark, Some(0.0)),
-            TrajectoryKnot::new(t_3, s_mark, Some(0.0)),
-            TrajectoryKnot::new(t_4, s_tail_clear, None),
+            TrajectoryKnot::new(t_1, s_start),
+            TrajectoryKnot::new(t_2, s_mark),
+            TrajectoryKnot::new(t_3, s_mark),
+            TrajectoryKnot::new(t_4, s_tail_clear),
         ]
     }
 
@@ -124,15 +123,10 @@ impl MtaSubwayBuilder {
             &shape_geom.projected_line,
             &shape_geom.cum_dist,
         )?;
-        let v_clamp = match &position.data {
-            PositionData::MtaSubway(data) if data.status.as_deref() == Some("AT_STOP") => Some(0.0),
-            _ => None,
-        };
 
         Some(TrajectoryKnot::new(
             trip.as_of.timestamp() as f64,
             projected_s.clamp(0.0, trip.shape_length_m),
-            v_clamp,
         ))
     }
 }

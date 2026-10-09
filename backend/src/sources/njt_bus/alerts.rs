@@ -39,14 +39,8 @@ impl GtfsAlertSource for NjtBusAlerts {
         Source::NjtBus
     }
 
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
-        let token = match get_token().await {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::error!(error = %e, "NJT auth failed for alerts");
-                return vec![];
-            }
-        };
+    async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
+        let token = get_token().await?;
 
         gtfs_realtime::fetch_feeds(vec![(
             "njt_bus_alerts".into(),

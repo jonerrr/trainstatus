@@ -1,9 +1,62 @@
 use crate::feed::{Alert as GtfsAlert, FeedMessage};
-use crate::models::alert::{ActivePeriod, AffectedEntity, Alert, AlertTranslation};
+use crate::models::alert::{
+    ActivePeriod, AffectedEntity, Alert, AlertFormat, AlertSection, AlertTranslation,
+};
 use crate::models::source::Source;
 use crate::stores::alert::AlertStore;
 use async_trait::async_trait;
+use chrono::DateTime;
 use tracing::{debug, info, instrument, warn};
+use uuid::Uuid;
+
+/// MTA uses a language suffix to distinguish HTML from plain translations.
+pub(crate) fn mta_translations(alert_id: Uuid, alert: &GtfsAlert) -> Vec<AlertTranslation> {
+    let mut translations = Vec::new();
+    for (section, text) in [
+        (AlertSection::Header, &alert.header_text),
+        (AlertSection::Description, &alert.description_text),
+    ] {
+        if let Some(text) = text {
+            for translation in &text.translation {
+                let language = translation.language.as_deref().unwrap_or("en");
+                let (format, language) = match language.strip_suffix("-html") {
+                    Some(language) => (AlertFormat::Html, language),
+                    None => (AlertFormat::Plain, language),
+                };
+                translations.push(AlertTranslation {
+                    alert_id,
+                    section,
+                    format,
+                    language: language.to_owned(),
+                    text: translation.text.clone(),
+                });
+            }
+        }
+    }
+    translations
+}
+
+pub(crate) fn active_periods(alert_id: Uuid, alert: &GtfsAlert) -> Vec<ActivePeriod> {
+    alert
+        .active_period
+        .iter()
+        .filter_map(|period| {
+            let start = DateTime::from_timestamp(period.start? as i64, 0)?;
+            let end = period
+                .end
+                .and_then(|end| DateTime::from_timestamp(end as i64, 0));
+            Some(ActivePeriod {
+                alert_id,
+                start_time: start,
+                end_time: end,
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+#[path = "tests/gtfs.rs"]
+mod tests;
 
 type ProcessedAlert = (
     Alert,
@@ -17,7 +70,7 @@ pub trait GtfsAlertSource: Send + Sync {
     fn source(&self) -> Source;
 
     /// Fetch and decode all GTFS-RT alert feeds for this source.
-    async fn fetch_feeds(&self) -> Vec<FeedMessage>;
+    async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>>;
 
     /// Process a GTFS-RT alert into our internal Alert representation.
     /// Returns None if the alert should be skipped (e.g., missing mercury extension).
@@ -42,8 +95,6 @@ pub struct ProcessedAlerts {
     pub translations: Vec<AlertTranslation>,
     pub active_periods: Vec<ActivePeriod>,
     pub affected_entities: Vec<AffectedEntity>,
-    /// Alert IDs that are in the current feed
-    pub in_feed_ids: Vec<uuid::Uuid>,
     /// MTA IDs of alerts that were cloned (used to remove old versions)
     pub cloned_mta_ids: Vec<String>,
 }
@@ -54,7 +105,7 @@ pub async fn run_pipeline<T: GtfsAlertSource>(
     adapter: &T,
     alert_store: &AlertStore,
 ) -> anyhow::Result<()> {
-    let feeds = adapter.fetch_feeds().await;
+    let feeds = adapter.fetch_feeds().await?;
     if feeds.is_empty() {
         warn!(source = %adapter.source(), "No alert feeds fetched");
         return Ok(());
@@ -97,7 +148,6 @@ pub async fn run_pipeline<T: GtfsAlertSource>(
                 processed.cloned_mta_ids.push(clone_id);
             }
 
-            processed.in_feed_ids.push(parsed_alert.id);
             processed.alerts.push(parsed_alert);
             processed.translations.extend(translations);
             processed.active_periods.extend(periods);

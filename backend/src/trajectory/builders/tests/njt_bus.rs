@@ -70,7 +70,6 @@ fn schedule_fallback_preserves_reported_dwell_and_motion() {
     assert_eq!(k.knots.len(), 6);
     assert_eq!(k.knots[1].t_event - k.knots[0].t_event, 20.0);
     assert_eq!(k.knots[0].s_m, k.knots[1].s_m);
-    assert_eq!(k.knots[1].v_clamp, Some(0.0));
     let result = compute_trajectory(
         &NjtBusBuilder,
         &t,

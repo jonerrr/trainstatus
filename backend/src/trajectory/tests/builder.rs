@@ -2,12 +2,12 @@ use super::*;
 
 #[test]
 fn past_knot_ahead_of_the_vehicle_does_not_discard_the_live_anchor() {
-    let anchor = TrajectoryKnot::new(1_000.0, 40.0, None);
+    let anchor = TrajectoryKnot::new(1_000.0, 40.0);
     let mut knots = vec![
-        TrajectoryKnot::new(900.0, 10.0, None),
-        TrajectoryKnot::new(950.0, 200.0, None),
-        TrajectoryKnot::new(1_100.0, 200.0, None),
-        TrajectoryKnot::new(1_050.0, 20.0, None),
+        TrajectoryKnot::new(900.0, 10.0),
+        TrajectoryKnot::new(950.0, 200.0),
+        TrajectoryKnot::new(1_100.0, 200.0),
+        TrajectoryKnot::new(1_050.0, 20.0),
     ];
     retain_anchor_consistent_knots(&mut knots, &anchor);
     knots.push(anchor);
@@ -32,11 +32,11 @@ fn past_knot_ahead_of_the_vehicle_does_not_discard_the_live_anchor() {
 
 #[test]
 fn dwell_at_the_anchor_is_kept_and_a_near_miss_behind_it_is_not() {
-    let anchor = TrajectoryKnot::new(100.0, 50.0, None);
+    let anchor = TrajectoryKnot::new(100.0, 50.0);
     let mut knots = vec![
-        TrajectoryKnot::new(90.0, 50.0, Some(0.0)),
-        TrajectoryKnot::new(95.0, 49.7, None),
+        TrajectoryKnot::new(90.0, 50.0),
+        TrajectoryKnot::new(95.0, 49.7),
     ];
     retain_anchor_consistent_knots(&mut knots, &anchor);
-    assert_eq!(knots, vec![TrajectoryKnot::new(90.0, 50.0, Some(0.0))]);
+    assert_eq!(knots, vec![TrajectoryKnot::new(90.0, 50.0)]);
 }

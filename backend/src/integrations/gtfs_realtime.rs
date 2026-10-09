@@ -5,6 +5,7 @@ use crate::models::{
     trip::{StopTime, Trip},
 };
 use crate::static_data::index::StaticTransitRevision;
+use anyhow::Context;
 use futures::future::BoxFuture;
 use prost::Message;
 use prost::bytes;
@@ -27,57 +28,52 @@ pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
 
 /// Fetches and decodes GTFS-RT feeds from the provided labeled futures.
 /// Each entry is a `(label, future)` pair where the future returns raw protobuf bytes.
-/// If DEBUG_RT_DATA env var is set, saves raw protobuf and decoded data to ./gtfs/ for debugging.
-pub async fn fetch_feeds(labeled_futures: Vec<(String, FeedFuture)>) -> Vec<FeedMessage> {
+/// Every supplied feed is required: a fetch or decode failure rejects the entire collection.
+/// If DEBUG_RT_DATA env var is set, saves raw protobuf and decoded data to ./debug_data/gtfs/.
+pub async fn fetch_feeds(
+    labeled_futures: Vec<(String, FeedFuture)>,
+) -> anyhow::Result<Vec<FeedMessage>> {
     let futures: Vec<_> = labeled_futures
         .into_iter()
         .map(|(name, fut)| async move {
-            match fut.await {
-                Ok(bytes) => {
-                    let bytes_for_debug = if *debug_rt_data() {
-                        Some(bytes.clone())
-                    } else {
-                        None
-                    };
+            let bytes = fut
+                .await
+                .with_context(|| format!("Failed to fetch feed {name}"))?;
+            let bytes_for_debug = if *debug_rt_data() {
+                Some(bytes.clone())
+            } else {
+                None
+            };
 
-                    match FeedMessage::decode(bytes) {
-                        Ok(msg) => {
-                            if let Some(raw) = bytes_for_debug {
-                                create_dir_all("./debug_data/gtfs").await.ok();
+            let msg = FeedMessage::decode(bytes)
+                .with_context(|| format!("Failed to decode feed {name}"))?;
+            if let Some(raw) = bytes_for_debug {
+                create_dir_all("./debug_data/gtfs").await.ok();
 
-                                let pb_path = format!("./debug_data/gtfs/{}.pb", name);
-                                if let Err(e) = write(&pb_path, &raw).await {
-                                    error!(pb_path, %e, "Failed to write protobuf");
-                                }
-
-                                let txt_path = format!("./debug_data/gtfs/{}.txt", name);
-                                let debug_str = format!("{:#?}", msg);
-                                if let Err(e) = write(&txt_path, debug_str).await {
-                                    error!(txt_path, %e, "Failed to write debug output");
-                                }
-                            }
-                            Some(msg)
-                        }
-                        Err(e) => {
-                            error!(name, %e, "Failed to decode protobuf");
-                            None
-                        }
-                    }
+                let pb_path = format!("./debug_data/gtfs/{}.pb", name);
+                if let Err(e) = write(&pb_path, &raw).await {
+                    error!(pb_path, %e, "Failed to write protobuf");
                 }
-                Err(e) => {
-                    error!(name, %e, "Failed to fetch feed");
-                    None
+
+                let txt_path = format!("./debug_data/gtfs/{}.txt", name);
+                let debug_str = format!("{:#?}", msg);
+                if let Err(e) = write(&txt_path, debug_str).await {
+                    error!(txt_path, %e, "Failed to write debug output");
                 }
             }
+            Ok(msg)
         })
         .collect();
 
     futures::future::join_all(futures)
         .await
         .into_iter()
-        .flatten()
         .collect()
 }
+
+#[cfg(test)]
+#[path = "tests/gtfs_realtime.rs"]
+mod tests;
 
 /// Rewrite realtime stop ids to their canonical static stop id.
 ///

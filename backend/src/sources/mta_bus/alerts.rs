@@ -2,8 +2,7 @@ use crate::alerts::gtfs::{self as gtfs_alert, GtfsAlertSource};
 use crate::feed::{Alert as GtfsAlert, FeedMessage};
 use crate::integrations::gtfs_realtime;
 use crate::models::alert::{
-    ActivePeriod, AffectedEntity, Alert, AlertData, AlertFormat, AlertSection, AlertTranslation,
-    MtaAlertData,
+    ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, MtaAlertData,
 };
 use crate::models::source::Source;
 use crate::sources::AlertsAdapter;
@@ -13,20 +12,6 @@ use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 use uuid::Uuid;
-
-/// Parses MTA's language field (e.g., "en", "en-html") into format and language.
-/// "en" -> (Plain, "en")
-/// "en-html" -> (Html, "en")
-fn parse_mta_language(lang: Option<&str>) -> (AlertFormat, String) {
-    match lang {
-        Some(l) if l.ends_with("-html") => {
-            let language = l.strip_suffix("-html").unwrap_or("en").to_string();
-            (AlertFormat::Html, language)
-        }
-        Some(l) => (AlertFormat::Plain, l.to_string()),
-        None => (AlertFormat::Plain, "en".to_string()),
-    }
-}
 
 pub struct MtaBusAlerts;
 
@@ -50,7 +35,7 @@ impl GtfsAlertSource for MtaBusAlerts {
         Source::MtaBus
     }
 
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
+    async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
         gtfs_realtime::fetch_feeds(vec![(
             "mta_bus_alerts".into(),
             gtfs_realtime::get_bytes(
@@ -111,49 +96,8 @@ impl GtfsAlertSource for MtaBusAlerts {
             data: AlertData::MtaBus(mta_data),
         };
 
-        // Parse translations (header and description)
-        let mut translations = Vec::new();
-
-        if let Some(header_text) = &alert.header_text {
-            for translation in header_text.translation.iter() {
-                let (format, language) = parse_mta_language(translation.language.as_deref());
-                translations.push(AlertTranslation {
-                    alert_id,
-                    section: AlertSection::Header,
-                    format,
-                    language,
-                    text: translation.text.clone(),
-                });
-            }
-        }
-
-        if let Some(description_text) = &alert.description_text {
-            for translation in description_text.translation.iter() {
-                let (format, language) = parse_mta_language(translation.language.as_deref());
-                translations.push(AlertTranslation {
-                    alert_id,
-                    section: AlertSection::Description,
-                    format,
-                    language,
-                    text: translation.text.clone(),
-                });
-            }
-        }
-
-        // Parse active periods
-        let active_periods: Vec<ActivePeriod> = alert
-            .active_period
-            .iter()
-            .filter_map(|ap| {
-                let start = DateTime::from_timestamp(ap.start? as i64, 0)?;
-                let end = ap.end.and_then(|e| DateTime::from_timestamp(e as i64, 0));
-                Some(ActivePeriod {
-                    alert_id,
-                    start_time: start,
-                    end_time: end,
-                })
-            })
-            .collect();
+        let translations = gtfs_alert::mta_translations(alert_id, &alert);
+        let active_periods = gtfs_alert::active_periods(alert_id, &alert);
 
         // Parse affected entities
         let affected_entities: Vec<AffectedEntity> = alert

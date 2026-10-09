@@ -8,21 +8,16 @@ use crate::models::position::VehiclePosition;
 use crate::models::trip::StopTimeData;
 use crate::models::{source::Source, stop::StopData};
 
-/// A single trajectory knot: (time, distance, optional velocity clamp).
+/// A single trajectory knot: (time, distance).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct TrajectoryKnot {
     pub t_event: f64,
     pub s_m: f64,
-    pub v_clamp: Option<f64>,
 }
 
 impl TrajectoryKnot {
-    pub fn new(t_event: f64, s_m: f64, v_clamp: Option<f64>) -> Self {
-        Self {
-            t_event,
-            s_m,
-            v_clamp,
-        }
+    pub fn new(t_event: f64, s_m: f64) -> Self {
+        Self { t_event, s_m }
     }
 }
 
@@ -204,9 +199,4 @@ pub fn bbox_intersects(trip_bbox: [f64; 4], query: [f64; 4]) -> bool {
         && trip_bbox[2] >= query[0]
         && trip_bbox[1] <= query[3]
         && trip_bbox[3] >= query[1]
-}
-
-pub fn round_to_5min_bucket(unix: i64) -> i64 {
-    const BUCKET: i64 = 300;
-    (unix / BUCKET) * BUCKET
 }

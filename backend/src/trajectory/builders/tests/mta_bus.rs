@@ -54,16 +54,20 @@ fn generates_four_knots_per_stop() {
 }
 
 #[test]
-fn dwell_knots_have_zero_velocity_clamp() {
+fn dwell_knots_preserve_stationary_plateau() {
     let stops = vec![make_stop("A", 1000.0, 200.0)];
     let trip = make_trip(stops, 500.0);
     let kinematics = BusKinematicsConfig::default();
     let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
 
-    // knots[1] = t_arrive, knots[2] = t_depart — both must be v=0
-    assert_eq!(knots[1].v_clamp, Some(0.0), "arrive knot should clamp v=0");
-    assert_eq!(knots[2].v_clamp, Some(0.0), "depart knot should clamp v=0");
     assert_eq!(knots[1].s_m, knots[2].s_m, "dwell knots should share s_m");
+    use crate::trajectory::interpolation::{InterpolationMethod, PchipMethod};
+    let midpoint = (knots[1].t_event + knots[2].t_event) / 2.0;
+    let motion = PchipMethod
+        .sample_motion(&knots, &[midpoint], midpoint)
+        .unwrap();
+    assert_eq!(motion.distances, vec![knots[1].s_m]);
+    assert_eq!(motion.state_speed_mps, 0.0);
 }
 
 #[test]

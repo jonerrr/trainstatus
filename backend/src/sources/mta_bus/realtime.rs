@@ -85,7 +85,7 @@ impl MtaBusRealtime {
 }
 
 impl MtaBusRealtime {
-    async fn fetch_feeds(&self) -> Vec<FeedMessage> {
+    async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
         gtfs_realtime::fetch_feeds(vec![
             (
                 "mta_bus-trips".into(),
@@ -258,7 +258,7 @@ impl RealtimeSource for MtaBusRealtime {
 
     async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
         let (feeds, oba_result) = tokio::join!(self.fetch_feeds(), self.fetch_oba_data());
-        anyhow::ensure!(!feeds.is_empty(), "No MTA bus GTFS-RT feeds returned");
+        let feeds = feeds?;
         let oba = oba_result.unwrap_or_else(|error| {
             error!(%error, "OBA fetch failed");
             Vec::new()

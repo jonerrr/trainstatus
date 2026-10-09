@@ -7,7 +7,7 @@ use moka::future::Cache;
 use crate::models::source::Source;
 
 use super::geometry::{ShapeGeometry, build_shape_geometry};
-use super::types::{HotSnapshot, round_to_5min_bucket, source_projected_epsg_code};
+use super::types::{HotSnapshot, source_projected_epsg_code};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShapeKey {
@@ -32,7 +32,7 @@ pub struct PlatformMatch {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HistKey {
     pub source: Source,
-    pub bucket_unix: i64,
+    pub at_unix: i64,
 }
 
 pub struct TrajectoryCache {
@@ -72,17 +72,16 @@ impl TrajectoryCache {
         self.hot.replace(source, snapshot);
     }
 
-    /// Coalesces same-bucket loads and retains only successful snapshots.
+    /// Coalesces same-timestamp loads and retains only successful snapshots.
     pub async fn get_historical_with(
         &self,
         source: Source,
         at: DateTime<Utc>,
         init: impl std::future::Future<Output = anyhow::Result<Arc<HotSnapshot>>>,
     ) -> anyhow::Result<Arc<HotSnapshot>> {
-        let bucket = round_to_5min_bucket(at.timestamp());
         let key = HistKey {
             source,
-            bucket_unix: bucket,
+            at_unix: at.timestamp(),
         };
         self.historical
             .try_get_with(key, init)

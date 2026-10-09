@@ -1,4 +1,3 @@
-use crate::models::position::PositionData;
 use crate::models::source::Source;
 use crate::models::stop::StopData;
 
@@ -86,18 +85,15 @@ impl MtaBusBuilder {
         let t_clear = t_depart + dt_accel_s;
 
         vec![
-            TrajectoryKnot::new(t_approach, s_approach, None),
-            TrajectoryKnot::new(t_arrive, s_stop, Some(0.0)),
-            TrajectoryKnot::new(t_depart, s_stop, Some(0.0)),
-            TrajectoryKnot::new(t_clear, s_depart, None),
+            TrajectoryKnot::new(t_approach, s_approach),
+            TrajectoryKnot::new(t_arrive, s_stop),
+            TrajectoryKnot::new(t_depart, s_stop),
+            TrajectoryKnot::new(t_clear, s_depart),
         ]
     }
 
     /// Project the live GPS position onto the bus route shape and return a
     /// "live anchor" knot at the current time.
-    ///
-    /// If the OBA status indicates the bus is stopped (status contains
-    /// `"STOPPED"`), the knot is velocity-clamped to zero.
     fn live_anchor_knot(trip: &TripSnapshot, shape_geom: &ShapeGeometry) -> Option<TrajectoryKnot> {
         let position = trip.positions.iter().find(|p| p.geom.is_some())?;
         let geom = position.geom.as_ref()?;
@@ -114,20 +110,9 @@ impl MtaBusBuilder {
             &shape_geom.cum_dist,
         )?;
 
-        // Zero-clamp velocity if OBA reports the bus is stopped at a stop.
-        let v_clamp = match &position.data {
-            PositionData::MtaBus(data) => data
-                .status
-                .as_deref()
-                .filter(|s| s.contains("STOPPED"))
-                .map(|_| 0.0),
-            _ => None,
-        };
-
         Some(TrajectoryKnot::new(
             trip.as_of.timestamp() as f64,
             projected_s.clamp(0.0, trip.shape_length_m),
-            v_clamp,
         ))
     }
 

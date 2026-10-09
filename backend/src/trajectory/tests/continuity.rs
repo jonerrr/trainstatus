@@ -4,8 +4,8 @@ use crate::trajectory::types::{TrajectoryConfig, TrajectoryKnot, TrajectoryState
 #[test]
 fn hold_prevents_distance_regression() {
     let knots = vec![
-        TrajectoryKnot::new(100.0, 200.0, None),
-        TrajectoryKnot::new(110.0, 150.0, None),
+        TrajectoryKnot::new(100.0, 200.0),
+        TrajectoryKnot::new(110.0, 150.0),
     ];
     let prev = TrajectoryState {
         t_unix: 90.0,
@@ -23,8 +23,8 @@ fn hold_prevents_distance_regression() {
 #[test]
 fn discards_stale_prev_state() {
     let knots = vec![
-        TrajectoryKnot::new(100.0, 200.0, None),
-        TrajectoryKnot::new(110.0, 250.0, None),
+        TrajectoryKnot::new(100.0, 200.0),
+        TrajectoryKnot::new(110.0, 250.0),
     ];
     let prev = TrajectoryState {
         t_unix: 0.0,
@@ -46,8 +46,8 @@ fn discards_stale_prev_state() {
 #[test]
 fn discards_large_backward_gap() {
     let knots = vec![
-        TrajectoryKnot::new(100.0, 100.0, None),
-        TrajectoryKnot::new(110.0, 150.0, None),
+        TrajectoryKnot::new(100.0, 100.0),
+        TrajectoryKnot::new(110.0, 150.0),
     ];
     let prev = TrajectoryState {
         t_unix: 95.0,
@@ -69,8 +69,8 @@ fn discards_large_backward_gap() {
 #[test]
 fn discards_large_forward_jump() {
     let knots = vec![
-        TrajectoryKnot::new(100.0, 500.0, None),
-        TrajectoryKnot::new(200.0, 900.0, None),
+        TrajectoryKnot::new(100.0, 500.0),
+        TrajectoryKnot::new(200.0, 900.0),
     ];
     let prev = TrajectoryState {
         t_unix: 95.0,

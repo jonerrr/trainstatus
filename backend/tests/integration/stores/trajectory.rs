@@ -22,11 +22,65 @@ async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
             "concurrent misses must return the same computed snapshot"
         );
     }
-    let cached = service
+    let cached = service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
+    assert!(std::sync::Arc::ptr_eq(&snapshots[0], &cached));
+    let next_second = service
         .snapshot(Source::MtaBus, Some(at + chrono::Duration::seconds(1)))
         .await
         .unwrap();
-    assert!(std::sync::Arc::ptr_eq(&snapshots[0], &cached));
+    assert!(!std::sync::Arc::ptr_eq(&snapshots[0], &next_second));
+}
+
+#[sqlx::test]
+async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(pool: sqlx::PgPool) {
+    let stores = test_stores(pool.clone());
+    stores
+        .static_data_store
+        .persist(&mta_bus_dataset())
+        .await
+        .unwrap();
+    let at = crate::support::fixtures::fixed_time();
+    stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
+        .await
+        .unwrap();
+    let later = at + chrono::Duration::seconds(1);
+    assert_eq!(
+        at.timestamp().div_euclid(300),
+        later.timestamp().div_euclid(300)
+    );
+    let first = backend::trajectory::TrajectoryService::new(pool.clone())
+        .snapshot(Source::MtaBus, Some(at))
+        .await
+        .unwrap();
+    let second = backend::trajectory::TrajectoryService::new(pool.clone())
+        .snapshot(Source::MtaBus, Some(later))
+        .await
+        .unwrap();
+    assert!(!first.render_units.is_empty());
+    assert!(!second.render_units.is_empty());
+    let expected_first = serde_json::to_value(&first.render_units).unwrap();
+    let expected_second = serde_json::to_value(&second.render_units).unwrap();
+    assert_ne!(
+        expected_first, expected_second,
+        "sampling windows depend on the requested second"
+    );
+    for order in [[at, later], [later, at]] {
+        let service = backend::trajectory::TrajectoryService::new(pool.clone());
+        for time in order {
+            let snapshot = service.snapshot(Source::MtaBus, Some(time)).await.unwrap();
+            let expected = if time == at {
+                &expected_first
+            } else {
+                &expected_second
+            };
+            assert_eq!(
+                &serde_json::to_value(&snapshot.render_units).unwrap(),
+                expected
+            );
+        }
+    }
 }
 
 #[sqlx::test]
