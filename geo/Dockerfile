@@ -1,6 +1,6 @@
 # Declared before the first FROM so it can be used in later FROM lines.
 # Bump manually when upgrading; tile major version must match backend Valhalla.
-ARG VALHALLA_VERSION=3.9.0@sha256:511c095b8caf393dccceb8b519ec96b6f85a0166b2288ba014a8a748acc5a63c
+ARG VALHALLA_VERSION=3.9.1@sha256:4fd114eb1d26b8fc2f43bcb3df234c1b63a0bf13c277405e5943d5361dc575de
 
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS osm-data
 
