@@ -189,42 +189,34 @@
 		];
 	});
 
-	// The viewport owns subscriptions so replacing rows cannot temporarily release
-	// routes that are still visible. Only changes to the route union reach the owner.
-	let held_resource: StopTimeResources[Source];
-	let held_routes = new Set<string>();
+	// One subscription on the resource. Replacing rows only changes the route union,
+	// so a route that stays visible is not released and acquired again.
+	let synced_resource: StopTimeResources[Source];
+	let route_sync: { sync: (routes: Iterable<string>) => void; stop: () => void } | undefined;
 	$effect(() => {
 		const source = active_source;
 		const resource =
 			source && type !== 'route' && source_info[source].monitor_routes
 				? stop_time_context.getSource(source)
 				: undefined;
-		const routes = new Set(
-			visible_items.flatMap(({ data }) =>
-				type === 'stop'
-					? (data as Stop).routes.map((route) => route.route_id)
-					: type === 'trip'
-						? [(data as Trip).route_id]
-						: []
-			)
+		const routes = visible_items.flatMap(({ data }) =>
+			type === 'stop'
+				? (data as Stop).routes.map((route) => route.route_id)
+				: type === 'trip'
+					? [(data as Trip).route_id]
+					: []
 		);
 		untrack(() => {
-			if (held_resource !== resource) {
-				for (const route of held_routes) held_resource?.remove_route(route);
-				held_routes = new Set();
-				held_resource = resource;
+			if (synced_resource !== resource) {
+				route_sync?.stop();
+				route_sync = resource?.sync_routes();
+				synced_resource = resource;
 			}
-			for (const route of routes) {
-				if (!held_routes.has(route)) void resource?.add_route(route).catch(() => {});
-			}
-			for (const route of held_routes) {
-				if (!routes.has(route)) resource?.remove_route(route);
-			}
-			held_routes = routes;
+			route_sync?.sync(routes);
 		});
 	});
 	$effect(() => () => {
-		for (const route of held_routes) held_resource?.remove_route(route);
+		route_sync?.stop();
 	});
 
 	// Calculate total height for the scroll container

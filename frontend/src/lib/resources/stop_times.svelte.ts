@@ -1,6 +1,6 @@
 import { untrack } from 'svelte';
 
-import { SvelteDate, SvelteMap } from 'svelte/reactivity';
+import { SvelteDate, SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
@@ -118,6 +118,28 @@ export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTim
 		for (const route of routes) void this.add_route(route).catch(() => {});
 		return () => {
 			for (const route of routes) this.remove_route(route);
+		};
+	}
+	/**
+	 * One caller's route set. Syncing replaces that set and leaves routes that
+	 * remain held, so a visible row is not released and acquired again.
+	 */
+	sync_routes() {
+		const held = new SvelteSet<string>();
+		const sync = (routes: Iterable<string>) => {
+			const next = new SvelteSet(routes);
+			for (const route of next) {
+				if (!held.has(route)) void this.add_route(route).catch(() => {});
+			}
+			for (const route of held) {
+				if (!next.has(route)) this.remove_route(route);
+			}
+			held.clear();
+			for (const route of next) held.add(route);
+		};
+		return {
+			sync,
+			stop: () => sync([])
 		};
 	}
 }

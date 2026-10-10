@@ -6,13 +6,14 @@ import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import type { Trip } from '../lib/client';
+import type { TypedTrip } from '../lib/resources/index.svelte';
 import { LiveResource } from '../lib/resources/liveResource.svelte';
 import { resourceQuery } from '../lib/resources/request';
 import { page } from '../lib/test/page.svelte';
 import Layout from './+layout.svelte';
 
 const requests = vi.hoisted(() => ({ fail: true }));
-const trip: Trip = {
+const trip: TypedTrip<'njt_bus'> = {
 	id: 'requested',
 	original_id: 'requested',
 	route_id: '1',

@@ -10,7 +10,7 @@
 		type SourceMap,
 		type TypedVehiclePosition
 	} from '#lib/resources/index.svelte.js';
-	import { awaitingRows } from '#lib/resources/pending.js';
+	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
@@ -20,6 +20,7 @@
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import Transfers from '#lib/Stop/Transfers.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
@@ -130,8 +131,8 @@
 	<Transfers stop_source={stop.data.source} transfers={stop.transfers} />
 {/if}
 
-{#if stop_times_store?.error && !current_stop_times.length}
-	<p class="p-2 text-center text-neutral-400">Arrivals unavailable</p>
+{#if unavailableRows(stop_times_store, current_stop_times.length)}
+	<UnavailableRows arrivals />
 {:else if st_loading}
 	<Skeleton lines={5} class="p-2" />
 {:else if !selected_stop_times.length}

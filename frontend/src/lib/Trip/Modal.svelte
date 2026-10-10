@@ -8,13 +8,14 @@
 	import type { StopTime, Trip } from '#lib/client/index.js';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
-	import { awaitingRows } from '#lib/resources/pending.js';
+	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
@@ -70,16 +71,17 @@
 	const headsign = $derived(
 		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
 	);
-	const busPosition = $derived(
-		trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'
-			? position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
-			: undefined
-	);
-	const deviationMinutes = $derived(
-		trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
-			? trip.data.deviation / 60
-			: undefined
-	);
+	const bus = $derived.by(() => {
+		if (trip.data.source !== 'mta_bus' && trip.data.source !== 'njt_bus') return;
+		return {
+			position: position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id),
+			vehicle_id: trip.vehicle_id,
+			deviation:
+				trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
+					? trip.data.deviation / 60
+					: undefined
+		};
+	});
 
 	type StopTransfers = Record<string, StopTime[]>;
 
@@ -158,48 +160,40 @@
 </script>
 
 <div class="p-3">
-	<!-- TODO: simplify styling. it shouldn't be this source specific -->
-	<div
-		class={[
-			'grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3',
-			trip.data.source === 'mta_subway' ? 'grid-rows-[28px]' : 'grid-rows-[28px_20px]'
-		]}
-	>
+	<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
 		{#if route}
 			<Icon
 				{route}
 				width={28}
 				height={28}
-				link={!!route}
+				link
 				show_alerts
 				class="col-start-1 row-start-1 h-7 self-center justify-self-center"
 			/>
 		{/if}
-		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
+		{#if bus}
 			<div
 				class={[
 					'flex h-5 items-center justify-self-center leading-5',
 					route ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
 				]}
 			>
-				<VehicleCapacity position={busPosition} />
+				<VehicleCapacity position={bus.position} />
 			</div>
+			<span
+				class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
+				>Bus #{bus.vehicle_id}</span
+			>
 		{/if}
 		<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
 			<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
 				{trip_destination_title(headsign, route)}
 			</div>
 		</div>
-		{#if deviationMinutes !== undefined}
+		{#if bus?.deviation !== undefined}
 			<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300">
-				{Math.abs(deviationMinutes).toFixed(0)} min {deviationMinutes > 0 ? 'late' : 'early'}
+				{Math.abs(bus.deviation).toFixed(0)} min {bus.deviation > 0 ? 'late' : 'early'}
 			</div>
-		{/if}
-		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
-			<span
-				class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
-				>Bus #{trip.vehicle_id}</span
-			>
 		{/if}
 	</div>
 </div>
@@ -262,8 +256,8 @@
 	</details>
 {/if}
 
-{#if source_stop_times?.error && !all_trip_stop_times.length}
-	<p class="p-2 text-center text-neutral-400">Arrivals unavailable</p>
+{#if unavailableRows(source_stop_times, all_trip_stop_times.length)}
+	<UnavailableRows arrivals />
 {:else if st_loading}
 	<Skeleton lines={6} class="p-2" />
 {:else}

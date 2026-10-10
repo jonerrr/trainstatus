@@ -195,6 +195,32 @@ test('route holders are reference counted and availability belongs to the coveri
 	expect(controls.arrivals.active).toBe(false);
 	await view.unmount();
 });
+test('syncing routes releases only the routes that leave', async () => {
+	let controls!: ResourceControls;
+	const calls: string[] = [];
+	const view = await render(ResourceHarness, {
+		fetcher: async () => [],
+		routeFetcher: async (url) => {
+			calls.push(String(url));
+			return new Response('[]');
+		},
+		onready: (next) => {
+			controls = next;
+		}
+	});
+	const routeIds = (url: string) => new URL(url, 'http://localhost').searchParams.get('route_ids');
+	const subscription = controls.arrivals.sync_routes();
+	subscription.sync(['B', 'A']);
+	await expect.poll(() => calls.map(routeIds)).toEqual(['A,B']);
+	subscription.sync(['A', 'B']);
+	expect(calls.map(routeIds)).toEqual(['A,B']);
+	subscription.sync(['A']);
+	await expect.poll(() => calls.map(routeIds)).toEqual(['A,B', 'A']);
+	expect(controls.arrivals.coversRoute('B')).toBe(false);
+	subscription.stop();
+	await expect.poll(() => controls.arrivals.active).toBe(false);
+	await view.unmount();
+});
 test('failed updates retain data and retry inside the mobile navbar without covering content', async () => {
 	await browserPage.viewport(390, 844);
 	let controls!: ResourceControls;

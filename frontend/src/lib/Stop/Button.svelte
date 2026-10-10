@@ -5,12 +5,13 @@
 
 	import type { Stop } from '#lib/client/index.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
-	import { awaitingRoute, awaitingRows } from '#lib/resources/pending.js';
+	import { awaitingRoute, awaitingRows, unavailableRows } from '#lib/resources/pending.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import { get_stop_arrivals, type StopArrival } from '#lib/Stop/arrivals.js';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 
@@ -128,8 +129,8 @@
 			class="inline-block w-10 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
 			>&nbsp;</span
 		>
-	{:else if stop_times?.error && !current_stop_times.length}
-		<span class="text-xs text-amber-200">Unavailable</span>
+	{:else if unavailableRows(stop_times, current_stop_times.length)}
+		<UnavailableRows />
 	{:else if route_stop_times.length}
 		{#each route_stop_times.slice(0, 2) as stop_time (stop_time.trip_id)}
 			{@render eta(stop_time.eta)}

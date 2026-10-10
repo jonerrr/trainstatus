@@ -3,11 +3,12 @@
 
 	import type { Trip } from '#lib/client/index.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
-	import { awaitingRows } from '#lib/resources/pending.js';
+	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
 
@@ -59,9 +60,9 @@
 	});
 </script>
 
-{#if source_stop_times?.error && !all_trip_stop_times.length}<span class="text-xs text-amber-200"
-		>Unavailable</span
-	>{:else if is_loading}
+{#if unavailableRows(source_stop_times, all_trip_stop_times.length)}
+	<UnavailableRows />
+{:else if is_loading}
 	<Skeleton lines={2} class="w-full" />
 {:else}
 	<div class="flex flex-col items-center gap-1 text-left">

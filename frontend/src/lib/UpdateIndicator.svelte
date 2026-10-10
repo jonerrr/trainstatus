@@ -23,7 +23,6 @@
 {#if visible}
 	<div
 		class="overflow-hidden"
-		inert={!visible}
 		transition:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
 	>
 		<button

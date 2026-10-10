@@ -22,6 +22,11 @@ export function awaitingRows(
 	return !resource.available;
 }
 
+/** Nothing retained to show because the resource failed before publishing rows. */
+export function unavailableRows(resource: SettledResource | undefined, rowCount: number): boolean {
+	return rowCount === 0 && !!resource?.error;
+}
+
 type MonitoredResource = Omit<SettledResource, 'available' | 'coversRoute'> &
 	Required<Pick<SettledResource, 'coversRoute'>>;
 

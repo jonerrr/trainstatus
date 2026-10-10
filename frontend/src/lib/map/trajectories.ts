@@ -16,7 +16,7 @@ export interface TrajectorySnapshot {
 }
 export interface TrajectoryWatcher {
 	(): void;
-	refresh(source?: Source): Promise<void>;
+	refresh(): Promise<void>;
 }
 
 /** One query owns all requests; the shared query owner rejects late publication. */
@@ -66,12 +66,8 @@ export function watchTrajectories(
 			for (const resource of resources.values()) resource.dispose();
 		},
 		{
-			refresh: async (source?: Source) => {
-				await Promise.all(
-					[...resources]
-						.filter(([key]) => !source || key === source)
-						.map(([, resource]) => resource.refresh(true))
-				);
+			refresh: async () => {
+				await Promise.all([...resources.values()].map((resource) => resource.refresh(true)));
 			}
 		}
 	);
