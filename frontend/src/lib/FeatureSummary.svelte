@@ -8,6 +8,7 @@
 		link = false,
 		show_alerts = false
 	}: { feature: FeaturePresentation; link?: boolean; show_alerts?: boolean } = $props();
+	// TODO: this component is redundant. its only really used in the map summary.
 </script>
 
 <div

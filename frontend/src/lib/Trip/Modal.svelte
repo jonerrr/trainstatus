@@ -6,13 +6,13 @@
 
 	import Button from '#lib/Button.svelte';
 	import type { StopTime, Trip } from '#lib/client/index.js';
-	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
 	import { awaitingRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
@@ -158,31 +158,50 @@
 </script>
 
 <div class="p-3">
-	<div class="flex items-center justify-between gap-3">
-		<FeatureSummary
-			link={!!route}
-			show_alerts
-			feature={{
-				route,
-				title: trip_destination_title(headsign, route)
-			}}
-		/>
+	<!-- TODO: simplify styling. it shouldn't be this source specific -->
+	<div
+		class={[
+			'grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3',
+			trip.data.source === 'mta_subway' ? 'grid-rows-[28px]' : 'grid-rows-[28px_20px]'
+		]}
+	>
+		{#if route}
+			<Icon
+				{route}
+				width={28}
+				height={28}
+				link={!!route}
+				show_alerts
+				class="col-start-1 row-start-1 h-7 self-center justify-self-center"
+			/>
+		{/if}
 		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
-			<span class="shrink-0 text-xs text-neutral-400">Bus #{trip.vehicle_id}</span>
+			<div
+				class={[
+					'flex h-5 items-center justify-self-center leading-5',
+					route ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
+				]}
+			>
+				<VehicleCapacity position={busPosition} />
+			</div>
+		{/if}
+		<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
+			<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
+				{trip_destination_title(headsign, route)}
+			</div>
+		</div>
+		{#if deviationMinutes !== undefined}
+			<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300">
+				{Math.abs(deviationMinutes).toFixed(0)} min {deviationMinutes > 0 ? 'late' : 'early'}
+			</div>
+		{/if}
+		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
+			<span
+				class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
+				>Bus #{trip.vehicle_id}</span
+			>
 		{/if}
 	</div>
-	{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
-		<div
-			class="mt-2 flex items-center divide-x divide-neutral-600 *:pl-3 first:*:pl-0 [&:not(:has(*))]:hidden"
-		>
-			<VehicleCapacity position={busPosition} />
-			{#if deviationMinutes !== undefined}
-				<div class="shrink-0 text-sm text-neutral-300">
-					{Math.abs(deviationMinutes).toFixed(0)} min {deviationMinutes > 0 ? 'late' : 'early'}
-				</div>
-			{/if}
-		</div>
-	{/if}
 </div>
 <!-- TODO: rework -->
 {#if trip.data.source === 'mta_subway'}
