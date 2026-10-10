@@ -9,6 +9,7 @@
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
+	import { awaitingRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
@@ -43,17 +44,18 @@
 	// Stop modal that would otherwise register the route, so without this the
 	// destination and stop list stay empty and `last_stop` shows "Unknown".
 	$effect(() => {
-		if (source_stop_times && source_info[trip.data.source]?.monitor_routes) {
-			const route_id = trip.route_id;
-			source_stop_times.add_route(route_id);
-			return () => source_stop_times.remove_route(route_id);
-		}
+		if (!source_info[trip.data.source]?.monitor_routes) return;
+		return source_stop_times?.hold([trip.route_id]);
 	});
 
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
 
 	const st_loading = $derived(
-		!source_stop_times || (source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
+		awaitingRows(
+			source_stop_times,
+			all_trip_stop_times.length,
+			source_info[trip.data.source].monitor_routes ? trip.route_id : undefined
+		)
 	);
 
 	const stop_times = $derived(
@@ -241,7 +243,9 @@
 	</details>
 {/if}
 
-{#if st_loading}
+{#if source_stop_times?.error && !all_trip_stop_times.length}
+	<p class="p-2 text-center text-neutral-400">Arrivals unavailable</p>
+{:else if st_loading}
 	<Skeleton lines={6} class="p-2" />
 {:else}
 	<ModalList>

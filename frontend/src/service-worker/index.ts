@@ -56,8 +56,8 @@ self.addEventListener('fetch', (event) => {
 			}
 		}
 
-		// for everything else, try the network first, but
-		// fall back to the cache if we're offline
+		// Network first. The service worker owns the deadline, and a failure
+		// returns the last cached response as a normal response.
 		try {
 			const response = await fetch(event.request, { signal: AbortSignal.timeout(5000) });
 
@@ -69,28 +69,13 @@ self.addEventListener('fetch', (event) => {
 
 			// if the response is OK and http (prevents caching chrome-extension:// etc)
 			if (response.status === 200 && url.protocol.startsWith('http')) {
-				cache.put(event.request, response.clone());
+				event.waitUntil(cache.put(event.request, response.clone()));
 			}
 
 			return response;
 		} catch (err) {
 			const response = await cache.match(event.request);
-
-			if (response) {
-				// add header to indicate that this is a fallback
-				const headers = new Headers(response.headers);
-				headers.append('x-sw-fallback', 'true');
-
-				// return the cached response
-				return new Response(response.body, {
-					status: response.status,
-					statusText: response.statusText,
-					headers
-				});
-			}
-
-			// if there's no cache, then just error out
-			// as there is nothing we can do to respond to this request
+			if (response) return response;
 			throw err;
 		}
 	}

@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
+	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
 
+	import UpdateIndicator from './UpdateIndicator.svelte';
+
 	const current_time = getCurrentTime();
+	const updates = getUpdateStatus();
 
 	interface Routes {
 		[key: string]: [
@@ -54,15 +58,31 @@
 
 <!-- Mobile: fixed bottom bar (scrollable row). (larger screens) md+  fixed left sidebar (column). -->
 <nav
-	class="fixed bottom-0 z-30 flex h-16 w-full flex-row items-stretch overflow-x-auto bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:shadow-none"
+	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
 >
-	{@render nav_button('Home')}
-	{@render nav_button('Alerts')}
-	{@render nav_button('Stops')}
-	{@render nav_button('Charts')}
-	{@render nav_button('Map')}
-	<div class="md:mt-auto">
-		{@render nav_button('Settings')}
+	<div class="shrink-0 md:hidden"><UpdateIndicator /></div>
+	<div
+		class="nav-links flex min-h-0 flex-1 items-stretch overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto"
+	>
+		{@render nav_button('Home')}
+		{@render nav_button('Alerts')}
+		{@render nav_button('Stops')}
+		{@render nav_button('Charts')}
+		{@render nav_button('Map')}
+		{#if current_time.value !== undefined}
+			<button
+				type="button"
+				class="nav-button"
+				onclick={() => {
+					void updates.retry(true);
+				}}
+				aria-label="Reload historical data"><Clock class="nav-icon" /><span>Reload</span></button
+			>
+		{/if}
+		<div class="md:mt-auto">
+			<div class="hidden md:block"><UpdateIndicator /></div>
+			{@render nav_button('Settings')}
+		</div>
 	</div>
 </nav>
 
@@ -72,6 +92,19 @@
 	.nav-button {
 		/* Mobile: fixed-width cells so the bar scrolls rather than squishing */
 		@apply flex min-w-20 flex-none flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
+	}
+
+	@media (max-width: 767px) {
+		nav:has(:global(.update-control)) .nav-button {
+			gap: 0;
+			padding-block: 2px;
+			font-size: 0.75rem;
+			line-height: 1rem;
+		}
+		nav:has(:global(.update-control)) :global(.nav-icon) {
+			width: 18px;
+			height: 18px;
+		}
 	}
 
 	/* Desktop sidebar: buttons fill full width and get taller touch targets */

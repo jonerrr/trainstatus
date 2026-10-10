@@ -12,5 +12,6 @@
   },
   "files.associations": {
     "*.css": "tailwindcss"
-  }
+  },
+  "eslint.workingDirectories": ["${workspaceFolder}/frontend"]
 }

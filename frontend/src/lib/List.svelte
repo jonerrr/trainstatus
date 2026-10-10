@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends Stop | Route | Trip">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
@@ -11,6 +11,7 @@
 	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
+	import { stop_time_context, type StopTimeResources } from '#lib/resources/stop_times.svelte.js';
 	import RouteButton from '#lib/Route/Button.svelte';
 	import StopButton from '#lib/Stop/Button.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
@@ -188,6 +189,44 @@
 		];
 	});
 
+	// The viewport owns subscriptions so replacing rows cannot temporarily release
+	// routes that are still visible. Only changes to the route union reach the owner.
+	let held_resource: StopTimeResources[Source];
+	let held_routes = new Set<string>();
+	$effect(() => {
+		const source = active_source;
+		const resource =
+			source && type !== 'route' && source_info[source].monitor_routes
+				? stop_time_context.getSource(source)
+				: undefined;
+		const routes = new Set(
+			visible_items.flatMap(({ data }) =>
+				type === 'stop'
+					? (data as Stop).routes.map((route) => route.route_id)
+					: type === 'trip'
+						? [(data as Trip).route_id]
+						: []
+			)
+		);
+		untrack(() => {
+			if (held_resource !== resource) {
+				for (const route of held_routes) held_resource?.remove_route(route);
+				held_routes = new Set();
+				held_resource = resource;
+			}
+			for (const route of routes) {
+				if (!held_routes.has(route)) void resource?.add_route(route).catch(() => {});
+			}
+			for (const route of held_routes) {
+				if (!routes.has(route)) resource?.remove_route(route);
+			}
+			held_routes = routes;
+		});
+	});
+	$effect(() => () => {
+		for (const route of held_routes) held_resource?.remove_route(route);
+	});
+
 	// Calculate total height for the scroll container
 	const total_height = $derived.by(() => {
 		const { offsets, total } = derived_layout;
@@ -312,11 +351,11 @@
 							}}
 						>
 							{#if type === 'stop'}
-								<StopButton data={data as Stop} />
+								<StopButton data={data as Stop} acquire_routes={false} />
 							{:else if type === 'route'}
 								<RouteButton data={data as Route} />
 							{:else if type === 'trip'}
-								<TripButton data={data as Trip} />
+								<TripButton data={data as Trip} acquire_routes={false} />
 							{/if}
 						</button>
 

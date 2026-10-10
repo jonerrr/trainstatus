@@ -139,7 +139,7 @@
 				const resource = trips[target.source];
 				const trip =
 					resource?.current?.get(target.id) ??
-					(resource && (await resource.whenReady()).get(target.id));
+					(resource && (await resource.whenAvailable()).get(target.id));
 				if (version !== selectionVersion) return;
 				if (trip) open_modal({ type: 'trip', ...trip });
 				else selectionError = 'This trip is no longer available. Select another vehicle.';

@@ -2,14 +2,12 @@ import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
+	createEntityResource,
 	createMultiSourceContext,
-	LiveResource,
-	source_info,
 	type TripResource,
 	type TripResources,
 	type TypedTrip
 } from '#lib/resources/index.svelte.js';
-import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResource<S> {
 	return new SvelteMap(
@@ -25,38 +23,12 @@ export function index_trips<S extends Source>(data: TypedTrip<S>[]): TripResourc
 }
 
 export function createTripResource<S extends Source>(source: S) {
-	const current_time = getCurrentTime();
-	const resource = new LiveResource<TripResource<S>>(
-		async (signal) => {
-			console.log(`updating ${source} trips`);
-
-			const at = current_time.value;
-			const query_params = at !== undefined ? `?at=${at}` : '';
-			const res = await fetch(`/api/v1/trips/${source}${query_params}`, { signal });
-
-			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
-			if (!res.ok) throw new Error('Failed to fetch trips');
-
-			const data: TypedTrip<S>[] = await res.json();
-			return index_trips<S>(data);
-		},
-		new SvelteMap(),
-		{
-			interval: source_info[source].refresh_interval.trips,
-			debounce: 500
-		}
+	return createEntityResource<TypedTrip<S>[], TripResource<S>>(
+		source,
+		'trips',
+		index_trips<S>,
+		new SvelteMap()
 	);
-
-	let prev_time = current_time.value;
-	$effect(() => {
-		const val = current_time.value;
-		if (val !== prev_time) {
-			prev_time = val;
-			resource.refresh();
-		}
-	});
-
-	return resource;
 }
 
 export const trip_context = createMultiSourceContext<TripResources>();

@@ -1,4 +1,7 @@
 import type { Source } from '#lib/client/index.js';
+import { LiveResource, type ResourceSnapshot } from '#lib/resources/liveResource.svelte.js';
+import { requestData, resourceQuery } from '#lib/resources/request.js';
+import type { UpdateStatus } from '#lib/resources/status.svelte.js';
 
 import { renderUnitTableFromIPC, type RenderUnitTable } from './trajectoryArrow';
 
@@ -7,58 +10,70 @@ export interface TrajectoryQuery {
 	at: number | null;
 	refreshInterval: number;
 }
-
 export interface TrajectorySnapshot {
 	tables: ReadonlyMap<Source, RenderUnitTable>;
-	errors: ReadonlyMap<Source, string>;
+	statuses: ReadonlyMap<Source, ResourceSnapshot<RenderUnitTable | null>>;
+}
+export interface TrajectoryWatcher {
+	(): void;
+	refresh(source?: Source): Promise<void>;
 }
 
-/** One query owns all its requests and timers. Replacing it cannot publish old data. */
+/** One query owns all requests; the shared query owner rejects late publication. */
 export function watchTrajectories(
 	query: TrajectoryQuery,
 	onchange: (snapshot: TrajectorySnapshot) => void,
-	fetcher: typeof fetch = fetch
-): () => void {
-	const tables = new Map<Source, RenderUnitTable>();
-	const errors = new Map<Source, string>();
-	const requests = new Map<Source, AbortController>();
+	fetcher: typeof fetch = fetch,
+	updates?: UpdateStatus
+): TrajectoryWatcher {
+	const resources = new Map<Source, LiveResource<RenderUnitTable | null>>();
+	const statuses = new Map<Source, ResourceSnapshot<RenderUnitTable | null>>();
 	let disposed = false;
-	const publish = () => onchange({ tables: new Map(tables), errors: new Map(errors) });
-	async function refresh(source: Source) {
-		// Do not starve slow requests by aborting them on every polling interval.
-		if (requests.has(source)) return;
-		const controller = new AbortController();
-		requests.set(source, controller);
-		try {
-			const suffix = query.at === null ? '' : `?at=${query.at}`;
-			const response = await fetcher(`/api/v1/trajectories/${source}${suffix}`, {
-				signal: controller.signal
-			});
-			if (!response.ok) throw new Error(`Vehicle data unavailable (${response.status})`);
-			const buffer = await response.arrayBuffer();
-			if (disposed) return;
-			tables.set(source, renderUnitTableFromIPC(buffer));
-			errors.delete(source);
-		} catch (error) {
-			if (disposed) return;
-			errors.set(source, error instanceof Error ? error.message : 'Vehicle data unavailable');
-		} finally {
-			requests.delete(source);
-			if (!disposed) publish();
+	const publish = () => {
+		if (disposed) return;
+		const tables = new Map<Source, RenderUnitTable>();
+		for (const [source, state] of statuses) {
+			if (state.current) tables.set(source, state.current);
 		}
-	}
-	publish();
-	for (const source of query.sources) void refresh(source);
-	const timer =
-		query.at === null
-			? setInterval(() => {
-					for (const source of query.sources) void refresh(source);
-				}, query.refreshInterval)
-			: undefined;
-	return () => {
-		disposed = true;
-		clearInterval(timer);
-		for (const request of requests.values()) request.abort();
-		requests.clear();
+		onchange({ tables, statuses: new Map(statuses) });
 	};
+	publish();
+	for (const source of query.sources) {
+		const resource = new LiveResource<RenderUnitTable | null>(
+			(captured, signal) =>
+				requestData(
+					captured.url,
+					async (response) => renderUnitTableFromIPC(await response.arrayBuffer()),
+					signal,
+					fetcher
+				),
+			null,
+			{
+				interval: query.refreshInterval,
+				updates,
+				onchange: (state) => {
+					statuses.set(source, state);
+					publish();
+				}
+			}
+		);
+		resources.set(source, resource);
+		resource.setQuery(resourceQuery(source, 'trajectories', query.at));
+	}
+	const stop: TrajectoryWatcher = Object.assign(
+		() => {
+			disposed = true;
+			for (const resource of resources.values()) resource.dispose();
+		},
+		{
+			refresh: async (source?: Source) => {
+				await Promise.all(
+					[...resources]
+						.filter(([key]) => !source || key === source)
+						.map(([, resource]) => resource.refresh(true))
+				);
+			}
+		}
+	);
+	return stop;
 }

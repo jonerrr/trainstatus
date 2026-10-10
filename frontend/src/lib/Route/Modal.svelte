@@ -81,8 +81,6 @@
 			a.removeAttribute('href');
 		});
 	});
-
-	// $inspect(alerts);
 </script>
 
 <header class="flex flex-col gap-3 p-3">

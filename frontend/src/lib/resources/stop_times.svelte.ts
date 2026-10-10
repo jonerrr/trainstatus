@@ -1,4 +1,6 @@
-import { SvelteDate, SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
+import { untrack } from 'svelte';
+
+import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
@@ -9,6 +11,9 @@ import {
 	type TypedStopTime
 } from '#lib/resources/index.svelte.js';
 import { getCurrentTime } from '#lib/url_params.svelte.js';
+
+import { requestData, resourceQuery, type ResourceQuery } from './request';
+import { trip_context } from './trips.svelte';
 
 export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): StopTimeResource<S> {
 	const by_trip_id = new SvelteMap<string, TypedStopTime<S>[]>();
@@ -31,89 +36,89 @@ export function index_stop_times<S extends Source>(data: TypedStopTime<S>[]): St
 	return { by_trip_id, by_stop_id };
 }
 
-const EMPTY_INDEX: StopTimeResource<Source> = {
-	by_trip_id: new SvelteMap(),
-	by_stop_id: new SvelteMap()
-};
+function emptyIndex<S extends Source>(): StopTimeResource<S> {
+	return { by_trip_id: new SvelteMap(), by_stop_id: new SvelteMap() };
+}
 
-/**
- * Live stop times for a source: same `LiveResource` surface as trips/positions/alerts
- * (`current`, `status`, `refresh`, …) plus route monitoring helpers for sources that
- * require `route_ids` on the API.
- */
+/** Keep rows for routes that remain. Drop a row only when its trip names a released route. */
+export function retain_stop_times<S extends Source>(
+	data: StopTimeResource<S>,
+	routeOf: (tripId: string) => string | undefined,
+	next: Pick<ResourceQuery, 'active' | 'routes'>
+): StopTimeResource<S> {
+	if (!next.active) return emptyIndex();
+	const retained = [...data.by_trip_id.values()].flat().filter((st) => {
+		const route = routeOf(st.trip_id);
+		return route === undefined || next.routes.includes(route);
+	});
+	return index_stop_times(retained);
+}
+
 export class StopTimeLiveResource<S extends Source> extends LiveResource<StopTimeResource<S>> {
-	/** route_id → number of active holders */
-	// Reference counts are fetch bookkeeping, not UI state; keep them untracked.
+	// Counts are bookkeeping, revision is the reactive query trigger.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	#monitored_routes = new Map<string, number>();
-
-	constructor(source: S) {
-		const current_time = getCurrentTime();
-		const empty = EMPTY_INDEX as StopTimeResource<S>;
+	#holders = new Map<string, number>();
+	#revision = $state(0);
+	constructor(source: S, fetcher: typeof fetch = fetch) {
+		const time = getCurrentTime();
+		const trips = trip_context.getSource(source);
+		// Called after construction by the owning effect or route acquisition.
+		const query = () => {
+			void this.#revision;
+			const routes = [...this.#holders.keys()];
+			return resourceQuery(
+				source,
+				'stop_times',
+				time.value ?? null,
+				source_info[source].monitor_routes ? routes : [],
+				!source_info[source].monitor_routes || routes.length > 0
+			);
+		};
 		super(
-			async (signal) => {
-				console.log(`updating ${source} stop times`);
-
-				const routes = [...this.#monitored_routes.keys()];
-
-				if (source_info[source].monitor_routes && routes.length === 0) {
-					return empty;
-				}
-
-				const query_params = new SvelteURLSearchParams();
-				const at = current_time.value;
-				if (at !== undefined) query_params.set('at', at.toString());
-				// TODO: encodeURIComponent for route ids that contain special chars (e.g. "+")
-				if (routes.length) query_params.set('route_ids', routes.join(','));
-
-				const params_str = query_params.toString();
-				const url = params_str
-					? `/api/v1/stop_times/${source}?${params_str}`
-					: `/api/v1/stop_times/${source}`;
-
-				const res = await fetch(url, { signal });
-
-				if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
-				if (!res.ok) throw new Error(`Failed to fetch stop times: ${res.status}`);
-
-				const data: TypedStopTime<S>[] = await res.json();
-				return index_stop_times<S>(data);
-			},
-			empty,
+			(captured, signal) =>
+				requestData(
+					captured.url,
+					async (response) => index_stop_times<S>(await response.json()),
+					signal,
+					fetcher
+				),
+			emptyIndex<S>(),
 			{
+				query,
 				interval: source_info[source].refresh_interval.stop_times,
-				debounce: 500
+				debounce: 500,
+				retain: (data, _previous, next) =>
+					retain_stop_times(data, (tripId) => trips?.current.get(tripId)?.route_id, next)
 			}
 		);
-
-		let prev_time = current_time.value;
-		$effect(() => {
-			const val = current_time.value;
-			if (val !== prev_time) {
-				prev_time = val;
-				this.refresh();
-			}
+	}
+	add_route(route: string): Promise<StopTimeResource<S>> {
+		return untrack(() => {
+			const count = this.#holders.get(route) ?? 0;
+			this.#holders.set(route, count + 1);
+			if (count === 0) this.#revision++;
+			return this.whenAvailable(route);
 		});
 	}
-
-	add_route(route_id: string): Promise<void> {
-		const count = this.#monitored_routes.get(route_id) ?? 0;
-		this.#monitored_routes.set(route_id, count + 1);
-		// Only trigger a fetch the first time this route is registered
-		if (count === 0) {
-			return this.next_refresh();
-		}
-		return this.status === 'ready' ? Promise.resolve() : this.next_refresh();
+	remove_route(route: string) {
+		untrack(() => {
+			const count = this.#holders.get(route);
+			if (count === undefined) return;
+			if (count > 1) {
+				this.#holders.set(route, count - 1);
+				return;
+			}
+			this.#holders.delete(route);
+			this.#revision++;
+			this.syncQuery();
+		});
 	}
-
-	remove_route(route_id: string): void {
-		const count = this.#monitored_routes.get(route_id);
-		if (count === undefined) return;
-		if (count <= 1) {
-			this.#monitored_routes.delete(route_id);
-		} else {
-			this.#monitored_routes.set(route_id, count - 1);
-		}
+	/** Reference-count these routes until the caller runs the returned cleanup. */
+	hold(routes: readonly string[]) {
+		for (const route of routes) void this.add_route(route).catch(() => {});
+		return () => {
+			for (const route of routes) this.remove_route(route);
+		};
 	}
 }
 

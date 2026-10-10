@@ -10,6 +10,7 @@
 		type SourceMap,
 		type TypedVehiclePosition
 	} from '#lib/resources/index.svelte.js';
+	import { awaitingRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
@@ -42,24 +43,13 @@
 	const routes = $derived(page.data.routes_by_id[stop.data.source]);
 
 	$effect(() => {
-		if (stop_times_store && source_info[stop.data.source]?.monitor_routes) {
-			const route_ids = stop.routes.map((r) => r.route_id);
-			for (const id of route_ids) {
-				stop_times_store.add_route(id);
-			}
-			return () => {
-				for (const id of route_ids) {
-					stop_times_store.remove_route(id);
-				}
-			};
-		}
+		if (!source_info[stop.data.source]?.monitor_routes) return;
+		return stop_times_store?.hold(stop.routes.map((route) => route.route_id));
 	});
 
 	const current_stop_times = $derived(stop_times_store?.current.by_stop_id.get(stop.id) ?? []);
 
-	const st_loading = $derived(
-		!stop_times_store || (stop_times_store.status !== 'ready' && current_stop_times.length === 0)
-	);
+	const st_loading = $derived(awaitingRows(stop_times_store, current_stop_times.length));
 
 	const { arrivals: stop_times_with_trip, active_routes } = $derived(
 		get_stop_arrivals(current_stop_times, trips?.current, current_time.ms, {
@@ -140,7 +130,9 @@
 	<Transfers stop_source={stop.data.source} transfers={stop.transfers} />
 {/if}
 
-{#if st_loading}
+{#if stop_times_store?.error && !current_stop_times.length}
+	<p class="p-2 text-center text-neutral-400">Arrivals unavailable</p>
+{:else if st_loading}
 	<Skeleton lines={5} class="p-2" />
 {:else if !selected_stop_times.length}
 	<div class="text-center font-semibold text-neutral-400">No upcoming trips</div>

@@ -2,6 +2,8 @@
 	import { page } from '$app/state';
 
 	import type { Trip } from '#lib/client/index.js';
+	import { source_info } from '#lib/resources/index.svelte.js';
+	import { awaitingRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
@@ -15,15 +17,25 @@
 
 	interface Props {
 		data: Trip;
+		acquire_routes?: boolean;
 	}
-	let { data }: Props = $props();
+	let { data, acquire_routes = true }: Props = $props();
 
 	const source_stop_times = $derived(stop_time_context.getSource(data.data.source));
+
+	$effect(() => {
+		if (!acquire_routes || !source_info[data.data.source].monitor_routes) return;
+		return source_stop_times?.hold([data.route_id]);
+	});
 
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(data.id) ?? []);
 
 	const is_loading = $derived(
-		!source_stop_times || (source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
+		awaitingRows(
+			source_stop_times,
+			all_trip_stop_times.length,
+			source_info[data.data.source].monitor_routes ? data.route_id : undefined
+		)
 	);
 
 	const stop_times = $derived(
@@ -47,7 +59,9 @@
 	});
 </script>
 
-{#if is_loading}
+{#if source_stop_times?.error && !all_trip_stop_times.length}<span class="text-xs text-amber-200"
+		>Unavailable</span
+	>{:else if is_loading}
 	<Skeleton lines={2} class="w-full" />
 {:else}
 	<div class="flex flex-col items-center gap-1 text-left">
