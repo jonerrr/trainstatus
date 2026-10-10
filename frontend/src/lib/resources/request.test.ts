@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { requestData, resourceQuery } from './request';
 
@@ -36,6 +36,21 @@ it('returns decoded data directly and rejects failed live updates', async () => 
 		)
 	).rejects.toBeInstanceOf(SyntaxError);
 });
+it.each(['1', ''])(
+	'rejects cached fallback updates before decoding (marker %j)',
+	async (marker) => {
+		const decode = vi.fn((response: Response) => response.json());
+		await expect(
+			requestData(
+				'/data',
+				decode,
+				new AbortController().signal,
+				async () => new Response('[]', { headers: { 'x-sw-fallback': marker } })
+			)
+		).rejects.toThrow('cached fallback');
+		expect(decode).not.toHaveBeenCalled();
+	}
+);
 it('cancels a pending fetch with the caller signal', async () => {
 	const controller = new AbortController();
 	const fetcher: typeof fetch = async (_url, options) => {

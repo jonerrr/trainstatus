@@ -57,7 +57,7 @@ self.addEventListener('fetch', (event) => {
 		}
 
 		// Network first. The service worker owns the deadline, and a failure
-		// returns the last cached response as a normal response.
+		// marks the last cached response so resources treat it as a failed update.
 		try {
 			const response = await fetch(event.request, { signal: AbortSignal.timeout(5000) });
 
@@ -75,7 +75,15 @@ self.addEventListener('fetch', (event) => {
 			return response;
 		} catch (err) {
 			const response = await cache.match(event.request);
-			if (response) return response;
+			if (response) {
+				const headers = new Headers(response.headers);
+				headers.set('x-sw-fallback', '1');
+				return new Response(response.body, {
+					status: response.status,
+					statusText: response.statusText,
+					headers
+				});
+			}
 			throw err;
 		}
 	}

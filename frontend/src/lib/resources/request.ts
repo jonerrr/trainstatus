@@ -32,6 +32,11 @@ export async function requestData<T>(
 	fetcher: typeof fetch = fetch
 ): Promise<T> {
 	const response = await fetcher(url, { signal });
+	// TODO: decide whether offline startup should load cached realtime data as stale
+	// while still treating the network update as failed and continuing retries.
+	if (response.headers.has('x-sw-fallback')) {
+		throw new Error('Data service returned a cached fallback');
+	}
 	if (!response.ok) throw new Error(`Data service returned ${response.status}`);
 	return decode(response);
 }
