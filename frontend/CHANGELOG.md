@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.5.1...frontend-v1.6.0) (2026-10-10)
+
+
+### Features
+
+* Add offline indicator and improve error handling ([#451](https://github.com/jonerrr/trainstatus/issues/451)) ([8b614fd](https://github.com/jonerrr/trainstatus/commit/8b614fdcab7868497d602a86d3d4ccbae3b0851e))
+
+
+### Bug Fixes
+
+* current time handling, modal focus, and remove unused code ([8e5e429](https://github.com/jonerrr/trainstatus/commit/8e5e429fb2682a763f2c61c6397e68505fea0fff))
+
 ## [1.5.1](https://github.com/jonerrr/trainstatus/compare/frontend-v1.5.0...frontend-v1.5.1) (2026-10-08)
 
 
