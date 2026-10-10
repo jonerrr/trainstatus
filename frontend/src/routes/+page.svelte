@@ -18,7 +18,7 @@
 
 	$effect(() => {
 		for (const [source, resource] of Object.entries(all_trips)) {
-			if (resource.status !== 'ready') continue;
+			if (!resource.available) continue;
 			const map = resource.current;
 			if (!map) continue;
 			const src = source as Source;

@@ -4,16 +4,13 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import type { Source } from '#lib/client/index.js';
+	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import DeckOverlay from './DeckOverlay.svelte';
 	import type { MapFeatureKey, VehiclePicker } from './interactions';
 	import { watchTrajectories, type TrajectorySnapshot } from './trajectories';
-	import {
-		buildActiveVehiclesAtTime,
-		type ActiveVehicle,
-		type RenderUnitTable
-	} from './trajectoryArrow';
+	import { buildActiveVehiclesAtTime, type ActiveVehicle } from './trajectoryArrow';
 	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
 
 	const current_time = getCurrentTime();
@@ -32,19 +29,30 @@
 		onPickerReady: (picker: VehiclePicker | null) => void;
 	} = $props();
 	const fixedAt = $derived(current_time.value ?? null);
-	let snapshot = $state.raw<TrajectorySnapshot>({ tables: new Map(), errors: new Map() });
-	const invalidTables = new WeakSet<RenderUnitTable>();
+	let snapshot = $state.raw<TrajectorySnapshot>({
+		tables: new Map(),
+		statuses: new Map()
+	});
 	const identities = new WeakMap<ActiveVehicle[], string[]>();
 	const pools = new SvelteMap<Source, ActiveVehicle[]>();
 	let frame = $state(0);
 	let membership = $state(0);
-	let decodeError = $state(false);
 
-	$effect(() =>
-		watchTrajectories({ sources, at: fixedAt, refreshInterval: 30_000 }, (next) => {
-			snapshot = next;
-		})
-	);
+	const updates = getUpdateStatus();
+	$effect(() => {
+		const selected = [...sources];
+		const at = fixedAt;
+		return untrack(() => {
+			return watchTrajectories(
+				{ sources: selected, at, refreshInterval: 30_000 },
+				(next) => {
+					snapshot = next;
+				},
+				undefined,
+				updates
+			);
+		});
+	});
 
 	function update(time: number) {
 		let changed = false;
@@ -58,16 +66,7 @@
 			const pool = pools.get(source) ?? [];
 			const previousIds = identities.get(pool) ?? [];
 			identities.set(pool, previousIds);
-			try {
-				if (invalidTables.has(table)) {
-					pool.length = 0;
-					decodeError = true;
-				} else buildActiveVehiclesAtTime(table, time, pool);
-			} catch {
-				invalidTables.add(table);
-				pool.length = 0;
-				decodeError = true;
-			}
+			buildActiveVehiclesAtTime(table, time, pool);
 			// Reuse the identity buffer rather than allocating arrays/strings every frame.
 			if (previousIds.length !== pool.length) changed = true;
 			for (let i = 0; i < pool.length; i++) {
@@ -85,7 +84,6 @@
 		void snapshot;
 		const at = fixedAt;
 		untrack(() => {
-			decodeError = false;
 			update(at ?? Date.now() / 1000);
 			membership++;
 		});
@@ -117,13 +115,3 @@
 </script>
 
 <DeckOverlay {layers} onpicker={onPickerReady} />
-{#if snapshot.errors.size || decodeError}
-	<div
-		class="pointer-events-none absolute right-3 bottom-14 z-20 rounded-lg bg-neutral-950/90 px-3 py-2 text-xs text-amber-200"
-		role="status"
-	>
-		Some vehicle data is unavailable. {fixedAt === null
-			? 'Retrying automatically.'
-			: 'Try another time or reload.'}
-	</div>
-{/if}

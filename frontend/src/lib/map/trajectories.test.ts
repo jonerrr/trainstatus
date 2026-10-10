@@ -4,7 +4,35 @@ import { watchTrajectories } from './trajectories';
 
 afterEach(() => vi.useRealTimers());
 
-test('historical requests carry the selected time and never poll', async () => {
+test('a failed historical Arrow update retries until network recovery', async () => {
+	vi.useFakeTimers();
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let calls = 0;
+	let latest: import('./trajectories').TrajectorySnapshot | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: 0, refreshInterval: 100 },
+		(snapshot) => {
+			latest = snapshot;
+		},
+		async () => {
+			calls++;
+			return new Response(trajectoryFixture(), calls === 1 ? { status: 503 } : {});
+		}
+	);
+	await vi.advanceTimersByTimeAsync(0);
+	expect(latest?.tables.size).toBe(0);
+	expect(latest?.statuses.get('mta_bus')?.available).toBe(false);
+	expect(latest?.statuses.get('mta_bus')?.error).toBeInstanceOf(Error);
+	await vi.advanceTimersByTimeAsync(1000);
+	expect(calls).toBe(2);
+	expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
+	expect(latest?.statuses.get('mta_bus')?.error).toBeNull();
+	await stop.refresh();
+	expect(calls).toBe(3);
+	stop();
+});
+
+test('historical failures retry at the selected time', async () => {
 	vi.useFakeTimers();
 	const urls: string[] = [];
 	const stop = watchTrajectories(
@@ -16,7 +44,8 @@ test('historical requests carry the selected time and never poll', async () => {
 		}
 	);
 	await vi.advanceTimersByTimeAsync(1000);
-	expect(urls).toEqual(['/api/v1/trajectories/mta_bus?at=123']);
+	expect(urls.length).toBeGreaterThan(1);
+	expect(new Set(urls)).toEqual(new Set(['/api/v1/trajectories/mta_bus?at=123']));
 	stop();
 });
 
@@ -49,7 +78,9 @@ test('live polling reports a source failure and stops after disposal', async () 
 	const stop = watchTrajectories(
 		{ sources: ['njt_bus'], at: null, refreshInterval: 100 },
 		(update) => {
-			errors.push(...update.errors.values());
+			for (const state of update.statuses.values()) {
+				if (state.error) errors.push(state.error.message);
+			}
 		},
 		async () => {
 			requests++;

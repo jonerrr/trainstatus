@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends Stop | Route | Trip">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
@@ -11,6 +11,7 @@
 	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import { source_info } from '#lib/resources/index.svelte.js';
+	import { stop_time_context, type StopTimeResources } from '#lib/resources/stop_times.svelte.js';
 	import RouteButton from '#lib/Route/Button.svelte';
 	import StopButton from '#lib/Stop/Button.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
@@ -188,6 +189,36 @@
 		];
 	});
 
+	// One subscription on the resource. Replacing rows only changes the route union,
+	// so a route that stays visible is not released and acquired again.
+	let synced_resource: StopTimeResources[Source];
+	let route_sync: { sync: (routes: Iterable<string>) => void; stop: () => void } | undefined;
+	$effect(() => {
+		const source = active_source;
+		const resource =
+			source && type !== 'route' && source_info[source].monitor_routes
+				? stop_time_context.getSource(source)
+				: undefined;
+		const routes = visible_items.flatMap(({ data }) =>
+			type === 'stop'
+				? (data as Stop).routes.map((route) => route.route_id)
+				: type === 'trip'
+					? [(data as Trip).route_id]
+					: []
+		);
+		untrack(() => {
+			if (synced_resource !== resource) {
+				route_sync?.stop();
+				route_sync = resource?.sync_routes();
+				synced_resource = resource;
+			}
+			route_sync?.sync(routes);
+		});
+	});
+	$effect(() => () => {
+		route_sync?.stop();
+	});
+
 	// Calculate total height for the scroll container
 	const total_height = $derived.by(() => {
 		const { offsets, total } = derived_layout;
@@ -312,11 +343,11 @@
 							}}
 						>
 							{#if type === 'stop'}
-								<StopButton data={data as Stop} />
+								<StopButton data={data as Stop} acquire_routes={false} />
 							{:else if type === 'route'}
 								<RouteButton data={data as Route} />
 							{:else if type === 'trip'}
-								<TripButton data={data as Trip} />
+								<TripButton data={data as Trip} acquire_routes={false} />
 							{/if}
 						</button>
 

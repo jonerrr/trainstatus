@@ -6,14 +6,16 @@
 
 	import Button from '#lib/Button.svelte';
 	import type { StopTime, Trip } from '#lib/client/index.js';
-	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import ModalList from '#lib/ModalList.svelte';
 	import { source_info } from '#lib/resources/index.svelte.js';
+	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
 	import { position_context } from '#lib/resources/positions.svelte.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
@@ -43,17 +45,18 @@
 	// Stop modal that would otherwise register the route, so without this the
 	// destination and stop list stay empty and `last_stop` shows "Unknown".
 	$effect(() => {
-		if (source_stop_times && source_info[trip.data.source]?.monitor_routes) {
-			const route_id = trip.route_id;
-			source_stop_times.add_route(route_id);
-			return () => source_stop_times.remove_route(route_id);
-		}
+		if (!source_info[trip.data.source]?.monitor_routes) return;
+		return source_stop_times?.hold([trip.route_id]);
 	});
 
 	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
 
 	const st_loading = $derived(
-		!source_stop_times || (source_stop_times.status !== 'ready' && all_trip_stop_times.length === 0)
+		awaitingRows(
+			source_stop_times,
+			all_trip_stop_times.length,
+			source_info[trip.data.source].monitor_routes ? trip.route_id : undefined
+		)
 	);
 
 	const stop_times = $derived(
@@ -68,16 +71,17 @@
 	const headsign = $derived(
 		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
 	);
-	const busPosition = $derived(
-		trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'
-			? position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id)
-			: undefined
-	);
-	const deviationMinutes = $derived(
-		trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
-			? trip.data.deviation / 60
-			: undefined
-	);
+	const bus = $derived.by(() => {
+		if (trip.data.source !== 'mta_bus' && trip.data.source !== 'njt_bus') return;
+		return {
+			position: position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id),
+			vehicle_id: trip.vehicle_id,
+			deviation:
+				trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
+					? trip.data.deviation / 60
+					: undefined
+		};
+	});
 
 	type StopTransfers = Record<string, StopTime[]>;
 
@@ -156,31 +160,42 @@
 </script>
 
 <div class="p-3">
-	<div class="flex items-center justify-between gap-3">
-		<FeatureSummary
-			link={!!route}
-			show_alerts
-			feature={{
-				route,
-				title: trip_destination_title(headsign, route)
-			}}
-		/>
-		{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
-			<span class="shrink-0 text-xs text-neutral-400">Bus #{trip.vehicle_id}</span>
+	<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
+		{#if route}
+			<Icon
+				{route}
+				width={28}
+				height={28}
+				link
+				show_alerts
+				class="col-start-1 row-start-1 h-7 self-center justify-self-center"
+			/>
+		{/if}
+		{#if bus}
+			<div
+				class={[
+					'flex h-5 items-center justify-self-center leading-5',
+					route ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
+				]}
+			>
+				<VehicleCapacity position={bus.position} />
+			</div>
+			<span
+				class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
+				>Bus #{bus.vehicle_id}</span
+			>
+		{/if}
+		<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
+			<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
+				{trip_destination_title(headsign, route)}
+			</div>
+		</div>
+		{#if bus?.deviation !== undefined}
+			<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300">
+				{Math.abs(bus.deviation).toFixed(0)} min {bus.deviation > 0 ? 'late' : 'early'}
+			</div>
 		{/if}
 	</div>
-	{#if trip.data.source === 'mta_bus' || trip.data.source === 'njt_bus'}
-		<div
-			class="mt-2 flex items-center divide-x divide-neutral-600 *:pl-3 first:*:pl-0 [&:not(:has(*))]:hidden"
-		>
-			<VehicleCapacity position={busPosition} />
-			{#if deviationMinutes !== undefined}
-				<div class="shrink-0 text-sm text-neutral-300">
-					{Math.abs(deviationMinutes).toFixed(0)} min {deviationMinutes > 0 ? 'late' : 'early'}
-				</div>
-			{/if}
-		</div>
-	{/if}
 </div>
 <!-- TODO: rework -->
 {#if trip.data.source === 'mta_subway'}
@@ -241,7 +256,9 @@
 	</details>
 {/if}
 
-{#if st_loading}
+{#if unavailableRows(source_stop_times, all_trip_stop_times.length)}
+	<UnavailableRows arrivals />
+{:else if st_loading}
 	<Skeleton lines={6} class="p-2" />
 {:else}
 	<ModalList>

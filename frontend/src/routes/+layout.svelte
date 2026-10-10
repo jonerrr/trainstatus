@@ -9,6 +9,7 @@
 	import Navbar from '#lib/Navbar.svelte';
 	import { alert_context, createAlertResource } from '#lib/resources/alerts.svelte.js';
 	import { createPositionResource, position_context } from '#lib/resources/positions.svelte.js';
+	import { setUpdateStatus, UpdateStatus } from '#lib/resources/status.svelte.js';
 	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
 	import SEO from '#lib/SEO.svelte';
@@ -24,6 +25,8 @@
 	let { children } = $props();
 
 	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
+
+	const update_status = setUpdateStatus(new UpdateStatus());
 
 	trip_context.set(
 		Object.fromEntries(
@@ -54,7 +57,6 @@
 		const url = page.url;
 		const stop_id = url.searchParams.get('s');
 		const route_id = url.searchParams.get('r');
-		const trip_id = url.searchParams.get('t');
 		const source_id = url.searchParams.get('src') as Source | null;
 
 		if (!source_id) {
@@ -84,24 +86,24 @@
 					})
 				);
 			}
-		} else if (trip_id) {
-			const all_trips_data = trip_context.get();
-			const resource = all_trips_data[source_id];
-			if (resource) {
-				resource.whenReady().then((trips) => {
-					const trip = trips.get(trip_id);
-					if (trip && page.url.searchParams.get('t') === trip_id) {
-						tick().then(() =>
-							goto('', {
-								shallow: true,
-								replace: true,
-								state: { modal: { ...trip, type: 'trip' } }
-							})
-						);
-					}
-				});
-			}
 		}
+	});
+
+	// A direct trip URL can recover through the shared Retry or reconnect handler.
+	$effect(() => {
+		const params = page.url.searchParams;
+		const trip_id = params.get('t');
+		const source = params.get('src') as Source | null;
+		if (!trip_id || !source || params.has('s') || params.has('r') || page.state.modal) return;
+		const resource = trip_context.getSource(source);
+		if (!resource?.available) return;
+		const trip = resource.current.get(trip_id);
+		if (trip)
+			void goto('', {
+				shallow: true,
+				replace: true,
+				state: { ...page.state, modal: { ...trip, type: 'trip' } }
+			});
 	});
 
 	// Sync current_time.value with ?at URL param whenever it changes.
@@ -127,12 +129,20 @@
 
 <SEO />
 
+<svelte:window
+	onoffline={() => {
+		void update_status.retry(true);
+	}}
+	ononline={() => {
+		void update_status.retry(true);
+	}}
+/>
+
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->
 <div class="app-shell flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
 	<main class="relative min-h-0 flex-1 overflow-hidden text-white">
 		<Modal />
-
 		{@render children()}
 	</main>
 </div>

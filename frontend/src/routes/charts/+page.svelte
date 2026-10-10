@@ -9,6 +9,7 @@
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { Route, Source } from '#lib/client/index.js';
 	import { source_info, type SourceMap } from '#lib/resources/index.svelte.js';
+	import { awaitingRows } from '#lib/resources/pending.js';
 	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
 	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
@@ -27,10 +28,9 @@
 	const all_stop_times = stop_time_context.get();
 
 	const trips_loading = $derived(
-		page.data.selected_sources.some((s) => {
-			const r = all_trips[s];
-			return !r || (r.status !== 'ready' && !r.current.size);
-		})
+		page.data.selected_sources.some((source) =>
+			awaitingRows(all_trips[source], all_trips[source]?.current.size ?? 0)
+		)
 	);
 
 	let routes = $state<SourceMap<Route[]>>(
@@ -70,27 +70,13 @@
 	// TODO: add tabs so users have to choose the source
 	// Monitor bus routes in the stop_times resource
 	$effect(() => {
-		// Track what we registered so the cleanup can undo exactly that set.
-		const registered: Array<{ source: Source; route_id: string }> = [];
-
-		for (const source of page.data.selected_sources) {
-			if (!source_info[source].monitor_routes) {
-				// stop times are already loaded for this source
-				continue;
-			}
-			const resource = all_stop_times[source];
-			if (!resource) continue;
-
-			for (const route of routes[source] ?? []) {
-				resource.add_route(route.id);
-				registered.push({ source, route_id: route.id });
-			}
-		}
-
+		const releases = page.data.selected_sources.flatMap((source) => {
+			if (!source_info[source].monitor_routes) return [];
+			const release = all_stop_times[source]?.hold((routes[source] ?? []).map((route) => route.id));
+			return release ? [release] : [];
+		});
 		return () => {
-			for (const { source, route_id } of registered) {
-				all_stop_times[source]?.remove_route(route_id);
-			}
+			for (const release of releases) release();
 		};
 	});
 

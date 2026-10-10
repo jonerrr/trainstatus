@@ -2,14 +2,12 @@ import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 
 import type { Source } from '#lib/client/index.js';
 import {
+	createEntityResource,
 	createMultiSourceContext,
-	LiveResource,
-	source_info,
 	type PositionResource,
 	type PositionResources,
 	type TypedVehiclePosition
 } from '#lib/resources/index.svelte.js';
-import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 export function index_positions<S extends Source>(
 	data: TypedVehiclePosition<S>[]
@@ -25,38 +23,12 @@ export function index_positions<S extends Source>(
 	);
 }
 export function createPositionResource<S extends Source>(source: S) {
-	const current_time = getCurrentTime();
-	const resource = new LiveResource<PositionResource<S>>(
-		async (signal) => {
-			console.log(`updating ${source} positions`);
-
-			const at = current_time.value;
-			const query_params = at !== undefined ? `?at=${at}` : '';
-			const res = await fetch(`/api/v1/positions/${source}${query_params}`, { signal });
-
-			if (res.headers.has('x-sw-fallback')) throw new Error('Offline');
-			if (!res.ok) throw new Error('Failed to fetch vehicle positions');
-
-			const data = (await res.json()) as TypedVehiclePosition<S>[];
-			return index_positions<S>(data);
-		},
-		new SvelteMap(),
-		{
-			interval: source_info[source].refresh_interval.positions,
-			debounce: 500
-		}
+	return createEntityResource<TypedVehiclePosition<S>[], PositionResource<S>>(
+		source,
+		'positions',
+		index_positions<S>,
+		new SvelteMap()
 	);
-
-	let prev_time = current_time.value;
-	$effect(() => {
-		const val = current_time.value;
-		if (val !== prev_time) {
-			prev_time = val;
-			resource.refresh();
-		}
-	});
-
-	return resource;
 }
 
 export const position_context = createMultiSourceContext<PositionResources>();

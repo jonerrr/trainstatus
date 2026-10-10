@@ -4,18 +4,23 @@ import type { LayoutLoad } from './$types';
 
 export const load: LayoutLoad = async ({ fetch, data }) => {
 	const { selected_sources } = data;
+	async function read<T>(url: string): Promise<T> {
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`Static data request failed: ${response.status}`);
+		return response.json();
+	}
 
 	const [stop_results, route_results] = await Promise.all([
 		Promise.all(
 			selected_sources.map(async (source) => ({
 				source,
-				data: (await (await fetch(`/api/v1/stops/${source}`)).json()) as Stop[]
+				data: await read<Stop[]>(`/api/v1/stops/${source}`)
 			}))
 		),
 		Promise.all(
 			selected_sources.map(async (source) => ({
 				source,
-				data: (await (await fetch(`/api/v1/routes/${source}`)).json()) as Route[]
+				data: await read<Route[]>(`/api/v1/routes/${source}`)
 			}))
 		)
 	]);

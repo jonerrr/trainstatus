@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Route } from '#lib/client/index.js';
 	import { alert_context } from '#lib/resources/alerts.svelte.js';
+	import { awaitingRows } from '#lib/resources/pending.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 
@@ -22,7 +23,7 @@
 			) ?? []
 	);
 
-	const alerts_loading = $derived(alerts?.status !== 'ready' && !route_alerts.length);
+	const alerts_loading = $derived(awaitingRows(alerts, route_alerts.length));
 </script>
 
 <section class="flex items-center gap-1">

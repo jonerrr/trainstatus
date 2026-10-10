@@ -18,6 +18,12 @@ import type {
 	TripData,
 	VehiclePosition
 } from '#lib/client/index.js';
+import { getCurrentTime } from '#lib/url_params.svelte.js';
+
+import { LiveResource } from './liveResource.svelte';
+import { requestData, resourceQuery, type DataKind } from './request';
+
+export { LiveResource } from './liveResource.svelte';
 
 export const source_info = {
 	// TODO: increase refresh interval
@@ -51,7 +57,6 @@ export const source_info = {
 	},
 	njt_bus: {
 		name: 'NJT Bus',
-		// TODO: update icon
 		icon: njt_bus_icon,
 		refresh_interval: {
 			trips: 30_000,
@@ -178,149 +183,22 @@ export function createMultiSourceContext<ResourceMap extends SourceMap<unknown>>
 	return { get, set, getSource };
 }
 
-type Fetcher<T> = (signal: AbortSignal) => Promise<T>;
-
-export type ResourceStatus = 'initial' | 'fetching' | 'ready' | 'error';
-
-interface LiveResourceOptions {
-	interval?: number;
-	enabled?: boolean;
-	debounce?: number;
-}
-
-export class LiveResource<T> {
-	current: T = $state() as T;
-	status: ResourceStatus = $state<ResourceStatus>('initial');
-	error: Error | null = $state(null);
-
-	#interval_ms: number = $state(5000);
-	#enabled: boolean = $state(true);
-	#debounce_ms: number = $state(0);
-
-	#fetcher: Fetcher<T>;
-	#interval_timer: ReturnType<typeof setTimeout> | undefined;
-	#debounce_timer: ReturnType<typeof setTimeout> | undefined;
-	#abort_controller: AbortController | undefined;
-
-	#pending_resolvers: Array<() => void> = [];
-	#ready_resolvers: Array<(value: T) => void> = [];
-
-	constructor(fetcher: Fetcher<T>, initial_value: T, options: LiveResourceOptions = {}) {
-		this.#fetcher = fetcher;
-		this.current = initial_value;
-		if (options.interval) this.#interval_ms = options.interval;
-		if (options.enabled !== undefined) this.#enabled = options.enabled;
-		if (options.debounce) this.#debounce_ms = options.debounce;
-
-		$effect(() => {
-			if (this.#enabled) {
-				this.#startInterval();
-			} else {
-				this.#stopInterval();
-				this.#abort_controller?.abort();
-			}
-
-			return () => {
-				this.#stopInterval();
-				this.#clearDebounce();
-			};
-		});
-	}
-
-	#startInterval() {
-		this.#stopInterval();
-		const delay = this.status === 'initial' ? 0 : this.#interval_ms;
-		this.#interval_timer = setTimeout(() => {
-			this.refresh();
-		}, delay);
-	}
-
-	#stopInterval() {
-		if (this.#interval_timer) {
-			clearTimeout(this.#interval_timer);
-			this.#interval_timer = undefined;
+/** Factories own indexing; the shared owner captures time and handles all scheduling. */
+export function createEntityResource<T, R>(
+	source: Source,
+	kind: Exclude<DataKind, 'stop_times' | 'trajectories'>,
+	index: (data: T) => R,
+	initial: R
+) {
+	const time = getCurrentTime();
+	return new LiveResource<R>(
+		(query, signal) =>
+			requestData(query.url, async (response) => index(await response.json()), signal),
+		initial,
+		{
+			query: () => resourceQuery(source, kind, time.value ?? null),
+			interval: source_info[source].refresh_interval[kind],
+			debounce: 500
 		}
-	}
-
-	#clearDebounce() {
-		if (this.#debounce_timer) {
-			clearTimeout(this.#debounce_timer);
-			this.#debounce_timer = undefined;
-		}
-	}
-
-	async refresh(immediate = false) {
-		this.#clearDebounce();
-
-		if (!immediate && this.#debounce_ms > 0) {
-			this.#debounce_timer = setTimeout(() => {
-				this.#executeFetch();
-			}, this.#debounce_ms);
-			return;
-		}
-
-		return this.#executeFetch();
-	}
-
-	/**
-	 * Returns a promise that resolves after the next successful fetch completes.
-	 * Triggers a debounced refresh so multiple calls within the debounce window
-	 * are batched into a single request.
-	 */
-	next_refresh(): Promise<void> {
-		const promise = new Promise<void>((resolve) => {
-			this.#pending_resolvers.push(resolve);
-		});
-		this.refresh();
-		return promise;
-	}
-
-	/**
-	 * Returns a promise that resolves with the current value once the resource
-	 * has successfully fetched at least once. Resolves immediately if already ready.
-	 */
-	whenReady(): Promise<T> {
-		if (this.status === 'ready') return Promise.resolve(this.current);
-		return new Promise<T>((resolve) => {
-			this.#ready_resolvers.push(resolve);
-		});
-	}
-
-	async #executeFetch() {
-		if (this.status === 'fetching') return;
-
-		this.status = 'fetching';
-		this.#abort_controller = new AbortController();
-
-		try {
-			const data = await this.#fetcher(this.#abort_controller.signal);
-
-			if (!this.#abort_controller.signal.aborted) {
-				this.current = data;
-				this.error = null;
-				this.status = 'ready';
-
-				const resolvers = this.#pending_resolvers.splice(0);
-				for (const resolve of resolvers) resolve();
-
-				const ready_resolvers = this.#ready_resolvers.splice(0);
-				for (const resolve of ready_resolvers) resolve(data);
-			}
-		} catch (e) {
-			if (e instanceof Error && e.name === 'AbortError') {
-				// Status cleared in `finally` — avoids leaving `fetching`, which would block
-				// subsequent `#executeFetch` calls at the guard below.
-			} else {
-				console.error('Resource fetch failed:', e);
-				this.error = e as Error;
-				this.status = 'error';
-			}
-		} finally {
-			// Abort paths (catch AbortError, or fetch resolved after abort) never assign
-			// `status`, so we would stay `fetching` forever and block future refreshes.
-			if (this.status === 'fetching') this.status = 'ready';
-
-			if (this.#enabled) this.#startInterval();
-		}
-	}
+	);
 }
