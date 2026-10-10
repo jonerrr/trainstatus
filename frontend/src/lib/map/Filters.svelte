@@ -7,7 +7,6 @@
 
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
-	import { dismissOnEscape } from './dialog';
 	import { layer_data, type FilterValue, type MapFilters } from './filters.svelte';
 	import SourceFilterGroup from './SourceFilterGroup.svelte';
 
@@ -38,12 +37,14 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (
+			event.key === 'Escape' &&
 			filtersOpen &&
 			!event.defaultPrevented &&
 			!page.state.modal &&
 			(panel?.contains(document.activeElement) || trigger === document.activeElement)
 		) {
-			dismissOnEscape(event, () => closeFilters());
+			event.preventDefault();
+			closeFilters();
 		}
 	}
 </script>
