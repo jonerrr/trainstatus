@@ -1,21 +1,18 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import type { Source } from '#lib/client/index.js';
+	import type { Catalog } from '#lib/client/index.js';
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
-	import { alert_context, createAlertResource } from '#lib/resources/alerts.svelte.js';
-	import { createPositionResource, position_context } from '#lib/resources/positions.svelte.js';
-	import { setUpdateStatus, UpdateStatus } from '#lib/resources/status.svelte.js';
-	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
-	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
 	import SEO from '#lib/SEO.svelte';
+	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
 		createCurrentTime,
+		modal_from_url,
 		setCurrentTime
 	} from '#lib/url_params.svelte.js';
 
@@ -26,84 +23,28 @@
 
 	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
 
-	const update_status = setUpdateStatus(new UpdateStatus());
+	// One owner per layout instance; on the server it never fetches.
+	const transit = setTransitData(new TransitData({ sources: page.data.selected_sources }));
+	$effect(() => {
+		transit.setSources(page.data.selected_sources);
+	});
+	onDestroy(() => transit.destroy());
 
-	trip_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createTripResource(source)])
-		)
-	);
-
-	stop_time_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createStopTimeResource(source)])
-		)
-	);
-
-	position_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createPositionResource(source)])
-		)
-	);
-
-	alert_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createAlertResource(source)])
-		)
-	);
-
-	// Initialize modal from URL params on page load
+	// Open the modal a direct link identifies; the modal loads its own data.
 	onMount(() => {
-		const url = page.url;
-		const stop_id = url.searchParams.get('s');
-		const route_id = url.searchParams.get('r');
-		const source_id = url.searchParams.get('src') as Source | null;
-
-		if (!source_id) {
-			console.warn('No source specified in URL params, skipping modal initialization');
-			return;
-		}
-
-		if (stop_id) {
-			const stop = page.data.stops_by_id[source_id]?.[stop_id];
-			if (stop) {
-				tick().then(() =>
-					goto('', {
-						shallow: true,
-						replace: true,
-						state: { modal: { ...stop, type: 'stop' } }
-					})
-				);
-			}
-		} else if (route_id) {
-			const route = page.data.routes_by_id[source_id]?.[route_id];
-			if (route) {
-				tick().then(() =>
-					goto('', {
-						shallow: true,
-						replace: true,
-						state: { modal: { ...route, type: 'route' } }
-					})
-				);
-			}
-		}
+		const modal = modal_from_url(page.url);
+		if (modal) void tick().then(() => goto('', { shallow: true, replace: true, state: { modal } }));
 	});
 
-	// A direct trip URL can recover through the shared Retry or reconnect handler.
-	$effect(() => {
-		const params = page.url.searchParams;
-		const trip_id = params.get('t');
-		const source = params.get('src') as Source | null;
-		if (!trip_id || !source || params.has('s') || params.has('r') || page.state.modal) return;
-		const resource = trip_context.getSource(source);
-		if (!resource?.available) return;
-		const trip = resource.current.get(trip_id);
-		if (trip)
-			void goto('', {
-				shallow: true,
-				replace: true,
-				state: { ...page.state, modal: { ...trip, type: 'trip' } }
-			});
+	// The service worker posts catalogs that changed after it served a saved copy.
+	onMount(() => {
+		const worker = navigator.serviceWorker;
+		const message = (event: MessageEvent<{ type?: string; body?: Catalog }>) => {
+			if (event.data?.type === 'catalog' && event.data.body)
+				transit.replaceCatalog(event.data.body);
+		};
+		worker?.addEventListener('message', message);
+		return () => worker?.removeEventListener('message', message);
 	});
 
 	// Sync current_time.value with ?at URL param whenever it changes.
@@ -130,11 +71,8 @@
 <SEO />
 
 <svelte:window
-	onoffline={() => {
-		void update_status.retry(true);
-	}}
 	ononline={() => {
-		void update_status.retry(true);
+		transit.retry();
 	}}
 />
 

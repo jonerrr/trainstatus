@@ -3,26 +3,47 @@ import type { Source } from '#lib/client/index.js';
 import '../../app.css';
 
 import { page } from '#lib/test/page.svelte.js';
+import { fixtureTransitData, type TransitFixture } from '#lib/test/transit-fixture.js';
+import TransitProvider from '#lib/test/TransitProvider.svelte';
+import type { TransitData } from '#lib/transit/store.svelte.js';
 
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
 
 import ChartsPage from '../../routes/charts/+page.svelte';
-import { resources, setFixture, stopResources } from './set-fixture.svelte.js';
+import { chartFixture, chartNow } from './fixtures.js';
 
-vi.mock('#lib/url_params.svelte.js', async () => ({
-	...(await import('./set-fixture.svelte.js')),
+vi.mock('#lib/url_params.svelte.js', async (original) => ({
+	...(await original<typeof import('#lib/url_params.svelte.js')>()),
+	getCurrentTime: () => ({ value: undefined, ms: chartNow }),
 	open_modal: () => {}
 }));
-vi.mock('#lib/resources/trips.svelte.js', () => ({ trip_context: { get: () => resources } }));
-vi.mock('#lib/resources/stop_times.svelte.js', () => ({
-	stop_time_context: { get: () => stopResources }
-}));
-vi.mock('#lib/resources/alerts.svelte.js', () => ({ alert_context: { get: () => ({}) } }));
+
+let fixture: TransitFixture = { catalogs: {}, services: {} };
+let data: TransitData | undefined;
+
+function setFixture(source: Source, direction: number, patterns?: string[][]) {
+	const built = chartFixture(source, direction, patterns);
+	fixture = { catalogs: { [source]: built.catalog }, services: { [source]: built.service } };
+	page.data = { selected_sources: [source] };
+	return built;
+}
+
+afterEach(() => {
+	data?.destroy();
+	data = undefined;
+});
 
 async function renderChart() {
-	const { container } = await render(ChartsPage);
+	data = fixtureTransitData(fixture, () => chartNow);
+	const { container } = await render(TransitProvider, {
+		props: {
+			data,
+			component: ChartsPage as never,
+			child_props: {}
+		}
+	});
 	container.style.width = '1400px';
 	container.style.height = '800px';
 }
@@ -38,7 +59,7 @@ async function expectChartSize() {
 for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 	for (const direction of [0, 1]) {
 		test(`${source} direction ${direction}: every rendered trip progresses through the stop axis`, async () => {
-			const fixture = setFixture(source, direction);
+			const built = setFixture(source, direction);
 			await renderChart();
 			if (source !== 'mta_subway') {
 				await userEvent.click(document.querySelector('[aria-label="Add routes"]')!);
@@ -47,7 +68,7 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 			if (direction === 1) await userEvent.click(document.querySelector('#southbound')!);
 			await expect
 				.poll(() => document.querySelectorAll('.path-line').length)
-				.toBe(fixture.trips.length);
+				.toBe(built.trips.length);
 			await expectChartSize();
 			for (const [index, path] of [...document.querySelectorAll('.path-line')].entries()) {
 				const d = path.getAttribute('d')!;
@@ -56,7 +77,7 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 					Number(m[1]),
 					Number(m[2])
 				]);
-				expect(points.length).toBe(fixture.stopTimes.get(fixture.trips[index].id)!.length);
+				expect(points.length).toBe(built.patterns[index].length);
 				expect(
 					points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0)
 				).toBe(true);
@@ -105,17 +126,12 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 
 test('multiple sources keep colliding trip/stop/route IDs separate and use their own route colors', async () => {
 	const sources: Source[] = ['mta_subway', 'mta_bus', 'njt_bus'];
-	const snapshots = sources.map((source) => {
-		setFixture(source, 0);
-		return page.data;
-	});
-	page.data = {
-		selected_sources: sources,
-		stops: Object.assign({}, ...snapshots.map((data) => data.stops)),
-		stops_by_id: Object.assign({}, ...snapshots.map((data) => data.stops_by_id)),
-		routes: Object.assign({}, ...snapshots.map((data) => data.routes)),
-		routes_by_id: Object.assign({}, ...snapshots.map((data) => data.routes_by_id))
+	const built = sources.map((source) => chartFixture(source, 0));
+	fixture = {
+		catalogs: Object.fromEntries(built.map((b, i) => [sources[i], b.catalog])),
+		services: Object.fromEntries(built.map((b, i) => [sources[i], b.service]))
 	};
+	page.data = { selected_sources: sources };
 	await renderChart();
 	for (const source of ['mta_bus', 'njt_bus']) {
 		// Activate the trigger itself, not a removable chip at its geometric center.

@@ -40,8 +40,10 @@ fn snapshot() -> CollectedSnapshot {
     };
     let stops = ["101", "102"]
         .into_iter()
-        .map(|stop_id| StopTime {
+        .enumerate()
+        .map(|(i, stop_id)| StopTime {
             trip_id: id,
+            stop_sequence: i as i32,
             stop_id: stop_id.into(),
             arrival: now + Duration::minutes(5),
             departure: now + Duration::minutes(6),
@@ -160,6 +162,42 @@ async fn empty_shapes_preserve_and_nonempty_shapes_replace_stored_shape(pool: sq
         .await
         .unwrap();
     assert_eq!(stored.0, ["replacement"]);
+}
+
+#[sqlx::test]
+async fn repeated_stop_visits_persist_and_publish_by_sequence(pool: sqlx::PgPool) {
+    let (ingestor, live) = ingestor(&pool).await;
+    let mut input = snapshot();
+    let mut revisit = input.trips[0].1[0].clone();
+    revisit.stop_sequence = 2;
+    revisit.arrival += Duration::minutes(20);
+    revisit.departure += Duration::minutes(20);
+    input.trips[0].1.push(revisit);
+    let saved = ingestor.ingest(input).await.unwrap();
+    let stored: Vec<(i32, String, chrono::DateTime<Utc>)> = sqlx::query_as(
+        "SELECT stop_sequence, stop_id, arrival FROM realtime.stop_time WHERE trip_id = $1 ORDER BY stop_sequence",
+    )
+    .bind(saved.trips[0].id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let base = Utc.timestamp_opt(1_780_000_300, 0).unwrap();
+    assert_eq!(
+        stored,
+        [
+            (0, "101".to_owned(), base),
+            (1, "102".to_owned(), base),
+            (2, "101".to_owned(), base + Duration::minutes(20)),
+        ]
+    );
+    let published = live.get(Source::MtaSubway).unwrap();
+    let mut sequences: Vec<(i32, &str)> = published
+        .stop_times
+        .iter()
+        .map(|stop| (stop.stop_sequence, stop.stop_id.as_ref()))
+        .collect();
+    sequences.sort();
+    assert_eq!(sequences, [(0, "101"), (1, "102"), (2, "101")]);
 }
 
 #[sqlx::test]

@@ -121,6 +121,7 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::realtime::Colle
             let arrival = now + chrono::Duration::minutes(i as i64 * 2);
             StopTime {
                 trip_id: id,
+                stop_sequence: i as i32,
                 stop_id: (*stop).into(),
                 arrival,
                 departure: arrival,

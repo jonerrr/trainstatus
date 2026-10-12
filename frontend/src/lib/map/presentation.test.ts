@@ -1,11 +1,11 @@
-import type { Route, Trip } from '#lib/client/index.js';
+import type { CatalogRoute, ServiceTrip } from '#lib/client/index.js';
 import { trip_destination_title } from '#lib/util.svelte.js';
 
 import { expect, test } from 'vitest';
 
 import { presentFeature } from './presentation';
 
-const route: Route = {
+const route: CatalogRoute = {
 	id: 'SBS-M15',
 	short_name: 'M15-SBS',
 	long_name: 'East Side',
@@ -21,15 +21,11 @@ const route: Route = {
 		directions: [{ direction_id: 0, destination: 'South Ferry', via: [] }]
 	}
 };
-const trip: Trip = {
+const trip: ServiceTrip = {
 	id: 'internal-trip',
-	original_id: 'original',
-	shape_ids: [],
 	vehicle_id: '1234',
-	route_id: route.id,
 	direction: 0,
-	created_at: new Date(),
-	updated_at: new Date(),
+	status: null,
 	data: { source: 'mta_bus' }
 };
 test('vehicle summaries show route and destination rather than internal IDs', () => {

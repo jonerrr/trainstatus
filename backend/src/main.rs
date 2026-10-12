@@ -20,7 +20,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 use backend::{
-    AppState, VERSION, alerts, api, api_prefix, integrations, models, prefixed_path,
+    AppState, VERSION, alerts, api, api_prefix, integrations, models, passenger, prefixed_path,
     realtime::{LiveSnapshots, RealtimeEngine, RealtimeIngestor, RealtimeSource},
     sources,
     sources::{
@@ -61,12 +61,10 @@ async fn main() {
     let live_snapshots = LiveSnapshots::default();
     let route_store = stores::route::RouteStore::new(pg_pool.clone());
     let stop_store = stores::stop::StopStore::new(pg_pool.clone());
-    let trip_store = stores::trip::TripStore::new(pg_pool.clone(), live_snapshots.clone());
-    let stop_time_store =
-        stores::stop_time::StopTimeStore::new(pg_pool.clone(), live_snapshots.clone());
-    let position_store =
-        stores::position::PositionStore::new(pg_pool.clone(), live_snapshots.clone());
     let alert_store = stores::alert::AlertStore::new(pg_pool.clone());
+    let catalog_store = passenger::CatalogStore::new(route_store.clone(), stop_store.clone());
+    let service_store =
+        passenger::ServiceStore::new(pg_pool.clone(), live_snapshots.clone(), route_store.clone());
     let static_data_store = static_data::store::StaticDataStore::new(
         pg_pool.clone(),
         static_data::index::StaticTransitIndex::new(),
@@ -124,8 +122,8 @@ async fn main() {
     #[openapi(info(title = "Train Status API", version = VERSION, description = "Realtime and static transit data for MTA subway, MTA bus, and NJ Transit bus services. Realtime endpoints serve the latest committed snapshot by default and support optional historical queries with `at`.", contact(email = "jonah@trainstat.us")),
     tags(
         (name = "HEALTH", description = "Liveness and readiness probes"),
-        (name = "STATIC", description = "Data that doesn't change often (stops, routes, and shapes)"),
-        (name = "REALTIME", description = "Live trips, stop times, vehicle positions, alerts, and rendered trajectories. Omit `at` for the latest committed snapshot; provide `at` as a Unix timestamp for retained historical data where supported.")
+        (name = "STATIC", description = "Data that changes only with static imports (catalogs)"),
+        (name = "REALTIME", description = "Passenger route service, alerts, and rendered trajectories. Omit `at` for the latest committed snapshot; provide `at` as a Unix timestamp for retained historical data where supported.")
     ),
     // TODO: maybe add route, stop, and shape models here
     components(schemas(models::source::Source))
@@ -136,10 +134,9 @@ async fn main() {
         pg_pool,
         route_store,
         stop_store,
-        trip_store,
-        stop_time_store,
-        position_store,
         alert_store,
+        catalog_store,
+        service_store,
         trajectories,
     };
 

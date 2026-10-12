@@ -11,15 +11,7 @@ import { page } from './test/page.svelte';
 function state(id: string, index: number): App.PageState {
 	return {
 		index,
-		modal: {
-			type: 'route',
-			id,
-			short_name: id,
-			long_name: id,
-			color: '000000',
-			text_color: 'ffffff',
-			data: { source: 'njt_bus' }
-		}
+		modal: { type: 'route', source: 'njt_bus', id }
 	};
 }
 

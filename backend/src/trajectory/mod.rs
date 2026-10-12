@@ -26,8 +26,7 @@ pub use render_units::{expand_render_units, source_render_config};
 pub use snapshot::{snapshot_from_persisted_trip, source_supports_trajectories};
 pub use types::{
     ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit, Trajectory,
-    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, bbox_intersects,
-    compute_path_bbox, source_projected_epsg_code,
+    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, source_projected_epsg_code,
 };
 
 pub use derive::TrajectoryDeriver;

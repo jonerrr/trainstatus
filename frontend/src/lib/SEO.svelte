@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
+	import { getTransitData } from '#lib/transit/store.svelte.js';
+
+	const transit = getTransitData();
+
 	const url_mappings = {
 		'/': 'Home',
 		'/stops': 'Stops',
@@ -12,13 +16,15 @@
 	} as const;
 
 	const title = $derived.by(() => {
-		switch (page.state.modal?.type) {
+		const modal = page.state.modal;
+		const catalog = modal ? transit.catalogState(modal.source).catalog : undefined;
+		switch (modal?.type) {
 			case 'stop':
-				return `Stop: ${page.state.modal.name}`;
+				return `Stop: ${catalog?.stops_by_id.get(modal.id)?.name ?? modal.id}`;
 			case 'route':
-				return `Route: ${page.state.modal.short_name}`;
+				return `Route: ${catalog?.routes_by_id.get(modal.id)?.short_name ?? modal.id}`;
 			case 'trip':
-				return `${page.state.modal.route_id} Trip`;
+				return modal.route_id ? `${modal.route_id} Trip` : 'Trip';
 			// TODO: settings
 		}
 

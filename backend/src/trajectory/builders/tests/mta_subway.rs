@@ -15,7 +15,7 @@ use crate::trajectory::builders::mta_subway::MtaSubwayBuilder;
 use crate::trajectory::continuity::apply;
 use crate::trajectory::geometry::{build_shape_geometry, distance_to_coord};
 use crate::trajectory::types::{
-    Trajectory, TrajectoryConfig, TrajectoryState, TrajectoryStop, TripSnapshot, compute_path_bbox,
+    Trajectory, TrajectoryConfig, TrajectoryState, TrajectoryStop, TripSnapshot,
     source_projected_epsg_code,
 };
 use crate::trajectory::{expand_render_units, source_render_config};
@@ -101,7 +101,6 @@ fn expand_render_units_emits_one_row_per_subway_car() {
         timestamps: vec![100.0, 110.0, 120.0],
         distances_m: distances_m.clone(),
         bearings: vec![0.0, 5.0, 10.0],
-        path_bbox: compute_path_bbox(&path),
     };
 
     let units = expand_render_units(Source::MtaSubway, &trip, &trajectory, &shape_geom);

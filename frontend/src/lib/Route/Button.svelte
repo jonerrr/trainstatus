@@ -1,37 +1,34 @@
 <script lang="ts">
-	import type { Route } from '#lib/client/index.js';
-	import { alert_context } from '#lib/resources/alerts.svelte.js';
-	import { awaitingRows } from '#lib/resources/pending.js';
+	import type { CatalogRoute } from '#lib/client/index.js';
+	import { route_alerts } from '#lib/Route/alerts.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	interface Props {
-		data: Route;
+		data: CatalogRoute;
 	}
 
 	let { data }: Props = $props();
 
-	const alerts = $derived(alert_context.getSource(data.data.source));
+	const transit = getTransitData();
+	const current_time = getCurrentTime();
 
-	const route_alerts = $derived(
-		alerts?.current?.alerts_by_route
-			.get(data.id)
-			?.sort(
-				(a, b) =>
-					b.entities.find((e) => e.route_id === data.id)!.sort_order -
-					a.entities.find((e) => e.route_id === data.id)!.sort_order
-			) ?? []
-	);
-
-	const alerts_loading = $derived(awaitingRows(alerts, route_alerts.length));
+	// Rows render as their alerts arrive; a suspending read per row would batch them.
+	const alerts_state = $derived(transit.alertsState(data.data.source, current_time.value ?? null));
+	const alerts = $derived(alerts_state.alerts && route_alerts(alerts_state.alerts, data.id));
 </script>
 
 <section class="flex items-center gap-1">
 	<Icon height={36} width={36} link={false} route={data} />
-	{#if alerts_loading}
+	{#if alerts_state.error}
+		<UnavailableRows />
+	{:else if !alerts}
 		<Skeleton lines={1} class="w-24" />
-	{:else if route_alerts.length}
-		{const alert_data = $derived(route_alerts[0].data)}
+	{:else if alerts.length}
+		{const alert_data = $derived(alerts[0].data)}
 		<div class="font-semibold">
 			{#if 'alert_type' in alert_data}
 				{alert_data.alert_type}
@@ -39,9 +36,9 @@
 				Alert
 			{/if}
 		</div>
-		{#if route_alerts.length > 1}
+		{#if alerts.length > 1}
 			<div class="rounded-sm bg-neutral-700 p-1 text-neutral-50">
-				+{route_alerts.length - 1}
+				+{alerts.length - 1}
 			</div>
 		{/if}
 	{:else}

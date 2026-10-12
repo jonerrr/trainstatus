@@ -1,27 +1,28 @@
 <script lang="ts">
-	import type { TypedVehiclePosition } from '#lib/resources/index.svelte.js';
+	import type { VehicleStatus } from '#lib/client/index.js';
 
 	import { Users } from '@lucide/svelte';
 
 	interface Props {
-		position?: TypedVehiclePosition<'mta_bus'> | TypedVehiclePosition<'njt_bus'>;
+		status?: VehicleStatus | null;
 	}
 
-	const { position }: Props = $props();
+	const { status }: Props = $props();
 
 	const occupancy = $derived.by(() => {
-		if (position?.data.source === 'mta_bus') {
-			if (!position.data.passengers || !position.data.capacity) return;
-			const pct = Math.floor((position.data.passengers / position.data.capacity) * 100);
+		const data = status?.data;
+		if (data?.source === 'mta_bus') {
+			if (!data.passengers || !data.capacity) return;
+			const pct = Math.floor((data.passengers / data.capacity) * 100);
 			return {
 				kind: 'count' as const,
-				label: String(position.data.passengers),
+				label: String(data.passengers),
 				tone: pct > 80 ? 'full' : pct > 30 ? 'busy' : 'open'
 			};
 		}
-		if (position?.data.source !== 'njt_bus') return;
+		if (data?.source !== 'njt_bus') return;
 		// Five steps, shortest to tallest. Not-boarding is a slash instead of another step.
-		switch (position.data.occupancy_status) {
+		switch (data.occupancy_status) {
 			case 'Empty':
 				return { kind: 'meter' as const, label: 'Empty', tone: 'open' as const, filled: 0 };
 			case 'ManySeatsAvailable':

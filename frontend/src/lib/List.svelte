@@ -1,5 +1,17 @@
-<script lang="ts" generics="T extends Stop | Route | Trip">
-	import { untrack, type Snippet } from 'svelte';
+<script lang="ts" module>
+	import type { Source } from '#lib/client/index.js';
+
+	/** A pinned trip row; `id` is its pin key. */
+	export interface TripItem {
+		id: string;
+		source: Source;
+		route_id: string;
+		trip_id: string;
+	}
+</script>
+
+<script lang="ts" generics="T extends CatalogStop | CatalogRoute | TripItem">
+	import type { Snippet } from 'svelte';
 
 	import { cubicInOut } from 'svelte/easing';
 	import { crossfade, slide } from 'svelte/transition';
@@ -7,12 +19,12 @@
 	import { browser } from '$app/env';
 	import { page } from '$app/state';
 
-	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
+	import type { CatalogRoute, CatalogStop } from '#lib/client/index.js';
 	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
-	import { source_info } from '#lib/resources/index.svelte.js';
-	import { stop_time_context, type StopTimeResources } from '#lib/resources/stop_times.svelte.js';
 	import RouteButton from '#lib/Route/Button.svelte';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import { source_info } from '#lib/source_info.js';
 	import StopButton from '#lib/Stop/Button.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import TripButton from '#lib/Trip/Button.svelte';
@@ -45,6 +57,8 @@
 		ssr_min?: number;
 		// extra items to render before and after visible items
 		overscan?: number;
+		// some source's items are still loading
+		loading?: boolean;
 	}
 
 	let {
@@ -65,7 +79,8 @@
 		auto_scroll = false,
 		items_before_scroll,
 		ssr_min = 10,
-		overscan = 5
+		overscan = 5,
+		loading = false
 	}: Props = $props();
 
 	const source_entries = $derived(
@@ -189,35 +204,15 @@
 		];
 	});
 
-	// One subscription on the resource. Replacing rows only changes the route union,
-	// so a route that stays visible is not released and acquired again.
-	let synced_resource: StopTimeResources[Source];
-	let route_sync: { sync: (routes: Iterable<string>) => void; stop: () => void } | undefined;
-	$effect(() => {
-		const source = active_source;
-		const resource =
-			source && type !== 'route' && source_info[source].monitor_routes
-				? stop_time_context.getSource(source)
-				: undefined;
-		const routes = visible_items.flatMap(({ data }) =>
-			type === 'stop'
-				? (data as Stop).routes.map((route) => route.route_id)
-				: type === 'trip'
-					? [(data as Trip).route_id]
-					: []
-		);
-		untrack(() => {
-			if (synced_resource !== resource) {
-				route_sync?.stop();
-				route_sync = resource?.sync_routes();
-				synced_resource = resource;
-			}
-			route_sync?.sync(routes);
-		});
-	});
-	$effect(() => () => {
-		route_sync?.stop();
-	});
+	function open(data: T) {
+		if (type === 'trip') {
+			const trip = data as TripItem;
+			open_modal({ type, source: trip.source, route_id: trip.route_id, id: trip.trip_id });
+		} else {
+			const source = (data as CatalogStop | CatalogRoute).data.source;
+			open_modal({ type, source, id: data.id });
+		}
+	}
 
 	// Calculate total height for the scroll container
 	const total_height = $derived.by(() => {
@@ -336,18 +331,15 @@
 					>
 						<button
 							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
-							onclick={() => {
-								if (type === 'stop') open_modal({ ...(data as Stop), type });
-								else if (type === 'route') open_modal({ ...(data as Route), type });
-								else open_modal({ ...(data as Trip), type });
-							}}
+							onclick={() => open(data)}
 						>
 							{#if type === 'stop'}
-								<StopButton data={data as Stop} acquire_routes={false} />
+								<StopButton data={data as CatalogStop} />
 							{:else if type === 'route'}
-								<RouteButton data={data as Route} />
+								<RouteButton data={data as CatalogRoute} />
 							{:else if type === 'trip'}
-								<TripButton data={data as Trip} acquire_routes={false} />
+								{const trip = $derived(data as TripItem)}
+								<TripButton source={trip.source} route_id={trip.route_id} trip_id={trip.trip_id} />
 							{/if}
 						</button>
 
@@ -364,5 +356,8 @@
 				{/each}
 			</div>
 		</div>
+		{#if loading && !items.length}
+			<Skeleton lines={6} class="p-2" />
+		{/if}
 	</div>
 </div>

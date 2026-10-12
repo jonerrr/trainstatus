@@ -3,9 +3,13 @@
 
 	import type { Attachment } from 'svelte/attachments';
 
-	import type { Route } from '#lib/client/index.js';
+	import type { Source } from '#lib/client/index.js';
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
-	import { alert_context } from '#lib/resources/alerts.svelte.js';
+	import { route_alerts as sorted_alerts } from '#lib/Route/alerts.js';
+	import Skeleton from '#lib/Skeleton.svelte';
+	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import UnavailableRows from '#lib/UnavailableRows.svelte';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { debounce } from '#lib/util.svelte.js';
 
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
@@ -15,23 +19,19 @@
 	dayjs.extend(relativeTime);
 
 	interface Props {
-		route: Route;
+		source: Source;
+		route_id: string;
 		time_format: 'time' | 'countdown';
 	}
 
-	let { route, time_format }: Props = $props();
+	let { source, route_id, time_format }: Props = $props();
 
-	const alerts = $derived(alert_context.getSource(route.data.source));
-
-	const route_alerts = $derived(
-		alerts?.current?.alerts_by_route
-			.get(route.id)
-			?.sort(
-				(a, b) =>
-					b.entities.find((e) => e.route_id === route.id)!.sort_order -
-					a.entities.find((e) => e.route_id === route.id)!.sort_order
-			) ?? []
-	);
+	const transit = getTransitData();
+	const current_time = getCurrentTime();
+	const catalog = $derived(transit.catalogState(source));
+	const route = $derived(catalog.catalog?.routes_by_id.get(route_id));
+	const alerts = $derived(loaded(transit.alerts(source, current_time.value ?? null)));
+	const route_alerts = $derived(sorted_alerts(alerts, route_id));
 
 	let idx = $state(0);
 
@@ -84,10 +84,20 @@
 </script>
 
 <header class="flex flex-col gap-3 p-3">
-	<FeatureSummary feature={{ route, title: route.long_name }} />
+	{#if route}
+		<FeatureSummary feature={{ route, title: route.long_name }} />
+	{:else if catalog.error}
+		<UnavailableRows />
+	{:else if !catalog.catalog}
+		<Skeleton lines={1} class="w-40" />
+	{:else}
+		<div class="text-sm font-semibold text-neutral-100">Route {route_id}</div>
+	{/if}
 
 	<div class="flex items-center gap-1 text-lg font-semibold text-neutral-100">
-		{#if route_alerts.length && idx < route_alerts.length}
+		{#if !alerts}
+			<Skeleton lines={1} class="w-24" />
+		{:else if route_alerts.length && idx < route_alerts.length}
 			{const alert_data = $derived(route_alerts[idx].data)}
 			{#if alert_data.source === 'mta_subway' || alert_data.source === 'mta_bus'}
 				{alert_data.alert_type}

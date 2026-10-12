@@ -1,9 +1,11 @@
 import { createContext } from 'svelte';
 
-import { SvelteURL } from 'svelte/reactivity';
+import { createSubscriber, SvelteURL } from 'svelte/reactivity';
 
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
+
+import type { Source } from '#lib/client/index.js';
 
 /**
  * Unix seconds from `?at=`. Blank and non-numeric values mean live, so callers
@@ -14,6 +16,12 @@ export function atParamToUnixSeconds(value: string | null | undefined): number |
 	const at = Number(value);
 	return Number.isFinite(at) ? at : undefined;
 }
+
+/** Re-runs live readers every 15 seconds while any are mounted. */
+const live_clock = createSubscriber((update) => {
+	const interval = setInterval(update, 15_000);
+	return () => clearInterval(interval);
+});
 
 export function createCurrentTime(initial?: number) {
 	let time = $state<number | undefined>(
@@ -27,7 +35,9 @@ export function createCurrentTime(initial?: number) {
 		},
 
 		get ms(): number {
-			return time !== undefined ? time * 1000 : Date.now();
+			if (time !== undefined) return time * 1000;
+			live_clock();
+			return Date.now();
 		},
 
 		set value(newValue: number | undefined) {
@@ -50,6 +60,28 @@ export const MODAL_PARAM = {
 
 export type ModalParamKey = (typeof MODAL_PARAM)[keyof typeof MODAL_PARAM];
 
+const sources: readonly string[] = ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[];
+
+/**
+ * The modal a URL identifies. Trip links carry their route in `r`; a trip link
+ * without one is kept with a null route so the modal can reject it explicitly.
+ */
+export function modal_from_url(url: {
+	searchParams: Pick<URLSearchParams, 'get'>;
+}): ModalData | null {
+	const params = url.searchParams;
+	const source = params.get('src');
+	if (!source || !sources.includes(source)) return null;
+	const src = source as Source;
+	const trip_id = params.get('t');
+	if (trip_id) return { type: 'trip', source: src, route_id: params.get('r'), id: trip_id };
+	const stop_id = params.get('s');
+	if (stop_id) return { type: 'stop', source: src, id: stop_id };
+	const route_id = params.get('r');
+	if (route_id) return { type: 'route', source: src, id: route_id };
+	return null;
+}
+
 /**
  * Open a stop/route/trip modal and update the URL to reflect the open state.
  * Pushes a history entry so the back button closes the modal.
@@ -64,9 +96,8 @@ export function open_modal(state: ModalData) {
 	url.searchParams.delete('src');
 
 	url.searchParams.set(key, state.id);
-	// if ('data' in state && 'source' in (state.data as any) && (state.data as any).source) {
-	url.searchParams.set('src', state.data.source);
-	// }
+	if (state.type === 'trip' && state.route_id) url.searchParams.set('r', state.route_id);
+	url.searchParams.set('src', state.source);
 
 	const snapshot = $state.snapshot(state);
 	const current_index = page.state?.index ?? 0;

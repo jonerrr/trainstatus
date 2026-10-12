@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { refreshAll } from '$app/navigation';
 
-	import { all_sources, source_info } from '#lib/resources/index.svelte.js';
+	import { all_sources, source_info } from '#lib/source_info.js';
 	import { source_preferences } from '#lib/source_preferences.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 

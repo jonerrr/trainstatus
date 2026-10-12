@@ -2,7 +2,6 @@ use crate::support;
 use axum_test::TestServer;
 use backend::static_data::dataset::StaticDataset;
 use backend::{
-    AppState,
     models::{
         geom::Geom,
         position::VehiclePosition,
@@ -14,6 +13,7 @@ use backend::{
     realtime::CollectedSnapshot,
 };
 use chrono::{Duration, Utc};
+use serde_json::Value;
 use uuid::Uuid;
 
 fn dataset(source: Source) -> StaticDataset {
@@ -73,8 +73,10 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
         };
         let stops = ["KEEP", "DROP"]
             .into_iter()
-            .map(|stop_id| StopTime {
+            .enumerate()
+            .map(|(i, stop_id)| StopTime {
                 trip_id: id,
+                stop_sequence: i as i32,
                 stop_id: stop_id.into(),
                 arrival: now + Duration::minutes(10),
                 departure: now + Duration::minutes(11),
@@ -103,97 +105,118 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
     s
 }
 fn server(pool: sqlx::PgPool, s: &support::TestStores) -> TestServer {
-    let state = AppState {
-        pg_pool: pool.clone(),
-        route_store: s.route_store.clone(),
-        stop_store: s.stop_store.clone(),
-        trip_store: s.trip_store.clone(),
-        stop_time_store: s.stop_time_store.clone(),
-        position_store: s.position_store.clone(),
-        alert_store: s.alert_store.clone(),
-        trajectories: backend::trajectory::TrajectoryService::new(pool),
-    };
+    let state = support::app_state_from_stores(pool, s.clone());
     TestServer::new(backend::api::router(state).split_for_parts().0)
 }
-async fn assert_live(
-    server: &TestServer,
-    source: Source,
-    trips: usize,
-    stops: usize,
-    positions: usize,
-) {
-    for (endpoint, expected, filter) in [
-        ("trips", trips, ""),
-        ("stop_times", stops, "?route_ids=A"),
-        ("positions", positions, ""),
-    ] {
-        let r = server.get(&format!("/{endpoint}/{source}{filter}")).await;
-        r.assert_status_ok();
-        let values = r.json::<serde_json::Value>();
-        assert_eq!(
-            values.as_array().unwrap().len(),
-            expected,
-            "live {endpoint} membership {source}"
-        );
-        if endpoint == "stop_times" && stops == 1 {
-            assert_eq!(values[0]["stop_id"], "KEEP");
-        }
+
+/// Route A and B service, read the way passengers read it: subway lists every route,
+/// buses request both.
+async fn service(server: &TestServer, source: Source, at: Option<i64>) -> Value {
+    let mut query = Vec::new();
+    if source != Source::MtaSubway {
+        query.push("route_ids=A,B".to_owned());
     }
+    if let Some(at) = at {
+        query.push(format!("at={at}"));
+    }
+    let r = server
+        .get(&format!("/service/{source}?{}", query.join("&")))
+        .await;
+    r.assert_status_ok();
+    r.json()
+}
+
+/// Per route: (original trip names, stop IDs of every call, trips with a vehicle status).
+fn membership(body: &Value, route: &str) -> (Vec<String>, Vec<String>, usize) {
+    let route = &body["routes"][route];
+    let trips = route["trips"].as_array().unwrap();
+    let mut names: Vec<String> = trips
+        .iter()
+        .map(|trip| trip["vehicle_id"].as_str().unwrap().to_owned())
+        .collect();
+    names.sort();
+    let stops = route["calls"]["stop"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| {
+            route["stops"][i.as_u64().unwrap() as usize]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    let statuses = trips
+        .iter()
+        .filter(|trip| !trip["status"].is_null())
+        .count();
+    (names, stops, statuses)
+}
+
+fn names(source: Source, names: &[&str]) -> Vec<String> {
+    let mut names: Vec<String> = names
+        .iter()
+        .map(|name| format!("{source}-{name}"))
+        .collect();
+    names.sort();
+    names
+}
+
+async fn seed(stores: &support::TestStores, source: Source) {
+    let static_data = dataset(source);
+    stores
+        .static_data_store
+        .persist(&static_data)
+        .await
+        .unwrap();
+    stores
+        .static_data_store
+        .static_index()
+        .publish(backend::static_data::index::StaticTransitRevision::from_dataset(&static_data));
 }
 
 async fn membership_case(pool: sqlx::PgPool) {
     let stores = support::test_stores(pool.clone());
     let server = server(pool, &stores);
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
-        let static_data = dataset(source);
-        stores
-            .static_data_store
-            .persist(&static_data)
-            .await
-            .unwrap();
-        stores.static_data_store.static_index().publish(
-            backend::static_data::index::StaticTransitRevision::from_dataset(&static_data),
-        );
+        seed(&stores, source).await;
         let now = crate::support::fixtures::fixed_time();
         let full = generation(source, now);
         stores.ingestor.ingest(full.clone()).await.unwrap();
-        assert_live(&server, source, 3, 4, 3).await;
+        let body = service(&server, source, None).await;
+        assert_eq!(
+            membership(&body, "A"),
+            (
+                names(source, &["omitted", "remaining"]),
+                vec!["KEEP".into(), "DROP".into(), "KEEP".into(), "DROP".into()],
+                2
+            )
+        );
+        assert_eq!(membership(&body, "B").0, names(source, &["other-route"]));
+
         let mut next = full;
         next.trips.remove(1);
         next.trips[0].1.pop();
         next.positions.remove(1);
         stores.ingestor.ingest(next).await.unwrap();
-        assert_live(&server, source, 2, 1, 2).await;
-        let r = server
-            .get(&format!("/stop_times/{source}?route_ids=B"))
-            .await;
-        r.assert_status_ok();
-        assert_eq!(r.json::<Vec<StopTime>>().len(), 2);
-        let r = server
-            .get(&format!("/stop_times/{source}?route_ids=unknown"))
-            .await;
-        r.assert_status_ok();
-        r.assert_text("[]");
-        let r = server.get(&format!("/stop_times/{source}")).await;
-        r.assert_status_ok();
+        let body = service(&server, source, None).await;
         assert_eq!(
-            r.json::<Vec<StopTime>>().len(),
-            if source == Source::MtaSubway { 3 } else { 0 }
+            membership(&body, "A"),
+            (names(source, &["remaining"]), vec!["KEEP".into()], 1),
+            "live {source} drops omitted trips, calls and statuses"
         );
-        for (endpoint, expected) in [("trips", 3), ("stop_times", 4), ("positions", 3)] {
-            let r = server
-                .get(&format!(
-                    "/{endpoint}/{source}?at={}&route_ids=A",
-                    now.timestamp()
-                ))
-                .await;
-            r.assert_status_ok();
-            assert_eq!(
-                r.json::<serde_json::Value>().as_array().unwrap().len(),
-                expected,
-                "history retains omitted {endpoint} {source}"
-            );
-        }
+        assert_eq!(membership(&body, "B").1, ["KEEP", "DROP"]);
+
+        let history = service(&server, source, Some(now.timestamp())).await;
+        let (trips, calls, statuses) = membership(&history, "A");
+        assert_eq!(
+            trips,
+            names(source, &["omitted", "remaining"]),
+            "history retains omitted trips {source}"
+        );
+        assert_eq!(calls.len(), 4, "history retains omitted calls {source}");
+        assert_eq!(statuses, 0);
+
         stores
             .ingestor
             .ingest(CollectedSnapshot {
@@ -203,24 +226,27 @@ async fn membership_case(pool: sqlx::PgPool) {
             })
             .await
             .unwrap();
-        assert_live(&server, source, 0, 0, 0).await;
+        let body = service(&server, source, None).await;
+        for route in ["A", "B"] {
+            assert_eq!(
+                membership(&body, route),
+                (vec![], vec![], 0),
+                "empty snapshot clears {source} {route}"
+            );
+        }
     }
 }
 #[sqlx::test]
-async fn live_route_filters_follow_committed_membership(pool: sqlx::PgPool) {
+async fn live_service_follows_committed_membership(pool: sqlx::PgPool) {
     membership_case(pool).await;
 }
 
 #[sqlx::test]
-async fn populated_live_reads_work_without_database_or_cache(pool: sqlx::PgPool) {
+async fn populated_live_service_works_without_database(pool: sqlx::PgPool) {
     let stores = support::test_stores(pool.clone());
     let now = support::fixtures::fixed_time();
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
-        stores
-            .static_data_store
-            .persist(&dataset(source))
-            .await
-            .unwrap();
+        seed(&stores, source).await;
         stores
             .ingestor
             .ingest(generation(source, now))
@@ -233,23 +259,13 @@ async fn populated_live_reads_work_without_database_or_cache(pool: sqlx::PgPool)
         .acquire_timeout(std::time::Duration::from_millis(100))
         .connect_lazy(&format!("postgres://unused:unused@{address}/unused"))
         .unwrap();
-    let mut disconnected = stores.clone();
-    disconnected.trip_store = backend::stores::trip::TripStore::new(
-        unavailable_pg.clone(),
-        stores.live_snapshots.clone(),
-    );
-    disconnected.stop_time_store = backend::stores::stop_time::StopTimeStore::new(
-        unavailable_pg.clone(),
-        stores.live_snapshots.clone(),
-    );
-    disconnected.position_store = backend::stores::position::PositionStore::new(
-        unavailable_pg.clone(),
-        stores.live_snapshots.clone(),
-    );
-    let server = server(unavailable_pg.clone(), &disconnected);
-    // Remove the owned cache entirely; every populated live endpoint still works.
+    let server = server(unavailable_pg.clone(), &stores);
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
-        assert_live(&server, source, 3, 4, 3).await;
+        let body = service(&server, source, None).await;
+        assert_eq!(
+            membership(&body, "A").0,
+            names(source, &["omitted", "remaining"])
+        );
     }
     assert_eq!(
         unavailable_pg.size(),

@@ -4,7 +4,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import type { Source } from '#lib/client/index.js';
-	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import DeckOverlay from './DeckOverlay.svelte';
@@ -38,7 +38,7 @@
 	let frame = $state(0);
 	let membership = $state(0);
 
-	const updates = getUpdateStatus();
+	const transit = getTransitData();
 	$effect(() => {
 		const selected = [...sources];
 		const at = fixedAt;
@@ -49,7 +49,7 @@
 					snapshot = next;
 				},
 				undefined,
-				updates
+				(update) => transit.track(update)
 			);
 		});
 	});

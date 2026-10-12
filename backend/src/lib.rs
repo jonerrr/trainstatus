@@ -5,6 +5,7 @@ pub mod fixtures;
 pub mod integrations;
 pub mod macros;
 pub mod models;
+pub mod passenger;
 pub mod realtime;
 pub mod sources;
 pub mod static_data;
@@ -27,10 +28,9 @@ pub struct AppState {
     pub pg_pool: sqlx::PgPool,
     pub route_store: crate::stores::route::RouteStore,
     pub stop_store: crate::stores::stop::StopStore,
-    pub trip_store: crate::stores::trip::TripStore,
-    pub stop_time_store: crate::stores::stop_time::StopTimeStore,
-    pub position_store: crate::stores::position::PositionStore,
     pub alert_store: crate::stores::alert::AlertStore,
+    pub catalog_store: crate::passenger::CatalogStore,
+    pub service_store: crate::passenger::ServiceStore,
     pub trajectories: crate::trajectory::TrajectoryService,
 }
 

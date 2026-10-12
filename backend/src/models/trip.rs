@@ -112,6 +112,10 @@ impl Trip {
 #[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq, ToSchema, FromRow)]
 pub struct StopTime {
     pub trip_id: Uuid,
+    /// Visit order within the trip. Provider GTFS-RT `stop_sequence` when present,
+    /// otherwise the call's position in the provider's array. Distinct within one
+    /// snapshot; a repeated stop is a separate visit.
+    pub stop_sequence: i32,
     pub stop_id: String,
     pub arrival: DateTime<Utc>,
     pub departure: DateTime<Utc>,

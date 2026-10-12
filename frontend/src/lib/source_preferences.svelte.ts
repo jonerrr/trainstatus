@@ -1,7 +1,7 @@
 import { browser } from '$app/env';
 
 import type { Source } from '#lib/client/index.js';
-import { all_sources } from '#lib/resources/index.svelte.js';
+import { all_sources } from '#lib/source_info.js';
 import { LocalStorage } from '#lib/storage.svelte.js';
 
 export const COOKIE_NAME = 'selected_sources';
@@ -25,6 +25,23 @@ export function parse_sources(value: string | null | undefined): Source[] {
 	} catch {
 		return default_sources;
 	}
+}
+
+/** Sources a page shows: the saved list plus a deep link's valid `src`. */
+export function layout_sources(cookie_value: string | null | undefined, src: string | null) {
+	const selected = parse_sources(cookie_value);
+	return src && all_sources.includes(src as Source) && !selected.includes(src as Source)
+		? [...selected, src as Source]
+		: selected;
+}
+
+/** The saved source list from a `document.cookie` string. */
+export function sources_cookie(cookies: string): string | undefined {
+	for (const part of cookies.split(';')) {
+		const [name, ...value] = part.trim().split('=');
+		if (name === COOKIE_NAME) return decodeURIComponent(value.join('='));
+	}
+	return undefined;
 }
 
 /**

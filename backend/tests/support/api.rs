@@ -9,11 +9,17 @@ pub fn app_state(pool: sqlx::PgPool) -> AppState {
 pub fn app_state_from_stores(pool: sqlx::PgPool, stores: TestStores) -> AppState {
     AppState {
         pg_pool: pool.clone(),
+        catalog_store: backend::passenger::CatalogStore::new(
+            stores.route_store.clone(),
+            stores.stop_store.clone(),
+        ),
+        service_store: backend::passenger::ServiceStore::new(
+            pool.clone(),
+            stores.live_snapshots.clone(),
+            stores.route_store.clone(),
+        ),
         route_store: stores.route_store,
         stop_store: stores.stop_store,
-        trip_store: stores.trip_store,
-        stop_time_store: stores.stop_time_store,
-        position_store: stores.position_store,
         alert_store: stores.alert_store,
         trajectories: backend::trajectory::TrajectoryService::new(pool),
     }

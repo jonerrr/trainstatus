@@ -1,49 +1,18 @@
-import type { Route, Stop } from '#lib/client/index.js';
+import { browser } from '$app/env';
+
+import { layout_sources, sources_cookie } from '#lib/source_preferences.svelte.js';
 
 import type { LayoutLoad } from './$types';
 
-export const load: LayoutLoad = async ({ fetch, data }) => {
-	const { selected_sources } = data;
-	async function read<T>(url: string): Promise<T> {
-		const response = await fetch(url);
-		if (!response.ok) throw new Error(`Static data request failed: ${response.status}`);
-		return response.json();
-	}
-
-	const [stop_results, route_results] = await Promise.all([
-		Promise.all(
-			selected_sources.map(async (source) => ({
-				source,
-				data: await read<Stop[]>(`/api/v1/stops/${source}`)
-			}))
-		),
-		Promise.all(
-			selected_sources.map(async (source) => ({
-				source,
-				data: await read<Route[]>(`/api/v1/routes/${source}`)
-			}))
-		)
-	]);
-
-	const stops: App.PageData['stops'] = {};
-	const stops_by_id: App.PageData['stops_by_id'] = {};
-	for (const { source, data } of stop_results) {
-		stops[source] = data;
-		stops_by_id[source] = Object.fromEntries(data.map((stop) => [stop.id, stop]));
-	}
-
-	const routes: App.PageData['routes'] = {};
-	const routes_by_id: App.PageData['routes_by_id'] = {};
-	for (const { source, data } of route_results) {
-		routes[source] = data;
-		routes_by_id[source] = Object.fromEntries(data.map((route) => [route.id, route]));
-	}
-
-	return {
-		stops,
-		routes,
-		stops_by_id,
-		routes_by_id,
-		...data
-	};
-};
+// Offline boots reuse the shell's build-time layout data, so the browser reads the cookie itself.
+export const load: LayoutLoad = ({ data, url }) =>
+	browser
+		? {
+				...data,
+				selected_sources: layout_sources(
+					sources_cookie(document.cookie),
+					url.searchParams.get('src')
+				),
+				at: url.searchParams.get('at') ?? undefined
+			}
+		: data;

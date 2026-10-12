@@ -163,13 +163,17 @@ fn build_realtime_from_response(
             }),
         };
 
+        // Helium lists the whole itinerary, departed stops included, so the array
+        // position is a stable visit order.
         let stop_times = helium_trip
             .stops
             .iter()
-            .filter_map(|stop| {
+            .enumerate()
+            .filter_map(|(index, stop)| {
                 let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
                 Some(StopTime {
                     trip_id,
+                    stop_sequence: index as i32,
                     stop_id: stop.station_id.to_string(),
                     arrival,
                     departure: arrival,

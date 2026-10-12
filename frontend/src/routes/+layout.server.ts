@@ -1,29 +1,14 @@
-import type { Source } from '#lib/client/index.js';
-import { all_sources } from '#lib/resources/index.svelte.js';
-import { COOKIE_NAME, parse_sources } from '#lib/source_preferences.svelte.js';
+import { building } from '$app/env';
+
+import { COOKIE_NAME, default_sources, layout_sources } from '#lib/source_preferences.svelte.js';
 
 import type { LayoutServerLoad } from './$types';
 
-// lightweight server load that just reads the cookie and URL params and passes it to the universal load function.
-// This way the client-side caching actually works properly since data isn't only being fetched server-side
 export const load: LayoutServerLoad = async ({ url, cookies }) => {
-	const cookie_value = cookies.get(COOKIE_NAME);
-	let selected_sources = parse_sources(cookie_value);
-
-	// Deep-link auto-enable: if URL has 'src' param, include it temporarily
-	const src_param = url.searchParams.get('src');
-	if (
-		src_param &&
-		all_sources.includes(src_param as Source) &&
-		!selected_sources.includes(src_param as Source)
-	) {
-		selected_sources = [...selected_sources, src_param as Source];
-	}
-
-	const at = url.searchParams.get('at') ?? undefined;
-
+	// The prerendered offline shell has no request; the browser load restores preferences.
+	if (building) return { selected_sources: default_sources, at: undefined };
 	return {
-		selected_sources,
-		at
+		selected_sources: layout_sources(cookies.get(COOKIE_NAME), url.searchParams.get('src')),
+		at: url.searchParams.get('at') ?? undefined
 	};
 };

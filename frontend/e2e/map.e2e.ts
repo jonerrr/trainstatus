@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import type { Route } from '../src/lib/client/index.js';
+import type { Catalog } from '../src/lib/client/index.js';
 import { expect, test } from './fixtures';
 
 test.setTimeout(90_000);
@@ -61,9 +61,9 @@ test('map remains pannable across filters, layers, modal dismissal and navigatio
 		await pan(page, true, true);
 		await pan(page, true);
 	}
-	const response = await page.request.get('/api/v1/routes/mta_subway');
+	const response = await page.request.get('/api/v1/catalog/mta_subway');
 	expect(response.ok()).toBe(true);
-	const routes: Route[] = await response.json();
+	const { routes }: Catalog = await response.json();
 	expect(routes.length).toBeGreaterThan(0);
 	await page.goto(`/map?r=${encodeURIComponent(routes[0].id)}&src=mta_subway`);
 	await expect(page.getByRole('dialog', { name: 'Transit details' })).toBeVisible();

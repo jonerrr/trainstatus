@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    api::util::point_schema,
+    api::schemas::point_schema,
     feed::vehicle_position::OccupancyStatus,
     impl_discriminated_data,
     models::{geom::Geom, source::Source},

@@ -13,6 +13,7 @@ use backend::{
 };
 use chrono::Utc;
 use std::{collections::HashMap, sync::Arc};
+use uuid::Uuid;
 
 struct Scenario {
     stores: support::TestStores,
@@ -189,28 +190,21 @@ async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPoo
         )
         .await
         .unwrap();
-    let trips = scenario
-        .stores
-        .trip_store
-        .get_all(Source::NjtBus, Some(scenario.now))
-        .await
-        .unwrap();
+    let trips: Vec<(Uuid, Vec<String>)> =
+        sqlx::query_as("SELECT id, shape_ids FROM realtime.trip WHERE source = $1")
+            .bind(Source::NjtBus)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(trips.len(), 1);
-    assert_eq!(
-        trips[0]
-            .shape_ids
-            .iter()
-            .map(AsRef::as_ref)
-            .collect::<Vec<&str>>(),
-        ["87-3"]
-    );
-    let positions = scenario
-        .stores
-        .position_store
-        .get_all(Source::NjtBus, Some(scenario.now))
-        .await
-        .unwrap();
-    assert_eq!(positions[0].trip_id, Some(trips[0].id));
+    assert_eq!(trips[0].1, ["87-3"]);
+    let position_trips: Vec<Option<Uuid>> =
+        sqlx::query_scalar("SELECT trip_id FROM realtime.vehicle_position WHERE source = $1")
+            .bind(Source::NjtBus)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(position_trips, [Some(trips[0].0)]);
     let trajectory_store = backend::stores::trajectory::TrajectoryStore::new(
         pool.clone(),
         Arc::new(backend::trajectory::TrajectoryCache::new()),

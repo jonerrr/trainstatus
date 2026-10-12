@@ -44,6 +44,7 @@ fn fixture() -> PersistedSnapshot {
             .enumerate()
             .map(|(i, stop)| StopTime {
                 trip_id: id,
+                stop_sequence: i as i32,
                 stop_id: (*stop).into(),
                 arrival: now + Duration::seconds(i as i64 * 180),
                 departure: now + Duration::seconds(i as i64 * 180),
@@ -237,6 +238,7 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         .enumerate()
         .map(|(i, id)| StopTime {
             trip_id: trip.id,
+            stop_sequence: i as i32,
             stop_id: (*id).into(),
             arrival: now + Duration::seconds(i as i64 * 180),
             departure: now + Duration::seconds(i as i64 * 180 + 30),

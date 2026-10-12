@@ -1,20 +1,16 @@
 <script lang="ts">
-	import { SvelteSet } from 'svelte/reactivity';
 	import { slide } from 'svelte/transition';
 
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
-	import type { StopTime, Trip } from '#lib/client/index.js';
+	import type { Source } from '#lib/client/index.js';
 	import ModalList from '#lib/ModalList.svelte';
-	import { source_info } from '#lib/resources/index.svelte.js';
-	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
-	import { position_context } from '#lib/resources/positions.svelte.js';
-	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
-	import { trip_context } from '#lib/resources/trips.svelte.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import Transfers from '#lib/Trip/Transfers.svelte';
+	import type { Call, CatalogData } from '#lib/transit/decode.js';
+	import { getTransitData, loaded, type TripRead } from '#lib/transit/store.svelte.js';
+	import Transfers, { type TransferCall } from '#lib/Trip/Transfers.svelte';
 	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
@@ -23,182 +19,134 @@
 	import { ChevronDown, ChevronUp, Circle } from '@lucide/svelte';
 
 	const current_time = getCurrentTime();
+	const transit = getTransitData();
 
 	interface Props {
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
-		trip: Trip;
+		source: Source;
+		/** Null for an unsupported trip link without route context. */
+		route_id: string | null;
+		trip_id: string;
 	}
 
-	const { trip, show_previous, time_format }: Props = $props();
+	const { source, route_id, trip_id, show_previous, time_format }: Props = $props();
 
-	const route = $derived(page.data.routes_by_id[trip.data.source]?.[trip.route_id]);
-
-	const all_trips = trip_context.get();
-	const all_stop_times = stop_time_context.get();
-
-	const source_stop_times = $derived(all_stop_times[trip.data.source]);
-
-	// For sources that filter stop times by route (mta_bus, njt_bus), the trip's
-	// stop times are only fetched once its route is on the monitor list. Opening a
-	// trip modal directly — e.g. clicking a bus vehicle on the map — bypasses the
-	// Stop modal that would otherwise register the route, so without this the
-	// destination and stop list stay empty and `last_stop` shows "Unknown".
-	$effect(() => {
-		if (!source_info[trip.data.source]?.monitor_routes) return;
-		return source_stop_times?.hold([trip.route_id]);
-	});
-
-	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(trip.id) ?? []);
-
-	const st_loading = $derived(
-		awaitingRows(
-			source_stop_times,
-			all_trip_stop_times.length,
-			source_info[trip.data.source].monitor_routes ? trip.route_id : undefined
-		)
+	const at = $derived(current_time.value ?? null);
+	// The header stays mounted across loading states and shows whatever has loaded.
+	const loaded_catalog = $derived(loaded(transit.catalog(source)));
+	const route = $derived(route_id ? loaded_catalog?.routes_by_id.get(route_id) : undefined);
+	const loaded_read = $derived(
+		route_id ? loaded(transit.trip(source, route_id, trip_id, at)) : undefined
 	);
+	const open_transfers = $state<Record<string, boolean>>({});
 
-	const stop_times = $derived(
-		all_trip_stop_times.filter(
-			(st) =>
-				st.arrival.getTime() > current_time.ms ||
-				show_previous ||
-				page.url.pathname.startsWith('/charts') // charts only show trips that have already passed TODO: maybe remove this
-		)
-	);
+	function visible_calls(read: TripRead) {
+		const now = current_time.ms;
+		// Charts only show trips that have already passed.
+		if (show_previous || page.url.pathname.startsWith('/charts')) return read.calls;
+		return read.calls.filter((call) => call.arrival > now);
+	}
 
-	const headsign = $derived(
-		trip_headsign(trip, route, all_trip_stop_times, page.data.stops_by_id?.[trip.data.source])
-	);
-	const bus = $derived.by(() => {
-		if (trip.data.source !== 'mta_bus' && trip.data.source !== 'njt_bus') return;
-		return {
-			position: position_context.getSource(trip.data.source)?.current?.get(trip.vehicle_id),
-			vehicle_id: trip.vehicle_id,
-			deviation:
-				trip.data.source === 'mta_bus' && trip.data.deviation && Math.abs(trip.data.deviation) > 120
-					? trip.data.deviation / 60
-					: undefined
-		};
-	});
-
-	type StopTransfers = Record<string, StopTime[]>;
-
-	const transfer_stop_times = $derived.by(() => {
-		const transfers: StopTransfers = {};
-		for (const st of stop_times) {
-			transfers[st.stop_id] = [];
-
-			const added_routes = new SvelteSet<string>();
-
-			const stop = page.data.stops_by_id[st.data.source]?.[st.stop_id];
+	/** Up to four later departures on other routes at each stop, from loaded routes only. */
+	function transfers_at(read: TripRead, calls: readonly Call[], catalog: CatalogData) {
+		const transfers: Record<string, TransferCall[]> = {};
+		for (const st of calls) {
+			const list: TransferCall[] = (transfers[st.stop_id] = []);
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			const added = new Set<string>();
+			const stop = catalog.stops_by_id.get(st.stop_id);
 			if (!stop) continue;
-
-			const stop_st = all_stop_times[st.data.source]?.current.by_stop_id.get(stop.id) || [];
-			for (const transfer_st of stop_st) {
-				if (transfers[st.stop_id].length > 3) break;
-				if (transfer_st.trip_id === st.trip_id || transfer_st.arrival < st.arrival) continue;
-
-				const transfer_trip = all_trips[transfer_st.data.source]?.current?.get(transfer_st.trip_id);
-				if (
-					!transfer_trip ||
-					transfer_trip.route_id === trip.route_id ||
-					transfer_trip.direction !== trip.direction ||
-					added_routes.has(transfer_trip.route_id)
-				)
-					continue;
-
-				transfers[st.stop_id].push(transfer_st);
-				added_routes.add(transfer_trip.route_id);
-			}
-
-			for (const transfer of stop.transfers) {
-				if (transfers[st.stop_id].length > 3) break;
-
-				const t_stop_st =
-					all_stop_times[transfer.to_stop_source]?.current.by_stop_id.get(transfer.to_stop_id) ||
-					[];
-				for (const transfer_st of t_stop_st) {
-					if (transfer_st.arrival < st.arrival) continue;
-					const transfer_trip = all_trips[transfer_st.data.source]?.current?.get(
-						transfer_st.trip_id
-					);
-
-					// TODO: maybe don't check direction bc it can be different for other stops
-					// also now with the multi-source setup, each source has different direction numbers (e.g. 1&3 for subway, 0&1 for bus), so we should check direction within the same source but not across sources
-
-					if (
-						!transfer_trip ||
-						(transfer_trip.data.source === trip.data.source &&
-							transfer_trip.direction !== trip.direction) ||
-						added_routes.has(transfer_trip.route_id)
-					)
+			const candidates = [
+				{ source, stop_id: st.stop_id, same_stop: true },
+				...stop.transfers
+					.filter((t) => page.data.selected_sources.includes(t.to_stop_source))
+					.map((t) => ({ source: t.to_stop_source, stop_id: t.to_stop_id, same_stop: false }))
+			];
+			for (const candidate of candidates) {
+				const loaded_calls = transit.loadedStopArrivals(candidate.source, candidate.stop_id, at);
+				for (const call of loaded_calls.calls) {
+					if (list.length > 3) break;
+					if (call.arrival < st.arrival || added.has(call.route_id)) continue;
+					if (candidate.same_stop && (call.trip_id === st.trip_id || call.route_id === route_id))
 						continue;
-
-					transfers[st.stop_id].push(transfer_st);
-					added_routes.add(transfer_trip.route_id);
+					const trip = loaded_calls.routes.get(call.route_id)?.trips.get(call.trip_id);
+					// Direction numbers are only comparable within one source.
+					if (!trip || (candidate.source === source && trip.direction !== read.trip.direction))
+						continue;
+					list.push({ source: candidate.source, call });
+					added.add(call.route_id);
 				}
 			}
+			list.sort((a, b) => a.call.arrival - b.call.arrival);
 		}
-
-		for (const stop_id in transfers) {
-			transfers[stop_id].sort((a, b) => a.arrival.getTime() - b.arrival.getTime());
-		}
-
 		return transfers;
-	});
-
-	type OpenTransfers = Record<string, boolean>;
-
-	const open_transfers = $state<OpenTransfers>({});
-	const subway_consist = $derived(trip.data.source === 'mta_subway' ? trip.data.consist : null);
-	const subway_consist_cars = $derived(
-		trip.data.source === 'mta_subway' ? (trip.data.consist_cars ?? []) : []
-	);
-	const subway_consist_model = $derived(subway_consist_cars[0]?.type);
+	}
 </script>
 
-<div class="p-3">
-	<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
-		{#if route}
-			<Icon
-				{route}
-				width={28}
-				height={28}
-				link
-				show_alerts
-				class="col-start-1 row-start-1 h-7 self-center justify-self-center"
-			/>
-		{/if}
-		{#if bus}
-			<div
-				class={[
-					'flex h-5 items-center justify-self-center leading-5',
-					route ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
-				]}
-			>
-				<VehicleCapacity position={bus.position} />
+{#snippet title_row(read: TripRead | undefined)}
+	{const status = $derived(read?.trip.status)}
+	{const is_bus = $derived(source === 'mta_bus' || source === 'njt_bus')}
+	{const trip_data = $derived(read?.trip.data)}
+	{const deviation = $derived(
+		trip_data?.source === 'mta_bus' && trip_data.deviation && Math.abs(trip_data.deviation) > 120
+			? trip_data.deviation / 60
+			: undefined
+	)}
+	<div class="p-3">
+		<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
+			{#if route}
+				<Icon
+					{route}
+					width={28}
+					height={28}
+					link
+					show_alerts
+					class="col-start-1 row-start-1 h-7 self-center justify-self-center"
+				/>
+			{/if}
+			{#if is_bus && read}
+				<div
+					class={[
+						'flex h-5 items-center justify-self-center leading-5',
+						route ? 'col-start-1 row-start-2' : 'col-start-1 row-start-1'
+					]}
+				>
+					<VehicleCapacity {status} />
+				</div>
+				<span
+					class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
+					>Bus #{read.trip.vehicle_id}</span
+				>
+			{/if}
+			<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
+				<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
+					{#if read}
+						{trip_destination_title(
+							trip_headsign(read.trip, route, read.calls, loaded_catalog?.stops_by_id),
+							route
+						)}
+					{:else}
+						{route?.long_name ?? ''}
+					{/if}
+				</div>
 			</div>
-			<span
-				class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
-				>Bus #{bus.vehicle_id}</span
-			>
-		{/if}
-		<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
-			<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
-				{trip_destination_title(headsign, route)}
-			</div>
+			{#if deviation !== undefined}
+				<div
+					class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300"
+				>
+					{Math.abs(deviation).toFixed(0)} min {deviation > 0 ? 'late' : 'early'}
+				</div>
+			{/if}
 		</div>
-		{#if bus?.deviation !== undefined}
-			<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300">
-				{Math.abs(bus.deviation).toFixed(0)} min {bus.deviation > 0 ? 'late' : 'early'}
-			</div>
-		{/if}
 	</div>
-</div>
-<!-- TODO: rework -->
-{#if trip.data.source === 'mta_subway'}
+{/snippet}
+
+{#snippet consist(read: TripRead)}
+	{const data = $derived(read.trip.data)}
+	{const subway_consist = $derived(data.source === 'mta_subway' ? data.consist : null)}
+	{const cars = $derived(data.source === 'mta_subway' ? (data.consist_cars ?? []) : [])}
+	{const model = $derived(cars[0]?.type)}
 	<details
 		class="group mx-2 mb-2 overflow-hidden rounded-xl border border-neutral-700/80 bg-neutral-900/80 text-sm shadow-sm shadow-black/20"
 	>
@@ -211,9 +159,9 @@
 				{#if subway_consist}
 					<div class="flex min-w-0 items-center gap-1.5 text-xs text-neutral-300">
 						<span class="truncate">{subway_consist.car_count} cars</span>
-						{#if subway_consist_model}
+						{#if model}
 							<Circle class="h-1 w-1 shrink-0 fill-current text-neutral-500" />
-							<span class="truncate">{subway_consist_model}</span>
+							<span class="truncate">{model}</span>
 						{/if}
 					</div>
 				{:else}
@@ -226,15 +174,15 @@
 
 		<div class="border-t border-neutral-800 px-3 pt-2 pb-3">
 			{#if subway_consist}
-				{#if subway_consist_cars.length}
+				{#if cars.length}
 					<div class="overflow-x-auto pb-1">
 						<div class="mx-auto flex w-fit min-w-max items-center justify-center gap-px">
-							{#each subway_consist_cars as car, index (car.number)}
+							{#each cars as car, index (car.number)}
 								<div
 									class={[
 										'flex min-h-7 items-center justify-center border border-neutral-600 bg-neutral-800 px-2.5 text-center text-[0.7rem] leading-none shadow-inner shadow-white/5',
 										index === 0 && 'rounded-l-full pl-3.5',
-										index === subway_consist_cars.length - 1 && 'rounded-r-full pr-3.5',
+										index === cars.length - 1 && 'rounded-r-full pr-3.5',
 										index !== 0 && 'border-l-0'
 									]}
 									title={car.number}
@@ -254,71 +202,91 @@
 			{/if}
 		</div>
 	</details>
-{/if}
+{/snippet}
 
-{#if unavailableRows(source_stop_times, all_trip_stop_times.length)}
-	<UnavailableRows arrivals />
-{:else if st_loading}
-	<Skeleton lines={6} class="p-2" />
+{#if route_id === null}
+	<p class="p-3 text-center text-neutral-400">
+		This trip link has no route and is no longer supported. Open the trip from its stop or route.
+	</p>
 {:else}
-	<ModalList>
-		{#each stop_times as st (`${st.stop_id}:${st.arrival.toISOString()}`)}
-			{const stop = $derived(page.data.stops_by_id[st.data.source]?.[st.stop_id])}
-			{#if stop}
-				<div class="relative text-base">
-					{#if transfer_stop_times[st.stop_id]?.length}
-						<button
-							tabindex="0"
-							onclick={() => {
-								if (open_transfers[st.stop_id]) {
-									open_transfers[st.stop_id] = false;
-								} else {
-									open_transfers[st.stop_id] = true;
-								}
-							}}
-							aria-label="Show transfers at stop"
-							class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
-						>
-							<div class="mx-1 flex items-center">
-								{#if !open_transfers[st.stop_id]}
-									<ChevronDown />
-								{:else}
-									<ChevronUp />
-								{/if}
-							</div>
-						</button>
-					{/if}
+	{@render title_row(loaded_read)}
+	<svelte:boundary>
+		{const [catalog, read] = $derived(
+			await Promise.all([transit.catalog(source), transit.trip(source, route_id, trip_id, at)])
+		)}
 
-					<Button state={{ type: 'stop', ...stop }}>
-						<div
-							class="flex w-full flex-col"
-							class:text-neutral-400={st.arrival.getTime() < current_time.ms}
-						>
-							<div class="flex items-center justify-between">
-								<div class="pl-10 text-left">
-									{stop.name}
-								</div>
+		{#if !read}
+			<p class="p-2 text-center text-neutral-400">This trip is not currently running.</p>
+		{:else}
+			{#if source === 'mta_subway'}
+				{@render consist(read)}
+			{/if}
 
-								<div class="flex items-center gap-1 text-right">
-									<div class="text-left">
-										{#if time_format === 'time'}
-											{st.arrival.toLocaleTimeString().replace(/AM|PM/, '')}
+			{const calls = $derived(visible_calls(read))}
+			{const transfers = $derived(transfers_at(read, calls, catalog))}
+			<ModalList>
+				{#each calls as st (st.sequence)}
+					{const stop = $derived(catalog.stops_by_id.get(st.stop_id))}
+					{#if stop}
+						<div class="relative text-base">
+							{#if transfers[st.stop_id]?.length}
+								<button
+									tabindex="0"
+									onclick={() => {
+										open_transfers[st.stop_id] = !open_transfers[st.stop_id];
+									}}
+									aria-label="Show transfers at stop"
+									class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
+								>
+									<div class="mx-1 flex items-center">
+										{#if !open_transfers[st.stop_id]}
+											<ChevronDown />
 										{:else}
-											{((st.arrival.getTime() - current_time.ms) / 1000 / 60).toFixed(0)}m
+											<ChevronUp />
 										{/if}
 									</div>
-								</div>
-							</div>
-						</div>
-					</Button>
-				</div>
+								</button>
+							{/if}
 
-				{#if open_transfers[st.stop_id]}
-					<div transition:slide>
-						<Transfers {time_format} transfer_stop_times={transfer_stop_times[st.stop_id]} />
-					</div>
-				{/if}
-			{/if}
-		{/each}
-	</ModalList>
+							<Button state={{ type: 'stop', source, id: stop.id }}>
+								<div
+									class="flex w-full flex-col"
+									class:text-neutral-400={st.arrival < current_time.ms}
+								>
+									<div class="flex items-center justify-between">
+										<div class="pl-10 text-left">
+											{stop.name}
+										</div>
+
+										<div class="flex items-center gap-1 text-right">
+											<div class="text-left">
+												{#if time_format === 'time'}
+													{new Date(st.arrival).toLocaleTimeString().replace(/AM|PM/, '')}
+												{:else}
+													{((st.arrival - current_time.ms) / 1000 / 60).toFixed(0)}m
+												{/if}
+											</div>
+										</div>
+									</div>
+								</div>
+							</Button>
+						</div>
+
+						{#if open_transfers[st.stop_id]}
+							<div transition:slide>
+								<Transfers {time_format} transfer_calls={transfers[st.stop_id]} />
+							</div>
+						{/if}
+					{/if}
+				{/each}
+			</ModalList>
+		{/if}
+
+		{#snippet pending()}
+			<Skeleton lines={6} class="p-2" />
+		{/snippet}
+		{#snippet failed(_error, reset)}
+			<UnavailableRows arrivals {reset} />
+		{/snippet}
+	</svelte:boundary>
 {/if}

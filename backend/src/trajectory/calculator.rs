@@ -140,7 +140,6 @@ pub fn compute_trajectory(
         return Err(anyhow::anyhow!("Not enough sampled points"));
     }
 
-    let path_bbox = super::types::compute_path_bbox(&path);
     let end_t = state_t;
     let v_mps = sampled.state_speed_mps;
     let end_s = sampled.state_distance_m;
@@ -153,7 +152,6 @@ pub fn compute_trajectory(
         timestamps,
         distances_m,
         bearings,
-        path_bbox,
     };
 
     Ok(ComputedTrajectory {

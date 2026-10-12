@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Route, RouteStop } from './client';
+import type { CatalogRoute, CatalogStopRoute } from './client';
 import { bus_headsign, debounce, main_route_stops } from './util.svelte';
 
 it('debounces rapid calls to the latest target and cancels pending work', () => {
@@ -23,9 +23,8 @@ it('debounces rapid calls to the latest target and cancels pending work', () => 
 });
 
 describe('main_route_stops', () => {
-	const routes: RouteStop[] = ['6', '6X', '7', '7X', 'FX'].map((route_id) => ({
+	const routes: CatalogStopRoute[] = ['6', '6X', '7', '7X', 'FX'].map((route_id) => ({
 		route_id,
-		stop_id: 'test-stop',
 		stop_sequence: 1,
 		data: { source: 'mta_subway', stop_type: 'full_time' }
 	}));
@@ -44,14 +43,14 @@ describe('main_route_stops', () => {
 
 /**
  * The Helium feed maps headsigns to a route's directions, never to individual
- * stops, so `RouteStop.data.headsign` is always empty for MTA buses and every
+ * stops, so `CatalogStopRoute.data.headsign` is always empty for MTA buses and every
  * bus headsign in the UI has to be resolved from the route plus the trip's
  * direction. These cover the shapes the feed actually produces.
  */
 
 function bus_route(
 	directions: { direction_id: number; destination: string; via: string[] }[] | undefined
-): Route {
+): CatalogRoute {
 	return {
 		id: 'B1',
 		short_name: 'B1',
@@ -66,10 +65,9 @@ function bus_route(
 			name_prefix: 'B',
 			name_number: 1,
 			name_suffix: null,
-			shape_ids: [],
 			directions
 		}
-	} as unknown as Route;
+	} as unknown as CatalogRoute;
 }
 
 describe('bus_headsign', () => {
@@ -105,7 +103,7 @@ describe('bus_headsign', () => {
 	it('returns undefined for a missing route or a non-bus route', () => {
 		expect(bus_headsign(undefined, 0)).toBeUndefined();
 		expect(
-			bus_headsign({ id: '1', data: { source: 'mta_subway' } } as unknown as Route, 0)
+			bus_headsign({ id: '1', data: { source: 'mta_subway' } } as unknown as CatalogRoute, 0)
 		).toBeUndefined();
 	});
 

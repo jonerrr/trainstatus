@@ -39,8 +39,6 @@ pub struct Trajectory {
     pub timestamps: Vec<f64>,
     pub distances_m: Vec<f64>,
     pub bearings: Vec<f32>,
-    /// [min_lon, min_lat, max_lon, max_lat]
-    pub path_bbox: [f64; 4],
 }
 
 /// A single rendered vehicle unit (bus or train car) for map animation.
@@ -60,8 +58,6 @@ pub struct RenderUnit {
     pub positions: Vec<[f64; 2]>,
     pub timestamps: Vec<f64>,
     pub bearings: Vec<f32>,
-    /// [min_lon, min_lat, max_lon, max_lat]
-    pub path_bbox: [f64; 4],
 }
 
 /// Result of `compute_trajectory` including continuity state for the next tick.
@@ -175,28 +171,4 @@ pub fn source_projected_epsg_code(source: Source) -> u16 {
     match source {
         Source::MtaBus | Source::MtaSubway | Source::NjtBus => 6538,
     }
-}
-
-pub fn compute_path_bbox(path: &[[f64; 2]]) -> [f64; 4] {
-    if path.is_empty() {
-        return [0.0, 0.0, 0.0, 0.0];
-    }
-    let mut min_lon = f64::INFINITY;
-    let mut min_lat = f64::INFINITY;
-    let mut max_lon = f64::NEG_INFINITY;
-    let mut max_lat = f64::NEG_INFINITY;
-    for [lon, lat] in path {
-        min_lon = min_lon.min(*lon);
-        min_lat = min_lat.min(*lat);
-        max_lon = max_lon.max(*lon);
-        max_lat = max_lat.max(*lat);
-    }
-    [min_lon, min_lat, max_lon, max_lat]
-}
-
-pub fn bbox_intersects(trip_bbox: [f64; 4], query: [f64; 4]) -> bool {
-    trip_bbox[0] <= query[2]
-        && trip_bbox[2] >= query[0]
-        && trip_bbox[1] <= query[3]
-        && trip_bbox[3] >= query[1]
 }

@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { type Source, type Stop } from '#lib/client/index.js';
+	import type { CatalogStop, Source } from '#lib/client/index.js';
 	import List from '#lib/List.svelte';
 	import { stop_pins } from '#lib/pins.svelte.js';
-	import { StopSearch } from '#lib/search.svelte.js';
+	import { search_stops } from '#lib/search.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { calculate_stop_height } from '#lib/util.svelte.js';
 
 	import { CircleX, Search } from '@lucide/svelte';
@@ -22,75 +23,60 @@
 		}
 	});
 
-	const stop_search = new StopSearch(page.data.stops);
+	const transit = getTransitData();
+	const catalogs = $derived(
+		page.data.selected_sources.map((source) => ({ source, ...transit.catalogState(source) }))
+	);
+	const all_stops = $derived(
+		Object.fromEntries(
+			catalogs.map(({ source, catalog }) => [source, catalog?.stops ?? []])
+		) as Partial<Record<Source, readonly CatalogStop[]>>
+	);
 
 	let search_input: string = $state('');
 	const throttled_search_input = new Throttled(() => search_input, 150);
 
-	const visible_stops = $derived.by(() => {
-		// console.log('searching for', throttled_search_input.current);
-
-		// default to all stops if search input empty
-		if (throttled_search_input.current === '') {
-			return page.data.stops;
-		}
+	function matching_stops(term: string): readonly CatalogStop[] | undefined {
+		const catalog = catalogs.find((c) => c.source === selected_source.current)?.catalog;
+		if (!catalog || term === '') return undefined;
 
 		// check if its a stop / route id
-		// TODO: maybe add back id length check (since stop_id must have like at least 3 chars. but its different for each source, so maybe not worth it)
-		const id_check = throttled_search_input.current.toUpperCase();
+		const id_check = term.toUpperCase();
+		const stop = catalog.stops_by_id.get(id_check);
+		if (stop) return [stop];
 
-		const stop = page.data.stops_by_id[selected_source.current]?.[id_check];
-		if (stop) {
-			// TODO: maybe preserve the other source search results instead of implicitly resetting them
-			return {
-				...page.data.stops,
-				[selected_source.current]: [stop]
-			};
-		}
-
-		const route = page.data.routes_by_id[selected_source.current]?.[id_check];
+		const route = catalog.routes_by_id.get(id_check);
 		if (route) {
-			const new_stops: Stop[] = [];
-			// store stop sequences by stop ID for sorting later
-			const route_stop_sequences: Record<string, number> = {};
-
-			for (const s of page.data.stops[selected_source.current] ?? []) {
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
+			const sequences = new Map<string, number>();
+			for (const s of catalog.stops) {
 				const r = s.routes.find((r) => r.route_id === route.id);
-
 				if (
 					r &&
 					r.data.source === 'mta_subway' &&
-					// TODO: maybe include other stop types
 					['full_time', 'part_time', 'rush_hour'].includes(r.data.stop_type)
 				) {
-					new_stops.push(s);
-					route_stop_sequences[s.id] = r.stop_sequence;
+					sequences.set(s.id, r.stop_sequence);
 				}
 			}
-			// TODO: maybe add sorting by route stop sequence back
-			if (new_stops.length) {
-				return {
-					...page.data.stops,
-					[selected_source.current]: new_stops.sort(
-						(a, b) => route_stop_sequences[a.id] - route_stop_sequences[b.id]
-					)
-				};
+			if (sequences.size) {
+				return catalog.stops
+					.filter((s) => sequences.has(s.id))
+					.sort((a, b) => sequences.get(a.id)! - sequences.get(b.id)!);
 			}
 		}
 
-		const search_results = stop_search.query(
-			throttled_search_input.current,
-			selected_source.current
-		);
 		// TODO: no-match fallback is unfinished; see frontend/TESTING.md
-		return {
-			...page.data.stops,
-			[selected_source.current]:
-				search_results.length > 0
-					? search_results
-					: (page.data.stops[selected_source.current] ?? [])
-		};
-	}) as Partial<Record<Source, Stop[]>>;
+		const results = search_stops(catalog, term);
+		return results.length ? results : undefined;
+	}
+
+	const visible_stops = $derived.by(() => {
+		const matches = matching_stops(throttled_search_input.current);
+		return (matches ? { ...all_stops, [selected_source.current]: matches } : all_stops) as Partial<
+			Record<Source, CatalogStop[]>
+		>;
+	});
 	// $inspect(visible_stops);
 
 	function clear_search() {
@@ -112,6 +98,7 @@
 		container_class="flex-1 min-h-0"
 		bind:selected_source
 		height_calc={calculate_stop_height}
+		loading={catalogs.some((c) => !c.catalog && !c.error)}
 	/>
 
 	<div class="w-full">

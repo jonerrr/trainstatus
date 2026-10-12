@@ -1,11 +1,12 @@
-import type { Route, Stop, Trip } from '../src/lib/client/index.js';
+import type { Catalog, Service } from '../src/lib/client/index.js';
 import { expect, test } from './fixtures';
 
 const dialog = (page: import('@playwright/test').Page) =>
 	page.getByRole('dialog', { name: 'Transit details' });
 
 test('opening a stop from the list can be restored with Back', async ({ page }) => {
-	const stops = (await (await page.request.get('/api/v1/stops/mta_subway')).json()) as Stop[];
+	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
+		.stops;
 	const stop = stops[0];
 	await page.goto('/stops');
 	await page.getByRole('searchbox').fill(stop.id);
@@ -24,15 +25,17 @@ test('opening a stop from the list can be restored with Back', async ({ page }) 
 });
 
 test('cold-load modals for subway stops, routes, and trips', async ({ page }) => {
-	const [stops, routes, trips] = (await Promise.all([
-		page.request.get('/api/v1/stops/mta_subway').then((response) => response.json()),
-		page.request.get('/api/v1/routes/mta_subway').then((response) => response.json()),
-		page.request.get('/api/v1/trips/mta_subway').then((response) => response.json())
-	])) as [Stop[], Route[], Trip[]];
-	const stop = stops[0];
-	const route = routes[0];
+	const [catalog, service] = (await Promise.all([
+		page.request.get('/api/v1/catalog/mta_subway').then((response) => response.json()),
+		page.request.get('/api/v1/service/mta_subway').then((response) => response.json())
+	])) as [Catalog, Service];
+	const stop = catalog.stops[0];
+	const route = catalog.routes[0];
 	expect(stop).toBeTruthy();
 	expect(route).toBeTruthy();
+	const trip = Object.entries(service.routes)
+		.map(([route_id, { trips }]) => ({ route_id, trip: trips[0] }))
+		.find(({ trip }) => trip);
 
 	await page.goto(`/?s=${encodeURIComponent(stop.id)}&src=mta_subway`);
 	await expect(page).toHaveURL(/[?&]s=/);
@@ -44,15 +47,13 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	await expect(page).toHaveURL(/[?&]src=mta_subway/);
 	await expect(dialog(page)).toContainText(route.short_name);
 
-	if (trips.length === 0) {
-		await page.goto('/?t=none&src=mta_subway');
-		await expect(page).toHaveURL(/[?&]t=/);
-		await expect(page).toHaveURL(/[?&]src=mta_subway/);
-		await expect(dialog(page)).toBeHidden();
-	} else {
-		const trip = trips[0];
-		await page.goto(`/?t=${encodeURIComponent(trip.id)}&src=mta_subway`);
-		await expect.poll(() => new URL(page.url()).searchParams.get('t')).toBe(trip.id);
+	if (trip) {
+		const id = trip.trip.id;
+		await page.goto(
+			`/?t=${encodeURIComponent(id)}&r=${encodeURIComponent(trip.route_id)}&src=mta_subway`
+		);
+		await expect.poll(() => new URL(page.url()).searchParams.get('t')).toBe(id);
+		await expect.poll(() => new URL(page.url()).searchParams.get('r')).toBe(trip.route_id);
 		await expect.poll(() => new URL(page.url()).searchParams.get('src')).toBe('mta_subway');
 		await expect(dialog(page)).toBeVisible();
 		await expect(dialog(page).locator('summary')).toContainText('Consist');
@@ -62,5 +63,5 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	await expect(dialog(page)).toBeHidden();
 
 	await page.goto('/?s=not-a-real-stop&src=mta_subway');
-	await expect(dialog(page)).toBeHidden();
+	await expect(dialog(page)).toContainText('not in the saved stop list');
 });

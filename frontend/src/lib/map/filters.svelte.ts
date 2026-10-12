@@ -2,7 +2,7 @@ import { page } from '$app/state';
 
 import type { Source } from '#lib/client/index.js';
 import { COMPASS_DIRECTION_OPTIONS } from '#lib/compassDirections.js';
-import { all_sources } from '#lib/resources/index.svelte.js';
+import { all_sources } from '#lib/source_info.js';
 
 import * as maplibregl from 'maplibre-gl';
 

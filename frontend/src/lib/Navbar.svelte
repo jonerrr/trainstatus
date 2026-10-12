@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
@@ -9,7 +9,7 @@
 	import UpdateIndicator from './UpdateIndicator.svelte';
 
 	const current_time = getCurrentTime();
-	const updates = getUpdateStatus();
+	const transit = getTransitData();
 
 	interface Routes {
 		[key: string]: [
@@ -74,7 +74,7 @@
 				type="button"
 				class="nav-button"
 				onclick={() => {
-					void updates.retry(true);
+					transit.reload();
 				}}
 				aria-label="Reload historical data"><Clock class="nav-icon" /><span>Reload</span></button
 			>

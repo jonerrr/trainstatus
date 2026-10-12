@@ -224,7 +224,9 @@ impl NjtBusRealtime {
         let stop_times: Vec<StopTime> = update
             .stop_time_update
             .into_iter()
-            .filter_map(|st| {
+            .enumerate()
+            .filter_map(|(index, st)| {
+                let stop_sequence = st.stop_sequence.map_or(index as i32, |s| s as i32);
                 let stop_id = st.stop_id?;
 
                 let arrival = match st.arrival {
@@ -241,6 +243,7 @@ impl NjtBusRealtime {
 
                 Some(StopTime {
                     trip_id: trip.id,
+                    stop_sequence,
                     stop_id,
                     arrival,
                     departure,

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { chart_context, type ChartPoint } from '#lib/charts/context.js';
-	import type { Route, Trip } from '#lib/client/index.js';
+	import { chart_context, type ChartPoint, type ChartSeries } from '#lib/charts/context.js';
+	import type { CatalogRoute } from '#lib/client/index.js';
 	import { open_modal } from '#lib/url_params.svelte.js';
 
 	import { line } from 'd3-shape';
@@ -8,7 +8,7 @@
 	const cake = chart_context();
 
 	interface Props {
-		routes?: Route[];
+		routes?: CatalogRoute[];
 		stop_points?: boolean;
 	}
 
@@ -20,16 +20,15 @@
 			.y((point) => cake.yGet(point))
 	);
 
-	function open_trip(trip: Trip) {
-		open_modal({ ...trip, type: 'trip' });
+	function open_trip(group: ChartSeries) {
+		open_modal({ type: 'trip', source: group.source, route_id: group.route_id, id: group.trip.id });
 	}
 </script>
 
 <!-- Draw a path for each train trip -->
-{#each cake.data as group (`${group.trip.data.source}:${group.trip.id}`)}
+{#each cake.data as group (`${group.source}:${group.trip.id}`)}
 	{const tripColor = $derived(
-		routes.find((r) => r.id === group.trip.route_id && r.data.source === group.trip.data.source)!
-			.color
+		routes.find((r) => r.id === group.route_id && r.data.source === group.source)?.color
 	)}
 
 	{const tripPath = $derived(path(group.points))}
@@ -45,8 +44,8 @@
 		role="button"
 		tabindex="0"
 		aria-label="View details for trip {group.trip.id}"
-		onclick={() => open_trip(group.trip)}
-		onkeydown={(e) => e.key === 'Enter' && open_trip(group.trip)}
+		onclick={() => open_trip(group)}
+		onkeydown={(e) => e.key === 'Enter' && open_trip(group)}
 	/>
 
 	<!-- Visible path for display only -->

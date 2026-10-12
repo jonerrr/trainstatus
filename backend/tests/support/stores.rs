@@ -1,10 +1,7 @@
 use backend::{
     realtime::{LiveSnapshots, RealtimeIngestor},
     static_data::{index::StaticTransitIndex, store::StaticDataStore},
-    stores::{
-        alert::AlertStore, position::PositionStore, route::RouteStore, stop::StopStore,
-        stop_time::StopTimeStore, trip::TripStore,
-    },
+    stores::{alert::AlertStore, route::RouteStore, stop::StopStore},
 };
 #[derive(Clone)]
 pub struct TestStores {
@@ -12,9 +9,6 @@ pub struct TestStores {
     pub ingestor: RealtimeIngestor,
     pub route_store: RouteStore,
     pub stop_store: StopStore,
-    pub trip_store: TripStore,
-    pub stop_time_store: StopTimeStore,
-    pub position_store: PositionStore,
     pub alert_store: AlertStore,
     pub static_data_store: StaticDataStore,
 }
@@ -31,9 +25,6 @@ pub fn test_stores(pool: sqlx::PgPool) -> TestStores {
     );
     TestStores {
         ingestor: RealtimeIngestor::new(pool.clone(), live_snapshots.clone(), index),
-        trip_store: TripStore::new(pool.clone(), live_snapshots.clone()),
-        stop_time_store: StopTimeStore::new(pool.clone(), live_snapshots.clone()),
-        position_store: PositionStore::new(pool.clone(), live_snapshots.clone()),
         alert_store: AlertStore::new(pool),
         live_snapshots,
         route_store,

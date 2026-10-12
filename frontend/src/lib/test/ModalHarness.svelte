@@ -1,12 +1,21 @@
 <script lang="ts">
 	import '../../app.css';
 
+	import { onDestroy } from 'svelte';
+
 	import Modal from '../Modal.svelte';
-	import { alert_context } from '../resources/alerts.svelte';
+	import { setTransitData } from '../transit/store.svelte';
 	import { createCurrentTime, setCurrentTime } from '../url_params.svelte';
+	import { fixtureTransitData } from './transit-fixture';
 
 	setCurrentTime(createCurrentTime());
-	alert_context.set({});
+	const transit = setTransitData(
+		fixtureTransitData({
+			catalogs: { njt_bus: { source: 'njt_bus', routes: [], stops: [] } },
+			services: {}
+		})
+	);
+	onDestroy(() => transit.destroy());
 </script>
 
 <button data-background>Background</button>

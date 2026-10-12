@@ -125,7 +125,7 @@ impl RealtimeIngestor {
                 // Publish the exact microsecond values PostgreSQL will commit.
                 stop.arrival = stop.arrival.trunc_subsecs(6);
                 stop.departure = stop.departure.trunc_subsecs(6);
-                if seen_stops.insert((trip_id, stop.stop_id.clone())) {
+                if seen_stops.insert((trip_id, stop.stop_sequence)) {
                     stop_times.push(stop);
                 }
             }
@@ -239,6 +239,7 @@ async fn merge_stop_times(
         return Ok(vec![]);
     }
     let trips: Vec<_> = stops.iter().map(|stop| stop.trip_id).collect();
+    let sequences: Vec<_> = stops.iter().map(|stop| stop.stop_sequence).collect();
     let ids: Vec<_> = stops.iter().map(|stop| stop.stop_id.clone()).collect();
     let arrivals: Vec<_> = stops.iter().map(|stop| stop.arrival).collect();
     let departures: Vec<_> = stops.iter().map(|stop| stop.departure).collect();
@@ -248,20 +249,20 @@ async fn merge_stop_times(
         .collect();
     let changed = sqlx::query_as::<_, (Uuid,)>(r#"
         WITH input_rows AS (
-            SELECT i.*, $6::source_enum AS source FROM UNNEST($1::uuid[], $2::text[], $3::timestamptz[], $4::timestamptz[], $5::jsonb[])
-                AS i(trip_id, stop_id, arrival, departure, data)
+            SELECT i.*, $7::source_enum AS source FROM UNNEST($1::uuid[], $2::integer[], $3::text[], $4::timestamptz[], $5::timestamptz[], $6::jsonb[])
+                AS i(trip_id, stop_sequence, stop_id, arrival, departure, data)
         ), changed_rows AS (
             SELECT i.* FROM input_rows i LEFT JOIN realtime.stop_time existing
-                ON existing.trip_id = i.trip_id AND existing.stop_id = i.stop_id AND existing.source = i.source
-            WHERE existing.trip_id IS NULL OR (existing.arrival, existing.departure, existing.data)
-                IS DISTINCT FROM (i.arrival, i.departure, i.data)
+                ON existing.source = i.source AND existing.trip_id = i.trip_id AND existing.stop_sequence = i.stop_sequence
+            WHERE existing.trip_id IS NULL OR (existing.stop_id, existing.arrival, existing.departure, existing.data)
+                IS DISTINCT FROM (i.stop_id, i.arrival, i.departure, i.data)
         )
-        INSERT INTO realtime.stop_time AS existing (trip_id, stop_id, arrival, departure, data, source)
-        SELECT trip_id, stop_id, arrival, departure, data, source FROM changed_rows
-        ON CONFLICT (trip_id, stop_id, source) DO UPDATE SET arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, data = EXCLUDED.data
-        WHERE (existing.arrival, existing.departure, existing.data) IS DISTINCT FROM (EXCLUDED.arrival, EXCLUDED.departure, EXCLUDED.data)
+        INSERT INTO realtime.stop_time AS existing (trip_id, stop_sequence, stop_id, arrival, departure, data, source)
+        SELECT trip_id, stop_sequence, stop_id, arrival, departure, data, source FROM changed_rows
+        ON CONFLICT (source, trip_id, stop_sequence) DO UPDATE SET stop_id = EXCLUDED.stop_id, arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, data = EXCLUDED.data
+        WHERE (existing.stop_id, existing.arrival, existing.departure, existing.data) IS DISTINCT FROM (EXCLUDED.stop_id, EXCLUDED.arrival, EXCLUDED.departure, EXCLUDED.data)
         RETURNING trip_id
-    "#).bind(&trips).bind(&ids).bind(&arrivals).bind(&departures).bind(&data).bind(source).fetch_all(&mut **tx).await?;
+    "#).bind(&trips).bind(&sequences).bind(&ids).bind(&arrivals).bind(&departures).bind(&data).bind(source).fetch_all(&mut **tx).await?;
     Ok(changed.into_iter().map(|row| row.0).collect())
 }
 

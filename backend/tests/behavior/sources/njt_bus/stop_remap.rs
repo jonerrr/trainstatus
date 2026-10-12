@@ -35,6 +35,7 @@ fn stop_time(stop_id: &str) -> StopTime {
     let now = Utc::now();
     StopTime {
         trip_id: Uuid::now_v7(),
+        stop_sequence: 1,
         stop_id: stop_id.into(),
         arrival: now,
         departure: now,

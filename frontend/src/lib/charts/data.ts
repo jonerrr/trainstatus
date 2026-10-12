@@ -1,11 +1,14 @@
-import type { Stop, StopTime, Trip } from '#lib/client/index.js';
+import type { CatalogStop, ServiceTrip, Source } from '#lib/client/index.js';
+import type { Call } from '#lib/transit/decode.js';
 
-import type { ChartPoint } from './context.js';
+import type { ChartPoint, ChartSeries } from './context.js';
 
 export type ChartInput = {
-	trip: Trip;
-	stopTimes: readonly StopTime[];
-	stops: Record<string, Stop>;
+	source: Source;
+	route_id: string;
+	trip: ServiceTrip;
+	calls: readonly Call[];
+	stops: ReadonlyMap<string, CatalogStop>;
 };
 
 /** Merge itineraries without changing either one's travel order. Repeated
@@ -142,26 +145,26 @@ function rankDefiniteStops(patterns: string[][]): Map<string, number> {
 
 export function buildChartData(inputs: readonly ChartInput[], now: number) {
 	const names = new Map<string, string>();
-	const series = inputs.map(({ trip, stopTimes, stops }) => ({
+	const series = inputs.map(({ source, route_id, trip, calls, stops }) => ({
+		source,
+		route_id,
 		trip,
-		points: [...stopTimes]
-			.filter((st) => stops[st.stop_id] && Number.isFinite(st.arrival.getTime()))
+		points: [...calls]
+			.filter((call) => stops.has(call.stop_id) && Number.isFinite(call.arrival))
 			.sort(
 				(a, b) =>
-					a.arrival.getTime() - b.arrival.getTime() ||
-					a.departure.getTime() - b.departure.getTime() ||
-					a.stop_id.localeCompare(b.stop_id)
+					a.arrival - b.arrival || a.departure - b.departure || a.stop_id.localeCompare(b.stop_id)
 			)
-			.map((st) => {
-				const stop = stops[st.stop_id];
-				const stop_key = JSON.stringify([trip.data.source, stop.id]);
+			.map((call) => {
+				const stop = stops.get(call.stop_id)!;
+				const stop_key = JSON.stringify([source, stop.id]);
 				names.set(stop_key, stop.name);
 				return {
 					stop_id: stop.id,
 					stop_key,
 					stop_name: stop.name,
-					time: st.arrival,
-					departure: st.departure.getTime()
+					time: new Date(call.arrival),
+					departure: call.departure
 				};
 			})
 	}));
@@ -220,7 +223,7 @@ export function buildChartData(inputs: readonly ChartInput[], now: number) {
 
 	const visible = new Set<string>();
 	const route_trips = series
-		.map(({ trip, points }) => {
+		.map(({ source, route_id, trip, points }): ChartSeries => {
 			let index = 0;
 			const visits: ChartPoint[] = [];
 			for (const point of points) {
@@ -235,7 +238,7 @@ export function buildChartData(inputs: readonly ChartInput[], now: number) {
 					time: point.time
 				});
 			}
-			return { trip, points: visits };
+			return { source, route_id, trip, points: visits };
 		})
 		.filter((s) => s.points.length);
 	return { route_trips, yDomain: axisKeys.filter((key) => visible.has(key)), stopNames };

@@ -1,4 +1,4 @@
-import type { Trip } from '#lib/client/index.js';
+import type { ServiceTrip, Source } from '#lib/client/index.js';
 
 import type { ScalePoint, ScaleTime } from 'd3-scale';
 import { getLayerCakeContext } from 'layercake';
@@ -11,7 +11,9 @@ export type ChartPoint = {
 };
 
 export type ChartSeries = {
-	trip: Trip;
+	source: Source;
+	route_id: string;
+	trip: ServiceTrip;
 	points: ChartPoint[];
 };
 

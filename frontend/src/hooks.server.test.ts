@@ -31,7 +31,7 @@ describe('internal API routing', () => {
 		private_env.API_ORIGIN = 'http://trainstatus-backend:3055';
 		const response = await handleFetch({
 			event,
-			request: new Request('https://trainstat.us/api/v1/routes/mta_subway?at=123', {
+			request: new Request('https://trainstat.us/api/v1/catalog/mta_subway?at=123', {
 				method: 'POST',
 				headers: { 'x-test': 'preserved' },
 				body: 'payload'
@@ -39,7 +39,7 @@ describe('internal API routing', () => {
 			fetch: echo_fetch
 		});
 		expect(await response.json()).toEqual({
-			url: 'http://trainstatus-backend:3055/api/v1/routes/mta_subway?at=123',
+			url: 'http://trainstatus-backend:3055/api/v1/catalog/mta_subway?at=123',
 			method: 'POST',
 			header: 'preserved',
 			body: 'payload'
@@ -47,7 +47,7 @@ describe('internal API routing', () => {
 	});
 
 	it.each([
-		'https://other.example/api/v1/routes/mta_subway',
+		'https://other.example/api/v1/catalog/mta_subway',
 		'https://trainstat.us/martin/tiles',
 		'https://trainstat.us/apiary'
 	])('leaves unrelated requests unchanged: %s', async (url) => {
@@ -58,7 +58,7 @@ describe('internal API routing', () => {
 
 	it('uses the existing route when API_ORIGIN is unset', async () => {
 		private_env.API_ORIGIN = undefined;
-		const url = 'https://trainstat.us/api/v1/stops/mta_subway';
+		const url = 'https://trainstat.us/api/v1/alerts/mta_subway';
 		const response = await handleFetch({ event, request: new Request(url), fetch: echo_fetch });
 		expect((await response.json()).url).toBe(url);
 	});

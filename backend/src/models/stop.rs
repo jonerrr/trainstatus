@@ -3,7 +3,7 @@ use sqlx::FromRow;
 use utoipa::ToSchema;
 
 use crate::{
-    api::util::point_schema,
+    api::schemas::point_schema,
     impl_discriminated_data,
     models::{geom::Geom, source::Source},
 };

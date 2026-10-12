@@ -9,10 +9,11 @@
 	import type { Source } from '#lib/client/index.js';
 	import { contain_modal_focus } from '#lib/modal_focus.js';
 	import Pin from '#lib/Pin.svelte';
-	import { route_pins, stop_pins, trip_pins, type Pins } from '#lib/pins.svelte.js';
+	import { route_pins, stop_pins, trip_pin_key, trip_pins, type Pins } from '#lib/pins.svelte.js';
 	import RouteModal from '#lib/Route/Modal.svelte';
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
 	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
 
@@ -26,6 +27,11 @@
 	} from '@lucide/svelte';
 
 	const current_time = getCurrentTime();
+	const transit = getTransitData();
+
+	function catalog_of(source: Source) {
+		return loaded(transit.catalog(source));
+	}
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
@@ -39,7 +45,14 @@
 		const next_modal = $state.snapshot(next);
 		const local_modal = $state.snapshot(local);
 		if (!next_modal || !local_modal) return !!next_modal !== !!local_modal;
-		return next_modal.type !== local_modal.type || next_modal.id !== local_modal.id;
+		return (
+			next_modal.type !== local_modal.type ||
+			next_modal.id !== local_modal.id ||
+			next_modal.source !== local_modal.source ||
+			(next_modal.type === 'trip' &&
+				local_modal.type === 'trip' &&
+				next_modal.route_id !== local_modal.route_id)
+		);
 	}
 
 	function slide_to(next_state: typeof page.state, forward: boolean) {
@@ -160,7 +173,7 @@
 	id: string,
 	title: string,
 	source: Source,
-	pins: LocalStorage<Pins>
+	pins: LocalStorage<Pins> | undefined
 )}
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
@@ -262,7 +275,9 @@
 				</button>
 			{/if}
 
-			<Pin {id} {pins} {source} size="2rem" />
+			{#if pins}
+				<Pin {id} {pins} {source} size="2rem" />
+			{/if}
 		</div>
 	</div>
 {/snippet}
@@ -278,42 +293,43 @@
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 	>
 		{#if current_page_state.modal?.type === 'stop'}
-			<StopModal
-				stop={current_page_state.modal}
-				{show_previous}
-				time_format={time_format.current}
-			/>
+			{const { source, id } = $derived(current_page_state.modal)}
+			<StopModal {source} stop_id={id} {show_previous} time_format={time_format.current} />
 
 			{@render actions(
 				true,
-				current_page_state.modal.id,
-				`Arrivals at ${current_page_state.modal.name}`,
-				current_page_state.modal.data.source,
+				id,
+				`Arrivals at ${catalog_of(source)?.stops_by_id.get(id)?.name ?? id}`,
+				source,
 				stop_pins
 			)}
 		{:else if current_page_state.modal?.type === 'route'}
-			<RouteModal route={current_page_state.modal} time_format={time_format.current} />
+			{const { source, id } = $derived(current_page_state.modal)}
+			<RouteModal {source} route_id={id} time_format={time_format.current} />
 
 			{@render actions(
 				false,
-				current_page_state.modal.id,
-				`Alerts for ${current_page_state.modal.short_name}`,
-				current_page_state.modal.data.source,
+				id,
+				`Alerts for ${catalog_of(source)?.routes_by_id.get(id)?.short_name ?? id}`,
+				source,
 				route_pins
 			)}
 		{:else if current_page_state.modal?.type === 'trip'}
+			{const { source, id, route_id } = $derived(current_page_state.modal)}
 			<TripModal
-				trip={current_page_state.modal}
+				{source}
+				{route_id}
+				trip_id={id}
 				{show_previous}
 				time_format={time_format.current}
 			/>
 
 			{@render actions(
 				true,
-				current_page_state.modal.id,
-				`${current_page_state.modal.route_id} Trip`,
-				current_page_state.modal.data.source,
-				trip_pins
+				route_id ? trip_pin_key(route_id, id) : id,
+				`${route_id ?? ''} Trip`,
+				source,
+				route_id ? trip_pins : undefined
 			)}
 		{/if}
 	</div>

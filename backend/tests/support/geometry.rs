@@ -101,6 +101,7 @@ fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
             stop.geom = Geom::from(geo::Point::from(points[i * 2]));
             StopTime {
                 trip_id: id,
+                stop_sequence: i as i32,
                 stop_id: stop_id.clone(),
                 arrival: now + Duration::seconds(30 + i as i64 * 180),
                 departure: now + Duration::seconds(40 + i as i64 * 180),
