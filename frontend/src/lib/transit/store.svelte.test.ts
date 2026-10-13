@@ -88,7 +88,104 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks();
 	for (const data of created.splice(0)) data.destroy();
+	vi.useRealTimers();
 	clock = 1_780_000_000_000;
+});
+
+test('fast-changing bus rows wait for a pause and fetch only routes still being read', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+	const http = transport();
+	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher, now: () => clock });
+	created.push(data);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [
+			{ id: 'pinned', route: 'A' },
+			{ id: 'row', route: 'B' }
+		]
+	});
+	await tick();
+	for (const route of ['C', 'D']) {
+		await vi.advanceTimersByTimeAsync(80);
+		expect(http.calls).toHaveLength(0);
+		await view.rerender({
+			readers: [
+				{ id: 'pinned', route: 'A' },
+				{ id: 'row', route }
+			]
+		});
+		await tick();
+	}
+	await view.rerender({
+		readers: [
+			{ id: 'pinned', route: 'A' },
+			{ id: 'row', route: 'D' },
+			{ id: 'next', route: 'E' }
+		]
+	});
+	await tick();
+	await vi.advanceTimersByTimeAsync(199);
+	expect(http.calls).toHaveLength(0);
+	// Reacquisition by the polling loop must not extend the quiet window.
+	document.dispatchEvent(new Event('visibilitychange'));
+	await vi.advanceTimersByTimeAsync(1);
+	expect(http.calls.map(http.routes)).toEqual([['A', 'D', 'E']]);
+	http.calls[0].respond(http.json(http.service('mta_bus', { A: ['a1'], D: ['d1'], E: ['e1'] })));
+	await tick();
+	await vi.advanceTimersByTimeAsync(0);
+	expect(text('D')).toEqual(['d1']);
+});
+
+test('bus rows removed before the debounce expires make no request', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+	const http = transport();
+	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher, now: () => clock });
+	created.push(data);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [{ id: 'row', route: 'A' }]
+	});
+	await tick();
+	await view.rerender({ readers: [] });
+	await tick();
+	await vi.advanceTimersByTimeAsync(200);
+	expect(http.calls).toHaveLength(0);
+	await view.rerender({ readers: [{ id: 'row', route: 'A' }] });
+	await tick();
+	await vi.advanceTimersByTimeAsync(200);
+	expect(http.calls.map(http.routes)).toEqual([['A']]);
+});
+
+test('bus debouncing does not delay subway service and slow changes make their own batches', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+	const http = transport();
+	const data = new TransitData({
+		sources: ['mta_subway', 'mta_bus'],
+		fetcher: http.fetcher,
+		now: () => clock
+	});
+	created.push(data);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [{ id: 'row', route: 'A' }]
+	});
+	await tick();
+	await vi.advanceTimersByTimeAsync(10);
+	expect(http.calls.map((call) => call.url.pathname)).toEqual(['/api/v1/service/mta_subway']);
+	await vi.advanceTimersByTimeAsync(190);
+	expect(http.calls.map(http.routes)).toEqual([[], ['A']]);
+	await view.rerender({ readers: [{ id: 'row', route: 'B' }] });
+	await tick();
+	await vi.advanceTimersByTimeAsync(200);
+	expect(http.calls.map(http.routes)).toEqual([[], ['A'], ['B']]);
+	await view.rerender({ readers: [{ id: 'row', route: 'C' }] });
+	await tick();
+	data.destroy();
+	await vi.advanceTimersByTimeAsync(200);
+	expect(http.calls).toHaveLength(3);
 });
 
 test('duplicate and independent readers share one batched request', async () => {
@@ -178,7 +275,7 @@ test('a due remount shows retained data and refreshes once in the background', a
 	http.calls[1].respond(http.json(http.service('mta_bus', { A: ['a2'] })));
 	await settle();
 	expect(text('A')).toEqual(['a2']);
-	expect(data.status.last_fetched).toBe(clock);
+	expect(data.status.warning).toBe(false);
 });
 
 test('failed refreshes retain data and empty replacements remove stale trips', async () => {
@@ -192,7 +289,6 @@ test('failed refreshes retain data and empty replacements remove stale trips', a
 	await settle();
 	http.calls[0].respond(http.json(http.service('mta_bus', { A: ['a1'] })));
 	await settle();
-	const fetched = data.status.last_fetched;
 
 	clock += 31_000;
 	document.dispatchEvent(new Event('visibilitychange'));
@@ -200,34 +296,89 @@ test('failed refreshes retain data and empty replacements remove stale trips', a
 	http.calls[1].respond(new Response('down', { status: 500 }));
 	await settle();
 	expect(text('A')).toEqual(['a1']);
-	expect(data.status.failing).toBe(true);
-	expect(data.status.stale).toBe(false);
-	expect(data.status.last_fetched).toBe(fetched);
+	expect(data.status.warning).toBe(true);
 
 	clock += 60_000;
 	document.dispatchEvent(new Event('visibilitychange'));
 	await settle();
-	expect(data.status.stale).toBe(true);
+	expect(data.status.warning).toBe(true);
 	expect(text('A')).toEqual(['a1']);
 	http.calls[2].respond(http.json(http.service('mta_bus', { A: [] })));
 	await settle();
 	expect(text('A')).toEqual(['']);
-	expect(data.status.failing).toBe(false);
-	expect(data.status.stale).toBe(false);
+	expect(data.status.warning).toBe(false);
 });
 
-test('a failed first load rejects into the failure UI', async () => {
+test('a failed first load ends loading and a shared Retry recovers every reader', async () => {
 	const http = transport();
 	const data = store(http.fetcher);
 	await render(TransitDataHarness, {
 		data,
 		source: 'mta_bus',
-		readers: [{ id: '1', route: 'A' }]
+		readers: [
+			{ id: '1', route: 'A' },
+			{ id: '2', route: 'A' }
+		]
 	});
 	await settle();
 	http.calls[0].respond(new Response('down', { status: 503 }));
 	await settle();
 	expect(document.querySelector('[data-failed="A"]')?.textContent).toBe('Service returned 503');
+	expect(pending('A')).toBe(false);
+	expect(data.status.warning).toBe(true);
+	data.retry();
+	await settle();
+	expect(http.calls).toHaveLength(2);
+	http.calls[1].respond(http.json(http.service('mta_bus', { A: ['recovered'] })));
+	await settle();
+	expect(text('A')).toEqual(['recovered', 'recovered']);
+	expect(data.status.warning).toBe(false);
+});
+
+test('an aged source commit warns even after a successful empty fetch and Retry refreshes it', async () => {
+	const http = transport();
+	const data = store(http.fetcher);
+	await render(TransitDataHarness, { data, source: 'mta_bus', readers: [{ id: '1', route: 'A' }] });
+	await settle();
+	http.calls[0].respond(
+		http.json({ ...http.service('mta_bus', { A: [] }), updated_at: clock / 1000 - 91 })
+	);
+	await settle();
+	expect(text('A')).toEqual(['']);
+	expect(data.status.warning).toBe(true);
+	data.retry();
+	await settle();
+	expect(http.calls).toHaveLength(2);
+	http.calls[1].respond(
+		http.json({ ...http.service('mta_bus', { A: ['fresh'] }), updated_at: clock / 1000 })
+	);
+	await settle();
+	expect(text('A')).toEqual(['fresh']);
+	expect(data.status.warning).toBe(false);
+});
+
+test('historical failures warn while mounted and successful history never ages', async () => {
+	const http = transport();
+	const data = store(http.fetcher);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [{ id: 'h1', route: 'A', at: 100 }]
+	});
+	await settle();
+	http.calls[0].respond(new Response('down', { status: 503 }));
+	await settle();
+	expect(data.status.warning).toBe(true);
+	data.retry();
+	await settle();
+	http.calls[1].respond(http.json({ ...http.service('mta_bus', { A: ['old'] }), at: 100 }));
+	await settle();
+	clock += 100_000;
+	document.dispatchEvent(new Event('visibilitychange'));
+	await settle();
+	expect(data.status.warning).toBe(false);
+	expect(http.calls).toHaveLength(2);
+	await view.unmount();
 });
 
 test('unknown routes fail alone and the rest of the batch is requested again', async () => {
@@ -310,6 +461,40 @@ test('whole-source subway loads eagerly and serves every route from one request'
 	expect(text('1')).toEqual(['t1']);
 	expect(text('7')).toEqual(['']);
 	expect(http.calls).toHaveLength(1);
+});
+
+test('map-only owners and loaded peeks defer passenger requests until an itinerary binds', async () => {
+	const http = transport();
+	const data = new TransitData({
+		sources: ['mta_subway'],
+		eager_service: false,
+		fetcher: http.fetcher,
+		batch_ms: 0,
+		now: () => clock
+	});
+	created.push(data);
+	await settle();
+	expect(data.loadedTrip('mta_subway', '4', 't1')).toBeUndefined();
+	expect(data.loadedStopArrivals('mta_subway', 'S1').calls).toEqual([]);
+	expect(http.calls).toHaveLength(0);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'mta_subway',
+		readers: [{ id: '1', route: '4' }]
+	});
+	await settle();
+	expect(http.calls).toHaveLength(1);
+	http.calls[0].respond(http.json(http.service('mta_subway', { '4': ['t1'] })));
+	await settle();
+	expect(text('4')).toEqual(['t1']);
+	await view.unmount();
+	clock += 31_000;
+	document.dispatchEvent(new Event('visibilitychange'));
+	await settle();
+	expect(http.calls).toHaveLength(1);
+	data.setEagerService(true);
+	await settle();
+	expect(http.calls).toHaveLength(2);
 });
 
 test('destroying the owner aborts its requests', async () => {

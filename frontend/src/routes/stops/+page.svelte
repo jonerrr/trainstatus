@@ -24,9 +24,8 @@
 	});
 
 	const transit = getTransitData();
-	const catalogs = $derived(
-		page.data.selected_sources.map((source) => ({ source, ...transit.catalogState(source) }))
-	);
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current.value ?? []);
 	const all_stops = $derived(
 		Object.fromEntries(
 			catalogs.map(({ source, catalog }) => [source, catalog?.stops ?? []])

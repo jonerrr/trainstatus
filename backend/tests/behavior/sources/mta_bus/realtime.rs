@@ -1,9 +1,9 @@
-use backend::{
-    fixtures::{self, FixtureKind},
-    models::{position::PositionData, source::Source},
-    realtime::CollectedSnapshot,
-    sources::mta_bus::realtime::MtaBusRealtime,
-};
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
+use backend::operations::CollectedSnapshot;
+use backend::operations::types::position::PositionData;
+use backend::source::Source;
+use backend::sources::mta_bus::realtime::MtaBusRealtime;
 
 use crate::support::fixture_root;
 

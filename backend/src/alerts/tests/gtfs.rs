@@ -1,9 +1,10 @@
 use super::*;
-use crate::feed::{TimeRange, TranslatedString, translated_string::Translation};
+use crate::feed::TimeRange;
+use crate::feed::TranslatedString;
+use crate::feed::translated_string::Translation;
 
 #[test]
 fn mta_translation_language_and_format_are_shared_across_sections() {
-    let id = Uuid::nil();
     let alert = GtfsAlert {
         header_text: Some(TranslatedString {
             translation: vec![
@@ -25,7 +26,7 @@ fn mta_translation_language_and_format_are_shared_across_sections() {
         }),
         ..Default::default()
     };
-    let translations = mta_translations(id, &alert);
+    let translations = mta_translations(&alert);
     assert_eq!(translations.len(), 3);
     let expected = [
         (AlertSection::Header, AlertFormat::Plain, "en", "plain"),
@@ -43,7 +44,6 @@ fn mta_translation_language_and_format_are_shared_across_sections() {
         ),
     ];
     for (translation, (section, format, language, text)) in translations.iter().zip(expected) {
-        assert_eq!(translation.alert_id, id);
         assert_eq!(translation.section, section);
         assert_eq!(translation.format, format);
         assert_eq!(translation.language, language);
@@ -74,7 +74,7 @@ fn periods_require_a_valid_start_and_preserve_open_ends() {
         ],
         ..Default::default()
     };
-    let periods = active_periods(Uuid::nil(), &alert);
+    let periods = active_periods(&alert);
     assert_eq!(periods.len(), 2);
     assert_eq!(periods[0].start_time.timestamp(), 100);
     assert!(periods[0].end_time.is_none());

@@ -8,25 +8,23 @@ Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, Sv
 
 ### Backend (`backend/src/`)
 
-**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` → `RealtimeIngestor` transaction → committed `Arc<PersistedSnapshot>` → shared `LiveSnapshots` watch channels → `ServiceStore` / `TrajectoryDeriver` → Axum API. Static imports are transactional; static responses, catalogs and current alerts are cached in process.
+**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` with a pinned `NetworkRevision` → `OperationsIngestor` transaction → committed `Arc<SourceSnapshot>` → shared `LiveSnapshots` watch channels → `Operations` / `TrajectoryDeriver` → Axum API.
 
 **Key modules**:
 
-- `sources/` — `RealtimeSource` collectors plus `AlertsAdapter` and `StaticAdapter` implementations in `mta_subway/`, `mta_bus/` and `njt_bus/`
-- `realtime/` — `RealtimeEngine` collects each source independently; `RealtimeIngestor` commits trips, stop times, positions and resolved shapes together before publishing. `LiveSnapshots` shares the latest committed Arc with `ServiceStore` and trajectory workers; watch channels coalesce pending generations. `TrajectoryDeriver` uses the pinned static revision without SQL readback
-- `static_data/` — `StaticController`, collected datasets, transactional persistence and pinned static revisions; expanded NJT schedules persist in PostgreSQL and restore on restart
-- `alerts/` — Alert polling and shared processing; `AlertStore` persists alerts and coordinates its 30-second local cache
-- `passenger/` — Passenger read models. `CatalogStore` builds each source's static catalog (routes, stops, transfers, platform edges) with an ETag. `ServiceStore` builds route-keyed service (trips, vehicle status, columnar calls) once per committed generation, or from retained history for `?at=`
-- `stores/` — Route, stop and alert persistence. Static response snapshots pair exact JSON bytes with their ETag; `TrajectoryStore` loads historical trajectory inputs behind `TrajectoryService`
-- `api/` — Axum handlers; `AppState` holds all stores; OpenAPI docs at `/api/docs` (via utoipa/scalar)
-- `integrations/` — External GTFS-RT/OBA protocol helpers and the Valhalla routing-library wrapper
-- `trajectory/` — Live derivation, source builders, calculation, continuity and Arrow encoding; `TrajectoryService` owns live/historical reads and caches. Live snapshots never expire or evict
-- `models/` — DB row types; geometry decoded via `geozero` from WKB
-- `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`
+- `app.rs` — Application construction, owner handles and background worker startup/shutdown; `main.rs` handles HTTP and signals
+- `network/` — Transactional static imports, schedules, transfers, restore and atomic revision/catalog publication. `NetworkRevision` pairs routing inputs with exact catalog bytes and their ETag
+- `operations/` — Stable source-scoped run keys, latest run/visit/observation reconciliation, explicit GPS sample writes, committed live membership, passenger indexing and shared retained-history materialization
+- `alerts/` — Source-typed alert aggregates, transactional replacement of owned collections, current membership, declared-period historical reads and the local cache
+- `trajectory/` — Source builders, geometry, PCHIP, continuity and Arrow rendering. Live derivation consumes the committed Arc; historical rendering consumes operations' retained inputs and recorded GPS anchors
+- `sources/` — `RealtimeSource`, `AlertsAdapter` and `StaticAdapter` implementations for each provider
+- `api/` — Request validation, HTTP handlers, borrowed domain-to-DTO encoding and OpenAPI. `AppState` holds owner read handles and a readiness check; private SQL rows live behind owners
+- `integrations/` — External GTFS-RT/OBA protocol helpers and Valhalla routing
+- `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`; provider enums are translated at collection
 
-**`StaticController`**: `RealtimeEngine` calls `controller.ensure_updated(source)` before collection. A foreign-key violation triggers one `force_update` and one ingestion retry using the same collected snapshot.
+**Network refresh**: `RealtimeEngine` calls `NetworkController::ensure_updated(source)` before collection. A foreign-key failure triggers one forced import and one retry; network-dependent normalization retries the same decoded provider batch against the new pinned revision.
 
-**Live and historical reads**: Live service reflects the last committed source snapshot and never touches SQL. Collection/transaction failures preserve it; a successful empty snapshot clears it; it is `503` until the first commit. Every requested route is present, empty when it has no trips; unknown bus routes are `404`. Explicit `?at=` service selects trips with any retained arrival or departure in the inclusive four-hour window, returns all their calls and no vehicle status; trajectories use their historical store path.
+**Reads**: Live service uses the last committed source snapshot without SQL. Failures preserve it; a successful empty collection clears membership; startup returns `503` until the first commit. Requested routes are present even when empty; unknown bus routes return `404`. Service and trajectories share the historical loader's inclusive four-hour arrival-or-departure selection, with all retained visits and no historical vehicle status. For identity, freshness, retired-route and historical geometry changes, read [backend contracts](docs/backend-contracts.md).
 
 **API routes** (all under `/api/v1/`):
 
@@ -36,11 +34,11 @@ Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, Sv
 
 ### Frontend (`frontend/src/`)
 
-**Type generation**: TypeScript types are generated from the OpenAPI spec via `@hey-api/openapi-ts` and stored in `frontend/src/lib/client`. Run codegen with `pnpm openapi-ts` (in frontend directory) after backend changes. Frontend must be running to generate types.
+**Type generation**: TypeScript types are generated from the OpenAPI spec via `@hey-api/openapi-ts` and stored in `frontend/src/lib/client`. After backend contract changes, export with `mise exec -- cargo run --bin openapi` from `backend/`, then run `mise exec -- pnpm openapi-ts --input <exported-json>` from `frontend/`. Export requires no running feeds, frontend or database.
 
-**Data loading**: The layout loads only selected sources and `?at=`; it never waits for API data. `+layout.svelte` creates one `TransitData` (`src/lib/transit/store.svelte.ts`) and shares it with `setTransitData`; components call `getTransitData()`. Reads such as `catalog`, `route`, `trip`, `stopArrivals` and `alerts` return loaded data synchronously or a promise for `{const x = $derived(await ...)}` inside `<svelte:boundary>`; `loaded(read)` peeks without suspending. Readers subscribe through `createSubscriber`, so mounted readers share one entry and remounts within the 30-second refresh make no request. Subway service loads eagerly as one whole-source entry; bus routes load on demand and batch into shared `?route_ids=` requests. Historical (`at`) entries live in a small LRU. `decode.ts` turns columnar service into `RouteData` indexed by trip and stop.
+**Data loading**: The layout loads selected sources and `?at=` without waiting for API data. `+layout.svelte` creates one `TransitData` (`src/lib/transit/store.svelte.ts`) and shares it with `setTransitData`; components call `getTransitData()`. Create `catalog`, `route`, `trip`, `stopArrivals`, or `alerts` bindings during component initialization, supplying getters for reactive source/ID/time keys. Read `.current` synchronously inside `$derived` for `{ value, loading, error }`; fetch failures are outcomes, while boundaries handle rendering errors. Each binding's explicit effect owns reader interest and idempotent request acquisition. Native `$state.raw` snapshots carry loaded data; reads never subscribe, create effects, or schedule requests. `peekCatalog`, `loadedTrip`, and `loadedStopArrivals` observe snapshots without acquiring requests. Subway service loads eagerly outside `/map`; bus routes load on demand and batch into shared `?route_ids=` requests. Remounts within the 30-second refresh reuse data. Historical (`at`) entries live in a small LRU protected by active bindings. `decode.ts` indexes columnar service by trip and stop.
 
-**Freshness**: Live data older than 90 seconds since its last successful fetch is stale. Passed calls are dropped, future predictions are never hidden, and no remaining calls is "unavailable", never "no service". One global indicator reports failures and retries.
+**Freshness**: Live data older than 90 seconds since its last successful fetch or source commit triggers the shared warning. Passed calls are dropped and future predictions remain visible. Empty detail views say “No predictions to show”; list rows omit prediction labels when none remain. One “Can’t update data” indicator provides Retry, moving into the dialog while a modal is open. Refresh failures retain loaded values; successful historical data does not age into a live warning. Persisted preferences use cached `LocalStorage.current` snapshots: replace the value to mutate and persist, and use the layout-owned listener for cross-tab updates.
 
 **Map**: `/map` polls its own trajectories and makes no passenger requests until an itinerary is opened.
 
@@ -69,8 +67,9 @@ See README.md for detailed development setup instructions, including environment
 
 - When adding, changing, reviewing, or running backend tests, read [.agents/skills/backend-testing/SKILL.md](.agents/skills/backend-testing/SKILL.md) and follow the linked testing policy.
 
-- Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `main.rs` and the per-source `LiveSnapshots` registry. Collectors return normalized entities; `RealtimeIngestor` owns persistence and committed publication
+- Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `app.rs`, `Source::ALL` and the per-source `LiveSnapshots` registry. Collectors return source-scoped run keys and normalized owner types; `OperationsIngestor` resolves persistent IDs and owns committed publication
 - Error handling: `AppError(anyhow::Error)` in `api/` converts to 500; use `?` freely
+- Use SQLx compile-time query macros for describable SQL; complex JSON/spatial projections and utility commands may stay runtime queries. When changing checked SQL or schema, follow the metadata workflow in [backend/TESTING.md](backend/TESTING.md).
 
 ### Frontend
 
@@ -85,3 +84,5 @@ See README.md for detailed development setup instructions, including environment
 
 - PostgreSQL with PostGIS; geometry as WKB decoded by `geozero`
 - `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`, `njt_bus`)
+
+- Automatic historical-age retention remains deferred.

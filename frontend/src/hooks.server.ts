@@ -1,6 +1,10 @@
-import type { HandleFetch } from '@sveltejs/kit/hooks';
+import type { HandleFetch, HandleServerError } from '@sveltejs/kit/hooks';
 
 import { API_ORIGIN } from '$app/env/private';
+
+import { handleFrontendError } from '#lib/errors.js';
+
+export const handleError: HandleServerError = handleFrontendError;
 
 export const handleFetch: HandleFetch = ({ event, request, fetch }) => {
 	const url = new URL(request.url);

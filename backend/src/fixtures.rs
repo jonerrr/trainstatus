@@ -1,4 +1,4 @@
-use crate::static_data::dataset::StaticDataset;
+use crate::network::dataset::NetworkDataset;
 use std::{
     fmt,
     path::{Path, PathBuf},
@@ -10,14 +10,11 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{
-    feed::FeedMessage,
-    models::{
-        position::VehiclePosition,
-        source::Source,
-        trip::{StopTime, Trip},
-    },
-};
+use crate::feed::FeedMessage;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::StopVisit;
+use crate::operations::types::trip::TripRun;
+use crate::source::Source;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -252,7 +249,7 @@ pub fn assert_expected_json(
     assert_eq!(actual, expected, "fixture expected output changed: {name}");
 }
 
-pub fn static_dataset_expected_value(dataset: &StaticDataset) -> serde_json::Value {
+pub fn static_dataset_expected_value(dataset: &NetworkDataset) -> serde_json::Value {
     let report = dataset
         .validate()
         .expect("static dataset should validate for expected output");
@@ -353,9 +350,9 @@ pub fn static_dataset_expected_value(dataset: &StaticDataset) -> serde_json::Val
     })
 }
 
-pub fn realtime_expected_value(
-    trips: &[(Trip, Vec<StopTime>)],
-    positions: &[VehiclePosition],
+pub fn realtime_expected_value<I>(
+    trips: &[(TripRun<I>, Vec<StopVisit<I>>)],
+    positions: &[VehicleObservation<I>],
 ) -> serde_json::Value {
     let mut trip_values = trips
         .iter()

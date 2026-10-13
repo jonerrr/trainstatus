@@ -6,12 +6,13 @@ Run commands from `backend/`, prefixed with `mise exec --`.
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `mise run test:unit`                        | Private unit and public behavior tests; no running services or tile extract required |
 | `mise run test`                             | Ordinary suite on existing PostgreSQL, including integration tests and doctests      |
-| `mise run test:integration`                 | SQL, HTTP persistence and private engine tests                                |
+| `mise run test:integration`                 | SQL, HTTP persistence and private engine tests                                       |
 | `mise run test:services integration <name>` | Focused integration filter                                                           |
+| `mise run sqlx:prepare`                     | Refresh compile-time query metadata against the configured migrated database         |
+| `mise run sqlx:check`                       | Verify committed query metadata against that database                                |
 | `mise run test:performance`                 | Opt-in ingestion WAL and static import/restart benchmarks; use an idle machine       |
-| `mise run sqlx:check`                       | Verify committed SQLx metadata in the separate trainstatus_sqlx_check database       |
 
-For a focused service-free test, use `SQLX_OFFLINE=true cargo test --features fixture-capture --lib --test behavior <name>` through `mise exec --`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
+For a focused service-free test, use `cargo test --features fixture-capture --lib --test behavior <name>` through `mise exec --`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
 
 ## Placement and ownership
 
@@ -27,7 +28,7 @@ For captured NJT schedule import/restart memory, run `mise exec -- mise run test
 
 The large captured NJT GTFS import remains an ignored library test. Run it explicitly by its name with `--ignored` when checking the full import; the ordinary suite uses smaller committed cases.
 
-Only target entrypoints live at the root of `tests/`. Nested modules must be registered in their owner's `mod.rs`; helpers belong in `tests/support/`. Name files after the behavior, not an ambiguous `trajectory` or `snapshot` bucket. Live trajectory derivation is `behavior/trajectory/live`; historical inputs are `integration/stores/trajectory`; ingestion shape selection is `integration/realtime/shape_resolution`.
+Only target entrypoints live at the root of `tests/`. Nested modules must be registered in their owner's `mod.rs`; helpers belong in `tests/support/`. Name files after the behavior, not an ambiguous `trajectory` or `snapshot` bucket. Live trajectory derivation is `behavior/trajectory/live`; historical inputs are `integration/operations/history`; ingestion shape selection is `integration/operations/shape_resolution`.
 
 ## Services and clocks
 
@@ -35,7 +36,9 @@ Only target entrypoints live at the root of `tests/`. Nested modules must be reg
 
 Tests accepting `PgPool` through `#[sqlx::test]` get a fresh database with migrations applied automatically. Successful test databases are deleted; failed ones remain for debugging and SQLx cleans old test databases on a later run. The connection role needs permission to create databases and install the migration extensions (the local `trains` image role is a superuser). SQLx manages databases, not the PostgreSQL server. Normal Rust test parallelism is supported. Avoid overlapping independent suite invocations on this same server: SQLx's cleanup/database names can collide across runs; use separate servers if that is needed.
 
-`sqlx:check` is separate because it is a CLI schema check, not a `#[sqlx::test]`. It creates/migrates the dedicated `trainstatus_sqlx_check` database on the same server. Override its URL with `SQLX_CHECK_DATABASE_URL`; this must point to a metadata-check database, not `trains`. The check database is retained for reuse.
+Use `query!`, `query_as!` or `query_scalar!` for SQL that SQLx can describe. Complex nested JSON/spatial projections and PostgreSQL utility commands remain runtime queries and are covered by integration tests. Private persistence rows stay separate from domain and API types. `backend/sqlx.toml` maps geometry and source enum types to their Rust representations.
+
+Normal backend mise builds/tests use `SQLX_OFFLINE=true` and committed `.sqlx/` metadata; `test:services` still executes real SQL in isolated databases. After changing checked SQL or migrations, use the configured, migrated development database to run `mise exec -- mise run sqlx:prepare`, then `mise exec -- mise run sqlx:check`. These tasks set `SQLX_OFFLINE=false` and include all targets plus fixture/engine features. They describe queries without ingesting data or initializing a database. Commit the regenerated metadata with the SQL changes.
 
 Each store/service owns its in-memory caches. Construct fresh stores for test isolation; no external cache or container cleanup is required. Never reset the development pod for tests.
 

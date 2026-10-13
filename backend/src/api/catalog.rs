@@ -1,5 +1,7 @@
 use super::AppError;
-use crate::{AppState, models::source::Source, passenger::catalog::Catalog};
+use crate::AppState;
+use crate::api::dto::catalog::Catalog;
+use crate::source::Source;
 use axum::{
     extract::{Path, State},
     response::{IntoResponse, Response},
@@ -25,7 +27,7 @@ pub async fn catalog_handler(
     Path(source): Path<Source>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    let response = state.catalog_store.response(source).await?;
+    let response = state.network.response(source).await?;
     if etag_matches(&headers, &response.etag) {
         return Ok((cache_headers(&response.etag), StatusCode::NOT_MODIFIED).into_response());
     }

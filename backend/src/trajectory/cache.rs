@@ -4,7 +4,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use moka::future::Cache;
 
-use crate::models::source::Source;
+use crate::source::Source;
 
 use super::geometry::{ShapeGeometry, build_shape_geometry};
 use super::types::{HotSnapshot, source_projected_epsg_code};

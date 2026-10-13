@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM static.stop_transfer WHERE from_stop_source = $1 AND transfer_type != 6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6923c9055e734c3eb2daf31456f7ac18fd15d1f47c504422ba42313280c8fa27"
+}

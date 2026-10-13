@@ -22,9 +22,8 @@
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
-	const catalogs = $derived(
-		page.data.selected_sources.map((source) => ({ source, ...transit.catalogState(source) }))
-	);
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current.value ?? []);
 
 	type RouteKey = { source: Source; id: string };
 	let selected = $state<RouteKey[]>(
@@ -47,12 +46,14 @@
 		})
 	);
 
-	const reads = $derived(
+	const route_resources = transit.routes(() =>
 		selected.map((key) => ({
-			...key,
-			...transit.routeState(key.source, key.id, current_time.value ?? null)
+			source: key.source,
+			route_id: key.id,
+			at: current_time.value ?? null
 		}))
 	);
+	const reads = $derived(route_resources.current.value ?? []);
 	const trips_loading = $derived(
 		catalogs.some((c) => !c.catalog && !c.error) || reads.some((r) => !r.route && !r.error)
 	);
@@ -65,7 +66,7 @@
 
 	const data = $derived.by(() => {
 		const inputs: ChartInput[] = [];
-		for (const { source, id, route } of reads) {
+		for (const { source, route_id: id, route } of reads) {
 			const stops = catalogs.find((c) => c.source === source)?.catalog?.stops_by_id;
 			if (!route || !stops) continue;
 			for (const trip of route.trips.values()) {

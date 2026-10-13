@@ -1,0 +1,207 @@
+use crate::support;
+
+use backend::source::Source;
+use support::{mta_bus_dataset, test_owners};
+use uuid::Uuid;
+
+/// Real B94 stops (from the checked-in Helium fixture) all served by shape
+/// `B940017`. Used to build a synthetic realtime trip whose stop sequence
+/// unambiguously belongs to that shape.
+const B94_STOP_IDS: [&str; 5] = ["504409", "901701", "904218", "904219", "904979"];
+
+#[sqlx::test]
+async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
+    let service = backend::trajectory::TrajectoryService::new(pool);
+    let at = crate::support::fixtures::fixed_time();
+    let results =
+        futures::future::join_all((0..8).map(|_| service.snapshot(Source::MtaBus, Some(at)))).await;
+    let snapshots: Vec<_> = results.into_iter().map(Result::unwrap).collect();
+    for snapshot in &snapshots[1..] {
+        assert!(
+            std::sync::Arc::ptr_eq(&snapshots[0], snapshot),
+            "concurrent misses must return the same computed snapshot"
+        );
+    }
+    let cached = service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
+    assert!(std::sync::Arc::ptr_eq(&snapshots[0], &cached));
+    let next_second = service
+        .snapshot(Source::MtaBus, Some(at + chrono::Duration::seconds(1)))
+        .await
+        .unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&snapshots[0], &next_second));
+}
+
+#[sqlx::test]
+async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(pool: sqlx::PgPool) {
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_bus_dataset()).await.unwrap();
+    let at = crate::support::fixtures::fixed_time();
+    stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
+        .await
+        .unwrap();
+    let later = at + chrono::Duration::seconds(1);
+    assert_eq!(
+        at.timestamp().div_euclid(300),
+        later.timestamp().div_euclid(300)
+    );
+    let first = backend::trajectory::TrajectoryService::new(pool.clone())
+        .snapshot(Source::MtaBus, Some(at))
+        .await
+        .unwrap();
+    let second = backend::trajectory::TrajectoryService::new(pool.clone())
+        .snapshot(Source::MtaBus, Some(later))
+        .await
+        .unwrap();
+    assert!(!first.render_units.is_empty());
+    assert!(!second.render_units.is_empty());
+    let expected_first = serde_json::to_value(&first.render_units).unwrap();
+    let expected_second = serde_json::to_value(&second.render_units).unwrap();
+    assert_ne!(
+        expected_first, expected_second,
+        "sampling windows depend on the requested second"
+    );
+    for order in [[at, later], [later, at]] {
+        let service = backend::trajectory::TrajectoryService::new(pool.clone());
+        for time in order {
+            let snapshot = service.snapshot(Source::MtaBus, Some(time)).await.unwrap();
+            let expected = if time == at {
+                &expected_first
+            } else {
+                &expected_second
+            };
+            assert_eq!(
+                &serde_json::to_value(&snapshot.render_units).unwrap(),
+                expected
+            );
+        }
+    }
+}
+
+#[sqlx::test]
+async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
+    let service = backend::trajectory::TrajectoryService::new(pool.clone());
+    let at = crate::support::fixtures::fixed_time();
+    sqlx::query("ALTER TABLE realtime.trip RENAME TO unavailable_trip")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(service.snapshot(Source::MtaBus, Some(at)).await.is_err());
+    sqlx::query("ALTER TABLE realtime.unavailable_trip RENAME TO trip")
+        .execute(&pool)
+        .await
+        .unwrap();
+    service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
+}
+
+fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::CollectedSnapshot {
+    use backend::operations::CollectedTrip as TripRun;
+    use backend::operations::CollectedVisit as StopVisit;
+    use backend::operations::types::trip::MtaBusData;
+    use backend::operations::types::trip::StopTimeData;
+    use backend::operations::types::trip::TripData;
+    let id: backend::operations::RunKey = Uuid::now_v7().into();
+    let now = crate::support::fixtures::fixed_time();
+    let trip = TripRun {
+        id,
+        original_id: format!("test-trip-{}", Uuid::now_v7()),
+        vehicle_id: format!("test-vehicle-{}", Uuid::now_v7()),
+        route_id: route_id.into(),
+        shape_ids: vec![],
+        direction: 0,
+        created_at: now,
+        updated_at: now,
+        data: TripData::MtaBus(MtaBusData { deviation: None }),
+    };
+    let stops = stop_ids
+        .iter()
+        .enumerate()
+        .map(|(i, stop)| {
+            let arrival = now + chrono::Duration::minutes(i as i64 * 2);
+            StopVisit {
+                trip_id: id,
+                stop_sequence: i as i32,
+                stop_id: (*stop).into(),
+                arrival,
+                departure: arrival,
+                data: StopTimeData::MtaBus,
+            }
+        })
+        .collect();
+    backend::operations::CollectedSnapshot {
+        source: Source::MtaBus,
+        network_revision: None,
+        renormalize: None,
+        trips: vec![(trip, stops)],
+        positions: vec![],
+    }
+}
+
+/// A candidate shape can be geometrically closer to a trip's stops than the
+/// real shape (e.g. a coincidence, or here — deliberately — a decoy built
+/// exactly through the stop points) while having zero confirmed stop-membership
+/// hits. Ingestion must prefer the hit-rich real shape over the
+/// distance-closer decoy.
+#[sqlx::test]
+async fn historical_trajectory_uses_final_departure_and_past_history_points(pool: sqlx::PgPool) {
+    use backend::geometry::Geom;
+    use backend::operations::CollectedObservation as VehicleObservation;
+    use backend::operations::history::History;
+    use backend::operations::types::position::MtaBusPositionData;
+    use backend::operations::types::position::PositionData;
+
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_bus_dataset()).await.unwrap();
+    let at = crate::support::fixtures::fixed_time() - chrono::Duration::hours(1);
+    let mut input = collected_trip("B94", &B94_STOP_IDS);
+    input.trips[0].0.created_at = at - chrono::Duration::minutes(5);
+    input.trips[0].0.updated_at = at + chrono::Duration::hours(2);
+    for stop in &mut input.trips[0].1 {
+        stop.arrival = at - chrono::Duration::minutes(2);
+        stop.departure = at + chrono::Duration::minutes(1);
+    }
+    let old_point = geo::Point::new(-73.948151, 40.744723);
+    input.positions.push(VehicleObservation {
+        vehicle_id: input.trips[0].0.vehicle_id.clone(),
+        trip_id: Some(input.trips[0].0.id),
+        stop_id: None,
+        geom: Some(Geom::from(old_point)),
+        updated_at: at - chrono::Duration::seconds(20),
+        data: PositionData::MtaBus(MtaBusPositionData {
+            bearing: 0.0,
+            passengers: None,
+            capacity: None,
+            status: None,
+            phase: None,
+        }),
+    });
+    let committed = stores.ingestor.ingest(input.clone()).await.unwrap();
+    input.positions[0].updated_at = at + chrono::Duration::seconds(20);
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.94, 40.75)));
+    stores.ingestor.ingest(input).await.unwrap();
+    let historical = History::new(pool.clone())
+        .load(Source::MtaBus, at, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        historical.trips.len(),
+        1,
+        "final departure keeps retained trip relevant"
+    );
+    assert_eq!(historical.trips[0].id, committed.trips[0].id);
+    let anchor = &historical.anchors[&committed.trips[0].id];
+    assert_eq!(anchor.observed_at, committed.positions[0].updated_at);
+    assert_eq!(anchor.point, old_point);
+    assert!(!historical.stop_times.is_empty());
+    let rendered = backend::trajectory::TrajectoryService::new(pool)
+        .snapshot(Source::MtaBus, Some(at))
+        .await
+        .unwrap();
+    assert!(
+        rendered
+            .render_units
+            .values()
+            .any(|unit| unit.trip_id == committed.trips[0].id.to_string())
+    );
+}

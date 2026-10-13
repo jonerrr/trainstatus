@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                t.*\n            FROM realtime.trip t\n            WHERE t.source = $1\n            AND($3::text[] IS NULL OR t.route_id = ANY($3))\n            AND EXISTS(SELECT 1 FROM realtime.stop_time st WHERE st.trip_id = t.id AND st.source = $1 AND(st.arrival BETWEEN $2 AND($2 + INTERVAL '4 hours') OR st.departure BETWEEN $2 AND($2 + INTERVAL '4 hours')))\n            ORDER BY t.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "original_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "original_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "vehicle_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "vehicle_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "route_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "route_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "shape_ids",
+        "type_info": "VarcharArray",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "shape_ids"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "source",
+        "type_info": {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "direction",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "data",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "data"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "abec67be0737846c1ccc1fa28ff2f6a7568c0e4f66e2a6e638798f40f4611e29"
+}

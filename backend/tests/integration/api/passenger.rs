@@ -1,12 +1,15 @@
 use axum_test::TestServer;
-use backend::{
-    models::{
-        position::{MtaSubwayPositionData, PositionData, VehiclePosition},
-        source::Source,
-        trip::{MtaSubwayStopTimeData, MtaSubwayTripData, StopTime, StopTimeData, Trip, TripData},
-    },
-    realtime::CollectedSnapshot,
-};
+use backend::operations::CollectedObservation as VehicleObservation;
+use backend::operations::CollectedSnapshot;
+use backend::operations::CollectedTrip as TripRun;
+use backend::operations::CollectedVisit as StopVisit;
+use backend::operations::types::position::MtaSubwayPositionData;
+use backend::operations::types::position::PositionData;
+use backend::operations::types::trip::MtaSubwayStopTimeData;
+use backend::operations::types::trip::MtaSubwayTripData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::TripData;
+use backend::source::Source;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use http::{
     StatusCode,
@@ -15,19 +18,21 @@ use http::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::support::{
-    TestStores, app_state_from_stores, mta_bus_dataset, mta_subway_dataset, test_stores,
-};
+use crate::support::TestOwners;
+use crate::support::app_state_from_owners;
+use crate::support::mta_bus_dataset;
+use crate::support::mta_subway_dataset;
+use crate::support::test_owners;
 
-async fn server_with(pool: &sqlx::PgPool, stores: TestStores) -> TestServer {
+async fn server_with(pool: &sqlx::PgPool, stores: TestOwners) -> TestServer {
     let (router, _) =
-        backend::api::router(app_state_from_stores(pool.clone(), stores)).split_for_parts();
+        backend::api::router(app_state_from_owners(pool.clone(), stores)).split_for_parts();
     TestServer::new(router)
 }
 
-fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (Trip, Vec<StopTime>) {
-    let trip = Trip {
-        id: Uuid::now_v7(),
+fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (TripRun, Vec<StopVisit>) {
+    let trip = TripRun {
+        id: Uuid::now_v7().into(),
         original_id: "service-trip".into(),
         vehicle_id: "service-vehicle".into(),
         route_id: "A".into(),
@@ -43,7 +48,7 @@ fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (Trip, Vec<St
     let stops = offsets
         .iter()
         .enumerate()
-        .map(|(i, (stop_id, offset))| StopTime {
+        .map(|(i, (stop_id, offset))| StopVisit {
             trip_id: trip.id,
             stop_sequence: i as i32,
             stop_id: (*stop_id).into(),
@@ -59,8 +64,8 @@ fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (Trip, Vec<St
     (trip, stops)
 }
 
-fn subway_position(trip: &Trip, at: DateTime<Utc>) -> VehiclePosition {
-    VehiclePosition {
+fn subway_position(trip: &TripRun, at: DateTime<Utc>) -> VehicleObservation {
+    VehicleObservation {
         vehicle_id: trip.vehicle_id.clone(),
         trip_id: Some(trip.id),
         stop_id: Some("102".into()),
@@ -75,9 +80,9 @@ fn subway_position(trip: &Trip, at: DateTime<Utc>) -> VehiclePosition {
 
 #[sqlx::test]
 async fn catalog_preserves_static_detail_and_validates_with_etag(pool: sqlx::PgPool) {
-    let stores = test_stores(pool.clone());
+    let stores = test_owners(pool.clone());
     for dataset in [mta_subway_dataset(), mta_bus_dataset()] {
-        stores.static_data_store.persist(&dataset).await.unwrap();
+        stores.network.persist(&dataset).await.unwrap();
     }
     let server = server_with(&pool, stores).await;
 
@@ -131,12 +136,8 @@ async fn catalog_preserves_static_detail_and_validates_with_etag(pool: sqlx::PgP
 
 #[sqlx::test]
 async fn service_rejects_invalid_requests_and_reports_startup_unavailability(pool: sqlx::PgPool) {
-    let stores = test_stores(pool.clone());
-    stores
-        .static_data_store
-        .persist(&mta_subway_dataset())
-        .await
-        .unwrap();
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_subway_dataset()).await.unwrap();
     let server = server_with(&pool, stores).await;
 
     for path in [
@@ -164,12 +165,8 @@ async fn service_rejects_invalid_requests_and_reports_startup_unavailability(poo
 
 #[sqlx::test]
 async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPool) {
-    let stores = test_stores(pool.clone());
-    stores
-        .static_data_store
-        .persist(&mta_subway_dataset())
-        .await
-        .unwrap();
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_subway_dataset()).await.unwrap();
     let now = Utc::now();
     let (trip, stops) = subway_trip(
         now,
@@ -180,10 +177,12 @@ async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPo
         ],
     );
     let position = subway_position(&trip, now);
-    stores
+    let committed = stores
         .ingestor
         .ingest(CollectedSnapshot {
             source: Source::MtaSubway,
+            network_revision: None,
+            renormalize: None,
             trips: vec![(trip.clone(), stops)],
             positions: vec![position],
         })
@@ -206,7 +205,7 @@ async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPo
         "routes without trips are explicitly empty"
     );
     let route = &routes["A"];
-    assert_eq!(route["trips"][0]["id"], trip.id.to_string());
+    assert_eq!(route["trips"][0]["id"], committed.trips[0].id.to_string());
     assert_eq!(
         route["trips"][0]["status"]["data"],
         json!({"source": "mta_subway", "assigned": false, "status": "EN_ROUTE"})
@@ -223,28 +222,26 @@ async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPo
 
 #[sqlx::test]
 async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx::PgPool) {
-    let stores = test_stores(pool.clone());
-    stores
-        .static_data_store
-        .persist(&mta_subway_dataset())
-        .await
-        .unwrap();
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_subway_dataset()).await.unwrap();
     let at = Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap();
     let (inside, inside_stops) = subway_trip(
         at,
         &[("101", Duration::minutes(20)), ("102", Duration::hours(6))],
     );
     let (outside, outside_stops) = subway_trip(at, &[("101", Duration::hours(5))]);
-    let outside = Trip {
+    let outside = TripRun {
         original_id: "outside".into(),
         vehicle_id: "outside-vehicle".into(),
         ..outside
     };
     let position = subway_position(&inside, at);
-    stores
+    let committed = stores
         .ingestor
         .ingest(CollectedSnapshot {
             source: Source::MtaSubway,
+            network_revision: None,
+            renormalize: None,
             trips: vec![(inside.clone(), inside_stops), (outside, outside_stops)],
             positions: vec![position],
         })
@@ -259,7 +256,16 @@ async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx:
     assert_eq!(body["at"], at.timestamp());
     let route = &body["routes"]["A"];
     assert_eq!(route["trips"].as_array().unwrap().len(), 1);
-    assert_eq!(route["trips"][0]["id"], inside.id.to_string());
+    assert_eq!(
+        route["trips"][0]["id"],
+        committed
+            .trips
+            .iter()
+            .find(|trip| trip.original_id == inside.original_id)
+            .unwrap()
+            .id
+            .to_string()
+    );
     assert_eq!(route["trips"][0]["status"], Value::Null);
     assert_eq!(
         route["calls"]["arrival"],
@@ -275,12 +281,8 @@ async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx:
 async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_window(
     pool: sqlx::PgPool,
 ) {
-    let stores = test_stores(pool.clone());
-    stores
-        .static_data_store
-        .persist(&mta_subway_dataset())
-        .await
-        .unwrap();
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_subway_dataset()).await.unwrap();
     let at = Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap();
     // Removing departure relevance, either inclusive boundary, or restoring an
     // updated_at predicate must break these retained-data assertions.
@@ -295,7 +297,7 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
     .map(|(name, arrival, departure)| {
         let (trip, mut stops) = subway_trip(at, &[("101", Duration::minutes(arrival))]);
         stops[0].departure = at + Duration::minutes(departure);
-        let trip = Trip {
+        let trip = TripRun {
             original_id: name.into(),
             vehicle_id: name.into(),
             created_at: at - Duration::hours(9),
@@ -310,6 +312,8 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
         .ingestor
         .ingest(CollectedSnapshot {
             source: Source::MtaSubway,
+            network_revision: None,
+            renormalize: None,
             trips,
             positions: vec![],
         })
@@ -333,16 +337,14 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
 
 #[sqlx::test]
 async fn bus_service_returns_exactly_the_requested_known_routes(pool: sqlx::PgPool) {
-    let stores = test_stores(pool.clone());
-    stores
-        .static_data_store
-        .persist(&mta_bus_dataset())
-        .await
-        .unwrap();
+    let stores = test_owners(pool.clone());
+    stores.network.persist(&mta_bus_dataset()).await.unwrap();
     stores
         .ingestor
         .ingest(CollectedSnapshot {
             source: Source::MtaBus,
+            network_revision: None,
+            renormalize: None,
             trips: vec![],
             positions: vec![],
         })

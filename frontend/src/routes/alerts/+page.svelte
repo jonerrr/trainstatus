@@ -8,9 +8,8 @@
 	import { calculate_route_height } from '#lib/util.svelte.js';
 
 	const transit = getTransitData();
-	const catalogs = $derived(
-		page.data.selected_sources.map((source) => ({ source, ...transit.catalogState(source) }))
-	);
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current.value ?? []);
 
 	// remove special express mta_subway routes (FX, 6X, 7X, etc) since they won't have any alerts
 	const sources = $derived(

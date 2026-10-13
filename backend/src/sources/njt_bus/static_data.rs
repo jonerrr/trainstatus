@@ -1,20 +1,23 @@
-use crate::static_data::dataset::StaticDataset;
+use crate::network::dataset::NetworkDataset;
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
     time::Duration,
 };
 
-use crate::{
-    models::{
-        route::{Route, RouteData},
-        source::Source,
-        stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
-    },
-    sources::{StaticAdapter, normalize_title, normalize_whitespace},
-    static_data::expansion::expand_gtfs,
-    static_data::index::TripPatternRevision,
-};
+use crate::network::expansion::expand_gtfs;
+use crate::network::index::TripPatternRevision;
+use crate::network::types::route::Route;
+use crate::network::types::route::RouteData;
+use crate::network::types::stop::NjtBusStopData;
+use crate::network::types::stop::RouteStop;
+use crate::network::types::stop::RouteStopData;
+use crate::network::types::stop::Stop;
+use crate::network::types::stop::StopData;
+use crate::source::Source;
+use crate::sources::StaticAdapter;
+use crate::sources::normalize_title;
+use crate::sources::normalize_whitespace;
 use anyhow::Context;
 use async_trait::async_trait;
 use geo::{Distance, Euclidean, Point};
@@ -38,7 +41,7 @@ impl StaticAdapter for NjtBusStatic {
         Duration::from_secs(60 * 60 * 24) // 24 hours
     }
 
-    async fn collect(&self) -> anyhow::Result<StaticDataset> {
+    async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         let token = super::get_token()
             .await
             .context("NJT authentication failed")?;
@@ -93,27 +96,6 @@ impl StaticAdapter for NjtBusStatic {
         );
         let dataset = build_static_dataset(&gtfs, patterns, scheduled_trips, stops, &stop_remap);
 
-        // TODO: move this to a standardized print method in StaticDataset
-        #[cfg(debug_assertions)]
-        {
-            // additional sanity check: look for duplicates in the raw vector (before storing)
-            let mut seen: HashMap<(String, String), usize> = HashMap::new();
-            for rs in &dataset.route_stops {
-                let key = (rs.route_id.clone(), rs.stop_id.clone());
-                *seen.entry(key).or_insert(0) += 1;
-            }
-            for ((rid, sid), count) in seen {
-                if count > 1 {
-                    tracing::warn!(
-                        route_id = %rid,
-                        stop_id = %sid,
-                        count,
-                        "Raw route_stops vector contains duplicate entries"
-                    );
-                }
-            }
-        }
-
         Ok(dataset)
     }
 }
@@ -150,7 +132,7 @@ pub async fn capture_fixtures() -> anyhow::Result<std::collections::BTreeMap<Str
 }
 
 pub struct PatternStaticBuild {
-    pub dataset: StaticDataset,
+    pub dataset: NetworkDataset,
     pub revision: TripPatternRevision,
 }
 
@@ -207,17 +189,17 @@ fn build_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
     patterns: PatternDataset,
-    mut scheduled_trips: Vec<crate::static_data::schedule::ScheduledTrip>,
+    mut scheduled_trips: Vec<crate::network::schedule::ScheduledTrip>,
     stops: Vec<Stop>,
     stop_remap: &HashMap<String, String>,
-) -> StaticDataset {
+) -> NetworkDataset {
     for trip in &mut scheduled_trips {
         trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
     }
 
     let PatternDataset { shapes, trips } = patterns;
 
-    StaticDataset {
+    NetworkDataset {
         source: Source::NjtBus,
         routes: build_routes(gtfs),
         stops,

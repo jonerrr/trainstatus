@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { CatalogRoute } from '#lib/client/index.js';
 	import icons from '#lib/icons.js';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	let {
@@ -21,11 +21,11 @@
 	} = $props();
 	const transit = getTransitData();
 	const current_time = getCurrentTime();
-	// An async batch started before the route loaded can re-run these with its stale undefined.
+	const alerts_resource = transit.alerts(() =>
+		show_alerts && route ? { source: route.data.source, at: current_time.value ?? null } : null
+	);
 	const hasAlert = $derived(
-		show_alerts &&
-			!!route &&
-			loaded(transit.alerts(route.data.source, current_time.value ?? null))?.by_route.has(route.id)
+		show_alerts && !!route && alerts_resource.current.value?.by_route.has(route.id)
 	);
 	const classes = $derived([
 		'inline-flex shrink-0 items-center rounded-md',

@@ -1,5 +1,5 @@
 use crate::support::geometry::ingest_case;
-use backend::models::source::Source;
+use backend::source::Source;
 use prost::Message;
 
 // Decode the fields used by this contract. Wire tags follow the MVT 2.1 schema:
@@ -100,4 +100,44 @@ async fn mta_bus_resolved_shape_reaches_tiles(pool: sqlx::PgPool) {
 #[sqlx::test]
 async fn njt_bus_resolved_shape_reaches_tiles(pool: sqlx::PgPool) {
     assert_tile(pool, Source::NjtBus).await;
+}
+
+#[sqlx::test]
+async fn stop_tiles_exclude_retired_identities_and_keep_selection_fields(pool: sqlx::PgPool) {
+    let stores = crate::support::test_owners(pool.clone());
+    stores
+        .network
+        .persist(&crate::support::mta_subway_dataset())
+        .await
+        .unwrap();
+    let retired: (String,) =
+        sqlx::query_as("SELECT id FROM static.stop WHERE source = 'mta_subway' LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query("UPDATE static.stop SET current = FALSE WHERE id = $1")
+        .bind(&retired.0)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (bytes,): (Vec<u8>,) = sqlx::query_as("SELECT realtime.stop(0,0,0)")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let tile = Tile::decode(bytes.as_slice()).unwrap();
+    let layer = &tile.layers[0];
+    assert_eq!(layer.name, "stop");
+    assert!(!layer.features.is_empty());
+    for feature in &layer.features {
+        let property = |key| {
+            feature.tags.chunks_exact(2).find_map(|pair| {
+                (layer.keys[pair[0] as usize] == key)
+                    .then(|| layer.values[pair[1] as usize].text.as_deref().unwrap())
+            })
+        };
+        assert_ne!(property("id"), Some(retired.0.as_str()));
+        assert_eq!(property("source"), Some("mta_subway"));
+        assert!(property("name").is_some());
+        assert_eq!(feature.kind, 1);
+    }
 }

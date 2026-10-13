@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO realtime.alert_translation (\n                        alert_id,\n                        section,\n                        format,\n                        language,\n                        text\n                    )\n                    SELECT\n                        unnest($1::uuid[]),\n                        unnest($2::text[])::alert_section,\n                        unnest($3::text[])::alert_format,\n                        unnest($4::text[]),\n                        unnest($5::text[])\n                    ON CONFLICT (alert_id, section, format, language) DO UPDATE SET text = EXCLUDED.text\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "57a82901563c75d775ae452cd4815f8b4836fffd15647c2339828e4cb9de670d"
+}

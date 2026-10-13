@@ -1,5 +1,5 @@
-use crate::models::source::Source;
-use crate::models::stop::StopData;
+use crate::network::types::stop::StopData;
+use crate::source::Source;
 
 use super::super::builder::{
     TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
@@ -94,7 +94,13 @@ impl MtaBusBuilder {
 
     /// Project the live GPS position onto the bus route shape and return a
     /// "live anchor" knot at the current time.
-    fn live_anchor_knot(trip: &TripSnapshot, shape_geom: &ShapeGeometry) -> Option<TrajectoryKnot> {
+    fn vehicle_anchor_knot(
+        trip: &TripSnapshot,
+        shape_geom: &ShapeGeometry,
+    ) -> Option<TrajectoryKnot> {
+        if trip.recorded_anchor.is_some() {
+            return super::super::builder::recorded_anchor_knot(trip, shape_geom, Source::MtaBus);
+        }
         let position = trip.positions.iter().find(|p| p.geom.is_some())?;
         let geom = position.geom.as_ref()?;
         let point = match &geom.0 {
@@ -117,7 +123,7 @@ impl MtaBusBuilder {
     }
 
     /// Along-shape distance of the stop the live feed says the bus is still
-    /// heading toward (GTFS-RT `VehiclePosition.stop_id`, remapped to a canonical
+    /// heading toward (GTFS-RT `VehicleObservation.stop_id`, remapped to a canonical
     /// static stop id during import).
     ///
     /// The bus has not passed this stop yet, so the animated marker must not be
@@ -169,7 +175,7 @@ impl TrajectoryBuilder for MtaBusBuilder {
 
         let mut stats = KnotGenerationStats::default();
 
-        if let Some(anchor) = Self::live_anchor_knot(trip, shape_geom) {
+        if let Some(anchor) = Self::vehicle_anchor_knot(trip, shape_geom) {
             // Record how far the first schedule knot is from the live fix.
             stats.live_anchor_gap_m = all_knots.first().map(|k| (anchor.s_m - k.s_m).abs());
 

@@ -1,7 +1,7 @@
 use geo::{Coord, Distance, Euclidean, LineString, Point};
 use proj4rs::{Proj, transform::transform};
 
-use crate::models::geom::Geom;
+use crate::geometry::Geom;
 
 /// Cached projected geometry for a trip shape.
 #[derive(Clone)]

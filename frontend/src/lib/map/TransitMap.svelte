@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 
 	import type { Source } from '#lib/client/index.js';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	import type { Map as MapInstance, MapMouseEvent } from 'maplibre-gl';
@@ -95,7 +95,7 @@
 						const source = feature.properties?.source as Source;
 						if (!id || !filters.sources.includes(source)) return [];
 						const kind = feature.layer.id.startsWith('stop-') ? 'stop' : 'route';
-						const catalog = loaded(transit.catalog(source));
+						const catalog = transit.peekCatalog(source);
 						if (kind === 'stop' ? !catalog?.stops_by_id.has(id) : !catalog?.routes_by_id.has(id))
 							return [];
 						return [{ kind, id, source }];

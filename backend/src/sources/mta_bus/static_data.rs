@@ -1,4 +1,4 @@
-use crate::static_data::dataset::StaticDataset;
+use crate::network::dataset::NetworkDataset;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Context;
@@ -7,25 +7,26 @@ use geo::{LineString, Point};
 use proj4rs::Proj;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    integrations::valhalla::ValhallaManager,
-    models::{
-        route::{MtaBusDirection, MtaBusRouteData, Route, RouteData},
-        shape::Shape,
-        source::Source,
-        stop::{
-            Borough, CompassDirection, MtaBusStopData, RouteStop, RouteStopData, Stop, StopData,
-        },
-    },
-    sources::StaticAdapter,
-    trajectory::{
-        geometry::{
-            cumulative_distances, project_linestring_wgs84_to_epsg, project_point_onto_line,
-            project_point_wgs84_to_epsg,
-        },
-        types::source_projected_epsg_code,
-    },
-};
+use crate::integrations::valhalla::ValhallaManager;
+use crate::network::types::route::MtaBusDirection;
+use crate::network::types::route::MtaBusRouteData;
+use crate::network::types::route::Route;
+use crate::network::types::route::RouteData;
+use crate::network::types::shape::Shape;
+use crate::network::types::stop::Borough;
+use crate::network::types::stop::CompassDirection;
+use crate::network::types::stop::MtaBusStopData;
+use crate::network::types::stop::RouteStop;
+use crate::network::types::stop::RouteStopData;
+use crate::network::types::stop::Stop;
+use crate::network::types::stop::StopData;
+use crate::source::Source;
+use crate::sources::StaticAdapter;
+use crate::trajectory::geometry::cumulative_distances;
+use crate::trajectory::geometry::project_linestring_wgs84_to_epsg;
+use crate::trajectory::geometry::project_point_onto_line;
+use crate::trajectory::geometry::project_point_wgs84_to_epsg;
+use crate::trajectory::types::source_projected_epsg_code;
 
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
@@ -131,7 +132,7 @@ impl StaticAdapter for MtaBusStatic {
         Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
-    async fn collect(&self) -> anyhow::Result<StaticDataset> {
+    async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         let client = reqwest::Client::new();
         let infra = fetch_infrastructure(&client).await?;
         let dataset = build_static_dataset(infra);
@@ -159,7 +160,7 @@ fn route_long_name(route_name: &str, directions: &[MtaBusDirection]) -> String {
     }
 }
 
-fn build_static_dataset(infra: HeliumBusInfrastructure) -> StaticDataset {
+fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
     // First pass: collect all shape_ids per route from stop-route data.
     // The GTFS-RT feed does not include shape_id, so we store all shapes
     // for a route here so the trajectory engine can pick the best one at runtime.
@@ -333,7 +334,7 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> StaticDataset {
         .collect();
     shapes.sort_by(|a, b| a.id.cmp(&b.id));
 
-    StaticDataset {
+    NetworkDataset {
         source: Source::MtaBus,
         routes,
         stops,
@@ -448,7 +449,7 @@ fn shape_stop_orders<'a>(
 #[cfg(feature = "fixture-capture")]
 pub fn build_static_dataset_from_fixture(
     infrastructure: serde_json::Value,
-) -> anyhow::Result<StaticDataset> {
+) -> anyhow::Result<NetworkDataset> {
     Ok(build_static_dataset(serde_json::from_value(
         infrastructure,
     )?))

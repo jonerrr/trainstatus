@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH accepted AS (INSERT INTO realtime.vehicle_position AS existing (vehicle_id, trip_id, stop_id, geom, data, updated_at, source)\n        SELECT i.*, $7 FROM UNNEST($1::text[], $2::uuid[], $3::text[], $4::geometry[], $5::jsonb[], $6::timestamptz[])\n            AS i(vehicle_id, trip_id, stop_id, geom, data, updated_at)\n        ON CONFLICT (vehicle_id, source) DO UPDATE SET trip_id = EXCLUDED.trip_id, stop_id = EXCLUDED.stop_id,\n            geom = EXCLUDED.geom, data = EXCLUDED.data, updated_at = EXCLUDED.updated_at\n        WHERE EXCLUDED.updated_at > existing.updated_at AND\n            (existing.trip_id, existing.stop_id, existing.geom, existing.data, existing.updated_at)\n            IS DISTINCT FROM (EXCLUDED.trip_id, EXCLUDED.stop_id, EXCLUDED.geom, EXCLUDED.data, EXCLUDED.updated_at)\n        RETURNING trip_id, updated_at, geom\n        ), samples AS (\n            INSERT INTO realtime.gps_sample (run_id, observed_at, longitude, latitude)\n            SELECT trip_id, updated_at, ST_X(geom), ST_Y(geom) FROM accepted\n            WHERE trip_id IS NOT NULL AND geom IS NOT NULL\n            ON CONFLICT (run_id, observed_at) DO NOTHING\n        ) SELECT trip_id FROM accepted\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "trip_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "UuidArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray",
+        "TimestamptzArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2803aacb40e4216724489a3b68738b3d658323b52095e752b87022062c6424cc"
+}

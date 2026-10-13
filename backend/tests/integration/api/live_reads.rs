@@ -1,23 +1,20 @@
 use crate::support;
 use axum_test::TestServer;
-use backend::static_data::dataset::StaticDataset;
-use backend::{
-    models::{
-        geom::Geom,
-        position::VehiclePosition,
-        route::Route,
-        source::Source,
-        stop::Stop,
-        trip::{StopTime, Trip},
-    },
-    realtime::CollectedSnapshot,
-};
+use backend::geometry::Geom;
+use backend::network::dataset::NetworkDataset;
+use backend::network::types::route::Route;
+use backend::network::types::stop::Stop;
+use backend::operations::CollectedObservation as VehicleObservation;
+use backend::operations::CollectedSnapshot;
+use backend::operations::CollectedTrip as TripRun;
+use backend::operations::CollectedVisit as StopVisit;
+use backend::source::Source;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 
-fn dataset(source: Source) -> StaticDataset {
-    let mut d = StaticDataset::new(source);
+fn dataset(source: Source) -> NetworkDataset {
+    let mut d = NetworkDataset::new(source);
     for id in ["A", "B"] {
         d.routes.push(Route {
             id: id.into(),
@@ -52,13 +49,15 @@ fn dataset(source: Source) -> StaticDataset {
 fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
     let mut s = CollectedSnapshot {
         source,
+        network_revision: None,
+        renormalize: None,
         trips: vec![],
         positions: vec![],
     };
     for (name, route) in [("remaining", "A"), ("omitted", "A"), ("other-route", "B")] {
-        let id = Uuid::now_v7();
+        let id: backend::operations::RunKey = Uuid::now_v7().into();
         let tag = source.as_str();
-        let trip = Trip {
+        let trip = TripRun {
             id,
             original_id: format!("{tag}-{name}"),
             vehicle_id: format!("{tag}-{name}"),
@@ -74,7 +73,7 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
         let stops = ["KEEP", "DROP"]
             .into_iter()
             .enumerate()
-            .map(|(i, stop_id)| StopTime {
+            .map(|(i, stop_id)| StopVisit {
                 trip_id: id,
                 stop_sequence: i as i32,
                 stop_id: stop_id.into(),
@@ -87,7 +86,7 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
                 .unwrap(),
             })
             .collect();
-        s.positions.push(VehiclePosition {
+        s.positions.push(VehicleObservation {
             vehicle_id: trip.vehicle_id.clone(),
             trip_id: Some(id),
             stop_id: Some("KEEP".into()),
@@ -104,8 +103,8 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
     }
     s
 }
-fn server(pool: sqlx::PgPool, s: &support::TestStores) -> TestServer {
-    let state = support::app_state_from_stores(pool, s.clone());
+fn server(pool: sqlx::PgPool, s: &support::TestOwners) -> TestServer {
+    let state = support::app_state_from_owners(pool, s.clone());
     TestServer::new(backend::api::router(state).split_for_parts().0)
 }
 
@@ -162,21 +161,19 @@ fn names(source: Source, names: &[&str]) -> Vec<String> {
     names
 }
 
-async fn seed(stores: &support::TestStores, source: Source) {
+async fn seed(stores: &support::TestOwners, source: Source) {
     let static_data = dataset(source);
+    stores.network.persist(&static_data).await.unwrap();
     stores
-        .static_data_store
-        .persist(&static_data)
-        .await
-        .unwrap();
-    stores
-        .static_data_store
-        .static_index()
-        .publish(backend::static_data::index::StaticTransitRevision::from_dataset(&static_data));
+        .network
+        .network_index()
+        .publish(backend::network::index::NetworkRevision::from_dataset(
+            &static_data,
+        ));
 }
 
 async fn membership_case(pool: sqlx::PgPool) {
-    let stores = support::test_stores(pool.clone());
+    let stores = support::test_owners(pool.clone());
     let server = server(pool, &stores);
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
         seed(&stores, source).await;
@@ -221,6 +218,8 @@ async fn membership_case(pool: sqlx::PgPool) {
             .ingestor
             .ingest(CollectedSnapshot {
                 source,
+                network_revision: None,
+                renormalize: None,
                 trips: vec![],
                 positions: vec![],
             })
@@ -243,7 +242,7 @@ async fn live_service_follows_committed_membership(pool: sqlx::PgPool) {
 
 #[sqlx::test]
 async fn populated_live_service_works_without_database(pool: sqlx::PgPool) {
-    let stores = support::test_stores(pool.clone());
+    let stores = support::test_owners(pool.clone());
     let now = support::fixtures::fixed_time();
     for source in [Source::MtaSubway, Source::MtaBus, Source::NjtBus] {
         seed(&stores, source).await;

@@ -2,10 +2,9 @@
 	import type { CatalogStop } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { isStale, upcomingCalls, type Call } from '#lib/transit/decode.js';
-	import { getTransitData, loaded, type StopArrivals } from '#lib/transit/store.svelte.js';
+	import { upcomingCalls } from '#lib/transit/decode.js';
+	import { getTransitData, type StopArrivals } from '#lib/transit/store.svelte.js';
 	import { stop_arrivals, type StopArrival } from '#lib/transit/view.js';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 
@@ -20,36 +19,21 @@
 
 	const source = $derived(stop.data.source);
 	const at = $derived(current_time.value ?? null);
-	const catalog = $derived(loaded(transit.catalog(source)));
+	const catalog = $derived(transit.peekCatalog(source));
 	// Rows render as arrivals load; a suspending read per row would batch them together.
-	const arrivals = $derived(transit.stopArrivalsState(source, stop.id, at));
+	const arrivals_resource = transit.stopArrivals(() => ({ source, stop_id: stop.id, at }));
+	const arrivals = $derived(arrivals_resource.current);
 
 	interface View {
 		by_direction: Map<number, Map<string, StopArrival[]>>;
 		active_routes: ReadonlySet<string>;
-		unavailable: ReadonlySet<string>;
 		pending: ReadonlySet<string>;
 		read: StopArrivals;
 	}
 
 	function view(read: StopArrivals): View {
 		const now = current_time.ms;
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const by_route = new Map<string, Call[]>();
-		for (const call of read.calls) {
-			let calls = by_route.get(call.route_id);
-			if (!calls) by_route.set(call.route_id, (calls = []));
-			calls.push(call);
-		}
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const unavailable = new Set(read.failed);
-		const upcoming: Call[] = [];
-		for (const [route_id, route] of read.routes) {
-			const result = upcomingCalls(by_route.get(route_id) ?? [], now, isStale(route, now));
-			if (result.unavailable) unavailable.add(route_id);
-			upcoming.push(...result.calls);
-		}
-		upcoming.sort((a, b) => a.arrival - b.arrival);
+		const upcoming = upcomingCalls(read.calls, now);
 		const { arrivals, active_routes } = stop_arrivals(upcoming, read.routes, now);
 
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -69,7 +53,7 @@
 			if (!times) routes.set(st.route_id, (times = []));
 			times.push(st);
 		}
-		return { by_direction, active_routes, unavailable, pending: new Set(read.pending), read };
+		return { by_direction, active_routes, pending: new Set(read.pending), read };
 	}
 
 	// A bus stop sits on one side of the street, so it almost always serves a
@@ -99,10 +83,8 @@
 	{/key}
 {/snippet}
 
-{#snippet etas(v: View | undefined, times: StopArrival[], route_id: string, reset?: () => void)}
-	{#if reset || v?.unavailable.has(route_id)}
-		<UnavailableRows {reset} />
-	{:else if !v || v.pending.has(route_id)}
+{#snippet etas(v: View | undefined, times: StopArrival[], route_id: string, failed = false)}
+	{#if !failed && (!v || v.pending.has(route_id))}
 		<span
 			class="inline-block w-8 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
 			>&nbsp;</span
@@ -116,11 +98,11 @@
 			{@render eta(st.eta)}
 		{/each}
 	{:else}
-		<div class="text-neutral-400">No trips</div>
+		<span class="text-neutral-400">—</span>
 	{/if}
 {/snippet}
 
-{#snippet body(v: View | undefined, reset?: () => void)}
+{#snippet body(v: View | undefined, failed = false)}
 	{#if stop.data.source === 'mta_subway'}
 		{const header_routes = $derived(
 			main_route_stops(stop.routes, v?.active_routes ?? new Set())
@@ -165,7 +147,7 @@
 										<Icon height={20} width={20} link={false} {route} />
 									{/if}
 									<div class="flex items-center gap-1">
-										{@render etas(v, times, route_id, reset)}
+										{@render etas(v, times, route_id, failed)}
 									</div>
 								</div>
 							{/each}
@@ -213,7 +195,7 @@
 									v,
 									v ? next_times(v, route_stop.route_id) : [],
 									route_stop.route_id,
-									reset
+									failed
 								)}
 							</div>
 						</div>
@@ -228,4 +210,4 @@
 	{/if}
 {/snippet}
 
-{@render body(arrivals.read && view(arrivals.read), arrivals.error ? () => {} : undefined)}
+{@render body(arrivals.value && view(arrivals.value), !!arrivals.error)}

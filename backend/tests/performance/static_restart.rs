@@ -1,9 +1,9 @@
-use crate::support::{fixture_root, test_stores};
-use backend::{
-    models::source::Source,
-    sources::njt_bus::{patterns::PatternFeature, static_data::build_static_dataset_from_patterns},
-    static_data::expansion::expand_gtfs,
-};
+use crate::support::fixture_root;
+use crate::support::test_owners;
+use backend::network::expansion::expand_gtfs;
+use backend::source::Source;
+use backend::sources::njt_bus::patterns::PatternFeature;
+use backend::sources::njt_bus::static_data::build_static_dataset_from_patterns;
 use std::time::Instant;
 
 fn memory_kib(field: &str) -> u64 {
@@ -60,15 +60,11 @@ async fn njt_static_import_and_restart_memory(pool: sqlx::PgPool) {
         .iter()
         .map(|trip| (trip.trip_id.clone(), trip.start_date.clone()))
         .collect();
-    let stores = test_stores(pool.clone());
+    let stores = test_owners(pool.clone());
     let start = Instant::now();
-    stores.static_data_store.persist(&dataset).await.unwrap();
+    stores.network.persist(&dataset).await.unwrap();
     let import_ms = start.elapsed().as_millis();
-    let old = stores
-        .static_data_store
-        .static_index()
-        .get(Source::NjtBus)
-        .unwrap();
+    let old = stores.network.network_index().get(Source::NjtBus).unwrap();
     shift_service_dates(&mut dataset, 1);
     retained_keys.extend(
         dataset
@@ -79,16 +75,16 @@ async fn njt_static_import_and_restart_memory(pool: sqlx::PgPool) {
     let restored_expected = retained_keys.len();
     drop(retained_keys);
     // Re-import while a worker pins the previous revision to measure overlap.
-    stores.static_data_store.persist(&dataset).await.unwrap();
+    stores.network.persist(&dataset).await.unwrap();
     let overlap_rss = rss_kib();
     drop(dataset);
     drop(old);
     let steady_rss = rss_kib();
-    let restart = test_stores(pool);
+    let restart = test_owners(pool);
     let start = Instant::now();
     let restored = restart
-        .static_data_store
-        .load_revision(Source::NjtBus)
+        .network
+        .restore_revision(Source::NjtBus)
         .await
         .unwrap()
         .unwrap();
@@ -106,7 +102,7 @@ async fn njt_static_import_and_restart_memory(pool: sqlx::PgPool) {
     );
 }
 
-fn shift_service_dates(dataset: &mut backend::static_data::dataset::StaticDataset, days: i64) {
+fn shift_service_dates(dataset: &mut backend::network::dataset::NetworkDataset, days: i64) {
     let offset = chrono::Duration::days(days);
     for trip in &mut dataset.scheduled_trips {
         let date = chrono::NaiveDate::parse_from_str(&trip.start_date, "%Y%m%d").unwrap();

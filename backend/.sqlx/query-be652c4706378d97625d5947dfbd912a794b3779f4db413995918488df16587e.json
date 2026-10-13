@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.scheduled_trip(source, trip_id, service_date, payload, expires_at)\n            SELECT\n                $1,\n                id,\n                date,\n                payload,\n                $5\n            FROM UNNEST($2::text[], $3::text[], $4::jsonb[]) AS t(id, date, payload)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        "JsonbArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be652c4706378d97625d5947dfbd912a794b3779f4db413995918488df16587e"
+}

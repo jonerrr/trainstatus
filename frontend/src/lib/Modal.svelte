@@ -13,8 +13,9 @@
 	import RouteModal from '#lib/Route/Modal.svelte';
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
+	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
 	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
 
 	import {
@@ -30,7 +31,7 @@
 	const transit = getTransitData();
 
 	function catalog_of(source: Source) {
-		return loaded(transit.catalog(source));
+		return transit.peekCatalog(source);
 	}
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
@@ -292,6 +293,7 @@
 		{@attach modal}
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 	>
+		{#if has_modal}<UpdateIndicator compact />{/if}
 		{#if current_page_state.modal?.type === 'stop'}
 			{const { source, id } = $derived(current_page_state.modal)}
 			<StopModal {source} stop_id={id} {show_previous} time_format={time_format.current} />

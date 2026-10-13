@@ -1,4 +1,4 @@
-use crate::models::source::Source;
+use crate::source::Source;
 use crate::trajectory::arrow::encode_render_units;
 use crate::trajectory::types::RenderUnit;
 use arrow::array::{Array, Float64Array, Int16Array, ListArray, StringArray};

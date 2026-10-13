@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::models::source::Source;
+use crate::source::Source;
 
 /// An in-process, per-source snapshot of some static-derived value that the
 /// realtime pipeline needs to read cheaply.

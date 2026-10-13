@@ -4,7 +4,6 @@
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	interface Props {
@@ -17,14 +16,18 @@
 	const current_time = getCurrentTime();
 
 	// Rows render as their alerts arrive; a suspending read per row would batch them.
-	const alerts_state = $derived(transit.alertsState(data.data.source, current_time.value ?? null));
-	const alerts = $derived(alerts_state.alerts && route_alerts(alerts_state.alerts, data.id));
+	const alerts_resource = transit.alerts(() => ({
+		source: data.data.source,
+		at: current_time.value ?? null
+	}));
+	const alerts_state = $derived(alerts_resource.current);
+	const alerts = $derived(alerts_state.value && route_alerts(alerts_state.value, data.id));
 </script>
 
 <section class="flex items-center gap-1">
 	<Icon height={36} width={36} link={false} route={data} />
 	{#if alerts_state.error}
-		<UnavailableRows />
+		<span class="text-neutral-400">—</span>
 	{:else if !alerts}
 		<Skeleton lines={1} class="w-24" />
 	{:else if alerts.length}

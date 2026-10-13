@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.stop (id, source, name, geom, data)\n            SELECT * FROM UNNEST(\n                $1::TEXT[],\n                $2::source_enum[],\n                $3::TEXT[],\n                $4::GEOMETRY[],\n                $5::JSONB[]\n            )\n            ON CONFLICT (id, source) DO UPDATE SET\n                current = TRUE, name = EXCLUDED.name,\n                geom = EXCLUDED.geom,\n                data = EXCLUDED.data\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_bus"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "84ed7f47cc8f9ae361f38e91e0ddd1e5586a4d3d5582a17ad3b4c5ef4fc404d6"
+}

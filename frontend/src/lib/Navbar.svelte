@@ -60,7 +60,7 @@
 <nav
 	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
 >
-	<div class="shrink-0 md:hidden"><UpdateIndicator /></div>
+	{#if !page.state.modal}<div class="shrink-0 md:hidden"><UpdateIndicator /></div>{/if}
 	<div
 		class="nav-links flex min-h-0 flex-1 items-stretch overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto"
 	>
@@ -80,7 +80,7 @@
 			>
 		{/if}
 		<div class="md:mt-auto">
-			<div class="hidden md:block"><UpdateIndicator /></div>
+			{#if !page.state.modal}<div class="hidden md:block"><UpdateIndicator /></div>{/if}
 			{@render nav_button('Settings')}
 		</div>
 	</div>

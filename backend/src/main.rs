@@ -7,8 +7,7 @@ use axum::{
     routing::get,
 };
 use http::StatusCode;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
+use std::{convert::Infallible, env::var, time::Duration};
 use tokio::signal;
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
@@ -19,16 +18,10 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
-use backend::{
-    AppState, VERSION, alerts, api, api_prefix, integrations, models, passenger, prefixed_path,
-    realtime::{LiveSnapshots, RealtimeEngine, RealtimeIngestor, RealtimeSource},
-    sources,
-    sources::{
-        StaticAdapter, mta_bus::realtime::MtaBusRealtime, mta_subway::realtime::MtaSubwayRealtime,
-        njt_bus::realtime::NjtBusRealtime,
-    },
-    static_data, stores, valhalla_tile_extract,
-};
+use backend::VERSION;
+use backend::api;
+use backend::api_prefix;
+use backend::prefixed_path;
 
 // Use jemalloc instead of the system allocator to curb RSS growth from glibc
 // malloc arena retention/fragmentation under our threaded, bursty workload.
@@ -47,106 +40,17 @@ async fn main() {
         .init();
     tracing::info!(version = VERSION, "Starting Train Status API");
 
-    let pg_connect_option: PgConnectOptions = var("DATABASE_URL").unwrap().parse().unwrap();
-    let pg_pool = PgPoolOptions::new()
-        .max_connections(100)
-        .connect_with(pg_connect_option)
+    let application = backend::app::build()
         .await
-        .expect("Failed to create postgres pool");
-    sqlx::migrate!()
-        .run(&pg_pool)
-        .await
-        .expect("Failed to run database migrations");
-
-    let live_snapshots = LiveSnapshots::default();
-    let route_store = stores::route::RouteStore::new(pg_pool.clone());
-    let stop_store = stores::stop::StopStore::new(pg_pool.clone());
-    let alert_store = stores::alert::AlertStore::new(pg_pool.clone());
-    let catalog_store = passenger::CatalogStore::new(route_store.clone(), stop_store.clone());
-    let service_store =
-        passenger::ServiceStore::new(pg_pool.clone(), live_snapshots.clone(), route_store.clone());
-    let static_data_store = static_data::store::StaticDataStore::new(
-        pg_pool.clone(),
-        static_data::index::StaticTransitIndex::new(),
-        route_store.clone(),
-        stop_store.clone(),
-    );
-
-    let valhalla_manager = integrations::valhalla::ValhallaManager::new(
-        integrations::valhalla::ValhallaConfig::from_tile_extract(
-            valhalla_tile_extract().to_owned(),
-        ),
-    );
-
-    let static_adapters: Vec<Arc<dyn StaticAdapter>> = vec![
-        Arc::new(sources::mta_subway::static_data::MtaSubwayStatic),
-        Arc::new(sources::mta_bus::static_data::MtaBusStatic::new(
-            valhalla_manager,
-        )),
-        Arc::new(sources::njt_bus::static_data::NjtBusStatic),
-    ];
-
-    let static_controller =
-        static_data::controller::run(&pg_pool, &stop_store, &static_data_store, static_adapters)
-            .await;
-
-    let realtime_sources: Vec<Arc<dyn RealtimeSource>> = vec![
-        Arc::new(MtaSubwayRealtime),
-        Arc::new(MtaBusRealtime),
-        Arc::new(NjtBusRealtime::new(static_controller.static_index())),
-    ];
-
-    let trajectories = backend::trajectory::TrajectoryService::new(pg_pool.clone());
-
-    RealtimeEngine::new(
-        RealtimeIngestor::new(
-            pg_pool.clone(),
-            live_snapshots,
-            static_controller.static_index(),
-        ),
-        static_controller.clone(),
-        trajectories.clone(),
-    )
-    .run(realtime_sources)
-    .await;
-
-    let alert_adapters: Vec<Arc<dyn sources::AlertsAdapter>> = vec![
-        Arc::new(sources::mta_bus::alerts::MtaBusAlerts),
-        Arc::new(sources::mta_subway::alerts::MtaSubwayAlerts),
-        Arc::new(sources::njt_bus::alerts::NjtBusAlerts),
-    ];
-
-    alerts::worker::run(&alert_store, alert_adapters).await;
-
-    #[derive(OpenApi)]
-    #[openapi(info(title = "Train Status API", version = VERSION, description = "Realtime and static transit data for MTA subway, MTA bus, and NJ Transit bus services. Realtime endpoints serve the latest committed snapshot by default and support optional historical queries with `at`.", contact(email = "jonah@trainstat.us")),
-    tags(
-        (name = "HEALTH", description = "Liveness and readiness probes"),
-        (name = "STATIC", description = "Data that changes only with static imports (catalogs)"),
-        (name = "REALTIME", description = "Passenger route service, alerts, and rendered trajectories. Omit `at` for the latest committed snapshot; provide `at` as a Unix timestamp for retained historical data where supported.")
-    ),
-    // TODO: maybe add route, stop, and shape models here
-    components(schemas(models::source::Source))
-    )]
-    struct ApiDoc;
-
-    let state = AppState {
-        pg_pool,
-        route_store,
-        stop_store,
-        alert_store,
-        catalog_store,
-        service_store,
-        trajectories,
-    };
+        .expect("Failed to start application");
 
     let api_prefix = api_prefix().to_owned();
     let api_v1_prefix = prefixed_path(&api_prefix, "v1");
     let docs_path = prefixed_path(&api_prefix, "docs");
     let openapi_path = prefixed_path(&api_prefix, "openapi.json");
 
-    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest(&api_v1_prefix, api::router(state))
+    let (router, api) = OpenApiRouter::with_openapi(api::ApiDoc::openapi())
+        .nest(&api_v1_prefix, api::router(application.state.clone()))
         .split_for_parts();
 
     let openapi_schema = api.clone();
@@ -186,7 +90,10 @@ async fn main() {
     tracing::info!(address = %listener.local_addr().unwrap(), "Listening");
 
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            application.shutdown();
+        })
         .await
         .unwrap();
 }

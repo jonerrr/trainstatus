@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.shape_asset(source, id, geom)\n            SELECT\n                $1,\n                id,\n                ST_SetSRID(geom, 4326)\n            FROM UNNEST($2::text[], $3::geometry[]) AS i(id, geom)\n            ON CONFLICT(source, id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "93e49da598fc01cf713a173949c4736a2116d9b2b48149ce64a9f6683ab6c5ff"
+}

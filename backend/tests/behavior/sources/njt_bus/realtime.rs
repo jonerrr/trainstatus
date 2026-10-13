@@ -1,14 +1,14 @@
-use backend::{
-    fixtures::{self, FixtureKind},
-    models::source::Source,
-    realtime::CollectedSnapshot,
-    sources::njt_bus::realtime::NjtBusRealtime,
-    static_data::index::StaticTransitIndex,
-    static_data::index::StaticTransitRevision,
-    static_data::schedule::ScheduledTrip,
-};
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
+use backend::network::index::NetworkIndex;
+use backend::network::index::NetworkRevision;
+use backend::network::schedule::ScheduledTrip;
+use backend::operations::CollectedSnapshot;
+use backend::source::Source;
+use backend::sources::njt_bus::realtime::NjtBusRealtime;
 
-use crate::support::{fixture_root, njt_bus_dataset};
+use crate::support::fixture_root;
+use crate::support::njt_bus_dataset;
 
 #[tokio::test]
 async fn realtime_fixture_maps_trips() {
@@ -53,8 +53,8 @@ async fn realtime_fixture_maps_trips() {
 
     let mut dataset = njt_bus_dataset();
     dataset.scheduled_trips = scheduled_trips;
-    let index = StaticTransitIndex::new();
-    index.publish(StaticTransitRevision::from_dataset(&dataset));
+    let index = NetworkIndex::new();
+    index.publish(NetworkRevision::from_dataset(&dataset));
     let adapter = NjtBusRealtime::new(index);
 
     let snapshot: CollectedSnapshot = adapter

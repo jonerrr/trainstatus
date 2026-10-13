@@ -16,9 +16,8 @@
 
 	const transit = getTransitData();
 
-	const catalogs = $derived(
-		page.data.selected_sources.map((source) => ({ source, ...transit.catalogState(source) }))
-	);
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current.value ?? []);
 	const catalogs_loading = $derived(catalogs.some((c) => !c.catalog && !c.error));
 
 	function by_source<T>(pick: (source: Source) => T[]) {

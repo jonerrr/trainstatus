@@ -1,29 +1,30 @@
-use backend::static_data::dataset::StaticDataset;
+use backend::network::dataset::NetworkDataset;
 // Matched geometry inputs for output contracts. Adapter normalization has separate coverage.
 
-use backend::{
-    models::{
-        geom::Geom,
-        shape::Shape,
-        source::Source,
-        trip::{
-            Consist, MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, NjtBusData, StopTime,
-            StopTimeData, Trip, TripData,
-        },
-    },
-    realtime::CollectedSnapshot,
-};
+use backend::geometry::Geom;
+use backend::network::types::shape::Shape;
+use backend::operations::CollectedSnapshot;
+use backend::operations::CollectedTrip as TripRun;
+use backend::operations::CollectedVisit as StopVisit;
+use backend::operations::types::trip::Consist;
+use backend::operations::types::trip::MtaBusData;
+use backend::operations::types::trip::MtaSubwayStopTimeData;
+use backend::operations::types::trip::MtaSubwayTripData;
+use backend::operations::types::trip::NjtBusData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::TripData;
+use backend::source::Source;
 use chrono::Duration;
 
-pub async fn ingest_case(pool: sqlx::PgPool, source: Source) -> super::TestStores {
-    let stores = super::test_stores(pool);
+pub async fn ingest_case(pool: sqlx::PgPool, source: Source) -> super::TestOwners {
+    let stores = super::test_owners(pool);
     let (dataset, input) = input(source);
-    stores.static_data_store.persist(&dataset).await.unwrap();
+    stores.network.persist(&dataset).await.unwrap();
     stores.ingestor.ingest(input).await.unwrap();
     stores
 }
 
-fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
+fn input(source: Source) -> (NetworkDataset, CollectedSnapshot) {
     let (mut dataset, route, trip_data, stop_data) = match source {
         Source::MtaSubway => (
             super::mta_subway_dataset(),
@@ -76,7 +77,7 @@ fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
         });
     }
     let now = super::fixtures::fixed_time();
-    let id = uuid::Uuid::now_v7();
+    let id: backend::operations::RunKey = uuid::Uuid::now_v7().into();
     let stop_ids = if source == Source::MtaSubway {
         vec!["101".to_owned(), "102".to_owned()]
     } else if source == Source::MtaBus {
@@ -99,7 +100,7 @@ fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
                 .find(|stop| &stop.id == stop_id)
                 .unwrap();
             stop.geom = Geom::from(geo::Point::from(points[i * 2]));
-            StopTime {
+            StopVisit {
                 trip_id: id,
                 stop_sequence: i as i32,
                 stop_id: stop_id.clone(),
@@ -109,7 +110,7 @@ fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
             }
         })
         .collect();
-    let trip = Trip {
+    let trip = TripRun {
         id,
         original_id: "geometry-output".into(),
         vehicle_id: "output-vehicle".into(),
@@ -124,6 +125,8 @@ fn input(source: Source) -> (StaticDataset, CollectedSnapshot) {
         dataset,
         CollectedSnapshot {
             source,
+            network_revision: None,
+            renormalize: None,
             trips: vec![(trip, times)],
             positions: vec![],
         },

@@ -1,14 +1,18 @@
-use backend::models::{
-    route::{Route, RouteData},
-    source::Source,
-    stop::{MtaSubwayStopData, RouteStop, RouteStopData, Stop, StopData, StopType},
-};
-use backend::static_data::dataset::StaticDataset;
+use backend::network::dataset::NetworkDataset;
+use backend::network::types::route::Route;
+use backend::network::types::route::RouteData;
+use backend::network::types::stop::MtaSubwayStopData;
+use backend::network::types::stop::RouteStop;
+use backend::network::types::stop::RouteStopData;
+use backend::network::types::stop::Stop;
+use backend::network::types::stop::StopData;
+use backend::network::types::stop::StopType;
+use backend::source::Source;
 use geo::Point;
 
 #[test]
 fn validation_catches_missing_route_stop_references() {
-    let dataset = StaticDataset {
+    let dataset = NetworkDataset {
         source: Source::MtaSubway,
         routes: vec![Route {
             id: "A".into(),

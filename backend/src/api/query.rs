@@ -6,7 +6,7 @@ use axum::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use http::{StatusCode, request::Parts};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use utoipa::IntoParams;
 
 #[derive(Deserialize, IntoParams)]
@@ -44,12 +44,4 @@ pub(super) fn historical_time(
         ))
     })
     .transpose()
-}
-
-pub(super) fn parse_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let list = String::deserialize(deserializer)?;
-    Ok(list.split(',').map(str::to_owned).collect())
 }

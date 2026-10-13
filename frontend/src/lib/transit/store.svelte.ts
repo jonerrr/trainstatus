@@ -1,9 +1,8 @@
-/* eslint-disable svelte/prefer-svelte-reactivity -- readers subscribe per entry through
-   createSubscriber; collections here are private bookkeeping, never read reactively. */
-import { createContext } from 'svelte';
+/* eslint-disable svelte/prefer-svelte-reactivity -- maps hold private entry identities;
+   native state on each entry holds the reactive snapshots. */
+import { createContext, untrack } from 'svelte';
 
 import { on } from 'svelte/events';
-import { createSubscriber } from 'svelte/reactivity';
 
 import type {
 	ApiAlert,
@@ -34,12 +33,14 @@ const TICK_MS = 1_000;
 
 export interface TransitDataOptions {
 	sources: readonly Source[];
+	/** Map-only layouts defer passenger service until a binding acquires it. */
+	eager_service?: boolean;
 	fetcher?: typeof fetch;
 	/** Live refresh interval while visible and online. */
 	refresh_ms?: number;
 	/** Historical entries retained beyond those actively read. */
 	history_limit?: number;
-	/** Delay that lets independently requested bus routes share one request. */
+	/** Quiet window for new bus routes to share a request (defaults to 200 ms). */
 	batch_ms?: number;
 	now?: () => number;
 }
@@ -57,12 +58,12 @@ export interface StopArrivals {
 	routes: ReadonlyMap<string, RouteData>;
 	/** Serving routes whose first load has not finished. */
 	pending: string[];
-	/** Serving routes whose first load failed. */
-	failed: string[];
 }
 
-/** Live data polled outside this module that reports into the shared status. */
+/** Separately polled data that reports into the shared status. */
 export interface TrackedUpdate {
+	/** Historical queries report failures but do not age into a live warning. */
+	readonly at?: number | null;
 	readonly active: boolean;
 	readonly error: Error | null;
 	readonly fetched_at: number | null;
@@ -71,95 +72,107 @@ export interface TrackedUpdate {
 
 export class UnknownRouteError extends Error {}
 
+export interface ResourceSnapshot<T> {
+	value: T | undefined;
+	loading: boolean;
+	/** Initial-load failure. Refresh failures retain a loaded value. */
+	error: Error | null;
+}
+
+export interface Resource<T> {
+	readonly current: ResourceSnapshot<T>;
+}
+
+type Kind = 'catalog' | 'alerts' | 'service';
+
 class Entry<T> {
-	data: T | undefined = undefined;
-	promise: Promise<T> | undefined = undefined;
-	active = false;
-	/** Live whole-source entries refresh without readers. */
+	state = $state.raw<{ data: T | undefined; error: Error | null }>({
+		data: undefined,
+		error: null
+	});
+	readers = 0;
 	eager = false;
 	unknown = false;
 	in_flight = false;
 	fetched_at: number | null = null;
+	source_updated_at: number | null = null;
 	attempted_at: number | null = null;
 	failures = 0;
-	error: Error | null = null;
 	used_at = 0;
-	readonly subscribe: () => void;
-	#update = () => {};
-	#resolve: ((value: T) => void) | undefined;
-	#reject: ((error: Error) => void) | undefined;
+	/** Invalidates a request if another publisher installs newer data. */
+	revision = 0;
 
 	constructor(
 		readonly source: Source,
 		readonly at: number | null,
-		readonly route_id: string | null
-	) {
-		this.subscribe = createSubscriber((update) => {
-			this.#update = update;
-			this.active = true;
-			return () => {
-				this.active = false;
-			};
-		});
-	}
+		readonly route_id: string | null,
+		readonly kind: Kind = 'service'
+	) {}
 
-	/** The shared first-load promise, created on demand. */
-	pending(): Promise<T> {
-		if (!this.promise) {
-			this.promise = new Promise<T>((resolve, reject) => {
-				this.#resolve = resolve;
-				this.#reject = reject;
-			});
-			// Rejections surface through readers; an unread one is not an error.
-			this.promise.catch(() => {});
-		}
-		return this.promise;
+	get data() {
+		return this.state.data;
+	}
+	get error() {
+		return this.state.error;
+	}
+	get active() {
+		return this.readers > 0;
+	}
+	get current(): ResourceSnapshot<T> {
+		const { data, error } = this.state;
+		return {
+			value: data,
+			loading: data === undefined && !error,
+			error: data === undefined ? error : null
+		};
 	}
 
 	install(data: T, now: number) {
-		this.data = data;
+		this.revision++;
 		this.fetched_at = now;
 		this.failures = 0;
-		this.error = null;
-		this.#resolve?.(data);
-		this.promise = this.#resolve = this.#reject = undefined;
-		this.#update();
+		this.state = { data, error: null };
 	}
 
 	fail(error: Error) {
-		this.error = error;
 		this.failures++;
-		if (this.data === undefined) this.#reject?.(error);
-		this.#resolve = this.#reject = undefined;
-		this.#update();
+		this.state = { data: this.data, error };
 	}
 
-	/** Forget a failed first load so the next read requests it again. */
 	reset() {
-		if (this.data === undefined && this.error) this.promise = undefined;
+		if (this.data !== undefined || !this.error) return;
+		this.state = { data: undefined, error: null };
 	}
 }
 
 type ServiceEntry = Entry<ReadonlyMap<string, RouteData>>;
 
 class DataStatus {
-	offline = $state(false);
-	/** The latest attempt for some actively read live data failed. */
-	failing = $state(false);
-	/** Oldest last successful fetch among actively read live data, epoch milliseconds. */
-	last_fetched = $state<number | null>(null);
-	/** Some actively read live data is older than the stale threshold. */
-	stale = $state(false);
-	/** Increments on each explicit retry, so failed views can reset. */
-	retries = $state(0);
+	warning = $state(false);
 }
 
-/** A read's value when it is already available, without waiting. */
-export function loaded<T>(read: T | Promise<T>): T | undefined {
-	if (!(read instanceof Promise)) return read;
-	// Failures surface through status and boundaries; this caller only peeks.
-	read.catch(() => {});
-	return undefined;
+interface Selection<T> {
+	entries: Entry<unknown>[];
+	project(): ResourceSnapshot<T>;
+}
+
+export interface RouteKey {
+	source: Source;
+	route_id: string;
+	at?: number | null;
+}
+
+export interface CatalogRead {
+	source: Source;
+	catalog: CatalogData | undefined;
+	loading: boolean;
+	error: Error | null;
+}
+
+export interface RouteRead extends RouteKey {
+	route: RouteData | undefined;
+	loading: boolean;
+	error: Error | null;
 }
 
 function serviceUrl(source: Source, routes: readonly string[] | null, at: number | null) {
@@ -170,8 +183,8 @@ function serviceUrl(source: Source, routes: readonly string[] | null, at: number
 }
 
 /**
- * Layout-scoped owner of catalogs and passenger service. Reads return loaded data
- * synchronously and otherwise a shared promise; readers subscribe while they render.
+ * Layout-scoped owner of catalogs, alerts and passenger service. Views use
+ * native snapshots through bindings whose explicit effects own reader interest and first loads.
  */
 export class TransitData {
 	readonly status = new DataStatus();
@@ -179,14 +192,16 @@ export class TransitData {
 	#refresh_ms: number;
 	#history_limit: number;
 	#batch_ms: number;
+	#eager_service: boolean;
 	#now: () => number;
 	#sources = new Set<Source>();
+	#generation = $state(0);
 	#catalogs = new Map<Source, Entry<CatalogData>>();
 	#alerts = new Map<string, Entry<AlertsData>>();
 	#tracked = new Set<TrackedUpdate>();
 	#services = new Map<string, ServiceEntry>();
 	#queue = new Map<string, Set<ServiceEntry>>();
-	#flush_timer: ReturnType<typeof setTimeout> | undefined;
+	#flush_timers = new Map<string, ReturnType<typeof setTimeout>>();
 	#controllers = new Map<Source, AbortController>();
 	#destroyed = false;
 	#cleanup: (() => void)[] = [];
@@ -195,9 +210,10 @@ export class TransitData {
 		this.#fetcher = options.fetcher ?? ((...args) => fetch(...args));
 		this.#refresh_ms = options.refresh_ms ?? 30_000;
 		this.#history_limit = options.history_limit ?? 6;
-		this.#batch_ms = options.batch_ms ?? 10;
+		this.#batch_ms = options.batch_ms ?? 200;
+		this.#eager_service = options.eager_service ?? true;
 		this.#now = options.now ?? Date.now;
-		this.setSources(options.sources);
+		untrack(() => this.setSources(options.sources));
 		if (typeof window === 'undefined') return;
 		const tick = () => this.#tick();
 		const interval = setInterval(tick, TICK_MS);
@@ -216,185 +232,230 @@ export class TransitData {
 		for (const source of next) {
 			if (typeof window === 'undefined') break;
 			if (this.#sources.has(source)) continue;
-			const catalog = new Entry<CatalogData>(source, null, null);
+			const catalog = new Entry<CatalogData>(source, null, null, 'catalog');
+			catalog.eager = true;
 			this.#catalogs.set(source, catalog);
 			void this.#loadCatalog(catalog);
 			const alerts = this.#alertEntry(source, null);
 			alerts.eager = true;
 			void this.#loadAlerts(alerts);
-			if (!WHOLE_SOURCES.has(source)) continue;
+			if (!this.#eager_service || !WHOLE_SOURCES.has(source)) continue;
 			const entry = this.#service(source, null, null);
 			entry.eager = true;
 			this.#enqueue(entry);
 		}
+		if (next.size !== this.#sources.size || [...next].some((source) => !this.#sources.has(source)))
+			this.#generation++;
 		this.#sources = next;
 	}
 
-	catalog(source: Source): CatalogData | Promise<CatalogData> {
-		let entry = this.#catalogs.get(source);
-		if (!entry) this.#catalogs.set(source, (entry = new Entry(source, null, null)));
-		entry.subscribe();
-		if (entry.data) return entry.data;
-		if (!entry.promise) void this.#loadCatalog(entry);
-		return entry.pending();
-	}
-
-	/** Non-blocking catalog read for views that render each source as it arrives. */
-	catalogState(source: Source): { catalog: CatalogData | undefined; error: Error | null } {
-		const catalog = loaded(this.catalog(source));
-		return { catalog, error: catalog ? null : (this.#catalogs.get(source)?.error ?? null) };
-	}
-
-	/** Current alerts for a source, or those active at `at` (Unix seconds). */
-	alerts(source: Source, at: number | null = null): AlertsData | Promise<AlertsData> {
-		const entry = this.#alertEntry(source, at);
-		entry.subscribe();
-		entry.used_at = this.#now();
-		if (entry.data) {
-			if (at === null && !entry.in_flight && this.#due(entry) <= this.#now() && this.#may_poll())
-				void this.#loadAlerts(entry);
-			return entry.data;
+	/** Enable whole-source background service outside the map, keeping acquired readers active. */
+	setEagerService(enabled: boolean) {
+		if (enabled === this.#eager_service) return;
+		this.#eager_service = enabled;
+		for (const source of this.#sources) {
+			if (!WHOLE_SOURCES.has(source)) continue;
+			const entry = this.#service(source, null, null);
+			entry.eager = enabled;
+			if (enabled) this.#ensure(entry);
 		}
-		if (!entry.promise) void this.#loadAlerts(entry);
-		return entry.pending();
+		this.#updateStatus();
 	}
 
-	/** Report externally polled live data in the shared status; returns an unregister. */
-	track(update: TrackedUpdate): () => void {
-		this.#tracked.add(update);
-		return () => {
-			this.#tracked.delete(update);
-			this.#updateStatus();
-		};
-	}
-
-	/** Install a newer catalog body, e.g. from service-worker revalidation. */
-	replaceCatalog(body: Catalog) {
-		let entry = this.#catalogs.get(body.source);
-		if (!entry) this.#catalogs.set(body.source, (entry = new Entry(body.source, null, null)));
-		entry.install(decodeCatalog(body), this.#now());
-	}
-
-	/** Non-blocking route read for views that render each route as it arrives. */
-	routeState(
-		source: Source,
-		route_id: string,
-		at: number | null = null
-	): { route: RouteData | undefined; error: Error | null } {
-		const route = loaded(this.route(source, route_id, at));
-		const entry = this.#service(source, this.#key_route(source, route_id), at);
-		return { route, error: route ? null : entry.error };
-	}
-
-	/** Complete service for a route; `at` (Unix seconds) selects retained history. */
-	route(
-		source: Source,
-		route_id: string,
-		at: number | null = null
-	): RouteData | Promise<RouteData> {
-		const entry = this.#read(source, route_id, at);
-		const pick = (routes: ReadonlyMap<string, RouteData>) =>
-			routes.get(route_id) ?? emptyRoute(source, route_id, at, entry.fetched_at);
-		if (entry.data) return pick(entry.data);
-		return entry.pending().then(pick);
-	}
-
-	trip(
-		source: Source,
-		route_id: string,
-		trip_id: string,
-		at: number | null = null
-	): TripRead | undefined | Promise<TripRead | undefined> {
-		const pick = (route: RouteData): TripRead | undefined => {
-			const trip = route.trips.get(trip_id);
-			return trip && { trip, calls: route.calls_by_trip.get(trip_id) ?? [], route };
-		};
-		const route = this.route(source, route_id, at);
-		return route instanceof Promise ? route.then(pick) : pick(route);
-	}
-
-	/**
-	 * Arrivals at a stop across its serving routes. Waits only while no serving route
-	 * has loaded; afterwards, routes that are still loading or failed are listed.
-	 */
-	stopArrivals(
-		source: Source,
-		stop_id: string,
-		at: number | null = null
-	): StopArrivals | Promise<StopArrivals> {
-		const catalog = this.catalog(source);
-		if (catalog instanceof Promise)
-			return catalog.then(() => this.stopArrivals(source, stop_id, at));
-		const route_ids = [
-			...new Set(catalog.stops_by_id.get(stop_id)?.routes.map((route) => route.route_id))
-		];
-		const routes = new Map<string, RouteData>();
-		const pending: string[] = [];
-		const failed: string[] = [];
-		const waits: Promise<unknown>[] = [];
-		for (const route_id of route_ids) {
-			const entry = this.#read(source, route_id, at);
-			if (entry.data)
-				routes.set(
-					route_id,
-					entry.data.get(route_id) ?? emptyRoute(source, route_id, at, entry.fetched_at)
-				);
-			else if (entry.error) failed.push(route_id);
-			else {
-				pending.push(route_id);
-				waits.push(entry.pending());
-			}
-		}
-		const result = () => ({
-			calls: callsAtStop(routes.values(), stop_id),
-			routes,
-			pending,
-			failed
+	/** Bindings are created during component initialization, never inside a derived read. */
+	#bind<T>(select: () => Selection<T>): Resource<T> {
+		const selection = $derived.by(() => {
+			void this.#generation;
+			return select();
 		});
-		if (routes.size || !route_ids.length) return result();
-		if (!waits.length) return Promise.reject(this.#entryError(source, failed[0], at));
-		return Promise.allSettled(waits).then(() => this.stopArrivals(source, stop_id, at));
+		$effect(() => {
+			const entries = selection.entries;
+			return untrack(() => {
+				for (const entry of entries) {
+					entry.readers++;
+					entry.used_at = this.#now();
+					this.#ensure(entry);
+				}
+				this.#updateStatus();
+				return () => {
+					for (const entry of entries) entry.readers--;
+				};
+			});
+		});
+		return {
+			get current() {
+				return selection.project();
+			}
+		};
 	}
 
-	/**
-	 * Non-blocking stop arrivals for rows that render as data arrives. `read` is set once
-	 * any serving route has loaded; `error` only when the first load failed outright.
-	 */
-	stopArrivalsState(
-		source: Source,
-		stop_id: string,
-		at: number | null = null
-	): { read: StopArrivals | undefined; error: Error | null } {
-		const read = this.stopArrivals(source, stop_id, at);
-		if (!(read instanceof Promise)) return { read, error: null };
-		read.catch(() => {});
-		const catalog = this.#catalogs.get(source);
-		if (!catalog?.data) return { read: undefined, error: catalog?.error ?? null };
-		const route_ids = new Set(
-			catalog.data.stops_by_id.get(stop_id)?.routes.map((route) => route.route_id)
-		);
-		const errors = [...route_ids].map(
-			(route_id) => this.#service(source, this.#key_route(source, route_id), at).error
-		);
-		return { read: undefined, error: errors.length && errors.every(Boolean) ? errors[0] : null };
+	#catalogEntry(source: Source) {
+		let entry = this.#catalogs.get(source);
+		if (!entry) this.#catalogs.set(source, (entry = new Entry(source, null, null, 'catalog')));
+		return entry;
 	}
 
-	/** Alerts for views that render each row as data arrives. */
-	alertsState(
-		source: Source,
-		at: number | null = null
-	): { alerts: AlertsData | undefined; error: Error | null } {
-		const alerts = loaded(this.alerts(source, at));
-		return { alerts, error: alerts ? null : this.#alertEntry(source, at).error };
+	catalog(source: () => Source | null): Resource<CatalogData> {
+		return this.#bind(() => {
+			const key = source();
+			const entry = key === null ? undefined : this.#catalogEntry(key);
+			return {
+				entries: entry ? [entry] : [],
+				project: () => entry?.current ?? { value: undefined, loading: false, error: null }
+			};
+		});
 	}
 
-	/** Arrivals from serving routes that are already loaded; requests nothing. */
+	catalogs(sources: () => readonly Source[]): Resource<CatalogRead[]> {
+		return this.#bind(() => {
+			const entries = sources().map((source) => this.#catalogEntry(source));
+			return {
+				entries,
+				project: () => ({
+					value: entries.map((entry) => ({
+						source: entry.source,
+						catalog: entry.data,
+						loading: entry.current.loading,
+						error: entry.current.error
+					})),
+					loading: false,
+					error: null
+				})
+			};
+		});
+	}
+
+	alerts(key: () => { source: Source; at?: number | null } | null): Resource<AlertsData> {
+		return this.#bind(() => {
+			const selected = key();
+			const entry = selected && this.#alertEntry(selected.source, selected.at ?? null);
+			return {
+				entries: entry ? [entry] : [],
+				project: () => entry?.current ?? { value: undefined, loading: false, error: null }
+			};
+		});
+	}
+
+	#routeSnapshot(entry: ServiceEntry, route_id: string): ResourceSnapshot<RouteData> {
+		const current = entry.current;
+		return {
+			...current,
+			value:
+				current.value &&
+				(current.value.get(route_id) ??
+					emptyRoute(entry.source, route_id, entry.at, entry.fetched_at))
+		};
+	}
+
+	route(key: () => RouteKey | null): Resource<RouteData> {
+		return this.#bind(() => {
+			const selected = key();
+			const entry =
+				selected &&
+				this.#service(
+					selected.source,
+					this.#key_route(selected.source, selected.route_id),
+					selected.at ?? null
+				);
+			return {
+				entries: entry ? [entry] : [],
+				project: () =>
+					selected && entry
+						? this.#routeSnapshot(entry, selected.route_id)
+						: { value: undefined, loading: false, error: null }
+			};
+		});
+	}
+
+	routes(keys: () => readonly RouteKey[]): Resource<RouteRead[]> {
+		return this.#bind(() => {
+			const selected = keys().map((key) => ({
+				key,
+				entry: this.#service(key.source, this.#key_route(key.source, key.route_id), key.at ?? null)
+			}));
+			return {
+				entries: [...new Set(selected.map(({ entry }) => entry))],
+				project: () => ({
+					value: selected.map(({ key, entry }) => {
+						const { value, loading, error } = this.#routeSnapshot(entry, key.route_id);
+						return { ...key, route: value, loading, error };
+					}),
+					loading: false,
+					error: null
+				})
+			};
+		});
+	}
+
+	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<TripRead> {
+		const route = this.route(key);
+		const project = (current: ResourceSnapshot<RouteData>): ResourceSnapshot<TripRead> => {
+			const selected = key();
+			const data = current.value;
+			const trip = selected && data?.trips.get(selected.trip_id);
+			return {
+				...current,
+				value:
+					selected && data && trip
+						? { trip, calls: data.calls_by_trip.get(selected.trip_id) ?? [], route: data }
+						: undefined
+			};
+		};
+		return {
+			get current() {
+				return project(route.current);
+			}
+		};
+	}
+
+	stopArrivals(
+		key: () => { source: Source; stop_id: string; at?: number | null }
+	): Resource<StopArrivals> {
+		return this.#bind(() => {
+			const { source, stop_id, at = null } = key();
+			const catalog = this.#catalogEntry(source);
+			const ids = [
+				...new Set(catalog.data?.stops_by_id.get(stop_id)?.routes.map((route) => route.route_id))
+			];
+			const selected = ids.map((id) => ({
+				id,
+				entry: this.#service(source, this.#key_route(source, id), at)
+			}));
+			return {
+				entries: [catalog, ...new Set(selected.map(({ entry }) => entry))],
+				project: () => {
+					if (!catalog.data) return { ...catalog.current, value: undefined };
+					const routes = new Map<string, RouteData>();
+					const pending: string[] = [];
+					let error: Error | null = null;
+					for (const { id, entry } of selected) {
+						const current = this.#routeSnapshot(entry, id);
+						if (current.value) routes.set(id, current.value);
+						else if (current.loading) pending.push(id);
+						else error ??= current.error;
+					}
+					return {
+						value: { calls: callsAtStop(routes.values(), stop_id), routes, pending },
+						loading: !routes.size && pending.length > 0,
+						error: !routes.size && !pending.length ? error : null
+					};
+				}
+			};
+		});
+	}
+
+	/** Pure peeks: observe available snapshots without acquiring service interest. */
+	peekCatalog(source: Source): CatalogData | undefined {
+		void this.#generation;
+		return this.#catalogEntry(source).data;
+	}
+
 	loadedStopArrivals(
 		source: Source,
 		stop_id: string,
 		at: number | null = null
 	): Pick<StopArrivals, 'calls' | 'routes'> {
-		const catalog = loaded(this.catalog(source));
+		const catalog = this.peekCatalog(source);
 		const routes = new Map<string, RouteData>();
 		for (const { route_id } of catalog?.stops_by_id.get(stop_id)?.routes ?? []) {
 			const route = this.#peek(source, route_id, at);
@@ -403,7 +464,6 @@ export class TransitData {
 		return { calls: callsAtStop(routes.values(), stop_id), routes };
 	}
 
-	/** A trip from its route if already loaded; requests nothing. */
 	loadedTrip(
 		source: Source,
 		route_id: string,
@@ -415,38 +475,60 @@ export class TransitData {
 		return route && trip && { trip, calls: route.calls_by_trip.get(trip_id) ?? [], route };
 	}
 
-	/** Retry failed first loads and failed live refreshes now. */
+	/** Report separately polled trajectories without taking ownership of their requests. */
+	track(update: TrackedUpdate): () => void {
+		this.#tracked.add(update);
+		return () => {
+			this.#tracked.delete(update);
+			this.#updateStatus();
+		};
+	}
+
+	replaceCatalog(body: Catalog) {
+		if (!this.#sources.has(body.source)) return;
+		this.#catalogEntry(body.source).install(decodeCatalog(body), this.#now());
+		this.#updateStatus();
+	}
+
+	#ensure(entry: Entry<unknown>) {
+		if (this.#destroyed || entry.in_flight || entry.unknown) return;
+		if (entry.data !== undefined && (entry.kind === 'catalog' || entry.at !== null)) return;
+		if (
+			(entry.data !== undefined || entry.error) &&
+			(this.#due(entry) > this.#now() || !this.#may_poll())
+		)
+			return;
+		this.#start(entry);
+	}
+
+	#start(entry: Entry<unknown>) {
+		if (this.#destroyed || entry.in_flight || entry.unknown) return;
+		entry.reset();
+		if (entry.kind === 'catalog') void this.#loadCatalog(entry as Entry<CatalogData>);
+		else if (entry.kind === 'alerts') void this.#loadAlerts(entry as Entry<AlertsData>);
+		else this.#enqueue(entry as ServiceEntry);
+	}
+
+	/** Retry relevant initial failures and refresh live data, including aged successful reads. */
 	retry() {
-		this.status.retries++;
-		for (const entry of this.#catalogs.values()) {
-			if (entry.data || !entry.error) continue;
-			entry.reset();
-			void this.#loadCatalog(entry);
+		for (const entry of [
+			...this.#catalogs.values(),
+			...this.#alerts.values(),
+			...this.#services.values()
+		]) {
+			if (!entry.active && !entry.eager) continue;
+			if (entry.kind === 'catalog' ? !entry.error : entry.at !== null && !entry.error) continue;
+			this.#start(entry);
 		}
-		for (const entry of this.#alerts.values()) {
-			if (!entry.error || entry.in_flight) continue;
-			entry.reset();
-			void this.#loadAlerts(entry);
-		}
-		for (const update of this.#tracked) if (update.error) update.retry();
-		for (const entry of this.#services.values()) {
-			if (!entry.error || entry.unknown || entry.in_flight) continue;
-			entry.reset();
-			this.#enqueue(entry);
-		}
+		for (const update of this.#tracked) if (update.active) update.retry();
 	}
 
 	/** Refetch actively read historical data, which otherwise loads once. */
 	reload() {
 		this.retry();
-		for (const entry of this.#services.values()) {
-			if (entry.at !== null && entry.active && !entry.in_flight && !entry.unknown)
-				this.#enqueue(entry);
+		for (const entry of [...this.#services.values(), ...this.#alerts.values()]) {
+			if (entry.at !== null && entry.active) this.#start(entry);
 		}
-		for (const entry of this.#alerts.values()) {
-			if (entry.at !== null && entry.active && !entry.in_flight) void this.#loadAlerts(entry);
-		}
-		for (const update of this.#tracked) if (update.active) update.retry();
 	}
 
 	/** Stops timers and requests without touching reactive state that unmounting views may read. */
@@ -455,11 +537,8 @@ export class TransitData {
 		for (const cleanup of this.#cleanup) cleanup();
 		for (const controller of this.#controllers.values()) controller.abort();
 		this.#queue.clear();
-		clearTimeout(this.#flush_timer);
-	}
-
-	#entryError(source: Source, route_id: string, at: number | null) {
-		return this.#service(source, this.#key_route(source, route_id), at).error!;
+		for (const timer of this.#flush_timers.values()) clearTimeout(timer);
+		this.#flush_timers.clear();
 	}
 
 	#key_route(source: Source, route_id: string) {
@@ -474,29 +553,16 @@ export class TransitData {
 	}
 
 	#peek(source: Source, route_id: string, at: number | null): RouteData | undefined {
+		void this.#generation;
 		const entry = this.#service(source, this.#key_route(source, route_id), at);
-		entry.subscribe();
 		if (!entry.data) return undefined;
 		return entry.data.get(route_id) ?? emptyRoute(source, route_id, at, entry.fetched_at);
-	}
-
-	#read(source: Source, route_id: string, at: number | null): ServiceEntry {
-		const entry = this.#service(source, this.#key_route(source, route_id), at);
-		entry.subscribe();
-		entry.used_at = this.#now();
-		if (entry.in_flight || entry.unknown) return entry;
-		if (entry.data === undefined) {
-			if (!entry.promise) this.#enqueue(entry);
-		} else if (at === null && this.#due(entry) <= this.#now() && this.#may_poll()) {
-			this.#enqueue(entry);
-		}
-		return entry;
 	}
 
 	#alertEntry(source: Source, at: number | null) {
 		const key = `${source}|${at ?? ''}`;
 		let entry = this.#alerts.get(key);
-		if (!entry) this.#alerts.set(key, (entry = new Entry(source, at, null)));
+		if (!entry) this.#alerts.set(key, (entry = new Entry(source, at, null, 'alerts')));
 		return entry;
 	}
 
@@ -536,51 +602,64 @@ export class TransitData {
 	}
 
 	async #load<B, T>(entry: Entry<T>, url: string, init: RequestInit, decode: (body: B) => T) {
-		if (entry.data === undefined) entry.pending();
 		// Server renders show pending UI; the per-request owner never fetches.
 		if (typeof window === 'undefined' || this.#destroyed) return;
 		const { signal } = this.#controller(entry.source);
 		entry.attempted_at = this.#now();
 		entry.in_flight = true;
+		const revision = entry.revision;
 		try {
 			const response = await this.#fetcher(url, { ...init, signal });
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-			entry.install(decode((await response.json()) as B), this.#now());
+			const body = (await response.json()) as B;
+			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
+				entry.install(decode(body), this.#now());
 		} catch (error) {
-			if (!signal.aborted) entry.fail(error as Error);
+			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
+				entry.fail(error as Error);
 		} finally {
 			entry.in_flight = false;
+			this.#evictHistory();
 			this.#updateStatus();
 		}
 	}
 
 	#enqueue(entry: ServiceEntry) {
-		if (entry.data === undefined) entry.pending();
 		if (typeof window === 'undefined' || this.#destroyed) return;
 		const group = `${entry.source}|${entry.at ?? ''}`;
 		let entries = this.#queue.get(group);
 		if (!entries) this.#queue.set(group, (entries = new Set()));
+		// Duplicate readers and polling ticks must not postpone an existing batch.
+		if (entries.has(entry)) return;
 		entries.add(entry);
-		this.#flush_timer ??= setTimeout(() => this.#flush(), this.#batch_ms);
+		clearTimeout(this.#flush_timers.get(group));
+		// Whole-source subway requests do not wait for scrolling bus rows.
+		const delay = entry.route_id === null ? Math.min(10, this.#batch_ms) : this.#batch_ms;
+		this.#flush_timers.set(
+			group,
+			setTimeout(() => this.#flush(group), delay)
+		);
 	}
 
-	#flush() {
-		this.#flush_timer = undefined;
-		const groups = [...this.#queue.values()];
-		this.#queue.clear();
-		for (const group of groups) {
-			const entries = [...group].filter(
-				(entry) => !entry.in_flight && this.#services.get(this.#keyOf(entry)) === entry
-			);
-			if (!entries.length) continue;
-			if (entries[0].route_id === null) {
-				void this.#request(entries.slice(0, 1));
-				continue;
-			}
-			entries.sort((a, b) => a.route_id!.localeCompare(b.route_id!));
-			for (let i = 0; i < entries.length; i += MAX_BATCH_ROUTES) {
-				void this.#request(entries.slice(i, i + MAX_BATCH_ROUTES));
-			}
+	#flush(group: string) {
+		this.#flush_timers.delete(group);
+		const queued = this.#queue.get(group);
+		this.#queue.delete(group);
+		if (!queued) return;
+		const entries = [...queued].filter(
+			(entry) =>
+				(entry.active || entry.eager) &&
+				!entry.in_flight &&
+				this.#services.get(this.#keyOf(entry)) === entry
+		);
+		if (!entries.length) return;
+		if (entries[0].route_id === null) {
+			void this.#request(entries.slice(0, 1));
+			return;
+		}
+		entries.sort((a, b) => a.route_id!.localeCompare(b.route_id!));
+		for (let i = 0; i < entries.length; i += MAX_BATCH_ROUTES) {
+			void this.#request(entries.slice(i, i + MAX_BATCH_ROUTES));
 		}
 	}
 
@@ -602,9 +681,11 @@ export class TransitData {
 				signal,
 				cache: 'no-store'
 			});
+			if (signal.aborted || this.#destroyed) return;
 			if (response.status === 404 && routes) {
 				const unknown = new Set(((await response.json()) as UnknownRoutes).unknown_route_ids);
 				for (const entry of entries) {
+					if (!this.#owns(entry)) continue;
 					entry.in_flight = false;
 					if (!unknown.has(entry.route_id!)) this.#enqueue(entry);
 					else {
@@ -616,9 +697,13 @@ export class TransitData {
 			}
 			if (!response.ok) throw new Error(`Service returned ${response.status}`);
 			const now = this.#now();
-			const decoded = decodeService((await response.json()) as Service, now);
+			const body = (await response.json()) as Service;
+			const decoded = decodeService(body, now);
 			for (const entry of entries) {
+				if (signal.aborted || !this.#owns(entry)) continue;
 				entry.in_flight = false;
+				entry.source_updated_at =
+					at === null && body.updated_at != null ? body.updated_at * 1000 : null;
 				if (routes === null) entry.install(decoded, now);
 				else {
 					const route = decoded.get(entry.route_id!);
@@ -629,6 +714,7 @@ export class TransitData {
 		} catch (error) {
 			if (signal.aborted) return;
 			for (const entry of entries) {
+				if (signal.aborted || !this.#owns(entry)) continue;
 				entry.in_flight = false;
 				entry.fail(error as Error);
 			}
@@ -654,45 +740,52 @@ export class TransitData {
 	#tick() {
 		this.#updateStatus();
 		if (!this.#may_poll()) return;
-		const now = this.#now();
-		for (const entry of this.#services.values()) {
-			if (entry.at !== null || entry.unknown || entry.in_flight) continue;
+		for (const entry of [
+			...this.#catalogs.values(),
+			...this.#services.values(),
+			...this.#alerts.values()
+		]) {
 			if (!entry.active && !entry.eager) continue;
-			if (entry.data === undefined && !entry.error) continue;
-			if (this.#due(entry) > now) continue;
-			entry.reset();
-			this.#enqueue(entry);
-		}
-		for (const entry of this.#alerts.values()) {
-			if (entry.at !== null || entry.in_flight || (!entry.active && !entry.eager)) continue;
-			if (this.#due(entry) > now) continue;
-			entry.reset();
-			void this.#loadAlerts(entry);
+			if (entry.kind === 'catalog' ? !entry.error : entry.at !== null) continue;
+			this.#ensure(entry);
 		}
 		this.#evictHistory();
 	}
 
 	#updateStatus() {
-		this.status.offline = typeof navigator !== 'undefined' && !navigator.onLine;
-		let failing = false;
-		let last_fetched: number | null = null;
-		const live: Pick<TrackedUpdate, 'error' | 'fetched_at'>[] = [...this.#tracked].filter(
-			(update) => update.active
-		);
-		for (const entry of [...this.#services.values(), ...this.#alerts.values()]) {
-			if (entry.at !== null || entry.unknown || (!entry.active && !entry.eager)) continue;
-			live.push(entry);
+		if (this.#destroyed) return;
+		let warning = typeof navigator !== 'undefined' && !navigator.onLine;
+		const now = this.#now();
+		for (const entry of [
+			...this.#catalogs.values(),
+			...this.#services.values(),
+			...this.#alerts.values()
+		]) {
+			if (entry.unknown || (!entry.active && !entry.eager)) continue;
+			if (entry.error) warning = true;
+			if (entry.kind === 'catalog' || entry.at !== null || entry.fetched_at === null) continue;
+			const refreshed = Math.min(entry.fetched_at, entry.source_updated_at ?? entry.fetched_at);
+			if (now - refreshed > STALE_AFTER_MS) warning = true;
 		}
-		for (const entry of live) {
-			if (entry.error) failing = true;
-			if (entry.fetched_at !== null) {
-				last_fetched =
-					last_fetched === null ? entry.fetched_at : Math.min(last_fetched, entry.fetched_at);
-			}
+		for (const update of this.#tracked) {
+			if (!update.active) continue;
+			if (
+				update.error ||
+				(update.at == null &&
+					update.fetched_at !== null &&
+					now - update.fetched_at > STALE_AFTER_MS)
+			)
+				warning = true;
 		}
-		this.status.failing = failing;
-		this.status.last_fetched = last_fetched;
-		this.status.stale = last_fetched !== null && this.#now() - last_fetched > STALE_AFTER_MS;
+		this.status.warning = warning;
+	}
+
+	#owns(entry: Entry<unknown>) {
+		if (this.#destroyed) return false;
+		if (entry.kind === 'catalog') return this.#catalogs.get(entry.source) === entry;
+		if (entry.kind === 'alerts')
+			return this.#alerts.get(`${entry.source}|${entry.at ?? ''}`) === entry;
+		return this.#services.get(this.#keyOf(entry as ServiceEntry)) === entry;
 	}
 
 	#release(source: Source) {
@@ -703,7 +796,10 @@ export class TransitData {
 		for (const [key, entry] of this.#services)
 			if (entry.source === source) this.#services.delete(key);
 		for (const [group, entries] of this.#queue) {
-			if ([...entries].some((entry) => entry.source === source)) this.#queue.delete(group);
+			if (![...entries].some((entry) => entry.source === source)) continue;
+			this.#queue.delete(group);
+			clearTimeout(this.#flush_timers.get(group));
+			this.#flush_timers.delete(group);
 		}
 	}
 }

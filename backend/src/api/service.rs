@@ -1,9 +1,9 @@
 use super::{AppError, query::historical_time};
-use crate::{
-    AppState,
-    models::source::Source,
-    passenger::service::{RouteSelection, Service, ServiceError},
-};
+use crate::AppState;
+use crate::api::dto::service::Service;
+use crate::operations::service::RouteSelection;
+use crate::operations::service::ServiceError;
+use crate::source::Source;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -66,10 +66,10 @@ pub async fn service_handler(
     };
     let result = match at {
         None => state
-            .service_store
+            .operations
             .live(source)
             .and_then(|snapshot| snapshot.encode(&selection)),
-        Some(at) => state.service_store.historical(source, at, &selection).await,
+        Some(at) => state.operations.historical(source, at, &selection).await,
     };
     match result {
         Ok(body) => (

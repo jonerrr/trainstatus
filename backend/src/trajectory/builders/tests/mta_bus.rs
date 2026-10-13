@@ -1,5 +1,5 @@
 use super::*;
-use crate::models::stop::MtaBusStopData;
+use crate::network::types::stop::MtaBusStopData;
 use crate::trajectory::types::TrajectoryStop;
 use geo::LineString;
 
@@ -9,11 +9,11 @@ fn make_stop(stop_id: &str, arrival_unix: f64, stop_distance_m: f64) -> Trajecto
         arrival_unix,
         departure_unix: arrival_unix, // same in the feed
         stop_distance_m,
-        stop_time_data: crate::models::trip::StopTimeData::MtaBus,
+        stop_time_data: crate::operations::types::trip::StopTimeData::MtaBus,
         stop_data: StopData::MtaBus(MtaBusStopData {
             bearing: None,
             is_boardable: true,
-            direction: crate::models::stop::CompassDirection::Unknown,
+            direction: crate::network::types::stop::CompassDirection::Unknown,
         }),
     }
 }
@@ -36,6 +36,7 @@ fn make_trip(stops: Vec<TrajectoryStop>, shape_length_m: f64) -> TripSnapshot {
         consist_car_length_m: None,
         stops,
         positions: vec![],
+        recorded_anchor: None,
         as_of: chrono::Utc::now(),
     }
 }
@@ -61,7 +62,8 @@ fn dwell_knots_preserve_stationary_plateau() {
     let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
 
     assert_eq!(knots[1].s_m, knots[2].s_m, "dwell knots should share s_m");
-    use crate::trajectory::interpolation::{InterpolationMethod, PchipMethod};
+    use crate::trajectory::interpolation::InterpolationMethod;
+    use crate::trajectory::interpolation::PchipMethod;
     let midpoint = (knots[1].t_event + knots[2].t_event) / 2.0;
     let motion = PchipMethod
         .sample_motion(&knots, &[midpoint], midpoint)
@@ -106,9 +108,15 @@ fn stop_beyond_shape_length_yields_finite_knots() {
     }
 }
 
-fn make_position(stop_id: &str, lon: f64, lat: f64) -> crate::models::position::VehiclePosition {
-    use crate::models::position::{MtaBusPositionData, PositionData, VehiclePosition};
-    VehiclePosition {
+fn make_position(
+    stop_id: &str,
+    lon: f64,
+    lat: f64,
+) -> crate::operations::types::position::VehicleObservation {
+    use crate::operations::types::position::MtaBusPositionData;
+    use crate::operations::types::position::PositionData;
+    use crate::operations::types::position::VehicleObservation;
+    VehicleObservation {
         vehicle_id: "v1".to_string(),
         trip_id: None,
         stop_id: Some(stop_id.to_string()),

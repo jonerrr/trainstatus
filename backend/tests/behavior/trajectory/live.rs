@@ -1,22 +1,27 @@
 use crate::support;
-use backend::{
-    models::{
-        geom::Geom,
-        position::{MtaBusPositionData, PositionData, VehiclePosition},
-        source::Source,
-        trip::{MtaBusData, StopTime, StopTimeData, Trip, TripData},
-    },
-    realtime::{IngestionChanges, PersistedSnapshot},
-    static_data::index::StaticTransitRevision,
-    trajectory::{TrajectoryCache, TrajectoryCalculator, TrajectoryDeriver},
-};
+use backend::geometry::Geom;
+use backend::network::index::NetworkRevision;
+use backend::operations::IngestionChanges;
+use backend::operations::SourceSnapshot;
+use backend::operations::types::position::MtaBusPositionData;
+use backend::operations::types::position::PositionData;
+use backend::operations::types::position::VehicleObservation;
+use backend::operations::types::trip::MtaBusData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::StopVisit;
+use backend::operations::types::trip::TripData;
+use backend::operations::types::trip::TripRun;
+use backend::source::Source;
+use backend::trajectory::TrajectoryCache;
+use backend::trajectory::TrajectoryCalculator;
+use backend::trajectory::TrajectoryDeriver;
 use chrono::{Duration, Utc};
 use std::{collections::HashSet, sync::Arc};
 
-fn fixture() -> PersistedSnapshot {
+fn fixture() -> SourceSnapshot {
     let now = Utc::now();
     let id = uuid::Uuid::now_v7();
-    let mut revision = StaticTransitRevision::from_dataset(&support::mta_bus_dataset());
+    let mut revision = NetworkRevision::from_dataset(&support::mta_bus_dataset());
     let stop_ids = ["504409", "901701"];
     for (i, stop) in stop_ids.iter().enumerate() {
         revision.stops.get_mut(*stop).unwrap().geom =
@@ -26,9 +31,10 @@ fn fixture() -> PersistedSnapshot {
         "committed-shape".into(),
         Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
     );
-    PersistedSnapshot {
+    SourceSnapshot {
         source: Source::MtaBus,
-        trips: vec![Trip {
+        committed_at: chrono::Utc::now(),
+        trips: vec![TripRun {
             id,
             original_id: "test".into(),
             vehicle_id: "bus".into(),
@@ -42,7 +48,7 @@ fn fixture() -> PersistedSnapshot {
         stop_times: stop_ids
             .iter()
             .enumerate()
-            .map(|(i, stop)| StopTime {
+            .map(|(i, stop)| StopVisit {
                 trip_id: id,
                 stop_sequence: i as i32,
                 stop_id: (*stop).into(),
@@ -51,7 +57,7 @@ fn fixture() -> PersistedSnapshot {
                 data: StopTimeData::MtaBus,
             })
             .collect(),
-        positions: vec![VehiclePosition {
+        positions: vec![VehicleObservation {
             vehicle_id: "bus".into(),
             trip_id: Some(id),
             stop_id: None,
@@ -67,7 +73,7 @@ fn fixture() -> PersistedSnapshot {
         }],
         changed_trip_ids: HashSet::from([id]),
         changes: IngestionChanges::default(),
-        static_revision: Arc::new(revision),
+        network_revision: Arc::new(revision),
     }
 }
 
@@ -100,13 +106,13 @@ async fn trajectory_uses_pinned_stop_geometry_and_color() {
         &snapshot.trips[0],
         snapshot.stop_times.clone(),
         vec![],
-        &snapshot.static_revision,
+        &snapshot.network_revision,
         &cache,
         Utc::now(),
     )
     .await
     .unwrap();
-    let mut replacement = (*snapshot.static_revision).clone();
+    let mut replacement = (*snapshot.network_revision).clone();
     replacement.routes.get_mut("B94").unwrap().color = "ABCDEF".into();
     replacement.stops.get_mut("504409").unwrap().geom = Geom::from(geo::Point::new(-73.995, 40.7));
     let second = snapshot_from_persisted_trip(
@@ -135,12 +141,12 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
     let mut malformed = snapshot.trips[0].clone();
     malformed.id = uuid::Uuid::now_v7();
     malformed.shape_ids = vec!["nonfinite".into()];
-    let mut revision = (*snapshot.static_revision).clone();
+    let mut revision = (*snapshot.network_revision).clone();
     revision.shapes.insert(
         "nonfinite".into(),
         Geom::from(geo::LineString::from(vec![(f64::NAN, 40.7), (-73.9, 40.7)])),
     );
-    snapshot.static_revision = Arc::new(revision);
+    snapshot.network_revision = Arc::new(revision);
     snapshot.trips.push(malformed);
     let cache = Arc::new(TrajectoryCache::new());
     let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
@@ -158,7 +164,8 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
 
 #[tokio::test]
 async fn trajectory_preserves_previous_hot_state_continuity() {
-    use backend::trajectory::{HotSnapshot, TrajectoryState};
+    use backend::trajectory::HotSnapshot;
+    use backend::trajectory::TrajectoryState;
     let mut snapshot = fixture();
     let id = snapshot.trips[0].id;
     snapshot.positions.clear();
@@ -190,13 +197,11 @@ async fn trajectory_preserves_previous_hot_state_continuity() {
 
 #[tokio::test]
 async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data() {
-    use backend::{
-        models::{
-            stop::StopData,
-            trip::{Consist, MtaSubwayStopTimeData, MtaSubwayTripData},
-        },
-        trajectory::snapshot_from_persisted_trip,
-    };
+    use backend::network::types::stop::StopData;
+    use backend::operations::types::trip::Consist;
+    use backend::operations::types::trip::MtaSubwayStopTimeData;
+    use backend::operations::types::trip::MtaSubwayTripData;
+    use backend::trajectory::snapshot_from_persisted_trip;
     let now = Utc::now();
     let mut trip = fixture().trips.remove(0);
     trip.route_id = "A".into();
@@ -209,9 +214,9 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         }),
         consist_cars: vec![],
     });
-    let mut revision = StaticTransitRevision::from_dataset(&support::mta_subway_dataset());
+    let mut revision = NetworkRevision::from_dataset(&support::mta_subway_dataset());
     if let StopData::MtaSubway(data) = &mut revision.stops.get_mut("101").unwrap().data {
-        data.platform_edges = vec![backend::models::stop::PlatformEdge {
+        data.platform_edges = vec![backend::network::types::stop::PlatformEdge {
             id: "pinned-edge".into(),
             length_ft: 600.0,
             car_markers: vec![],
@@ -236,7 +241,7 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
     let stop_times = ["101", "102"]
         .iter()
         .enumerate()
-        .map(|(i, id)| StopTime {
+        .map(|(i, id)| StopVisit {
             trip_id: trip.id,
             stop_sequence: i as i32,
             stop_id: (*id).into(),
@@ -269,14 +274,15 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         unreachable!()
     };
     assert_eq!(data.platform_edges, ["pinned-edge"]);
-    let snapshot = PersistedSnapshot {
+    let snapshot = SourceSnapshot {
         source: Source::MtaSubway,
+        committed_at: chrono::Utc::now(),
         trips: vec![trip],
         stop_times,
         positions: vec![],
         changed_trip_ids: HashSet::new(),
         changes: IngestionChanges::default(),
-        static_revision: Arc::new(revision),
+        network_revision: Arc::new(revision),
     };
     let hot = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache)
         .derive(snapshot)
@@ -294,7 +300,7 @@ async fn trajectory_disconnected_subway_segments_are_rejected() {
     use backend::trajectory::snapshot_from_persisted_trip;
     let snapshot = fixture();
     let mut trip = snapshot.trips[0].clone();
-    let mut revision = (*snapshot.static_revision).clone();
+    let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids.push("disconnected".into());
     revision.shapes.insert(
@@ -324,7 +330,7 @@ async fn trajectory_bus_uses_one_resolved_whole_route_shape() {
         &snapshot.trips[0],
         snapshot.stop_times,
         vec![],
-        &snapshot.static_revision,
+        &snapshot.network_revision,
         &TrajectoryCache::new(),
         Utc::now(),
     )
@@ -358,19 +364,18 @@ async fn trajectory_nonfinite_position_does_not_hide_other_trips() {
 
 #[tokio::test]
 async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
-    use backend::{
-        fixtures::{FixtureKind, load_manifest_for, read_json_payload},
-        sources::mta_subway::realtime::build_realtime_from_fixture,
-        trajectory::snapshot_from_persisted_trip,
-    };
+    use backend::fixtures::FixtureKind;
+    use backend::fixtures::load_manifest_for;
+    use backend::fixtures::read_json_payload;
+    use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
+    use backend::trajectory::snapshot_from_persisted_trip;
     let root = support::fixture_root();
     let manifest =
         load_manifest_for(&root, Source::MtaSubway, FixtureKind::Realtime, "basic").unwrap();
     let at = chrono::DateTime::from_timestamp(1783352000, 0).unwrap();
     let collected =
-        build_realtime_from_fixture(read_json_payload(&root, &manifest, "trips").unwrap(), at)
-            .unwrap();
-    let revision = StaticTransitRevision::from_dataset(&support::mta_subway_dataset());
+        build_realtime_from_fixture(read_json_payload(&root, &manifest, "trips").unwrap()).unwrap();
+    let revision = NetworkRevision::from_dataset(&support::mta_subway_dataset());
     let cache = TrajectoryCache::new();
     let trip_count = collected.trips.len();
     let mut failures = Vec::new();
@@ -390,6 +395,12 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
             }
             expected.extend(line.0.iter().skip(usize::from(shared)).copied());
         }
+        let id = uuid::Uuid::now_v7();
+        let trip = trip.with_id(id);
+        let stops = stops
+            .into_iter()
+            .map(|stop| stop.with_trip_id(id))
+            .collect();
         match snapshot_from_persisted_trip(&trip, stops, vec![], &revision, &cache, at).await {
             Ok(input) => assert_eq!(
                 input.shape.0, expected,
@@ -416,7 +427,7 @@ async fn trajectory_subway_rejects_unrelated_topological_legs_even_with_shared_c
     use backend::trajectory::snapshot_from_persisted_trip;
     let snapshot = fixture();
     let mut trip = snapshot.trips[0].clone();
-    let mut revision = (*snapshot.static_revision).clone();
+    let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids = vec!["76-75".into(), "254-255".into()];
     revision.shapes.insert(

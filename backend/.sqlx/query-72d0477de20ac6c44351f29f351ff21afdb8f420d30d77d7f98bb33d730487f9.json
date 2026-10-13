@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                run_id,\n                array_agg(provider_shape_id ORDER BY ordinal) AS \"provider_ids!\"\n            FROM realtime.run_shape\n            WHERE run_id = ANY($1) GROUP BY run_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.run_shape",
+            "name": "run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_ids!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "72d0477de20ac6c44351f29f351ff21afdb8f420d30d77d7f98bb33d730487f9"
+}

@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::models::position::VehiclePosition;
-use crate::models::trip::StopTimeData;
-use crate::models::{source::Source, stop::StopData};
+use crate::network::types::stop::StopData;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::StopTimeData;
+use crate::source::Source;
 
 /// A single trajectory knot: (time, distance).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -93,7 +94,8 @@ pub struct TripSnapshot {
     pub consist_car_count: Option<i16>,
     pub consist_car_length_m: Option<f32>,
     pub stops: Vec<TrajectoryStop>,
-    pub positions: Vec<VehiclePosition>,
+    pub positions: Vec<VehicleObservation>,
+    pub recorded_anchor: Option<crate::operations::history::GpsSample>,
     pub as_of: DateTime<Utc>,
 }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::models::source::Source;
+use crate::source::Source;
 
 use super::builder::{TrajectoryBuilder, validate_knots};
 use super::builders::{
@@ -92,7 +92,7 @@ pub fn compute_trajectory(
     let sample_max = t_max.min(window_end);
 
     if sample_min >= sample_max {
-        return Err(anyhow::anyhow!("Trip is outside the active time window"));
+        return Err(anyhow::anyhow!("TripRun is outside the active time window"));
     }
 
     let n_samples = ((sample_max - sample_min) / config.dt_s).ceil() as usize;

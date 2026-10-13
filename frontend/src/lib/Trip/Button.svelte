@@ -4,7 +4,6 @@
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { current_stop_name } from '#lib/transit/view.js';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
 
@@ -22,10 +21,12 @@
 
 	const at = $derived(current_time.value ?? null);
 	// Rows render as their route arrives; a suspending read per row would batch them.
-	const catalog_state = $derived(transit.catalogState(source));
-	const route_state = $derived(transit.routeState(source, route_id, at));
-	const catalog = $derived(catalog_state.catalog);
-	const route_data = $derived(route_state.route);
+	const catalog_resource = transit.catalog(() => source);
+	const route_resource = transit.route(() => ({ source, route_id, at }));
+	const catalog_state = $derived(catalog_resource.current);
+	const route_state = $derived(route_resource.current);
+	const catalog = $derived(catalog_state.value);
+	const route_data = $derived(route_state.value);
 	const error = $derived(catalog_state.error ?? route_state.error);
 	const read = $derived(
 		route_data?.trips.has(trip_id)
@@ -39,7 +40,7 @@
 </script>
 
 {#if error}
-	<UnavailableRows />
+	<span class="text-neutral-400">—</span>
 {:else if !catalog || !route_data}
 	<Skeleton lines={2} class="w-full" />
 {:else}

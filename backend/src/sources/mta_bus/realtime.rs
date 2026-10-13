@@ -1,14 +1,20 @@
-use crate::feed::{FeedMessage, TripUpdate, VehiclePosition as GtfsVehiclePosition};
+use crate::feed::FeedMessage;
+use crate::feed::TripUpdate;
+use crate::feed::VehiclePosition as GtfsVehiclePosition;
 use crate::integrations::gtfs_realtime;
 use crate::integrations::oba;
-use crate::models::source::Source;
-use crate::models::trip::Trip;
-use crate::models::{
-    position::{MtaBusPositionData, PositionData, VehiclePosition},
-    trip::{StopTime, StopTimeData},
-};
 use crate::mta_oba_api_key;
-use crate::realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig};
+use crate::operations::CollectedSnapshot;
+use crate::operations::RealtimeSource;
+use crate::operations::RealtimeSourceConfig;
+use crate::operations::RunKey;
+use crate::operations::source::CollectedObservation as VehicleObservation;
+use crate::operations::source::CollectedTrip as TripRun;
+use crate::operations::source::CollectedVisit as StopVisit;
+use crate::operations::types::position::MtaBusPositionData;
+use crate::operations::types::position::PositionData;
+use crate::operations::types::trip::StopTimeData;
+use crate::source::Source;
 use crate::sources::mta_bus::AGENCIES;
 use crate::sources::mta_subway::realtime::parse_origin_time;
 use async_trait::async_trait;
@@ -18,7 +24,6 @@ use geo::Point;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use tracing::{debug, error, warn};
-use uuid::Uuid;
 
 pub struct MtaBusRealtime;
 
@@ -99,7 +104,11 @@ impl MtaBusRealtime {
         .await
     }
 
-    fn process_trip(&self, update: TripUpdate) -> (Option<Trip>, Vec<StopTime>) {
+    fn process_trip(
+        &self,
+        update: TripUpdate,
+        observed_at: Option<DateTime<Utc>>,
+    ) -> (Option<TripRun>, Vec<StopVisit>) {
         let trip_desc = update.trip;
 
         // Extract trip ID and route ID
@@ -161,32 +170,43 @@ impl MtaBusRealtime {
             NaiveTime::from_hms_opt(0, 0, 0).unwrap()
         });
 
-        let created_at = match Trip::created_at(start_date, start_time) {
+        let created_at = match trip_desc
+            .start_time
+            .as_deref()
+            .and_then(|time| crate::operations::normalize::gtfs_start(start_date, time))
+            .or_else(|| TripRun::created_at(start_date, start_time))
+        {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
 
-        let trip = Trip {
-            id: Uuid::now_v7(),
+        let trip = TripRun {
+            id: RunKey::new(Source::MtaBus, &mta_id, created_at, direction),
             original_id: mta_id,
             route_id,
             shape_ids: vec![],
             direction,
             created_at,
             vehicle_id,
-            updated_at: Utc::now(),
-            data: crate::models::trip::TripData::MtaBus(crate::models::trip::MtaBusData {
-                deviation: update.delay,
-            }),
+            updated_at: update
+                .timestamp
+                .and_then(|time| i64::try_from(time).ok())
+                .and_then(|time| DateTime::from_timestamp(time, 0))
+                .or(observed_at)
+                .unwrap_or(created_at),
+            data: crate::operations::types::trip::TripData::MtaBus(
+                crate::operations::types::trip::MtaBusData {
+                    deviation: update.delay,
+                },
+            ),
         };
 
         // Process stop times for bus
-        let stop_times: Vec<StopTime> = update
+        let stop_times: Vec<StopVisit> = update
             .stop_time_update
             .into_iter()
-            .enumerate()
-            .filter_map(|(index, st)| {
-                let stop_sequence = st.stop_sequence.map_or(index as i32, |s| s as i32);
+            .filter_map(|st| {
+                let stop_sequence = i32::try_from(st.stop_sequence?).ok()?;
                 // Bus stops use numeric IDs directly
                 let stop_id = st.stop_id?;
 
@@ -203,7 +223,7 @@ impl MtaBusRealtime {
                 let arrival = DateTime::from_timestamp(arrival, 0)?;
                 let departure = DateTime::from_timestamp(departure, 0)?;
 
-                Some(StopTime {
+                Some(StopVisit {
                     trip_id: trip.id,
                     stop_sequence,
                     stop_id,
@@ -217,7 +237,11 @@ impl MtaBusRealtime {
         (Some(trip), stop_times)
     }
 
-    fn process_vehicle(&self, vehicle: GtfsVehiclePosition) -> Option<VehiclePosition> {
+    fn process_vehicle(
+        &self,
+        vehicle: GtfsVehiclePosition,
+        observed_at: Option<DateTime<Utc>>,
+    ) -> Option<VehicleObservation> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -226,13 +250,14 @@ impl MtaBusRealtime {
 
         let updated_at = vehicle
             .timestamp
-            .and_then(|t| DateTime::from_timestamp(t as i64, 0))
-            .unwrap_or_else(Utc::now);
+            .and_then(|t| i64::try_from(t).ok())
+            .and_then(|t| DateTime::from_timestamp(t, 0))
+            .or(observed_at)?;
 
         let point: geo::Geometry =
             Point::new(position.longitude as f64, position.latitude as f64).into();
 
-        Some(VehiclePosition {
+        Some(VehicleObservation {
             vehicle_id,
             trip_id: None, // Will be set during trip linking
             stop_id,
@@ -259,14 +284,19 @@ impl RealtimeSource for MtaBusRealtime {
         }
     }
 
-    async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
+    async fn collect(
+        &self,
+        revision: std::sync::Arc<crate::network::index::NetworkRevision>,
+    ) -> anyhow::Result<CollectedSnapshot> {
         let (feeds, oba_result) = tokio::join!(self.fetch_feeds(), self.fetch_oba_data());
         let feeds = feeds?;
         let oba = oba_result.unwrap_or_else(|error| {
             error!(%error, "OBA fetch failed");
             Vec::new()
         });
-        Ok(self.build_snapshot(feeds, oba))
+        let mut snapshot = self.build_snapshot(feeds, oba);
+        snapshot.network_revision = Some(revision);
+        Ok(snapshot)
     }
 }
 
@@ -283,15 +313,20 @@ impl MtaBusRealtime {
         let mut trips = Vec::new();
         let mut positions = Vec::new();
         for feed in feeds {
+            let observed_at = feed
+                .header
+                .timestamp
+                .and_then(|time| i64::try_from(time).ok())
+                .and_then(|time| DateTime::from_timestamp(time, 0));
             for entity in feed.entity {
                 if let Some(update) = entity.trip_update {
-                    let (trip, times) = self.process_trip(update);
+                    let (trip, times) = self.process_trip(update, observed_at);
                     if let Some(trip) = trip {
                         trips.push((trip, times));
                     }
                 }
                 if let Some(vehicle) = entity.vehicle
-                    && let Some(mut position) = self.process_vehicle(vehicle)
+                    && let Some(mut position) = self.process_vehicle(vehicle, observed_at)
                 {
                     if let Some(oba) = oba_map.get(&position.vehicle_id)
                         && let PositionData::MtaBus(data) = &mut position.data
@@ -314,6 +349,8 @@ impl MtaBusRealtime {
         }
         CollectedSnapshot {
             source: Source::MtaBus,
+            network_revision: None,
+            renormalize: None,
             trips,
             positions,
         }

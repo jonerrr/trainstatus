@@ -1,6 +1,6 @@
 mod api;
 mod fixtures;
+mod network_index;
 mod sources;
-mod static_index;
 mod trajectory;
 mod validation;

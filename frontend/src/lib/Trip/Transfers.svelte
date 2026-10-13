@@ -10,7 +10,7 @@
 
 <script lang="ts">
 	import Icon from '#lib/Route/Icon.svelte';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	const current_time = getCurrentTime();
@@ -28,7 +28,7 @@
 	<div class="font-medium">Transfers:</div>
 	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
 		{#each transfer_calls as { source, call } (`${source}:${call.trip_id}`)}
-			{const route = $derived(loaded(transit.catalog(source))?.routes_by_id.get(call.route_id))}
+			{const route = $derived(transit.peekCatalog(source)?.routes_by_id.get(call.route_id))}
 			{#if route}
 				<button
 					onclick={() =>

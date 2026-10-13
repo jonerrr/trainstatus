@@ -1,12 +1,9 @@
-use crate::support::alerts::{assert_links, fixture_alert_where};
-use backend::{
-    alerts::gtfs::GtfsAlertSource,
-    models::{
-        alert::{AlertFormat, AlertSection},
-        source::Source,
-    },
-    sources::njt_bus::alerts::NjtBusAlerts,
-};
+use crate::support::alerts::fixture_alert_where;
+use backend::alerts::gtfs::GtfsAlertSource;
+use backend::alerts::types::AlertFormat;
+use backend::alerts::types::AlertSection;
+use backend::source::Source;
+use backend::sources::njt_bus::alerts::NjtBusAlerts;
 
 #[test]
 fn detour_alert_uses_period_identity_and_description_with_default_language() {
@@ -15,17 +12,19 @@ fn detour_alert_uses_period_identity_and_description_with_default_language() {
             && !alert.active_period.is_empty()
             && !alert.informed_entity.is_empty()
     });
-    let (alert, translations, periods, entities) = NjtBusAlerts
+    let alert = NjtBusAlerts
         .process_alert(entity_id.clone(), input.clone())
         .unwrap();
-    assert_links(&alert, &translations, &periods, &entities);
-    assert_eq!(alert.source, Source::NjtBus);
+    let translations = &alert.translations;
+    let periods = &alert.active_periods;
+    let entities = &alert.entities;
+    assert!(!periods.is_empty());
+    assert!(!entities.is_empty());
     assert_eq!(alert.original_id, entity_id.clone());
     assert_eq!(
         NjtBusAlerts
             .process_alert(entity_id, input)
             .unwrap()
-            .0
             .created_at,
         alert.created_at
     );

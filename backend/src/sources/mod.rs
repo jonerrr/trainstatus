@@ -1,6 +1,6 @@
-use crate::{
-    models::source::Source, static_data::dataset::StaticDataset, stores::alert::AlertStore,
-};
+use crate::alerts::store::Alerts;
+use crate::network::dataset::NetworkDataset;
+use crate::source::Source;
 use async_trait::async_trait;
 use titlecase::Titlecase;
 use tokio::time::Duration;
@@ -15,7 +15,7 @@ pub trait AlertsAdapter: Send + Sync {
 
     fn refresh_interval(&self) -> Duration;
 
-    async fn run(&self, alerts_store: &AlertStore) -> anyhow::Result<()>;
+    async fn run(&self, alerts_store: &Alerts) -> anyhow::Result<()>;
 }
 
 #[async_trait]
@@ -27,7 +27,7 @@ pub trait StaticAdapter: Send + Sync {
 
     fn refresh_interval(&self) -> Duration;
 
-    async fn collect(&self) -> anyhow::Result<StaticDataset>;
+    async fn collect(&self) -> anyhow::Result<NetworkDataset>;
 }
 
 ///// various utilities for parsing and normalizing static data

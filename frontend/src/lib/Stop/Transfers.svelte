@@ -5,7 +5,7 @@
 	import { COMPASS_DIRECTIONS } from '#lib/compassDirections.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 	import { main_route_stops } from '#lib/util.svelte.js';
 
@@ -41,7 +41,7 @@
 			.filter((t) => page.data.selected_sources.includes(t.to_stop_source))
 			.map((t) => ({
 				...t,
-				stop: loaded(transit.catalog(t.to_stop_source))?.stops_by_id.get(t.to_stop_id)
+				stop: transit.peekCatalog(t.to_stop_source)?.stops_by_id.get(t.to_stop_id)
 			}))
 			.filter((t): t is typeof t & { stop: CatalogStop } => t.stop !== undefined)
 			.sort((a, b) => {
@@ -72,7 +72,7 @@
 				{/if}
 				{#each transfer_routes(stop) as route_stop (route_stop.route_id)}
 					{const route = $derived(
-						loaded(transit.catalog(to_stop_source))?.routes_by_id.get(route_stop.route_id)
+						transit.peekCatalog(to_stop_source)?.routes_by_id.get(route_stop.route_id)
 					)}
 					{#if route}
 						<Icon width={24} height={24} link={false} {route} />

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import type { MapTarget } from './interactions';
@@ -10,7 +10,7 @@
 	const transit = getTransitData();
 
 	let { target }: { target: MapTarget } = $props();
-	const catalog = $derived(loaded(transit.catalog(target.source)));
+	const catalog = $derived(transit.peekCatalog(target.source));
 	const route_id = $derived(target.kind === 'route' ? target.id : target.routeId);
 	// Hover summaries use loaded service only; opening the trip loads its route.
 	const read = $derived(

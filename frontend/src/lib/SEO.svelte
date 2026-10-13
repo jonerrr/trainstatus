@@ -17,7 +17,7 @@
 
 	const title = $derived.by(() => {
 		const modal = page.state.modal;
-		const catalog = modal ? transit.catalogState(modal.source).catalog : undefined;
+		const catalog = modal ? transit.peekCatalog(modal.source) : undefined;
 		switch (modal?.type) {
 			case 'stop':
 				return `Stop: ${catalog?.stops_by_id.get(modal.id)?.name ?? modal.id}`;

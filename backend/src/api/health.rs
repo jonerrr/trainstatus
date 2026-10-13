@@ -27,8 +27,9 @@ pub async fn liveness_handler() -> &'static str {
     tag = "HEALTH"
 )]
 pub async fn readiness_handler(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
-    sqlx::query("SELECT 1")
-        .execute(&state.pg_pool)
+    state
+        .readiness
+        .check()
         .await
         .map(|_| "OK")
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)

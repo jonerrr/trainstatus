@@ -5,14 +5,13 @@ use anyhow::{Context, ensure};
 use geo::{Coord, LineString, Point};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    models::{shape::Shape, source::Source},
-    sources::normalize_id,
-    static_data::index::TripPattern,
-    trajectory::geometry::{
-        build_shape_geometry, project_point_onto_line, project_wgs84_point_to_epsg,
-    },
-};
+use crate::network::index::TripPattern;
+use crate::network::types::shape::Shape;
+use crate::source::Source;
+use crate::sources::normalize_id;
+use crate::trajectory::geometry::build_shape_geometry;
+use crate::trajectory::geometry::project_point_onto_line;
+use crate::trajectory::geometry::project_wgs84_point_to_epsg;
 
 pub const PATTERN_URL: &str = "https://services6.arcgis.com/M0t0HPE53pFK525U/arcgis/rest/services/Bus_Operating_Patterns_of_NJ_Transit/FeatureServer/7/query";
 const PAGE_SIZE: usize = 1000;

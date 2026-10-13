@@ -1,6 +1,6 @@
 use crate::support::app_state;
 use axum_test::TestServer;
-use backend::models::source::Source;
+use backend::source::Source;
 use http::StatusCode;
 
 #[tokio::test]

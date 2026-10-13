@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.shape AS existing(id, source, asset_id, data)\n            SELECT\n                id,\n                $1,\n                asset,\n                data\n            FROM UNNEST($2::text[], $3::text[], $4::jsonb[]) AS i(id, asset, data)\n            ON CONFLICT(id, source)\n            DO UPDATE SET\n                asset_id = EXCLUDED.asset_id,\n                current = TRUE,\n                data = EXCLUDED.data\n            WHERE(existing.asset_id, existing.current, existing.data) IS DISTINCT FROM(EXCLUDED.asset_id, TRUE, EXCLUDED.data)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5b6630fbb48b87c2624f8cc89c2ffa6e29f4cb5c9ef595be90e237f6cb45408e"
+}

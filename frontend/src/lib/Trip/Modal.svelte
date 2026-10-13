@@ -9,9 +9,8 @@
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import type { Call, CatalogData } from '#lib/transit/decode.js';
-	import { getTransitData, loaded, type TripRead } from '#lib/transit/store.svelte.js';
+	import { getTransitData, type TripRead } from '#lib/transit/store.svelte.js';
 	import Transfers, { type TransferCall } from '#lib/Trip/Transfers.svelte';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
@@ -33,12 +32,12 @@
 	const { source, route_id, trip_id, show_previous, time_format }: Props = $props();
 
 	const at = $derived(current_time.value ?? null);
+	const catalog_resource = transit.catalog(() => source);
+	const trip_resource = transit.trip(() => (route_id ? { source, route_id, trip_id, at } : null));
 	// The header stays mounted across loading states and shows whatever has loaded.
-	const loaded_catalog = $derived(loaded(transit.catalog(source)));
+	const loaded_catalog = $derived(transit.peekCatalog(source));
 	const route = $derived(route_id ? loaded_catalog?.routes_by_id.get(route_id) : undefined);
-	const loaded_read = $derived(
-		route_id ? loaded(transit.trip(source, route_id, trip_id, at)) : undefined
-	);
+	const loaded_read = $derived(trip_resource.current.value);
 	const open_transfers = $state<Record<string, boolean>>({});
 
 	function visible_calls(read: TripRead) {
@@ -55,7 +54,7 @@
 			const list: TransferCall[] = (transfers[st.stop_id] = []);
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const added = new Set<string>();
-			const stop = catalog.stops_by_id.get(st.stop_id);
+			const stop = catalog?.stops_by_id.get(st.stop_id);
 			if (!stop) continue;
 			const candidates = [
 				{ source, stop_id: st.stop_id, same_stop: true },
@@ -102,7 +101,7 @@
 					height={28}
 					link
 					show_alerts
-					class="col-start-1 row-start-1 h-7 self-center justify-self-center"
+					class="col-start-1 row-start-1 self-center justify-self-center"
 				/>
 			{/if}
 			{#if is_bus && read}
@@ -115,11 +114,11 @@
 					<VehicleCapacity {status} />
 				</div>
 				<span
-					class="col-start-3 row-start-1 flex h-7 shrink-0 items-center text-xs leading-4 text-neutral-400"
+					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-neutral-400"
 					>Bus #{read.trip.vehicle_id}</span
 				>
 			{/if}
-			<div class="col-start-2 row-start-1 flex h-7 min-w-0 items-center text-left">
+			<div class="col-start-2 row-start-1 flex min-h-7 min-w-0 items-center self-center text-left">
 				<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
 					{#if read}
 						{trip_destination_title(
@@ -211,22 +210,25 @@
 {:else}
 	{@render title_row(loaded_read)}
 	<svelte:boundary>
-		{const [catalog, read] = $derived(
-			await Promise.all([transit.catalog(source), transit.trip(source, route_id, trip_id, at)])
-		)}
+		{const catalog_state = $derived(catalog_resource.current)}
+		{const trip_state = $derived(trip_resource.current)}
+		{const catalog = $derived(catalog_state.value)}
+		{const read = $derived(trip_state.value)}
 
-		{#if !read}
+		{#if catalog_state.loading || trip_state.loading}
+			<Skeleton lines={6} class="p-2" />
+		{:else if !read && !catalog_state.error && !trip_state.error}
 			<p class="p-2 text-center text-neutral-400">This trip is not currently running.</p>
-		{:else}
+		{:else if read}
 			{#if source === 'mta_subway'}
 				{@render consist(read)}
 			{/if}
 
 			{const calls = $derived(visible_calls(read))}
-			{const transfers = $derived(transfers_at(read, calls, catalog))}
+			{const transfers = $derived(catalog ? transfers_at(read, calls, catalog) : {})}
 			<ModalList>
 				{#each calls as st (st.sequence)}
-					{const stop = $derived(catalog.stops_by_id.get(st.stop_id))}
+					{const stop = $derived(catalog?.stops_by_id.get(st.stop_id))}
 					{#if stop}
 						<div class="relative text-base">
 							{#if transfers[st.stop_id]?.length}
@@ -281,12 +283,5 @@
 				{/each}
 			</ModalList>
 		{/if}
-
-		{#snippet pending()}
-			<Skeleton lines={6} class="p-2" />
-		{/snippet}
-		{#snippet failed(_error, reset)}
-			<UnavailableRows arrivals {reset} />
-		{/snippet}
 	</svelte:boundary>
 {/if}

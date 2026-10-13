@@ -486,6 +486,7 @@ dependencies = [
  "axum",
  "axum-test",
  "blake3",
+ "bytes",
  "chrono",
  "chrono-tz",
  "futures",

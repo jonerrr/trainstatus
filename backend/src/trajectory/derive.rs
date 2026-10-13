@@ -1,12 +1,14 @@
-use crate::realtime::PersistedSnapshot;
-use crate::{
-    models::{position::VehiclePosition, trip::StopTime},
-    trajectory::{
-        HotSnapshot, TrajectoryCache, TrajectoryCalculator, TrajectoryConfig,
-        compute_trajectory_async, continuity::ContinuityStatsBatch, expand_render_units,
-        snapshot_from_persisted_trip,
-    },
-};
+use crate::operations::SourceSnapshot;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::StopVisit;
+use crate::trajectory::HotSnapshot;
+use crate::trajectory::TrajectoryCache;
+use crate::trajectory::TrajectoryCalculator;
+use crate::trajectory::TrajectoryConfig;
+use crate::trajectory::compute_trajectory_async;
+use crate::trajectory::continuity::ContinuityStatsBatch;
+use crate::trajectory::expand_render_units;
+use crate::trajectory::snapshot_from_persisted_trip;
 use chrono::Utc;
 use futures::future::join_all;
 use std::{borrow::Borrow, collections::HashMap, sync::Arc};
@@ -25,20 +27,20 @@ impl TrajectoryDeriver {
     }
     pub async fn derive(
         &self,
-        snapshot: impl Borrow<PersistedSnapshot>,
+        snapshot: impl Borrow<SourceSnapshot>,
     ) -> anyhow::Result<HotSnapshot> {
         let started = std::time::Instant::now();
         let snapshot = snapshot.borrow();
         let source = snapshot.source;
         anyhow::ensure!(
-            snapshot.static_revision.source == source,
+            snapshot.network_revision.source == source,
             "Static revision belongs to another source"
         );
         tracing::info!(%source, trips = snapshot.trips.len(), "Deriving trajectories from committed snapshot");
         let at = Utc::now();
         let previous = self.cache.get_hot(source).await;
-        let mut stops: HashMap<uuid::Uuid, Vec<StopTime>> = HashMap::new();
-        let mut positions: HashMap<uuid::Uuid, Vec<VehiclePosition>> = HashMap::new();
+        let mut stops: HashMap<uuid::Uuid, Vec<StopVisit>> = HashMap::new();
+        let mut positions: HashMap<uuid::Uuid, Vec<VehicleObservation>> = HashMap::new();
         for stop in &snapshot.stop_times {
             stops.entry(stop.trip_id).or_default().push(stop.clone());
         }
@@ -51,7 +53,7 @@ impl TrajectoryDeriver {
         let futures = snapshot.trips.iter().map(|trip| {
             let stops = stops.remove(&trip.id).unwrap_or_default();
             let positions = positions.remove(&trip.id).unwrap_or_default();
-            let revision = snapshot.static_revision.clone();
+            let revision = snapshot.network_revision.clone();
             let prev = previous.as_ref().and_then(|hot| hot.prev_states.get(&trip.id).copied());
             async move {
                 let result = async {

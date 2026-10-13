@@ -9,7 +9,9 @@ use super::super::{
     },
     types::{GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TripSnapshot},
 };
-use crate::models::{position::PositionData, source::Source, stop::StopData};
+use crate::network::types::stop::StopData;
+use crate::operations::types::position::PositionData;
+use crate::source::Source;
 
 pub const NJT_MAX_GPS_AGE_SECONDS: i64 = 120;
 pub const NJT_MAX_GPS_OFFSET_METERS: f64 = 100.0;
@@ -24,6 +26,10 @@ impl NjtBusBuilder {
         trip: &TripSnapshot,
         geometry: &ShapeGeometry,
     ) -> Option<(TrajectoryKnot, Option<f64>)> {
+        if trip.recorded_anchor.is_some() {
+            return super::super::builder::recorded_anchor_knot(trip, geometry, Source::NjtBus)
+                .map(|knot| (knot, None));
+        }
         let mut positions: Vec<_> = trip
             .positions
             .iter()

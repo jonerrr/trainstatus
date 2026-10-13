@@ -1,10 +1,9 @@
 use crate::debug_rt_data;
 use crate::feed::FeedMessage;
-use crate::models::{
-    position::VehiclePosition as VehiclePositionModel,
-    trip::{StopTime, Trip},
-};
-use crate::static_data::index::StaticTransitRevision;
+use crate::network::index::NetworkRevision;
+use crate::operations::types::position::VehicleObservation as VehiclePositionModel;
+use crate::operations::types::trip::StopVisit;
+use crate::operations::types::trip::TripRun;
 use anyhow::Context;
 use futures::future::BoxFuture;
 use prost::Message;
@@ -82,10 +81,10 @@ mod tests;
 /// source resolves to identity at no cost. This keeps the
 /// `stop_id -> static.stop` foreign keys satisfied when child stops have been
 /// collapsed away.
-pub fn remap_realtime_stop_ids(
-    revision: &StaticTransitRevision,
-    data: &mut [(Trip, Vec<StopTime>)],
-    positions: &mut [VehiclePositionModel],
+pub fn remap_realtime_stop_ids<I>(
+    revision: &NetworkRevision,
+    data: &mut [(TripRun<I>, Vec<StopVisit<I>>)],
+    positions: &mut [VehiclePositionModel<I>],
 ) {
     for (_trip, stop_times) in data.iter_mut() {
         for st in stop_times.iter_mut() {

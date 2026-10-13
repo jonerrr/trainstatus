@@ -1,26 +1,22 @@
-use super::{TestStores, test_stores};
+use super::{TestOwners, test_owners};
 use backend::AppState;
 
 pub fn app_state(pool: sqlx::PgPool) -> AppState {
-    let stores = test_stores(pool.clone());
-    app_state_from_stores(pool, stores)
+    let stores = test_owners(pool.clone());
+    app_state_from_owners(pool, stores)
 }
 
-pub fn app_state_from_stores(pool: sqlx::PgPool, stores: TestStores) -> AppState {
+pub fn app_state_from_owners(pool: sqlx::PgPool, stores: TestOwners) -> AppState {
     AppState {
-        pg_pool: pool.clone(),
-        catalog_store: backend::passenger::CatalogStore::new(
-            stores.route_store.clone(),
-            stores.stop_store.clone(),
-        ),
-        service_store: backend::passenger::ServiceStore::new(
+        readiness: backend::app::Readiness::new(pool.clone()),
+        network: backend::network::catalog::CatalogReader::new(stores.network.network_index()),
+        operations: backend::operations::service::Operations::new(
             pool.clone(),
             stores.live_snapshots.clone(),
-            stores.route_store.clone(),
+            stores.network.network_index(),
+            backend::api::dto::service::encode_route,
         ),
-        route_store: stores.route_store,
-        stop_store: stores.stop_store,
-        alert_store: stores.alert_store,
+        alerts: stores.alerts,
         trajectories: backend::trajectory::TrajectoryService::new(pool),
     }
 }

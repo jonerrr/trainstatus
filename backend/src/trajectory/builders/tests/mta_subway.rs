@@ -2,23 +2,34 @@ use chrono::{DateTime, Utc};
 use geo::{Coord, LineString};
 use uuid::Uuid;
 
-use crate::models::geom::Geom;
-use crate::models::position::{MtaSubwayPositionData, PositionData, VehiclePosition};
-use crate::models::source::Source;
-use crate::models::stop::{
-    CarMarker, EgressPoint, EgressType, MtaSubwayStopData, PlatformDirection, PlatformEdge,
-    StopData, VerticalDirection,
-};
-use crate::models::trip::{MtaSubwayStopTimeData, StopTimeData};
+use crate::geometry::Geom;
+use crate::network::types::stop::CarMarker;
+use crate::network::types::stop::EgressPoint;
+use crate::network::types::stop::EgressType;
+use crate::network::types::stop::MtaSubwayStopData;
+use crate::network::types::stop::PlatformDirection;
+use crate::network::types::stop::PlatformEdge;
+use crate::network::types::stop::StopData;
+use crate::network::types::stop::VerticalDirection;
+use crate::operations::types::position::MtaSubwayPositionData;
+use crate::operations::types::position::PositionData;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::MtaSubwayStopTimeData;
+use crate::operations::types::trip::StopTimeData;
+use crate::source::Source;
 use crate::trajectory::builder::TrajectoryBuilder;
 use crate::trajectory::builders::mta_subway::MtaSubwayBuilder;
 use crate::trajectory::continuity::apply;
-use crate::trajectory::geometry::{build_shape_geometry, distance_to_coord};
-use crate::trajectory::types::{
-    Trajectory, TrajectoryConfig, TrajectoryState, TrajectoryStop, TripSnapshot,
-    source_projected_epsg_code,
-};
-use crate::trajectory::{expand_render_units, source_render_config};
+use crate::trajectory::expand_render_units;
+use crate::trajectory::geometry::build_shape_geometry;
+use crate::trajectory::geometry::distance_to_coord;
+use crate::trajectory::source_render_config;
+use crate::trajectory::types::Trajectory;
+use crate::trajectory::types::TrajectoryConfig;
+use crate::trajectory::types::TrajectoryState;
+use crate::trajectory::types::TrajectoryStop;
+use crate::trajectory::types::TripSnapshot;
+use crate::trajectory::types::source_projected_epsg_code;
 
 #[test]
 fn match_platform_edge_picks_best_candidate() {
@@ -266,7 +277,7 @@ fn trip_with_anchor(
         &shape_geom.cum_dist,
     )
     .unwrap();
-    let anchor_position = VehiclePosition {
+    let anchor_position = VehicleObservation {
         vehicle_id: "train-1".into(),
         trip_id: Some(Uuid::nil()),
         stop_id: None,
@@ -294,6 +305,7 @@ fn trip_with_anchor(
         consist_car_length_m: Some(18.288),
         stops,
         positions: vec![anchor_position],
+        recorded_anchor: None,
         as_of: ts(100),
     };
 

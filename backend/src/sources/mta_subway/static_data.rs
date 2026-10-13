@@ -1,4 +1,4 @@
-use crate::static_data::dataset::StaticDataset;
+use crate::network::dataset::NetworkDataset;
 use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
@@ -6,18 +6,23 @@ use async_trait::async_trait;
 use geo::{LineString, Point};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    models::{
-        route::{Route, RouteData},
-        shape::Shape,
-        source::Source,
-        stop::{
-            CarMarker, EgressPoint, EgressType, MtaSubwayStopData, PlatformDirection, PlatformEdge,
-            RouteStop, RouteStopData, Stop, StopData, StopType, VerticalDirection,
-        },
-    },
-    sources::StaticAdapter,
-};
+use crate::network::types::route::Route;
+use crate::network::types::route::RouteData;
+use crate::network::types::shape::Shape;
+use crate::network::types::stop::CarMarker;
+use crate::network::types::stop::EgressPoint;
+use crate::network::types::stop::EgressType;
+use crate::network::types::stop::MtaSubwayStopData;
+use crate::network::types::stop::PlatformDirection;
+use crate::network::types::stop::PlatformEdge;
+use crate::network::types::stop::RouteStop;
+use crate::network::types::stop::RouteStopData;
+use crate::network::types::stop::Stop;
+use crate::network::types::stop::StopData;
+use crate::network::types::stop::StopType;
+use crate::network::types::stop::VerticalDirection;
+use crate::source::Source;
+use crate::sources::StaticAdapter;
 
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
@@ -176,7 +181,7 @@ impl StaticAdapter for MtaSubwayStatic {
         Duration::from_secs(60 * 60 * 24 * 3) // 3 days
     }
 
-    async fn collect(&self) -> anyhow::Result<StaticDataset> {
+    async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         let client = reqwest::Client::new();
         let infra = fetch_infrastructure(&client).await?;
 
@@ -211,7 +216,7 @@ async fn fetch_exit_strategy(client: &reqwest::Client) -> anyhow::Result<ExitStr
 fn build_static_dataset(
     infra: HeliumSubwayInfrastructure,
     exit_data: ExitStrategyResponse,
-) -> StaticDataset {
+) -> NetworkDataset {
     let exit_map: HashMap<i32, &ExitStrategyStation> = exit_data
         .release
         .dataset
@@ -398,7 +403,7 @@ fn build_static_dataset(
         })
         .collect();
 
-    StaticDataset {
+    NetworkDataset {
         source: Source::MtaSubway,
         routes,
         stops,
@@ -413,7 +418,7 @@ fn build_static_dataset(
 pub fn build_static_dataset_from_fixtures(
     infrastructure: serde_json::Value,
     exit_strategy: serde_json::Value,
-) -> anyhow::Result<StaticDataset> {
+) -> anyhow::Result<NetworkDataset> {
     Ok(build_static_dataset(
         serde_json::from_value(infrastructure)?,
         serde_json::from_value(exit_strategy)?,

@@ -2,7 +2,7 @@ import type { RouteService } from '#lib/client/index.js';
 
 import { expect, test } from 'vitest';
 
-import { callsAtStop, decodeRoute, isStale, upcomingCalls } from './decode.js';
+import { callsAtStop, decodeRoute, decodeService, isStale, upcomingCalls } from './decode.js';
 
 const route: RouteService = {
 	trips: [
@@ -44,14 +44,11 @@ test('merges routes at a stop in arrival order', () => {
 	expect(callsAtStop([a, b], 'loop').map((call) => call.trip_id)).toEqual(['t2', 'b1', 't1', 't1']);
 });
 
-test('drops passed calls but never hides future ones, reporting unavailable when none remain', () => {
+test('drops passed calls but retains future predictions and departures', () => {
 	const calls = decodeRoute('mta_bus', 'A', route).calls_by_stop.get('loop')!;
-	expect(upcomingCalls(calls, 105_000, true).calls.map((call) => call.arrival)).toEqual([
-		100_000, 300_000
-	]);
-	expect(upcomingCalls(calls, 400_000, false)).toEqual({ calls: [], unavailable: true });
-	expect(upcomingCalls([], 400_000, false)).toEqual({ calls: [], unavailable: false });
-	expect(upcomingCalls([], 400_000, true)).toEqual({ calls: [], unavailable: true });
+	expect(upcomingCalls(calls, 105_000).map((call) => call.arrival)).toEqual([100_000, 300_000]);
+	expect(upcomingCalls(calls, 400_000)).toEqual([]);
+	expect(upcomingCalls([], 400_000)).toEqual([]);
 });
 
 test('only live data becomes stale, after 90 seconds', () => {
@@ -71,4 +68,14 @@ test('rejects unequal columns and out-of-range indexes', () => {
 	expect(() =>
 		decodeRoute('mta_bus', 'A', { ...route, calls: { ...route.calls, trip: [0, 0, 0, 2] } })
 	).toThrow(/trip index 2/);
+});
+
+test('fetching an old committed snapshot does not renew source freshness', () => {
+	const service = { source: 'mta_bus' as const, updated_at: 2, routes: { A: route } };
+	const decoded = decodeService(service, 92_000).get('A')!;
+	expect(decoded.source_updated_at).toBe(2_000);
+	expect(isStale(decoded, 92_001)).toBe(true);
+	const historical = decodeService({ ...service, at: 50 }, 92_000).get('A')!;
+	expect(historical.source_updated_at).toBeNull();
+	expect(isStale(historical, 1_000_000)).toBe(false);
 });

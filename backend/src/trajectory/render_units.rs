@@ -1,5 +1,5 @@
-use crate::models::position::PositionData;
-use crate::models::source::Source;
+use crate::operations::types::position::PositionData;
+use crate::source::Source;
 
 use super::geometry::{ShapeGeometry, bearing_at_distance, distance_to_coord};
 use super::types::{RenderUnit, Trajectory, TripSnapshot};

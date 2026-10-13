@@ -1,8 +1,9 @@
-use crate::support::{contracts, fixture_root, mta_bus_dataset};
-use backend::{
-    fixtures::{self, FixtureKind},
-    models::source::Source,
-};
+use crate::support::contracts;
+use crate::support::fixture_root;
+use crate::support::mta_bus_dataset;
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
+use backend::source::Source;
 
 #[test]
 fn static_fixture_normalizes_routes_stops_and_shapes() {

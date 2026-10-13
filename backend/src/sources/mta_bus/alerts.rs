@@ -1,12 +1,15 @@
-use crate::alerts::gtfs::{self as gtfs_alert, GtfsAlertSource};
-use crate::feed::{Alert as GtfsAlert, FeedMessage};
+use crate::alerts::gtfs as gtfs_alert;
+use crate::alerts::gtfs::GtfsAlertSource;
+use crate::alerts::store::Alerts;
+use crate::alerts::types::AffectedEntity;
+use crate::alerts::types::MtaAlert;
+use crate::alerts::types::MtaAlertData;
+use crate::alerts::types::{AlertCollection, AlertDetails};
+use crate::feed::Alert as GtfsAlert;
+use crate::feed::FeedMessage;
 use crate::integrations::gtfs_realtime;
-use crate::models::alert::{
-    ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, MtaAlertData,
-};
-use crate::models::source::Source;
+use crate::source::Source;
 use crate::sources::AlertsAdapter;
-use crate::stores::alert::AlertStore;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
@@ -31,8 +34,12 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 
 #[async_trait]
 impl GtfsAlertSource for MtaBusAlerts {
+    type Alert = MtaAlert;
     fn source(&self) -> Source {
         Source::MtaBus
+    }
+    fn collection(&self, alerts: Vec<Self::Alert>) -> AlertCollection {
+        AlertCollection::MtaBus(alerts)
     }
 
     async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
@@ -60,16 +67,7 @@ impl GtfsAlertSource for MtaBusAlerts {
         Some(stop_id)
     }
 
-    fn process_alert(
-        &self,
-        entity_id: String,
-        alert: GtfsAlert,
-    ) -> Option<(
-        Alert,
-        Vec<AlertTranslation>,
-        Vec<ActivePeriod>,
-        Vec<AffectedEntity>,
-    )> {
+    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<Self::Alert> {
         // Get the Mercury extension - skip if not present (likely elevator outage)
         let mercury_alert = alert.mercury_alert.as_ref()?;
 
@@ -86,18 +84,8 @@ impl GtfsAlertSource for MtaBusAlerts {
             clone_id: mercury_alert.clone_id.clone(),
         };
 
-        let parsed_alert = Alert {
-            id: alert_id,
-            original_id: entity_id,
-            source: Source::MtaBus,
-            created_at,
-            updated_at,
-            recorded_at: Utc::now(),
-            data: AlertData::MtaBus(mta_data),
-        };
-
-        let translations = gtfs_alert::mta_translations(alert_id, &alert);
-        let active_periods = gtfs_alert::active_periods(alert_id, &alert);
+        let translations = gtfs_alert::mta_translations(&alert);
+        let active_periods = gtfs_alert::active_periods(&alert);
 
         // Parse affected entities
         let affected_entities: Vec<AffectedEntity> = alert
@@ -120,21 +108,26 @@ impl GtfsAlertSource for MtaBusAlerts {
                     .unwrap_or(0);
 
                 AffectedEntity {
-                    alert_id,
                     route_id,
-                    source: Source::MtaBus,
                     stop_id,
                     sort_order,
                 }
             })
             .collect();
 
-        Some((
-            parsed_alert,
-            translations,
-            active_periods,
-            affected_entities,
-        ))
+        Some(MtaAlert {
+            data: mta_data,
+            details: AlertDetails {
+                id: alert_id,
+                original_id: entity_id,
+                created_at,
+                updated_at,
+                recorded_at: Utc::now(),
+                translations,
+                active_periods,
+                entities: affected_entities,
+            },
+        })
     }
 }
 
@@ -148,7 +141,7 @@ impl AlertsAdapter for MtaBusAlerts {
         std::time::Duration::from_secs(60)
     }
 
-    async fn run(&self, alert_store: &AlertStore) -> anyhow::Result<()> {
-        gtfs_alert::run_pipeline(self, alert_store).await
+    async fn run(&self, alerts: &Alerts) -> anyhow::Result<()> {
+        gtfs_alert::run_pipeline(self, alerts).await
     }
 }

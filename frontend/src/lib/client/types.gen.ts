@@ -17,6 +17,16 @@ export type AlertFormat = 'plain' | 'html';
 export type AlertSection = 'header' | 'description';
 
 /**
+ * Alert translations for different content types
+ */
+export type AlertTranslation = {
+    format: AlertFormat;
+    language: string;
+    section: AlertSection;
+    text: string;
+};
+
+/**
  * API response for alerts - flattened with all related data
  */
 export type ApiAlert = {
@@ -36,7 +46,7 @@ export type ApiAlert = {
      * Start time of alert (earliest active period)
      */
     start_time: Date;
-    translations: Array<ApiAlertTranslation>;
+    translations: Array<AlertTranslation>;
     updated_at: Date;
 };
 
@@ -53,16 +63,6 @@ export type ApiAlertEntity = {
      * Affected stop ID
      */
     stop_id?: string | null;
-};
-
-/**
- * Alert translations for API response (it just doesn't have the alert_id since it's nested under the alert)
- */
-export type ApiAlertTranslation = {
-    format: AlertFormat;
-    language: string;
-    section: AlertSection;
-    text: string;
 };
 
 export type Borough = 'brooklyn' | 'queens' | 'bronx' | 'staten_island' | 'manhattan';
@@ -233,7 +233,7 @@ export type MtaBusData = {
 export type MtaBusDirection = {
     destination: string;
     /**
-     * Matches `Trip.direction` for trips on this route.
+     * Matches `TripRun.direction` for trips on this route.
      */
     direction_id: number;
     /**
@@ -280,17 +280,6 @@ export type NjtBusStopData = {
     stop_code: string;
 };
 
-/**
- * The state of passenger occupancy for the vehicle or carriage.
- * Individual producers may not publish all OccupancyStatus values. Therefore,
- * consumers must not assume that the OccupancyStatus values follow a linear
- * scale. Consumers should represent OccupancyStatus values as the state
- * indicated and intended by the producer. Likewise, producers must use
- * OccupancyStatus values that correspond to actual vehicle occupancy states.
- * For describing passenger occupancy levels on a linear scale, see
- * `occupancy_percentage`. This field is still experimental, and subject to
- * change. It may be formally adopted in the future.
- */
 export type OccupancyStatus = 'Empty' | 'ManySeatsAvailable' | 'FewSeatsAvailable' | 'StandingRoomOnly' | 'CrushedStandingRoomOnly' | 'Full' | 'NotAcceptingPassengers' | 'NoDataAvailable' | 'NotBoardable';
 
 export type PlatformDirection = 'NORTH' | 'SOUTH';
@@ -333,6 +322,10 @@ export type Service = {
         [key: string]: RouteService;
     };
     source: Source;
+    /**
+     * Successful source commit time in Unix seconds. Absent for retained history.
+     */
+    updated_at?: number | null;
 };
 
 /**
@@ -400,7 +393,7 @@ export type Transfer = {
 };
 
 /**
- * Trip data changes based on the `Source`
+ * TripRun data changes based on the `Source`
  */
 export type TripData = (MtaBusData & {
     source: 'mta_bus';
@@ -613,10 +606,6 @@ export type TrajectoriesHandlerData = {
         source: Source;
     };
     query?: {
-        /**
-         * Comma-separated list of route IDs to include.
-         */
-        route_ids?: Array<string>;
         /**
          * Unix timestamp used for a historical query. If omitted, the latest committed realtime snapshot is returned.
          */

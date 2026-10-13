@@ -1,12 +1,5 @@
-[migrate]
-ignored-chars = [" ", "\t", "\r", "\n", "\uFEFF"]
-
 [macros.type-overrides]
-'geometry' = "crate::models::geom::Geom"
-'geometry[]' = "Vec<crate::models::geom::Geom>"
-'source_enum' = "crate::models::source::Source"
-'source_enum[]' = "Vec<crate::models::source::Source>"
-'alert_section' = "crate::models::alert::AlertSection"
-'alert_section[]' = "Vec<crate::models::alert::AlertSection>"
-'alert_format' = "crate::models::alert::AlertFormat"
-'alert_format[]' = "Vec<crate::models::alert::AlertFormat>"
+'geometry' = "crate::geometry::Geom"
+'geometry[]' = "Vec<crate::geometry::Geom>"
+'source_enum' = "crate::source::Source"
+'source_enum[]' = "Vec<crate::source::Source>"

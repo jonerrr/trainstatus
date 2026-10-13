@@ -1,25 +1,33 @@
+use crate::alerts::store::Alerts;
 use crate::sources::AlertsAdapter;
-use crate::stores::alert::AlertStore;
 use std::sync::Arc;
 use tokio::time::sleep;
 use tracing::error;
 
-pub async fn run(alert_store: &AlertStore, adapters: Vec<Arc<dyn AlertsAdapter>>) {
+pub async fn run(
+    alerts: &Alerts,
+    adapters: Vec<Arc<dyn AlertsAdapter>>,
+) -> Vec<tokio::task::AbortHandle> {
+    let mut workers = Vec::new();
     for adapter in adapters {
-        let alert_store = alert_store.clone();
+        let alerts = alerts.clone();
 
-        tokio::spawn(async move {
-            loop {
-                if let Err(e) = adapter.run(&alert_store).await {
-                    error!(
-                        source = %adapter.source(),
-                        error = %e,
-                        "Alert pipeline error"
-                    );
+        workers.push(
+            tokio::spawn(async move {
+                loop {
+                    if let Err(e) = adapter.run(&alerts).await {
+                        error!(
+                            source = %adapter.source(),
+                            error = %e,
+                            "Alert pipeline error"
+                        );
+                    }
+
+                    sleep(adapter.refresh_interval()).await;
                 }
-
-                sleep(adapter.refresh_interval()).await;
-            }
-        });
+            })
+            .abort_handle(),
+        );
     }
+    workers
 }

@@ -6,6 +6,7 @@ mod calculator;
 pub(crate) mod continuity;
 mod derive;
 pub(crate) mod geometry;
+mod history;
 pub(crate) mod interpolation;
 mod platform;
 pub(crate) mod render_units;

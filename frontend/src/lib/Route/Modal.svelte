@@ -7,8 +7,7 @@
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
 	import { route_alerts as sorted_alerts } from '#lib/Route/alerts.js';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import { getTransitData, loaded } from '#lib/transit/store.svelte.js';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { debounce } from '#lib/util.svelte.js';
 
@@ -28,9 +27,12 @@
 
 	const transit = getTransitData();
 	const current_time = getCurrentTime();
-	const catalog = $derived(transit.catalogState(source));
-	const route = $derived(catalog.catalog?.routes_by_id.get(route_id));
-	const alerts = $derived(loaded(transit.alerts(source, current_time.value ?? null)));
+	const catalog_resource = transit.catalog(() => source);
+	const alerts_resource = transit.alerts(() => ({ source, at: current_time.value ?? null }));
+	const catalog = $derived(catalog_resource.current);
+	const route = $derived(catalog.value?.routes_by_id.get(route_id));
+	const alerts_state = $derived(alerts_resource.current);
+	const alerts = $derived(alerts_state.value);
 	const route_alerts = $derived(sorted_alerts(alerts, route_id));
 
 	let idx = $state(0);
@@ -86,16 +88,14 @@
 <header class="flex flex-col gap-3 p-3">
 	{#if route}
 		<FeatureSummary feature={{ route, title: route.long_name }} />
-	{:else if catalog.error}
-		<UnavailableRows />
-	{:else if !catalog.catalog}
+	{:else if catalog.loading}
 		<Skeleton lines={1} class="w-40" />
 	{:else}
 		<div class="text-sm font-semibold text-neutral-100">Route {route_id}</div>
 	{/if}
 
 	<div class="flex items-center gap-1 text-lg font-semibold text-neutral-100">
-		{#if !alerts}
+		{#if alerts_state.loading}
 			<Skeleton lines={1} class="w-24" />
 		{:else if route_alerts.length && idx < route_alerts.length}
 			{const alert_data = $derived(route_alerts[idx].data)}
@@ -104,7 +104,7 @@
 			{:else}
 				Alert
 			{/if}
-		{:else}
+		{:else if !alerts_state.error}
 			No alerts
 		{/if}
 	</div>

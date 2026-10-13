@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT trip_patterns, stop_remap, schedules_initialized FROM source WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_patterns",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "source",
+            "name": "trip_patterns"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_remap",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "source",
+            "name": "stop_remap"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "schedules_initialized",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "source",
+            "name": "schedules_initialized"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "022ea5d7fec1e560f9b7b642cdc2749f3689c33cb41a761d99783b0c28f27672"
+}

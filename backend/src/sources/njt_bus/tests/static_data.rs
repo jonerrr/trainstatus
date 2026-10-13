@@ -1,5 +1,5 @@
 use super::*;
-use crate::models::stop::StopData;
+use crate::network::types::stop::StopData;
 use gtfs_structures::{Gtfs, LocationType, Stop as GtfsStop};
 use std::sync::Arc;
 

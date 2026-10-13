@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM realtime.run_shape r\n            USING UNNEST($1::uuid[], $2::jsonb[]) AS i(run_id, assets)\n            WHERE r.run_id = i.run_id\n            AND r.ordinal >= jsonb_array_length(i.assets)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ec3660b7a10ce295eac203b5a8173f245211fa07d646b0e8ac9299b36b5d454"
+}

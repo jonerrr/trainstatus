@@ -18,7 +18,7 @@ export interface Call {
 	departure: number;
 }
 
-/** Live data older than this since its last successful fetch is stale. */
+/** Live data older than this since its fetch or successful source commit is stale. */
 export const STALE_AFTER_MS = 90_000;
 
 /** A route's complete service, indexed once when installed. */
@@ -29,6 +29,8 @@ export interface RouteData {
 	at: number | null;
 	/** Client time of the successful fetch, epoch milliseconds; null when never fetched. */
 	fetched_at: number | null;
+	/** Successful source commit, epoch milliseconds; absent on synthetic or historical data. */
+	source_updated_at?: number | null;
 	trips: ReadonlyMap<string, ServiceTrip>;
 	/** Calls of each trip in visit order. */
 	calls_by_trip: ReadonlyMap<string, readonly Call[]>;
@@ -61,28 +63,16 @@ export function emptyRoute(
 	};
 }
 
-export interface Upcoming {
-	calls: Call[];
-	/** Nothing remains, but the data cannot confirm there is no service. */
-	unavailable: boolean;
-}
-
-/**
- * Calls that have not yet passed. Future predictions are never hidden, however old;
- * when none remain after dropping passed ones, or stale data lists none, arrivals are
- * unavailable rather than absent.
- */
-export function upcomingCalls(calls: readonly Call[], now: number, stale: boolean): Upcoming {
-	const upcoming = calls.filter((call) => Math.max(call.arrival, call.departure) >= now);
-	return {
-		calls: upcoming,
-		unavailable: !upcoming.length && (stale || upcoming.length < calls.length)
-	};
+/** Future predictions remain visible regardless of age. */
+export function upcomingCalls(calls: readonly Call[], now: number): Call[] {
+	return calls.filter((call) => Math.max(call.arrival, call.departure) >= now);
 }
 
 /** Whether live route data has gone unrefreshed past the stale threshold. */
 export function isStale(route: RouteData, now: number): boolean {
-	return route.at === null && route.fetched_at !== null && now - route.fetched_at > STALE_AFTER_MS;
+	if (route.at !== null || route.fetched_at === null) return false;
+	const refreshed_at = Math.min(route.fetched_at, route.source_updated_at ?? route.fetched_at);
+	return now - refreshed_at > STALE_AFTER_MS;
 }
 
 function index(name: string, value: number, length: number) {
@@ -139,7 +129,10 @@ export function decodeService(body: Service, fetched_at: number): Map<string, Ro
 	return new Map(
 		Object.entries(body.routes).map(([id, route]) => [
 			id,
-			decodeRoute(body.source, id, route, at, fetched_at)
+			{
+				...decodeRoute(body.source, id, route, at, fetched_at),
+				source_updated_at: at === null && body.updated_at != null ? body.updated_at * 1000 : null
+			}
 		])
 	);
 }

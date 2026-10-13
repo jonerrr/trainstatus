@@ -50,6 +50,7 @@ export function watchTrajectories(
 		// The shared status reads this on its next tick.
 		const update = {
 			active: true as boolean,
+			at: query.at,
 			error: null as Error | null,
 			fetched_at: null as number | null,
 			retry: () => void load()
@@ -94,7 +95,7 @@ export function watchTrajectories(
 			}, delay);
 		}
 
-		const untrack = query.at === null ? track?.(update) : undefined;
+		const untrack = track?.(update);
 		return {
 			load,
 			stop() {

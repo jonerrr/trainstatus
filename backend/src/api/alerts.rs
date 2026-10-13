@@ -3,8 +3,8 @@ use super::{
     query::{RequestTime, TimeQuery},
 };
 use crate::AppState;
-use crate::models::source::Source;
-use crate::stores::alert::ApiAlert;
+use crate::api::dto::alerts::ApiAlert;
+use crate::source::Source;
 use axum::Json;
 use axum::extract::{Path, State};
 
@@ -29,6 +29,6 @@ pub async fn alerts_handler(
     Path(source): Path<Source>,
     time: RequestTime,
 ) -> Result<Json<Vec<ApiAlert>>, AppError> {
-    let alerts = state.alert_store.get_all(source, time.at).await?;
-    Ok(Json(alerts))
+    let alerts = state.alerts.get_all(source, time.at).await?;
+    Ok(Json(alerts.iter().map(ApiAlert::from).collect()))
 }

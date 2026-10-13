@@ -8,6 +8,7 @@
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
 	import SEO from '#lib/SEO.svelte';
+	import { syncLocalStorage } from '#lib/storage.svelte.js';
 	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
@@ -24,11 +25,22 @@
 	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
 
 	// One owner per layout instance; on the server it never fetches.
-	const transit = setTransitData(new TransitData({ sources: page.data.selected_sources }));
+	const transit = setTransitData(
+		new TransitData({
+			sources: page.data.selected_sources,
+			eager_service: page.url.pathname !== '/map'
+		})
+	);
 	$effect(() => {
-		transit.setSources(page.data.selected_sources);
+		const sources = page.data.selected_sources;
+		const eager = page.url.pathname !== '/map';
+		untrack(() => {
+			transit.setEagerService(eager);
+			transit.setSources(sources);
+		});
 	});
 	onDestroy(() => transit.destroy());
+	onMount(syncLocalStorage);
 
 	// Open the modal a direct link identifies; the modal loads its own data.
 	onMount(() => {
