@@ -86,3 +86,19 @@ See README.md for detailed development setup instructions, including environment
 - `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`, `njt_bus`)
 
 - Automatic historical-age retention remains deferred.
+
+## Maintainability Rules
+
+- Prefer the simplest, cleanest implementation that satisfies the requirements. Avoid unnecessary complexity, indirection, and overengineering.
+- Search for existing implementations and conventions before introducing new helpers, types, dependencies, or abstractions.
+- Favor maintainability and architectural consistency over minimizing the size of a diff. Larger refactors are acceptable when they meaningfully improve the codebase.
+- **Do not preserve backward compatibility unless explicitly required.** Prefer clean breaking changes over compatibility layers, deprecated interfaces, fallback logic, or workarounds.
+- Treat development databases and their data as disposable. Prefer updating schemas and resetting the development database over implementing complex migrations or compatibility logic solely to preserve development data. Ask before performing destructive operations.
+- When replacing functionality, fully remove obsolete implementations, unused code, and references. Do not leave behind legacy paths or redundant abstractions.
+- Avoid speculative future-proofing, unnecessary defensive programming, and abstractions that serve no concrete purpose.
+- Follow existing architectural conventions where reasonable, but do not perpetuate poor patterns merely for consistency.
+- Do not add functionality, dependencies, or architectural complexity beyond what is requested without discussing it first.
+- **Stop and ask for clarification whenever you encounter a meaningful decision, ambiguity, unexpected issue, or trade-off that the user should decide.** Present the available options and their implications rather than silently making assumptions or implementing workarounds.
+- Proactively identify opportunities for simplification, refactoring, or architectural improvement. Surface significant findings and recommendations, even when they fall outside the immediate task, but ask before expanding the scope.
+- Make routine, low-risk implementation decisions independently. Do not interrupt for trivial details that have an obvious solution.
+- Keep comments and documentation accurate and useful. Avoid comments that merely restate what the code does.
