@@ -3,3 +3,6 @@ saveExact: true
 allowBuilds:
   sharp: true
   esbuild: true
+# Temporary async batch fix: https://github.com/sveltejs/svelte/pull/18896
+patchedDependencies:
+  svelte@5.57.2: patches/svelte@5.57.2.patch
