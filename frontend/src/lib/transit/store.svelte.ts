@@ -33,6 +33,7 @@ const TICK_MS = 1_000;
 
 export interface TransitDataOptions {
 	sources: readonly Source[];
+	at?: number;
 	/** Map-only layouts defer passenger service until a binding acquires it. */
 	eager_service?: boolean;
 	fetcher?: typeof fetch;
@@ -192,6 +193,7 @@ export class TransitData {
 	#history_limit: number;
 	#batch_ms: number;
 	#eager_service: boolean;
+	#at: number | null;
 	#now: () => number;
 	#sources = new Set<Source>();
 	#generation = $state(0);
@@ -211,6 +213,7 @@ export class TransitData {
 		this.#history_limit = options.history_limit ?? 6;
 		this.#batch_ms = options.batch_ms ?? 200;
 		this.#eager_service = options.eager_service ?? true;
+		this.#at = options.at ?? null;
 		this.#now = options.now ?? Date.now;
 		untrack(() => this.setSources(options.sources));
 		if (typeof window === 'undefined') return;
@@ -235,11 +238,11 @@ export class TransitData {
 			catalog.eager = true;
 			this.#catalogs.set(source, catalog);
 			void this.#loadCatalog(catalog);
-			const alerts = this.#alertEntry(source, null);
+			const alerts = this.#alertEntry(source, this.#at);
 			alerts.eager = true;
 			void this.#loadAlerts(alerts);
 			if (!this.#eager_service || !WHOLE_SOURCES.has(source)) continue;
-			const entry = this.#service(source, null, null);
+			const entry = this.#service(source, null, this.#at);
 			entry.eager = true;
 			this.#enqueue(entry);
 		}
@@ -254,9 +257,27 @@ export class TransitData {
 		this.#eager_service = enabled;
 		for (const source of this.#sources) {
 			if (!WHOLE_SOURCES.has(source)) continue;
-			const entry = this.#service(source, null, null);
+			const entry = this.#service(source, null, this.#at);
 			entry.eager = enabled;
 			if (enabled) this.#ensure(entry);
+		}
+		this.#updateStatus();
+	}
+
+	/** Move background readers to the same time as the layout's passenger readers. */
+	setTime(at: number | undefined) {
+		const next = at ?? null;
+		if (next === this.#at) return;
+		this.#at = next;
+		for (const entry of [...this.#alerts.values(), ...this.#services.values()]) entry.eager = false;
+		for (const source of this.#sources) {
+			const alerts = this.#alertEntry(source, next);
+			alerts.eager = true;
+			this.#ensure(alerts);
+			if (!this.#eager_service || !WHOLE_SOURCES.has(source)) continue;
+			const service = this.#service(source, null, next);
+			service.eager = true;
+			this.#ensure(service);
 		}
 		this.#updateStatus();
 	}
@@ -532,14 +553,6 @@ export class TransitData {
 		for (const update of this.#tracked) if (update.active) update.retry();
 	}
 
-	/** Refetch actively read historical data, which otherwise loads once. */
-	reload() {
-		this.retry();
-		for (const entry of [...this.#services.values(), ...this.#alerts.values()]) {
-			if (entry.at !== null && entry.active) this.#start(entry);
-		}
-	}
-
 	/** Stops timers and requests without touching reactive state that unmounting views may read. */
 	destroy() {
 		this.#destroyed = true;
@@ -733,10 +746,12 @@ export class TransitData {
 	}
 
 	#evictHistory() {
-		type Evictable = Pick<ServiceEntry, 'at' | 'active' | 'in_flight' | 'used_at'>;
+		type Evictable = Pick<ServiceEntry, 'at' | 'active' | 'eager' | 'in_flight' | 'used_at'>;
 		for (const entries of [this.#services, this.#alerts] as Map<string, Evictable>[]) {
 			const evictable = [...entries.entries()]
-				.filter(([, entry]) => entry.at !== null && !entry.active && !entry.in_flight)
+				.filter(
+					([, entry]) => entry.at !== null && !entry.active && !entry.eager && !entry.in_flight
+				)
 				.sort(([, a], [, b]) => a.used_at - b.used_at);
 			const historical = [...entries.values()].filter((entry) => entry.at !== null).length;
 			for (const [key] of evictable.slice(0, Math.max(0, historical - this.#history_limit))) {

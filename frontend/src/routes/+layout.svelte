@@ -23,19 +23,25 @@
 
 	let { children } = $props();
 
-	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
+	const current_time = setCurrentTime(
+		createCurrentTime(atParamToUnixSeconds(page.url.searchParams.get('at')))
+	);
 
 	// One owner per layout instance; on the server it never fetches.
 	const transit = setTransitData(
 		new TransitData({
 			sources: page.data.selected_sources,
+			at: current_time.value,
 			eager_service: page.url.pathname !== '/map'
 		})
 	);
 	$effect(() => {
 		const sources = page.data.selected_sources;
 		const eager = page.url.pathname !== '/map';
+		const at = atParamToUnixSeconds(page.url.searchParams.get('at'));
 		untrack(() => {
+			current_time.value = at;
+			transit.setTime(at);
 			transit.setEagerService(eager);
 			transit.setSources(sources);
 		});
@@ -60,26 +66,6 @@
 		};
 		worker?.addEventListener('message', message);
 		return () => worker?.removeEventListener('message', message);
-	});
-
-	// Sync current_time.value with ?at URL param whenever it changes.
-	// Reads page.url inside untrack so this effect only re-runs when current_time changes.
-	$effect(() => {
-		const val = current_time.value;
-		untrack(() => {
-			const current_at = page.url.searchParams.get('at');
-			const new_at = val !== undefined ? val.toString() : null;
-			console.log(
-				`current_time changed: ${current_time.value} (URL param at=${current_at}), syncing to ${new_at}`
-			);
-			if (current_at === new_at) return; // no change needed
-
-			const url = new URL(page.url.href);
-			if (val !== undefined) url.searchParams.set('at', val.toString());
-			else url.searchParams.delete('at');
-			console.log(`Updating URL search param at=${new_at} (was ${current_at})`);
-			goto(url.pathname + url.search, { shallow: true, replace: true, state: page.state });
-		});
 	});
 </script>
 

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
@@ -9,7 +8,6 @@
 	import UpdateIndicator from './UpdateIndicator.svelte';
 
 	const current_time = getCurrentTime();
-	const transit = getTransitData();
 
 	interface Routes {
 		[key: string]: [
@@ -69,16 +67,6 @@
 		{@render nav_button('Stops')}
 		{@render nav_button('Charts')}
 		{@render nav_button('Map')}
-		{#if current_time.value !== undefined}
-			<button
-				type="button"
-				class="nav-button"
-				onclick={() => {
-					transit.reload();
-				}}
-				aria-label="Reload historical data"><Clock class="nav-icon" /><span>Reload</span></button
-			>
-		{/if}
 		<div class="md:mt-auto">
 			{#if !page.state.modal}<div class="hidden md:block"><UpdateIndicator /></div>{/if}
 			{@render nav_button('Settings')}

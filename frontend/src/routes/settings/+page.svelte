@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { refreshAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
+	import { page } from '$app/state';
 
 	import { all_sources, source_info } from '#lib/source_info.js';
 	import { source_preferences } from '#lib/source_preferences.svelte.js';
@@ -17,6 +18,18 @@
 	import dayjs from 'dayjs';
 
 	const current_time = getCurrentTime();
+	let selected_time = $derived(
+		current_time.value === undefined
+			? ''
+			: dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm')
+	);
+
+	function applyTime(at: number | undefined) {
+		const url = new URL(page.url.href);
+		if (at === undefined) url.searchParams.delete('at');
+		else url.searchParams.set('at', String(at));
+		void goto(url.pathname + url.search + url.hash, { state: page.state });
+	}
 
 	// TODO: improve ui
 	// TODO: add 'debug' mode that logs data in console and shows extra info about data sources
@@ -83,32 +96,43 @@
 					historical train movements and delays for research or analysis purposes.
 				</p>
 
-				<div class="flex items-center gap-2 pl-6">
+				<form
+					class="flex flex-wrap items-center gap-2 pl-6"
+					onsubmit={(event) => {
+						event.preventDefault();
+						applyTime(dayjs(selected_time).unix());
+					}}
+				>
 					<input
 						max={dayjs().format('YYYY-MM-DDTHH:mm')}
 						style="color-scheme: dark; font-size: 0.875rem"
 						type="datetime-local"
-						bind:value={
-							() =>
-								current_time.value !== undefined
-									? dayjs.unix(current_time.value).format('YYYY-MM-DDTHH:mm')
-									: '',
-							(v) => (current_time.value = dayjs(v).unix())
-						}
+						aria-label="Historical time"
+						required
+						bind:value={selected_time}
 						class="min-w-50 rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
 					/>
+					<button
+						type="submit"
+						disabled={!selected_time}
+						class="rounded bg-emerald-700 px-4 py-2 hover:bg-emerald-600 disabled:opacity-50"
+						>Apply</button
+					>
 					{#if current_time.value !== undefined}
 						<button
-							title="Clear time"
+							type="button"
+							title="Return to live data"
+							aria-label="Return to live data"
 							onclick={() => {
-								current_time.value = undefined;
+								selected_time = '';
+								applyTime(undefined);
 							}}
 							class="transition-colors duration-300 hover:text-fuchsia-300"
 						>
 							<CircleX class="size-6" />
 						</button>
 					{/if}
-				</div>
+				</form>
 				{#if current_time.value !== undefined}
 					<p class="mt-2 text-xs text-fuchsia-400">
 						Currently viewing data from: {dayjs

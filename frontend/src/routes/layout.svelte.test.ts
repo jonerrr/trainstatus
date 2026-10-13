@@ -27,6 +27,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
@@ -116,6 +117,58 @@ test('reconnecting retries failed reads without a click', async () => {
 	fail = false;
 	window.dispatchEvent(new Event('online'));
 	await expect.element(view.getByRole('button', { name: /Retry updates/ })).not.toBeInTheDocument();
+	await view.unmount();
+});
+
+test('historical layouts load background data at the URL time and follow URL changes', async () => {
+	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+	const now = vi.spyOn(Date, 'now').mockReturnValue(1_780_000_000_000);
+	fail = false;
+	const fixture = chartFixture('mta_subway', 0);
+	const respond = fixtureFetcher({
+		catalogs: { mta_subway: fixture.catalog },
+		services: { mta_subway: fixture.service }
+	});
+	const requests: URL[] = [];
+	vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
+		requests.push(new URL(String(input), location.origin));
+		return respond(input, init);
+	}) as typeof fetch);
+	page.data.selected_sources = ['mta_subway'];
+	page.data.at = '100';
+	page.url = new SvelteURL('http://localhost/?at=100');
+	const view = await render(Layout, {
+		children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
+	});
+	const realtime = () => requests.filter((url) => !url.pathname.includes('/catalog/'));
+	await expect.poll(() => realtime().length).toBe(2);
+	expect(realtime().map((url) => url.searchParams.get('at'))).toEqual(['100', '100']);
+	page.url = new SvelteURL('http://localhost/?at=200');
+	await expect.poll(() => realtime().length).toBe(4);
+	expect(
+		realtime()
+			.slice(2)
+			.map((url) => url.searchParams.get('at'))
+	).toEqual(['200', '200']);
+	await vi.advanceTimersByTimeAsync(31_000);
+	expect(realtime()).toHaveLength(4);
+	page.url = new SvelteURL('http://localhost/');
+	await expect.poll(() => realtime().length).toBe(6);
+	expect(
+		realtime()
+			.slice(4)
+			.map((url) => url.searchParams.get('at'))
+	).toEqual([null, null]);
+	now.mockReturnValue(1_780_000_031_000);
+	await vi.advanceTimersByTimeAsync(31_000);
+	await expect.poll(() => realtime().length).toBe(8);
+	page.url = new SvelteURL('http://localhost/?at=100');
+	await expect
+		.element(view.getByRole('link', { name: 'Settings' }))
+		.toHaveAttribute('href', '/settings?at=100');
+	now.mockReturnValue(1_780_000_062_000);
+	await vi.advanceTimersByTimeAsync(31_000);
+	expect(realtime()).toHaveLength(8);
 	await view.unmount();
 });
 
