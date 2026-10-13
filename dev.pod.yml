@@ -117,17 +117,15 @@ data:
   martin.yml: |-
     route_prefix: /martin
 
+    convert_to_mlt: auto
+
     postgres:
       # The connection URL will be read from DATABASE_URL env var
       connection_string: $DATABASE_URL
       reload_interval: 30s
 
       auto_publish:
-        tables:
-          from_schemas:
-            - static
-          # must be integer (but we are using string)
-          # id_columns: id
+        tables: false
         functions:
           from_schemas:
             - realtime
