@@ -367,10 +367,15 @@ async fn upsert_positions(
         SELECT i.*, $7 FROM UNNEST($1::text[], $2::uuid[], $3::text[], $4::geometry[], $5::jsonb[], $6::timestamptz[])
             AS i(vehicle_id, trip_id, stop_id, geom, data, updated_at)
         ON CONFLICT (vehicle_id, source) DO UPDATE SET trip_id = EXCLUDED.trip_id, stop_id = EXCLUDED.stop_id,
-            geom = EXCLUDED.geom, data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-        WHERE EXCLUDED.updated_at > existing.updated_at AND
+            geom = CASE WHEN EXCLUDED.updated_at > existing.updated_at THEN EXCLUDED.geom ELSE existing.geom END,
+            data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
+        -- OBA enrichment and run linkage can change without a newer GPS report.
+        -- Equal-time coordinates retain the first accepted fix.
+        WHERE EXCLUDED.updated_at >= existing.updated_at AND
             (existing.trip_id, existing.stop_id, existing.geom, existing.data, existing.updated_at)
-            IS DISTINCT FROM (EXCLUDED.trip_id, EXCLUDED.stop_id, EXCLUDED.geom, EXCLUDED.data, EXCLUDED.updated_at)
+            IS DISTINCT FROM (EXCLUDED.trip_id, EXCLUDED.stop_id,
+                CASE WHEN EXCLUDED.updated_at > existing.updated_at THEN EXCLUDED.geom ELSE existing.geom END,
+                EXCLUDED.data, EXCLUDED.updated_at)
         RETURNING trip_id, updated_at, geom
         ), samples AS (
             INSERT INTO realtime.gps_sample (run_id, observed_at, longitude, latitude)

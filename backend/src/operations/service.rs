@@ -108,7 +108,18 @@ pub struct RouteInputs<'a> {
     pub statuses: &'a HashMap<Uuid, usize>,
     pub vehicle_statuses: &'a HashMap<String, usize>,
 }
-pub type ServiceEncoder = fn(RouteInputs<'_>) -> anyhow::Result<Bytes>;
+pub struct ServiceInputs<'a> {
+    pub source: Source,
+    pub updated_at: Option<i64>,
+    pub at: Option<i64>,
+    pub routes: Vec<(&'a str, Bytes)>,
+}
+
+#[derive(Clone, Copy)]
+pub struct ServiceEncoder {
+    pub route: fn(RouteInputs<'_>) -> anyhow::Result<Bytes>,
+    pub service: fn(ServiceInputs<'_>) -> anyhow::Result<Bytes>,
+}
 
 pub struct PassengerSnapshot {
     encoder: ServiceEncoder,
@@ -209,7 +220,7 @@ impl PassengerSnapshot {
         if let Some(block) = entry.block.get() {
             return Ok(block.clone());
         }
-        let block = (self.encoder)(RouteInputs {
+        let block = (self.encoder.route)(RouteInputs {
             trips: self.inputs.trips(),
             visits: self.inputs.stop_times(),
             positions: self.inputs.positions(),
@@ -226,28 +237,18 @@ impl PassengerSnapshot {
         &self,
         routes: impl IntoIterator<Item = (&'a String, &'a RouteEntry)>,
     ) -> anyhow::Result<Bytes> {
-        let mut body = Vec::new();
-        body.extend_from_slice(b"{\"source\":");
-        serde_json::to_writer(&mut body, &self.source)?;
-        if let Inputs::Live(snapshot) = &self.inputs {
-            body.extend_from_slice(b",\"updated_at\":");
-            serde_json::to_writer(&mut body, &snapshot.committed_at.timestamp())?;
-        }
-        if let Some(at) = self.at {
-            body.extend_from_slice(b",\"at\":");
-            serde_json::to_writer(&mut body, &at)?;
-        }
-        body.extend_from_slice(b",\"routes\":{");
-        for (position, (id, entry)) in routes.into_iter().enumerate() {
-            if position > 0 {
-                body.push(b',');
-            }
-            serde_json::to_writer(&mut body, id)?;
-            body.push(b':');
-            body.extend_from_slice(&self.block(entry)?);
-        }
-        body.extend_from_slice(b"}}");
-        Ok(Bytes::from(body))
+        (self.encoder.service)(ServiceInputs {
+            source: self.source,
+            updated_at: match &self.inputs {
+                Inputs::Live(snapshot) => Some(snapshot.committed_at.timestamp()),
+                Inputs::Historical { .. } => None,
+            },
+            at: self.at,
+            routes: routes
+                .into_iter()
+                .map(|(id, entry)| Ok((id.as_str(), self.block(entry)?)))
+                .collect::<anyhow::Result<_>>()?,
+        })
     }
 
     /// Encoded response for the selection, or the requested IDs that are not routes.

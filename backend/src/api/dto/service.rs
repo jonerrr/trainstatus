@@ -4,6 +4,13 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+pub const ENCODER: crate::operations::service::ServiceEncoder =
+    crate::operations::service::ServiceEncoder {
+        route: encode_route,
+        service: encode_service,
+    };
+
 /// Passenger service for complete routes from one committed source snapshot, or from
 /// retained history when `at` is present.
 #[derive(Serialize, ToSchema)]
@@ -155,4 +162,32 @@ pub fn encode_route(
         calls,
     };
     Ok(bytes::Bytes::from(serde_json::to_vec(&route)?))
+}
+
+/// Assemble cached route blocks without decoding or re-encoding their payloads.
+fn encode_service(
+    input: crate::operations::service::ServiceInputs<'_>,
+) -> anyhow::Result<bytes::Bytes> {
+    let mut body = Vec::new();
+    body.extend_from_slice(b"{\"source\":");
+    serde_json::to_writer(&mut body, &input.source)?;
+    if let Some(updated_at) = input.updated_at {
+        body.extend_from_slice(b",\"updated_at\":");
+        serde_json::to_writer(&mut body, &updated_at)?;
+    }
+    if let Some(at) = input.at {
+        body.extend_from_slice(b",\"at\":");
+        serde_json::to_writer(&mut body, &at)?;
+    }
+    body.extend_from_slice(b",\"routes\":{");
+    for (position, (id, block)) in input.routes.into_iter().enumerate() {
+        if position > 0 {
+            body.push(b',');
+        }
+        serde_json::to_writer(&mut body, id)?;
+        body.push(b':');
+        body.extend_from_slice(&block);
+    }
+    body.extend_from_slice(b"}}");
+    Ok(bytes::Bytes::from(body))
 }

@@ -125,6 +125,21 @@ impl NjtBusRealtime {
 
         let pattern = revision.trip_patterns.get(&trip_id);
 
+        // NJT includes inactive trips with an empty vehicle descriptor. They
+        // have no run to identify or predictions to publish.
+        let Some(vehicle_id) = update
+            .vehicle
+            .as_ref()
+            .and_then(|v| {
+                v.id.as_ref()
+                    .filter(|id| !id.is_empty())
+                    .or_else(|| v.label.as_ref().filter(|label| !label.is_empty()))
+            })
+            .cloned()
+        else {
+            return (None, vec![]);
+        };
+
         // Identity requires a provider service date; a polling date can split an overnight run.
         let inferred_date = observed_at
             .or_else(|| {
@@ -182,20 +197,6 @@ impl NjtBusRealtime {
             .as_ref()
             .map(|ct| ct.headsign.clone())
             .unwrap_or_default();
-
-        // Use vehicle ID from the VehicleDescriptor if present, otherwise fall back to vehicle.label
-        // It looks like they are always identical, but sometimes it doesn't include the id in the trips feed.
-        let Some(vehicle_id) = update
-            .vehicle
-            .as_ref()
-            .and_then(|v| v.id.clone().or_else(|| v.label.clone()))
-        else {
-            warn!(
-                trip_id,
-                "Missing vehicle ID for NJT trip update and not found in cache"
-            );
-            return (None, vec![]);
-        };
 
         let shape_ids = pattern
             .filter(|p| p.route_id.eq_ignore_ascii_case(&route_id) && p.direction == direction)

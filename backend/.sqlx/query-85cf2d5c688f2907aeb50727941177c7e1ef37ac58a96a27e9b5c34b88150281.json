@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH accepted AS (INSERT INTO realtime.vehicle_position AS existing (vehicle_id, trip_id, stop_id, geom, data, updated_at, source)\n        SELECT i.*, $7 FROM UNNEST($1::text[], $2::uuid[], $3::text[], $4::geometry[], $5::jsonb[], $6::timestamptz[])\n            AS i(vehicle_id, trip_id, stop_id, geom, data, updated_at)\n        ON CONFLICT (vehicle_id, source) DO UPDATE SET trip_id = EXCLUDED.trip_id, stop_id = EXCLUDED.stop_id,\n            geom = CASE WHEN EXCLUDED.updated_at > existing.updated_at THEN EXCLUDED.geom ELSE existing.geom END,\n            data = EXCLUDED.data, updated_at = EXCLUDED.updated_at\n        -- OBA enrichment and run linkage can change without a newer GPS report.\n        -- Equal-time coordinates retain the first accepted fix.\n        WHERE EXCLUDED.updated_at >= existing.updated_at AND\n            (existing.trip_id, existing.stop_id, existing.geom, existing.data, existing.updated_at)\n            IS DISTINCT FROM (EXCLUDED.trip_id, EXCLUDED.stop_id,\n                CASE WHEN EXCLUDED.updated_at > existing.updated_at THEN EXCLUDED.geom ELSE existing.geom END,\n                EXCLUDED.data, EXCLUDED.updated_at)\n        RETURNING trip_id, updated_at, geom\n        ), samples AS (\n            INSERT INTO realtime.gps_sample (run_id, observed_at, longitude, latitude)\n            SELECT trip_id, updated_at, ST_X(geom), ST_Y(geom) FROM accepted\n            WHERE trip_id IS NOT NULL AND geom IS NOT NULL\n            ON CONFLICT (run_id, observed_at) DO NOTHING\n        ) SELECT trip_id FROM accepted\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "trip_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "UuidArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "geometry[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "geometry",
+                  "kind": "Simple"
+                }
+              }
+            }
+          }
+        },
+        "JsonbArray",
+        "TimestamptzArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "85cf2d5c688f2907aeb50727941177c7e1ef37ac58a96a27e9b5c34b88150281"
+}

@@ -124,7 +124,7 @@ fn live_case() -> Case {
             None,
             Inputs::Live(persisted),
             route_ids,
-            crate::api::dto::service::encode_route,
+            crate::api::dto::service::ENCODER,
         ),
         linked,
         vehicle_only,
@@ -242,10 +242,11 @@ fn historical_snapshot_echoes_at_and_has_no_status() {
             stop_times,
         },
         ["A".to_owned()],
-        crate::api::dto::service::encode_route,
+        crate::api::dto::service::ENCODER,
     );
     let body = decode(&snapshot.encode(&RouteSelection::All).unwrap());
     assert_eq!(body["at"], 1_780_000_000);
+    assert!(body.get("updated_at").is_none());
     assert_eq!(body["routes"]["A"]["trips"][0]["status"], Value::Null);
     assert_eq!(body["routes"]["A"]["calls"]["sequence"], json!([0, 1]));
 }

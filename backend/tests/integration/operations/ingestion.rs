@@ -483,6 +483,90 @@ async fn gps_samples_are_atomic_deduplicated_stationary_and_time_scoped(pool: sq
 }
 
 #[sqlx::test]
+async fn equal_time_oba_recovery_updates_status_without_replacing_gps(pool: sqlx::PgPool) {
+    use backend::geometry::Geom;
+    use backend::operations::types::position::MtaBusPositionData;
+    use backend::operations::types::trip::MtaBusData;
+
+    let owners = support::test_owners(pool.clone());
+    let dataset = support::mta_bus_dataset();
+    owners.network.persist(&dataset).await.unwrap();
+    let mut input = snapshot();
+    input.source = Source::MtaBus;
+    input.trips[0].0.route_id = dataset.routes[0].id.clone();
+    input.trips[0].0.data = TripData::MtaBus(MtaBusData { deviation: None });
+    input.trips[0].1.clear();
+    input.positions[0].stop_id = None;
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.99, 40.75)));
+    input.positions[0].data = PositionData::MtaBus(MtaBusPositionData {
+        bearing: 0.0,
+        passengers: None,
+        capacity: None,
+        status: None,
+        phase: None,
+    });
+    let first = owners.ingestor.ingest(input.clone()).await.unwrap();
+    let id = first.trips[0].id;
+    let at = first.positions[0].updated_at;
+    // A later OBA fetch recovers while GTFS still reports the same observation time.
+    input.positions[0].data = PositionData::MtaBus(MtaBusPositionData {
+        bearing: 0.0,
+        passengers: Some(12),
+        capacity: Some(60),
+        status: Some("approaching".into()),
+        phase: Some("in_progress".into()),
+    });
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-74.0, 40.76)));
+    let recovered = owners.ingestor.ingest(input.clone()).await.unwrap();
+    let published = owners.live_snapshots.get(Source::MtaBus).unwrap();
+    assert!(std::sync::Arc::ptr_eq(&recovered, &published));
+    let PositionData::MtaBus(data) = &published.positions[0].data else {
+        panic!("expected bus status");
+    };
+    assert_eq!(data.passengers, Some(12));
+    assert_eq!(data.capacity, Some(60));
+    assert_eq!(data.status.as_deref(), Some("approaching"));
+    assert_eq!(data.phase.as_deref(), Some("in_progress"));
+    assert_eq!(published.positions[0].updated_at, at);
+    assert_eq!(
+        published.positions[0].geom.as_ref().map(|geom| &geom.0),
+        first.positions[0].geom.as_ref().map(|geom| &geom.0)
+    );
+    let stored: (serde_json::Value, f64, f64) = sqlx::query_as(
+        "SELECT data, ST_X(geom), ST_Y(geom) FROM realtime.vehicle_position WHERE source = 'mta_bus' AND vehicle_id = 'vehicle'",
+    ).fetch_one(&pool).await.unwrap();
+    assert_eq!(stored.0["passengers"], 12);
+    assert_eq!((stored.1, stored.2), (-73.99, 40.75));
+    let samples: Vec<(chrono::DateTime<Utc>, f64, f64)> = sqlx::query_as(
+        "SELECT observed_at, longitude, latitude FROM realtime.gps_sample WHERE run_id = $1 ORDER BY observed_at",
+    ).bind(id).fetch_all(&pool).await.unwrap();
+    assert_eq!(samples, [(at, -73.99, 40.75)]);
+    let replay = owners.ingestor.ingest(input).await.unwrap();
+    assert_eq!(replay.changes.positions, 0);
+}
+
+#[sqlx::test]
+async fn equal_time_report_can_link_a_run_without_replacing_coordinates(pool: sqlx::PgPool) {
+    use backend::geometry::Geom;
+    let (ingestor, live) = ingestor(&pool).await;
+    let mut input = snapshot();
+    let run = input.positions[0].trip_id;
+    input.positions[0].trip_id = None;
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.99, 40.75)));
+    let first = ingestor.ingest(input.clone()).await.unwrap();
+    assert!(first.positions[0].trip_id.is_none());
+    input.positions[0].trip_id = run;
+    input.positions[0].geom = Some(Geom::from(geo::Point::new(-74.0, 40.76)));
+    ingestor.ingest(input).await.unwrap();
+    let published = live.get(Source::MtaSubway).unwrap();
+    assert_eq!(published.positions[0].trip_id, Some(first.trips[0].id));
+    let stored: (Uuid, f64, f64) = sqlx::query_as(
+        "SELECT trip_id, ST_X(geom), ST_Y(geom) FROM realtime.vehicle_position WHERE vehicle_id = 'vehicle'",
+    ).fetch_one(&pool).await.unwrap();
+    assert_eq!(stored, (first.trips[0].id, -73.99, 40.75));
+}
+
+#[sqlx::test]
 async fn vehicle_reassignment_keeps_run_identity_and_samples_belong_to_runs(pool: sqlx::PgPool) {
     let (ingestor, _) = ingestor(&pool).await;
     let mut input = snapshot();

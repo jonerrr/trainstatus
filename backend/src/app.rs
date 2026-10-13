@@ -71,7 +71,7 @@ pub async fn build() -> anyhow::Result<Application> {
         pg_pool.clone(),
         live_snapshots.clone(),
         index.clone(),
-        crate::api::dto::service::encode_route,
+        crate::api::dto::service::ENCODER,
     );
     let network = network::store::Network::new(pg_pool.clone(), index);
 

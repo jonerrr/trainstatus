@@ -14,7 +14,7 @@ pub fn app_state_from_owners(pool: sqlx::PgPool, stores: TestOwners) -> AppState
             pool.clone(),
             stores.live_snapshots.clone(),
             stores.network.network_index(),
-            backend::api::dto::service::encode_route,
+            backend::api::dto::service::ENCODER,
         ),
         alerts: stores.alerts,
         trajectories: backend::trajectory::TrajectoryService::new(pool),
