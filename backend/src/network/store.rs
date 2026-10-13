@@ -143,7 +143,7 @@ impl Network {
         }
         sqlx::query!(
             r#"
-            UPDATE source SET trip_patterns = $2, stop_remap = $3, updated_at = NOW(), schedules_initialized = TRUE
+            UPDATE source SET trip_patterns = $2, stop_remap = $3, updated_at = NOW()
             WHERE id = $1
             "#,
             source,
@@ -157,23 +157,27 @@ impl Network {
             .execute(&mut *tx)
             .await?;
         stop::compute_proximity_transfers(&mut tx, Some(source)).await?;
-        let mut bundle = Vec::new();
-        for affected in Source::ALL {
-            if affected == source {
-                let mut revision =
-                    NetworkRevision::from_dataset_with_schedules(dataset, schedules.clone());
+        let mut imported = NetworkRevision::from_dataset_with_schedules(dataset, schedules);
+        imported.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
+            source,
+            &route::query_all_on(source, &mut tx).await?,
+            &stop::query_all_on(source, &mut tx).await?,
+        )?));
+        let mut bundle = vec![imported];
+        for affected in Source::ALL
+            .into_iter()
+            .filter(|affected| *affected != source)
+        {
+            if let Some(current) = self.index.get(affected) {
+                // Only proximity transfers changed; retain the pinned routing inputs.
+                let mut revision = (*current).clone();
                 revision.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
                     affected,
                     &route::query_all_on(affected, &mut tx).await?,
                     &stop::query_all_on(affected, &mut tx).await?,
                 )?));
                 bundle.push(revision);
-            } else if let Some(mut revision) = self.load_revision_on(affected, &mut tx).await? {
-                revision.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
-                    affected,
-                    &route::query_all_on(affected, &mut tx).await?,
-                    &stop::query_all_on(affected, &mut tx).await?,
-                )?));
+            } else if let Some(revision) = self.load_revision_on(affected, &mut tx).await? {
                 bundle.push(revision);
             }
         }
@@ -201,17 +205,22 @@ impl Network {
     }
 
     /// Restore all network inputs and catalog bytes within one repeatable-read
-    /// transaction. Import also uses `load_revision_on` inside its write transaction.
+    /// transaction and publish it under the import lock. Imports also use
+    /// `load_revision_on` inside their write transaction.
     pub async fn restore_revision(
         &self,
         source: Source,
     ) -> anyhow::Result<Option<NetworkRevision>> {
+        let _guard = self.import_lock.lock().await;
         let mut tx = self.pool.begin().await?;
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .execute(&mut *tx)
             .await?;
         let revision = self.load_revision_on(source, &mut tx).await?;
         tx.commit().await?;
+        if let Some(revision) = &revision {
+            self.index.publish(revision.clone());
+        }
         Ok(revision)
     }
 
@@ -221,7 +230,7 @@ impl Network {
         connection: &mut sqlx::PgConnection,
     ) -> anyhow::Result<Option<NetworkRevision>> {
         let metadata = sqlx::query!(
-            "SELECT trip_patterns, stop_remap, schedules_initialized FROM source WHERE id = $1",
+            "SELECT trip_patterns, stop_remap FROM source WHERE id = $1",
             source
         )
         .fetch_optional(&mut *connection)
@@ -229,9 +238,6 @@ impl Network {
         let Some(metadata) = metadata else {
             return Ok(None);
         };
-        if source == Source::NjtBus && !metadata.schedules_initialized {
-            return Ok(None);
-        }
         let patterns: HashMap<String, TripPattern> =
             match serde_json::from_value(metadata.trip_patterns) {
                 Ok(value) => value,
@@ -249,6 +255,7 @@ impl Network {
         };
         let routes = route::query_all_on(source, &mut *connection).await?;
         let stops = stop::query_all_on(source, &mut *connection).await?;
+        let catalog = crate::api::dto::catalog::encode(source, &routes, &stops)?;
         let shapes = route::get_all_shapes_on(source, &mut *connection).await?;
         let schedules = Self::load_schedules_on(source, &mut *connection).await?;
         let Some(mut revision) =
@@ -257,11 +264,7 @@ impl Network {
             return Ok(None);
         };
         revision.set_schedules(schedules);
-        revision.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
-            source,
-            &route::query_all_on(source, connection).await?,
-            &stop::query_all_on(source, connection).await?,
-        )?));
+        revision.catalog = Some(Arc::new(catalog));
         Ok(Some(revision))
     }
 

@@ -273,20 +273,25 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
     let dataset = support::mta_subway_dataset();
     stores.network.persist(&dataset).await.unwrap();
     let mut revision = NetworkRevision::from_dataset(&dataset);
-    revision.routes.get_mut("A").unwrap().shape_ids = vec!["far".into(), "near".into()];
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.routes)
+        .get_mut("A")
+        .unwrap()
+        .shape_ids = vec!["far".into(), "near".into()];
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "far".into(),
         Geom::from(geo::LineString::from(vec![(10., 10.), (11., 11.)])),
     );
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "near".into(),
         Geom::from(geo::LineString::from(vec![(0., 0.), (1., 1.)])),
     );
     for stop in ["101", "102"] {
-        revision.stops.get_mut(stop).unwrap().geom = Geom::from(geo::Point::new(0., 0.));
+        std::sync::Arc::make_mut(&mut revision.stops)
+            .get_mut(stop)
+            .unwrap()
+            .geom = Geom::from(geo::Point::new(0., 0.));
     }
-    revision
-        .route_stop_shapes
+    std::sync::Arc::make_mut(&mut revision.route_stop_shapes)
         .insert(("A".into(), "101".into()), vec!["far".into()]);
     let index = stores.network.network_index();
     index.publish(revision.clone());
@@ -306,7 +311,7 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
         &first.network_revision,
         &index.get(Source::MtaSubway).unwrap()
     ));
-    revision.route_stop_shapes.clear();
+    std::sync::Arc::make_mut(&mut revision.route_stop_shapes).clear();
     index.publish(revision);
     assert!(!std::sync::Arc::ptr_eq(
         &first.network_revision,
@@ -438,12 +443,12 @@ async fn gps_samples_are_atomic_deduplicated_stationary_and_time_scoped(pool: sq
     );
     let history = History::new(pool.clone());
     let past = history
-        .load(Source::MtaSubway, at + Duration::seconds(30), None)
+        .load_trajectories(Source::MtaSubway, at + Duration::seconds(30))
         .await
         .unwrap();
     assert_eq!(past.anchors[&id].observed_at, at);
     let stale = history
-        .load(Source::MtaSubway, at + Duration::seconds(361), None)
+        .load_trajectories(Source::MtaSubway, at + Duration::seconds(361))
         .await
         .unwrap();
     assert!(!stale.anchors.contains_key(&id));
@@ -560,11 +565,11 @@ async fn removed_static_membership_preserves_runs_and_original_shape_assets(pool
             .contains_key("A")
     );
     let retained = History::new(pool.clone())
-        .load(Source::MtaSubway, first.trips[0].created_at, None)
+        .load_trajectories(Source::MtaSubway, first.trips[0].created_at)
         .await
         .unwrap();
-    assert_eq!(retained.trips[0].id, first.trips[0].id);
-    assert_eq!(retained.stop_times.len(), 2);
+    assert_eq!(retained.service.trips[0].id, first.trips[0].id);
+    assert_eq!(retained.service.stop_times.len(), 2);
     assert!(
         retained
             .network
@@ -595,11 +600,11 @@ async fn unknown_replacement_shape_drops_previous_retained_geometry(pool: sqlx::
     let replacement = stores.ingestor.ingest(input).await.unwrap();
     assert_eq!(replacement.trips[0].shape_ids, ["unknown-replacement"]);
     let history = backend::operations::history::History::new(pool)
-        .load(Source::MtaSubway, first.trips[0].created_at, None)
+        .load_trajectories(Source::MtaSubway, first.trips[0].created_at)
         .await
         .unwrap();
-    assert_eq!(history.trips[0].id, first.trips[0].id);
-    assert!(history.trips[0].shape_ids.is_empty());
+    assert_eq!(history.service.trips[0].id, first.trips[0].id);
+    assert!(history.service.trips[0].shape_ids.is_empty());
     assert!(history.network.unwrap().shapes.is_empty());
 }
 

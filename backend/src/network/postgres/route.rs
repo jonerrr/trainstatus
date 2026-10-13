@@ -9,7 +9,7 @@ pub(in crate::network) async fn query_all_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Route>> {
-    Ok(sqlx::query_as!(
+    sqlx::query_as!(
         RouteRow,
         r#"SELECT
                 id,
@@ -30,7 +30,7 @@ pub(in crate::network) async fn query_all_on(
     .await?
     .into_iter()
     .map(TryInto::try_into)
-    .collect::<anyhow::Result<Vec<Route>>>()?)
+    .collect::<anyhow::Result<Vec<Route>>>()
 }
 
 /// Persist routes inside the owning static import transaction.

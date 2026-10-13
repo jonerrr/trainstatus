@@ -80,7 +80,7 @@ impl<I> VehicleObservation<I> {
     pub fn with_trip_id<J>(self, trip_id: Option<J>) -> VehicleObservation<J> {
         VehicleObservation {
             vehicle_id: self.vehicle_id,
-            trip_id: trip_id,
+            trip_id,
             stop_id: self.stop_id,
             updated_at: self.updated_at,
             data: self.data,

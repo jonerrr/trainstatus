@@ -138,13 +138,8 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::Col
     }
 }
 
-/// A candidate shape can be geometrically closer to a trip's stops than the
-/// real shape (e.g. a coincidence, or here — deliberately — a decoy built
-/// exactly through the stop points) while having zero confirmed stop-membership
-/// hits. Ingestion must prefer the hit-rich real shape over the
-/// distance-closer decoy.
 #[sqlx::test]
-async fn historical_trajectory_uses_final_departure_and_past_history_points(pool: sqlx::PgPool) {
+async fn historical_inputs_use_final_departure_and_past_history_points(pool: sqlx::PgPool) {
     use backend::geometry::Geom;
     use backend::operations::CollectedObservation as VehicleObservation;
     use backend::operations::history::History;
@@ -152,7 +147,8 @@ async fn historical_trajectory_uses_final_departure_and_past_history_points(pool
     use backend::operations::types::position::PositionData;
 
     let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_bus_dataset()).await.unwrap();
+    let dataset = mta_bus_dataset();
+    stores.network.persist(&dataset).await.unwrap();
     let at = crate::support::fixtures::fixed_time() - chrono::Duration::hours(1);
     let mut input = collected_trip("B94", &B94_STOP_IDS);
     input.trips[0].0.created_at = at - chrono::Duration::minutes(5);
@@ -162,12 +158,13 @@ async fn historical_trajectory_uses_final_departure_and_past_history_points(pool
         stop.departure = at + chrono::Duration::minutes(1);
     }
     let old_point = geo::Point::new(-73.948151, 40.744723);
+    let observed_at = at - chrono::Duration::seconds(20);
     input.positions.push(VehicleObservation {
         vehicle_id: input.trips[0].0.vehicle_id.clone(),
         trip_id: Some(input.trips[0].0.id),
         stop_id: None,
         geom: Some(Geom::from(old_point)),
-        updated_at: at - chrono::Duration::seconds(20),
+        updated_at: observed_at,
         data: PositionData::MtaBus(MtaBusPositionData {
             bearing: 0.0,
             passengers: None,
@@ -181,27 +178,81 @@ async fn historical_trajectory_uses_final_departure_and_past_history_points(pool
     input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.94, 40.75)));
     stores.ingestor.ingest(input).await.unwrap();
     let historical = History::new(pool.clone())
-        .load(Source::MtaBus, at, None)
+        .load_trajectories(Source::MtaBus, at)
         .await
         .unwrap();
     assert_eq!(
-        historical.trips.len(),
+        historical.service.trips.len(),
         1,
         "final departure keeps retained trip relevant"
     );
-    assert_eq!(historical.trips[0].id, committed.trips[0].id);
+    assert_eq!(historical.service.trips[0].id, committed.trips[0].id);
     let anchor = &historical.anchors[&committed.trips[0].id];
     assert_eq!(anchor.observed_at, committed.positions[0].updated_at);
     assert_eq!(anchor.point, old_point);
-    assert!(!historical.stop_times.is_empty());
+    assert!(!historical.service.stop_times.is_empty());
+}
+
+#[sqlx::test]
+async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
+    pool: sqlx::PgPool,
+) {
+    use backend::geometry::Geom;
+    use backend::operations::CollectedObservation;
+    use backend::operations::types::position::{MtaBusPositionData, PositionData};
+
+    let stores = test_owners(pool.clone());
+    let dataset = mta_bus_dataset();
+    stores.network.persist(&dataset).await.unwrap();
+    let at = crate::support::fixtures::fixed_time();
+    let mut input = collected_trip("B94", &B94_STOP_IDS);
+    let shape = &dataset
+        .shapes
+        .iter()
+        .find(|shape| shape.id == "B940017")
+        .unwrap()
+        .geom
+        .0;
+    let geo::Geometry::LineString(shape) = shape else {
+        panic!("fixture must contain a line");
+    };
+    let old_point = geo::Point::from(shape.0[0]);
+    let observed_at = at - chrono::Duration::seconds(20);
+    input.positions.push(CollectedObservation {
+        vehicle_id: input.trips[0].0.vehicle_id.clone(),
+        trip_id: Some(input.trips[0].0.id),
+        stop_id: None,
+        geom: Some(Geom::from(old_point)),
+        updated_at: observed_at,
+        data: PositionData::MtaBus(MtaBusPositionData {
+            bearing: 0.0,
+            passengers: None,
+            capacity: None,
+            status: None,
+            phase: None,
+        }),
+    });
+    let committed = stores.ingestor.ingest(input.clone()).await.unwrap();
+    input.positions[0].updated_at = at + chrono::Duration::seconds(20);
+    input.positions[0].geom = Some(Geom::from(geo::Point::from(*shape.0.last().unwrap())));
+    stores.ingestor.ingest(input).await.unwrap();
     let rendered = backend::trajectory::TrajectoryService::new(pool)
         .snapshot(Source::MtaBus, Some(at))
         .await
         .unwrap();
+    let unit = rendered
+        .render_units
+        .values()
+        .find(|unit| unit.trip_id == committed.trips[0].id.to_string())
+        .expect("historical bus renders");
+    let sample = unit
+        .timestamps
+        .iter()
+        .position(|t| (*t - observed_at.timestamp() as f64).abs() < 0.001)
+        .expect("rendered path samples the historical GPS observation time");
+    let [lon, lat] = unit.positions[sample];
     assert!(
-        rendered
-            .render_units
-            .values()
-            .any(|unit| unit.trip_id == committed.trips[0].id.to_string())
+        (lon - old_point.x()).abs() < 0.00001 && (lat - old_point.y()).abs() < 0.00001,
+        "rendered position must use the past GPS fix, not schedule-only interpolation or the future fix: {lon}, {lat}"
     );
 }

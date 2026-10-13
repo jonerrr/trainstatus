@@ -11,7 +11,7 @@ pub(in crate::network) async fn query_all_on(
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Stop>> {
     // Runtime projection: nested route/transfer JSON decodes through FromRow.
-    Ok(sqlx::query_as::<_, StopRow>(
+    sqlx::query_as::<_, StopRow>(
         r#"SELECT
                 s.id,
                 s.source,
@@ -51,7 +51,7 @@ pub(in crate::network) async fn query_all_on(
     )
     .bind(source)
     .fetch_all(connection)
-    .await?.into_iter().map(TryInto::try_into).collect::<anyhow::Result<Vec<Stop>>>()?)
+    .await?.into_iter().map(TryInto::try_into).collect::<anyhow::Result<Vec<Stop>>>()
 }
 
 /// Persist stops inside the owning static import transaction.

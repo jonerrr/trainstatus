@@ -254,10 +254,9 @@ async fn check_needs_update(
         if !network
             .import_due(source, adapter.refresh_interval())
             .await?
-            && let Some(revision) = network.restore_revision(source).await?
+            && network.restore_revision(source).await?.is_some()
         {
             info!(source = %source, "Loaded static revision from the database");
-            network_index.publish(revision);
             return Ok(false);
         }
         return Ok(true);

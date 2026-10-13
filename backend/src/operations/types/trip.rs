@@ -124,7 +124,7 @@ pub enum StopTimeData {
 impl<I> TripRun<I> {
     pub fn with_id<J>(self, id: J) -> TripRun<J> {
         TripRun {
-            id: id,
+            id,
             original_id: self.original_id,
             vehicle_id: self.vehicle_id,
             route_id: self.route_id,
@@ -140,7 +140,7 @@ impl<I> TripRun<I> {
 impl<I> StopVisit<I> {
     pub fn with_trip_id<J>(self, trip_id: J) -> StopVisit<J> {
         StopVisit {
-            trip_id: trip_id,
+            trip_id,
             stop_sequence: self.stop_sequence,
             stop_id: self.stop_id,
             arrival: self.arrival,

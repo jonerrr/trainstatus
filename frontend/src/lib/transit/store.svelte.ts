@@ -92,7 +92,6 @@ class Entry<T> {
 	});
 	readers = 0;
 	eager = false;
-	unknown = false;
 	in_flight = false;
 	fetched_at: number | null = null;
 	source_updated_at: number | null = null;
@@ -486,12 +485,22 @@ export class TransitData {
 
 	replaceCatalog(body: Catalog) {
 		if (!this.#sources.has(body.source)) return;
-		this.#catalogEntry(body.source).install(decodeCatalog(body), this.#now());
+		const catalog = decodeCatalog(body);
+		this.#catalogEntry(body.source).install(catalog, this.#now());
+		for (const entry of this.#services.values())
+			if (
+				entry.source === body.source &&
+				entry.active &&
+				entry.error instanceof UnknownRouteError &&
+				entry.route_id !== null &&
+				catalog.routes_by_id.has(entry.route_id)
+			)
+				this.#start(entry);
 		this.#updateStatus();
 	}
 
 	#ensure(entry: Entry<unknown>) {
-		if (this.#destroyed || entry.in_flight || entry.unknown) return;
+		if (this.#destroyed || entry.in_flight) return;
 		if (entry.data !== undefined && (entry.kind === 'catalog' || entry.at !== null)) return;
 		if (
 			(entry.data !== undefined || entry.error) &&
@@ -502,7 +511,7 @@ export class TransitData {
 	}
 
 	#start(entry: Entry<unknown>) {
-		if (this.#destroyed || entry.in_flight || entry.unknown) return;
+		if (this.#destroyed || entry.in_flight) return;
 		entry.reset();
 		if (entry.kind === 'catalog') void this.#loadCatalog(entry as Entry<CatalogData>);
 		else if (entry.kind === 'alerts') void this.#loadAlerts(entry as Entry<AlertsData>);
@@ -689,7 +698,6 @@ export class TransitData {
 					entry.in_flight = false;
 					if (!unknown.has(entry.route_id!)) this.#enqueue(entry);
 					else {
-						entry.unknown = true;
 						entry.fail(new UnknownRouteError(`Unknown ${source} route ${entry.route_id}`));
 					}
 				}
@@ -761,7 +769,7 @@ export class TransitData {
 			...this.#services.values(),
 			...this.#alerts.values()
 		]) {
-			if (entry.unknown || (!entry.active && !entry.eager)) continue;
+			if (entry.error instanceof UnknownRouteError || (!entry.active && !entry.eager)) continue;
 			if (entry.error) warning = true;
 			if (entry.kind === 'catalog' || entry.at !== null || entry.fetched_at === null) continue;
 			const refreshed = Math.min(entry.fetched_at, entry.source_updated_at ?? entry.fetched_at);

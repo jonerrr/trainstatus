@@ -24,10 +24,12 @@ fn fixture() -> SourceSnapshot {
     let mut revision = NetworkRevision::from_dataset(&support::mta_bus_dataset());
     let stop_ids = ["504409", "901701"];
     for (i, stop) in stop_ids.iter().enumerate() {
-        revision.stops.get_mut(*stop).unwrap().geom =
-            Geom::from(geo::Point::new(-74.0 + i as f64 * 0.01, 40.7));
+        std::sync::Arc::make_mut(&mut revision.stops)
+            .get_mut(*stop)
+            .unwrap()
+            .geom = Geom::from(geo::Point::new(-74.0 + i as f64 * 0.01, 40.7));
     }
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "committed-shape".into(),
         Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
     );
@@ -113,8 +115,14 @@ async fn trajectory_uses_pinned_stop_geometry_and_color() {
     .await
     .unwrap();
     let mut replacement = (*snapshot.network_revision).clone();
-    replacement.routes.get_mut("B94").unwrap().color = "ABCDEF".into();
-    replacement.stops.get_mut("504409").unwrap().geom = Geom::from(geo::Point::new(-73.995, 40.7));
+    std::sync::Arc::make_mut(&mut replacement.routes)
+        .get_mut("B94")
+        .unwrap()
+        .color = "ABCDEF".into();
+    std::sync::Arc::make_mut(&mut replacement.stops)
+        .get_mut("504409")
+        .unwrap()
+        .geom = Geom::from(geo::Point::new(-73.995, 40.7));
     let second = snapshot_from_persisted_trip(
         &snapshot.trips[0],
         snapshot.stop_times.clone(),
@@ -142,7 +150,7 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
     malformed.id = uuid::Uuid::now_v7();
     malformed.shape_ids = vec!["nonfinite".into()];
     let mut revision = (*snapshot.network_revision).clone();
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "nonfinite".into(),
         Geom::from(geo::LineString::from(vec![(f64::NAN, 40.7), (-73.9, 40.7)])),
     );
@@ -215,7 +223,11 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         consist_cars: vec![],
     });
     let mut revision = NetworkRevision::from_dataset(&support::mta_subway_dataset());
-    if let StopData::MtaSubway(data) = &mut revision.stops.get_mut("101").unwrap().data {
+    if let StopData::MtaSubway(data) = &mut std::sync::Arc::make_mut(&mut revision.stops)
+        .get_mut("101")
+        .unwrap()
+        .data
+    {
         data.platform_edges = vec![backend::network::types::stop::PlatformEdge {
             id: "pinned-edge".into(),
             length_ft: 600.0,
@@ -232,12 +244,17 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         ("second", vec![c, b]),
         ("third", vec![c, d]),
     ] {
-        revision
-            .shapes
+        std::sync::Arc::make_mut(&mut revision.shapes)
             .insert(id.into(), Geom::from(geo::LineString::from(coords)));
     }
-    revision.stops.get_mut("101").unwrap().geom = Geom::from(geo::Point::from(a));
-    revision.stops.get_mut("102").unwrap().geom = Geom::from(geo::Point::from(d));
+    std::sync::Arc::make_mut(&mut revision.stops)
+        .get_mut("101")
+        .unwrap()
+        .geom = Geom::from(geo::Point::from(a));
+    std::sync::Arc::make_mut(&mut revision.stops)
+        .get_mut("102")
+        .unwrap()
+        .geom = Geom::from(geo::Point::from(d));
     let stop_times = ["101", "102"]
         .iter()
         .enumerate()
@@ -303,7 +320,7 @@ async fn trajectory_disconnected_subway_segments_are_rejected() {
     let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids.push("disconnected".into());
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "disconnected".into(),
         Geom::from(geo::LineString::from(vec![(-73.9, 40.7), (-73.89, 40.7)])),
     );
@@ -430,11 +447,11 @@ async fn trajectory_subway_rejects_unrelated_topological_legs_even_with_shared_c
     let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids = vec!["76-75".into(), "254-255".into()];
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "76-75".into(),
         Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
     );
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         "254-255".into(),
         Geom::from(geo::LineString::from(vec![(-73.99, 40.7), (-73.98, 40.7)])),
     );

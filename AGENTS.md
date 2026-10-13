@@ -24,7 +24,7 @@ Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, Sv
 
 **Network refresh**: `RealtimeEngine` calls `NetworkController::ensure_updated(source)` before collection. A foreign-key failure triggers one forced import and one retry; network-dependent normalization retries the same decoded provider batch against the new pinned revision.
 
-**Reads**: Live service uses the last committed source snapshot without SQL. Failures preserve it; a successful empty collection clears membership; startup returns `503` until the first commit. Requested routes are present even when empty; unknown bus routes return `404`. Service and trajectories share the historical loader's inclusive four-hour arrival-or-departure selection, with all retained visits and no historical vehicle status. For identity, freshness, retired-route and historical geometry changes, read [backend contracts](docs/backend-contracts.md).
+**Reads**: Live service uses the last committed source snapshot without SQL. Failures preserve it; a successful empty collection clears membership; startup returns `503` until the first commit. Requested routes are present even when empty; unknown bus routes return `404`. Service and trajectories share the historical loader's inclusive four-hour arrival-or-departure selection, with all retained visits and no historical vehicle status.
 
 **API routes** (all under `/api/v1/`):
 

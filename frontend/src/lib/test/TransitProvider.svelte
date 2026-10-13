@@ -1,4 +1,4 @@
-<script lang="ts" generics="P extends Record<string, unknown>">
+<script lang="ts" generics="P extends object">
 	import type { Component } from 'svelte';
 
 	import { setTransitData, type TransitData } from '#lib/transit/store.svelte.js';

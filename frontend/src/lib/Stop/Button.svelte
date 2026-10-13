@@ -94,7 +94,7 @@
 			>&nbsp;</span
 		>
 	{:else if times.length}
-		{#each times.slice(0, 2) as st (st.trip_id)}
+		{#each times.slice(0, 2) as st (`${st.trip_id}:${st.sequence}`)}
 			{@render eta(st.eta)}
 		{/each}
 	{:else}

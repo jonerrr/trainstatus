@@ -47,6 +47,10 @@ pub type CollectedTrip = TripRun<RunKey>;
 pub type CollectedVisit = StopVisit<RunKey>;
 pub type CollectedObservation = VehicleObservation<RunKey>;
 
+type Renormalize = dyn Fn(std::sync::Arc<crate::network::index::NetworkRevision>) -> anyhow::Result<CollectedSnapshot>
+    + Send
+    + Sync;
+
 /// Provider decoding returns stable source keys and visits; operations assigns UUIDs.
 #[derive(Clone)]
 pub struct CollectedSnapshot {
@@ -56,15 +60,7 @@ pub struct CollectedSnapshot {
     /// can apply new schedules/remaps without fetching a different provider poll.
     /// Reusing normalized results would keep filters and identities from the old
     /// revision. Sources with no network-dependent normalization leave this empty.
-    pub renormalize: Option<
-        std::sync::Arc<
-            dyn Fn(
-                    std::sync::Arc<crate::network::index::NetworkRevision>,
-                ) -> anyhow::Result<CollectedSnapshot>
-                + Send
-                + Sync,
-        >,
-    >,
+    pub renormalize: Option<std::sync::Arc<Renormalize>>,
     pub trips: Vec<(TripRun<RunKey>, Vec<StopVisit<RunKey>>)>,
     pub positions: Vec<VehicleObservation<RunKey>>,
 }

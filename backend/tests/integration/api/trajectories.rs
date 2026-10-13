@@ -98,7 +98,9 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
             assert!(
                 coords
                     .values()
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .collect::<Vec<_>>()
                     .windows(2)
                     .any(|w| w[0] != w[1]),

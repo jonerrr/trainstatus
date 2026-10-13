@@ -118,3 +118,29 @@ test('reconnecting retries failed reads without a click', async () => {
 	await expect.element(view.getByRole('button', { name: /Retry updates/ })).not.toBeInTheDocument();
 	await view.unmount();
 });
+
+for (const query of [
+	'?s=missing&src=njt_bus',
+	'?r=missing&src=njt_bus',
+	'?t=missing&r=4&src=njt_bus',
+	'?t=trip-0&src=njt_bus',
+	'?r=4&src=invalid'
+]) {
+	test(`silently dismisses invalid modal URL ${query}`, async () => {
+		fail = false;
+		page.data.selected_sources = ['njt_bus'];
+		page.data.at = '0';
+		page.url = new SvelteURL(`http://localhost/${query}&at=0&keep=value`);
+		const view = await render(Layout, {
+			children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
+		});
+		await expect.poll(() => page.state.modal ?? null).toBeNull();
+		await expect.poll(() => page.url.searchParams.has('src')).toBe(false);
+		expect(page.url.searchParams.get('at')).toBe('0');
+		expect(page.url.searchParams.get('keep')).toBe('value');
+		await expect
+			.element(view.getByRole('button', { name: /Retry updates/ }))
+			.not.toBeInTheDocument();
+		await view.unmount();
+	});
+}

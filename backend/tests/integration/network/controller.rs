@@ -113,21 +113,23 @@ impl StaticAdapter for CountingNjtAdapter {
 }
 
 #[sqlx::test]
-async fn njt_upgrade_imports_once_and_next_restart_restores_without_collection(pool: sqlx::PgPool) {
+async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
     let stores = test_owners(pool.clone());
-    stores
-        .network
-        .persist(&crate::support::njt_bus_dataset())
-        .await
-        .unwrap();
-    // Simulate an installation whose old static rows predate schedule persistence.
-    sqlx::query("UPDATE source SET schedules_initialized = FALSE WHERE id = $1")
-        .bind(Source::NjtBus)
-        .execute(&pool)
-        .await
-        .unwrap();
+    let mut dataset = crate::support::njt_bus_dataset();
+    dataset
+        .scheduled_trips
+        .push(backend::network::schedule::ScheduledTrip {
+            trip_id: "restart-trip".into(),
+            route_id: "87".into(),
+            headsign: "Recovered terminal".into(),
+            direction_id: 1,
+            start_date: "20260528".into(),
+            start_time: crate::support::fixed_time(),
+            stop_times: vec![],
+        });
+    stores.network.persist(&dataset).await.unwrap();
     let imports = Arc::new(AtomicUsize::new(0));
-    for expected_imports in [1, 1] {
+    for _ in 0..2 {
         let restarted = test_owners(pool.clone());
         let controller = static_data::run(
             &restarted.network,
@@ -145,6 +147,6 @@ async fn njt_upgrade_imports_once_and_next_restart_restores_without_collection(p
                 .headsign,
             "Recovered terminal"
         );
-        assert_eq!(imports.load(Ordering::SeqCst), expected_imports);
+        assert_eq!(imports.load(Ordering::SeqCst), 0);
     }
 }

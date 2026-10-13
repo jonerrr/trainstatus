@@ -2,7 +2,7 @@ import type { RouteService } from '#lib/client/index.js';
 
 import { expect, test } from 'vitest';
 
-import { callsAtStop, decodeRoute, decodeService, isStale, upcomingCalls } from './decode.js';
+import { callsAtStop, decodeRoute, decodeService, upcomingCalls } from './decode.js';
 
 const route: RouteService = {
 	trips: [
@@ -51,13 +51,6 @@ test('drops passed calls but retains future predictions and departures', () => {
 	expect(upcomingCalls([], 400_000)).toEqual([]);
 });
 
-test('only live data becomes stale, after 90 seconds', () => {
-	const live = decodeRoute('mta_bus', 'A', route, null, 1_000);
-	expect(isStale(live, 91_000)).toBe(false);
-	expect(isStale(live, 91_001)).toBe(true);
-	expect(isStale(decodeRoute('mta_bus', 'A', route, 50, 1_000), 1_000_000)).toBe(false);
-});
-
 test('rejects unequal columns and out-of-range indexes', () => {
 	expect(() =>
 		decodeRoute('mta_bus', 'A', { ...route, calls: { ...route.calls, arrival: [1] } })
@@ -74,8 +67,6 @@ test('fetching an old committed snapshot does not renew source freshness', () =>
 	const service = { source: 'mta_bus' as const, updated_at: 2, routes: { A: route } };
 	const decoded = decodeService(service, 92_000).get('A')!;
 	expect(decoded.source_updated_at).toBe(2_000);
-	expect(isStale(decoded, 92_001)).toBe(true);
 	const historical = decodeService({ ...service, at: 50 }, 92_000).get('A')!;
 	expect(historical.source_updated_at).toBeNull();
-	expect(isStale(historical, 1_000_000)).toBe(false);
 });

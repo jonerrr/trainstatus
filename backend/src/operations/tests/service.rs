@@ -73,13 +73,14 @@ fn revision(route_ids: &[&str]) -> Arc<NetworkRevision> {
                     },
                 )
             })
-            .collect(),
-        stops: HashMap::new(),
-        shapes: HashMap::new(),
-        route_stop_shapes: HashMap::new(),
-        trip_patterns: HashMap::new(),
-        stop_remap: HashMap::new(),
-        scheduled_trips: HashMap::new(),
+            .collect::<HashMap<_, _>>()
+            .into(),
+        stops: Arc::new(HashMap::new()),
+        shapes: Arc::new(HashMap::new()),
+        route_stop_shapes: Arc::new(HashMap::new()),
+        trip_patterns: Arc::new(HashMap::new()),
+        stop_remap: Arc::new(HashMap::new()),
+        scheduled_trips: Arc::new(HashMap::new()),
     })
 }
 

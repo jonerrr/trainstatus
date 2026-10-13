@@ -1,6 +1,5 @@
 use backend::fixtures;
 use backend::fixtures::FixtureKind;
-use backend::network::index::NetworkIndex;
 use backend::network::index::NetworkRevision;
 use backend::network::schedule::ScheduledTrip;
 use backend::operations::CollectedSnapshot;
@@ -53,14 +52,11 @@ async fn realtime_fixture_maps_trips() {
 
     let mut dataset = njt_bus_dataset();
     dataset.scheduled_trips = scheduled_trips;
-    let index = NetworkIndex::new();
-    index.publish(NetworkRevision::from_dataset(&dataset));
-    let adapter = NjtBusRealtime::new(index);
-
-    let snapshot: CollectedSnapshot = adapter
-        .build_snapshot(vec![fixture, vehicles])
-        .await
-        .expect("NJT snapshot should normalize");
+    let snapshot: CollectedSnapshot = NjtBusRealtime::build_snapshot(
+        vec![fixture, vehicles],
+        std::sync::Arc::new(NetworkRevision::from_dataset(&dataset)),
+    )
+    .expect("NJT snapshot should normalize");
     assert_eq!(snapshot.source, Source::NjtBus);
     let (trip, times) = snapshot
         .trips

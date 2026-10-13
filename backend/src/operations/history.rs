@@ -50,6 +50,11 @@ pub struct RetainedGeometry {
 pub struct RetainedService {
     pub trips: Vec<TripRun>,
     pub stop_times: Vec<StopVisit>,
+}
+
+/// Passenger inputs plus the geometry needed to render their trajectories.
+pub struct RetainedTrajectories {
+    pub service: RetainedService,
     pub network: Option<RetainedGeometry>,
     pub anchors: HashMap<uuid::Uuid, GpsSample>,
 }
@@ -67,11 +72,27 @@ impl History {
         at: DateTime<Utc>,
         route_ids: Option<&[String]>,
     ) -> anyhow::Result<RetainedService> {
+        let mut tx = self.begin_read().await?;
+        let service = Self::load_service_on(&mut tx, source, at, route_ids).await?;
+        tx.commit().await?;
+        Ok(service)
+    }
+
+    async fn begin_read(&self) -> anyhow::Result<sqlx::Transaction<'_, sqlx::Postgres>> {
         let mut tx = self.pg_pool.begin().await?;
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .execute(&mut *tx)
             .await?;
-        let mut trips = sqlx::query_as!(
+        Ok(tx)
+    }
+
+    async fn load_service_on(
+        tx: &mut sqlx::PgConnection,
+        source: Source,
+        at: DateTime<Utc>,
+        route_ids: Option<&[String]>,
+    ) -> anyhow::Result<RetainedService> {
+        let trips = sqlx::query_as!(
             TripRow,
             r#"
             SELECT
@@ -91,15 +112,44 @@ impl History {
         .into_iter()
         .map(TryInto::try_into)
         .collect::<anyhow::Result<Vec<TripRun>>>()?;
-        if trips.is_empty() {
+        let ids: Vec<_> = trips.iter().map(|trip| trip.id).collect();
+        let stop_times = sqlx::query_as!(
+            VisitRow,
+            r#"
+            SELECT
+                *
+            FROM realtime.stop_time
+            WHERE source = $1
+            AND trip_id = ANY($2)
+            ORDER BY trip_id, stop_sequence
+            "#,
+            source,
+            &ids
+        )
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<anyhow::Result<Vec<StopVisit>>>()?;
+        Ok(RetainedService { trips, stop_times })
+    }
+
+    pub async fn load_trajectories(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+    ) -> anyhow::Result<RetainedTrajectories> {
+        let mut tx = self.begin_read().await?;
+        let mut service = Self::load_service_on(&mut tx, source, at, None).await?;
+        if service.trips.is_empty() {
             tx.commit().await?;
-            return Ok(RetainedService {
-                trips,
-                stop_times: vec![],
+            return Ok(RetainedTrajectories {
+                service,
                 network: None,
                 anchors: HashMap::new(),
             });
         }
+        let trips = &mut service.trips;
         let ids: Vec<_> = trips.iter().map(|trip| trip.id).collect();
         let route_ids: Vec<_> = trips.iter().map(|trip| trip.route_id.clone()).collect();
         let refs = sqlx::query!(
@@ -123,29 +173,15 @@ impl History {
             aliases.insert(alias.clone(), row.asset_id);
             shapes_by_run.entry(row.run_id).or_default().push(alias);
         }
-        for trip in &mut trips {
+        for trip in trips.iter_mut() {
             trip.shape_ids = shapes_by_run.remove(&trip.id).unwrap_or_default();
         }
         let shape_ids: Vec<_> = aliases.values().cloned().collect();
-        let stop_times = sqlx::query_as!(
-            VisitRow,
-            r#"
-            SELECT
-                *
-            FROM realtime.stop_time
-            WHERE source = $1
-            AND trip_id = ANY($2)
-            ORDER BY trip_id, stop_sequence
-            "#,
-            source,
-            &ids
-        )
-        .fetch_all(&mut *tx)
-        .await?
-        .into_iter()
-        .map(TryInto::try_into)
-        .collect::<anyhow::Result<Vec<StopVisit>>>()?;
-        let stop_ids: Vec<_> = stop_times.iter().map(|stop| stop.stop_id.clone()).collect();
+        let stop_ids: Vec<_> = service
+            .stop_times
+            .iter()
+            .map(|stop| stop.stop_id.clone())
+            .collect();
         let routes = sqlx::query_as!(
             RouteColorRow,
             "SELECT id, color FROM static.route WHERE source = $1 AND id = ANY($2)",
@@ -223,9 +259,8 @@ impl History {
             },
         };
         tx.commit().await?;
-        Ok(RetainedService {
-            trips,
-            stop_times,
+        Ok(RetainedTrajectories {
+            service,
             network: Some(revision),
             anchors: points
                 .into_iter()

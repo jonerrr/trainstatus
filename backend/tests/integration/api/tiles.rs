@@ -60,7 +60,7 @@ async fn assert_tile(pool: sqlx::PgPool, source: Source) {
     assert_eq!(feature.kind, 2, "line geometry");
     assert!(!feature.geometry.is_empty());
     let property = |key| {
-        feature.tags.chunks_exact(2).find_map(|pair| {
+        feature.tags.as_chunks::<2>().0.iter().find_map(|pair| {
             (layer.keys[pair[0] as usize] == key)
                 .then(|| layer.values[pair[1] as usize].text.as_deref().unwrap())
         })
@@ -130,7 +130,7 @@ async fn stop_tiles_exclude_retired_identities_and_keep_selection_fields(pool: s
     assert!(!layer.features.is_empty());
     for feature in &layer.features {
         let property = |key| {
-            feature.tags.chunks_exact(2).find_map(|pair| {
+            feature.tags.as_chunks::<2>().0.iter().find_map(|pair| {
                 (layer.keys[pair[0] as usize] == key)
                     .then(|| layer.values[pair[1] as usize].text.as_deref().unwrap())
             })

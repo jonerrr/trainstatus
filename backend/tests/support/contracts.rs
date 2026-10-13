@@ -19,13 +19,13 @@ pub fn assert_static_dataset_contract(dataset: &NetworkDataset) {
 pub async fn assert_static_persistence_contract(dataset: &NetworkDataset, stores: &TestOwners) {
     stores
         .network
-        .persist(&dataset)
+        .persist(dataset)
         .await
         .expect("first static import should persist");
 
     stores
         .network
-        .persist(&dataset)
+        .persist(dataset)
         .await
         .expect("second static import should be idempotent");
 
@@ -42,10 +42,10 @@ pub async fn assert_static_persistence_contract(dataset: &NetworkDataset, stores
         .unwrap()
         .unwrap();
     assert_eq!(
-        serde_json::to_value(&revision.trip_patterns).unwrap(),
+        serde_json::to_value(revision.trip_patterns.as_ref()).unwrap(),
         serde_json::to_value(&dataset.trip_patterns).unwrap()
     );
-    assert_eq!(revision.stop_remap, dataset.stop_remap);
+    assert_eq!(*revision.stop_remap, dataset.stop_remap);
     for expected in &dataset.route_stops {
         let stop = stops
             .iter()

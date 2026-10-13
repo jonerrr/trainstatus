@@ -38,13 +38,13 @@ pub struct IndexedStop {
 pub struct NetworkRevision {
     pub source: Source,
     pub catalog: Option<Arc<crate::network::catalog::CatalogResponse>>,
-    pub routes: HashMap<String, IndexedRoute>,
-    pub stops: HashMap<String, IndexedStop>,
-    pub shapes: HashMap<String, Geom>,
-    pub route_stop_shapes: HashMap<(String, String), Vec<String>>,
-    pub trip_patterns: HashMap<String, TripPattern>,
-    pub stop_remap: HashMap<String, String>,
-    pub scheduled_trips: HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>>,
+    pub routes: Arc<HashMap<String, IndexedRoute>>,
+    pub stops: Arc<HashMap<String, IndexedStop>>,
+    pub shapes: Arc<HashMap<String, Geom>>,
+    pub route_stop_shapes: Arc<HashMap<(String, String), Vec<String>>>,
+    pub trip_patterns: Arc<HashMap<String, TripPattern>>,
+    pub stop_remap: Arc<HashMap<String, String>>,
+    pub scheduled_trips: Arc<HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>>>,
 }
 
 impl NetworkRevision {
@@ -119,13 +119,13 @@ impl NetworkRevision {
         Self {
             source: dataset.source,
             catalog: None,
-            routes,
-            stops,
-            shapes,
-            route_stop_shapes,
-            trip_patterns: dataset.trip_patterns.clone(),
-            stop_remap: dataset.stop_remap.clone(),
-            scheduled_trips: schedule_index(schedules),
+            routes: Arc::new(routes),
+            stops: Arc::new(stops),
+            shapes: Arc::new(shapes),
+            route_stop_shapes: Arc::new(route_stop_shapes),
+            trip_patterns: Arc::new(dataset.trip_patterns.clone()),
+            stop_remap: Arc::new(dataset.stop_remap.clone()),
+            scheduled_trips: Arc::new(schedule_index(schedules)),
         }
     }
 
@@ -133,7 +133,7 @@ impl NetworkRevision {
         &mut self,
         trips: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
     ) {
-        self.scheduled_trips = schedule_index(trips);
+        self.scheduled_trips = Arc::new(schedule_index(trips));
     }
 
     pub fn scheduled_trip(

@@ -1,5 +1,6 @@
 import { tick } from 'svelte';
 
+import { chartFixture } from '#lib/charts/fixtures.js';
 import type { RouteService, Service, Source } from '#lib/client/index.js';
 import TransitDataHarness from '#lib/test/TransitDataHarness.svelte';
 
@@ -508,4 +509,21 @@ test('destroying the owner aborts its requests', async () => {
 	await settle();
 	data.destroy();
 	expect(http.calls[0].signal.aborted).toBe(true);
+});
+
+test('a replacement catalog retries an active route previously reported unknown', async () => {
+	const http = transport();
+	const data = store(http.fetcher);
+	await render(TransitDataHarness, { data, source: 'mta_bus', readers: [{ id: '1', route: '4' }] });
+	await settle();
+	http.calls[0].respond(http.json({ unknown_route_ids: ['4'] }, 404));
+	await settle();
+	expect(document.querySelector('[data-failed="4"]')).not.toBeNull();
+	data.replaceCatalog(chartFixture('mta_bus').catalog);
+	await settle();
+	expect(http.calls).toHaveLength(2);
+	http.calls[1].respond(http.json(http.service('mta_bus', { '4': ['recovered'] })));
+	await settle();
+	expect(text('4')).toEqual(['recovered']);
+	expect(document.querySelector('[data-failed="4"]')).toBeNull();
 });

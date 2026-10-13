@@ -14,17 +14,17 @@ pub(super) async fn load_historical_inputs(
     source: Source,
     at: DateTime<Utc>,
 ) -> anyhow::Result<Vec<TripSnapshot>> {
-    let retained = history.load(source, at, None).await?;
+    let retained = history.load_trajectories(source, at).await?;
     let Some(network) = retained.network else {
         return Ok(vec![]);
     };
     let mut visits: HashMap<_, Vec<_>> = HashMap::new();
-    for visit in retained.stop_times {
+    for visit in retained.service.stop_times {
         visits.entry(visit.trip_id).or_default().push(visit);
     }
     let mut anchors = retained.anchors;
     let mut inputs = Vec::new();
-    for trip in retained.trips {
+    for trip in retained.service.trips {
         let Some(color) = network.routes.get(&trip.route_id) else {
             continue;
         };

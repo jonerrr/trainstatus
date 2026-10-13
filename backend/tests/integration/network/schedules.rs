@@ -68,29 +68,11 @@ async fn schedules_restore_after_restart_and_empty_import_replaces_them(pool: sq
 }
 
 #[sqlx::test]
-async fn expired_schedules_are_excluded_and_upgrade_requires_one_import(pool: sqlx::PgPool) {
+async fn expired_schedules_are_excluded(pool: sqlx::PgPool) {
     let stores = test_owners(pool.clone());
     let mut dataset = njt_bus_dataset();
     dataset.scheduled_trips = vec![scheduled_trip()];
     stores.network.persist(&dataset).await.unwrap();
-    sqlx::query("UPDATE source SET schedules_initialized = FALSE WHERE id = $1")
-        .bind(Source::NjtBus)
-        .execute(&pool)
-        .await
-        .unwrap();
-    assert!(
-        stores
-            .network
-            .restore_revision(Source::NjtBus)
-            .await
-            .unwrap()
-            .is_none()
-    );
-    sqlx::query("UPDATE source SET schedules_initialized = TRUE WHERE id = $1")
-        .bind(Source::NjtBus)
-        .execute(&pool)
-        .await
-        .unwrap();
     sqlx::query("UPDATE static.scheduled_trip SET expires_at = NOW() - INTERVAL '1 second'")
         .execute(&pool)
         .await
@@ -108,8 +90,7 @@ async fn expired_schedules_are_excluded_and_upgrade_requires_one_import(pool: sq
             .is_none()
     );
     let mut pinned = backend::network::index::NetworkRevision::from_dataset(&dataset);
-    pinned
-        .scheduled_trips
+    std::sync::Arc::make_mut(&mut pinned.scheduled_trips)
         .get_mut("schedule-restart")
         .unwrap()
         .get_mut("20260528")

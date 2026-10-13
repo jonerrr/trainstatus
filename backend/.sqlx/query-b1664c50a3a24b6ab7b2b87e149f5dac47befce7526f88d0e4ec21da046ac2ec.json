@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE source SET trip_patterns = $2, stop_remap = $3, updated_at = NOW(), schedules_initialized = TRUE\n            WHERE id = $1\n            ",
+  "query": "\n            UPDATE source SET trip_patterns = $2, stop_remap = $3, updated_at = NOW()\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -23,5 +23,5 @@
     },
     "nullable": []
   },
-  "hash": "fd28ed10c0c9466e2d481cedeb587585093c89d2856fe7b0611f0fd2f096f61d"
+  "hash": "b1664c50a3a24b6ab7b2b87e149f5dac47befce7526f88d0e4ec21da046ac2ec"
 }

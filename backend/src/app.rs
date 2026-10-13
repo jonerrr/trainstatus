@@ -94,7 +94,7 @@ pub async fn build() -> anyhow::Result<Application> {
     let realtime_sources: Vec<Arc<dyn RealtimeSource>> = vec![
         Arc::new(MtaSubwayRealtime),
         Arc::new(MtaBusRealtime),
-        Arc::new(NjtBusRealtime::new(static_controller.network_index())),
+        Arc::new(NjtBusRealtime),
     ];
 
     let trajectories = crate::trajectory::TrajectoryService::new(pg_pool.clone());

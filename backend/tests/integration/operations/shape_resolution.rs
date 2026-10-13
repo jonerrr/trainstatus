@@ -78,12 +78,11 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         .expect("fixture should persist");
 
     let mut revision = backend::network::index::NetworkRevision::from_dataset(&dataset);
-    revision.shapes.insert(
+    std::sync::Arc::make_mut(&mut revision.shapes).insert(
         DECOY_SHAPE.into(),
         backend::geometry::Geom::from(geo::LineString::from(B94_STOP_COORDS.to_vec())),
     );
-    revision
-        .routes
+    std::sync::Arc::make_mut(&mut revision.routes)
         .get_mut("B94")
         .unwrap()
         .shape_ids
@@ -117,7 +116,7 @@ async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
         .expect("fixture should persist");
 
     let mut revision = backend::network::index::NetworkRevision::from_dataset(&dataset);
-    revision.route_stop_shapes.clear();
+    std::sync::Arc::make_mut(&mut revision.route_stop_shapes).clear();
     stores.network.network_index().publish(revision);
     let committed = stores
         .ingestor

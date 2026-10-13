@@ -11,7 +11,6 @@ use crate::feed::FeedMessage;
 use crate::feed::TripUpdate;
 use crate::feed::VehiclePosition as GtfsVehiclePosition;
 use crate::integrations::gtfs_realtime;
-use crate::network::index::NetworkIndex;
 use crate::network::index::NetworkRevision;
 use crate::operations::CollectedSnapshot;
 use crate::operations::RealtimeSource;
@@ -27,9 +26,7 @@ use crate::source::Source;
 
 use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
-pub struct NjtBusRealtime {
-    network_index: NetworkIndex,
-}
+pub struct NjtBusRealtime;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
@@ -47,10 +44,6 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 }
 
 impl NjtBusRealtime {
-    pub fn new(network_index: NetworkIndex) -> Self {
-        Self { network_index }
-    }
-
     async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
         let token = get_token().await?;
         gtfs_realtime::fetch_feeds(vec![
@@ -66,14 +59,10 @@ impl NjtBusRealtime {
         .await
     }
 
-    pub async fn build_snapshot(
-        &self,
+    pub fn build_snapshot(
         feeds: Vec<FeedMessage>,
+        revision: std::sync::Arc<NetworkRevision>,
     ) -> anyhow::Result<CollectedSnapshot> {
-        let revision = self
-            .network_index
-            .get(Source::NjtBus)
-            .ok_or_else(|| anyhow::anyhow!("NJT static transit index is not loaded"))?;
         Self::build_snapshot_on(std::sync::Arc::new(feeds), revision)
     }
     fn build_snapshot_on(
@@ -319,7 +308,7 @@ impl RealtimeSource for NjtBusRealtime {
         &self,
         revision: std::sync::Arc<NetworkRevision>,
     ) -> anyhow::Result<CollectedSnapshot> {
-        Self::build_snapshot_on(std::sync::Arc::new(self.fetch_feeds().await?), revision)
+        Self::build_snapshot(self.fetch_feeds().await?, revision)
     }
 }
 

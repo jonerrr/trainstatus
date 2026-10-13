@@ -13,7 +13,7 @@
 	import RouteModal from '#lib/Route/Modal.svelte';
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { getTransitData, UnknownRouteError } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
 	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
 	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
@@ -90,6 +90,41 @@
 			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
 			slide_to(next_state, forward);
 		}
+	});
+
+	const selected_catalog = transit.catalog(() => page.state.modal?.source ?? null);
+	const selected_service = transit.route(() => {
+		const selected = page.state.modal;
+		const catalog = selected_catalog.current.value;
+		const route_id =
+			selected?.type === 'route'
+				? selected.id
+				: selected?.type === 'trip'
+					? selected.route_id
+					: null;
+		return selected && route_id && catalog?.routes_by_id.has(route_id)
+			? { source: selected.source, route_id, at: current_time.value }
+			: null;
+	});
+	$effect(() => {
+		const selected = page.state.modal;
+		if (!selected) return;
+		const catalog = selected_catalog.current.value;
+		if (!catalog) return; // Failed or pending catalog reads cannot establish validity.
+		const service = selected_service.current;
+		const invalid =
+			selected.type === 'stop'
+				? !catalog.stops_by_id.has(selected.id)
+				: selected.type === 'route'
+					? !catalog.routes_by_id.has(selected.id) || service.error instanceof UnknownRouteError
+					: !selected.route_id ||
+						!catalog.routes_by_id.has(selected.route_id) ||
+						service.error instanceof UnknownRouteError ||
+						(!service.loading &&
+							!service.error &&
+							service.value !== undefined &&
+							!service.value.trips.has(selected.id));
+		if (invalid) untrack(() => close_modal(current_time.value, true));
 	});
 
 	const modal: Attachment<HTMLDivElement> = (node) => {

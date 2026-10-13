@@ -38,7 +38,7 @@
 	const loaded_catalog = $derived(transit.peekCatalog(source));
 	const route = $derived(route_id ? loaded_catalog?.routes_by_id.get(route_id) : undefined);
 	const loaded_read = $derived(trip_resource.current.value);
-	const open_transfers = $state<Record<string, boolean>>({});
+	const open_transfers = $state<Record<number, boolean>>({});
 
 	function visible_calls(read: TripRead) {
 		const now = current_time.ms;
@@ -49,9 +49,9 @@
 
 	/** Up to four later departures on other routes at each stop, from loaded routes only. */
 	function transfers_at(read: TripRead, calls: readonly Call[], catalog: CatalogData) {
-		const transfers: Record<string, TransferCall[]> = {};
+		const transfers: Record<number, TransferCall[]> = {};
 		for (const st of calls) {
-			const list: TransferCall[] = (transfers[st.stop_id] = []);
+			const list: TransferCall[] = (transfers[st.sequence] = []);
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const added = new Set<string>();
 			const stop = catalog?.stops_by_id.get(st.stop_id);
@@ -231,17 +231,17 @@
 					{const stop = $derived(catalog?.stops_by_id.get(st.stop_id))}
 					{#if stop}
 						<div class="relative text-base">
-							{#if transfers[st.stop_id]?.length}
+							{#if transfers[st.sequence]?.length}
 								<button
 									tabindex="0"
 									onclick={() => {
-										open_transfers[st.stop_id] = !open_transfers[st.stop_id];
+										open_transfers[st.sequence] = !open_transfers[st.sequence];
 									}}
 									aria-label="Show transfers at stop"
 									class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
 								>
 									<div class="mx-1 flex items-center">
-										{#if !open_transfers[st.stop_id]}
+										{#if !open_transfers[st.sequence]}
 											<ChevronDown />
 										{:else}
 											<ChevronUp />
@@ -274,9 +274,9 @@
 							</Button>
 						</div>
 
-						{#if open_transfers[st.stop_id]}
+						{#if open_transfers[st.sequence]}
 							<div transition:slide>
-								<Transfers {time_format} transfer_calls={transfers[st.stop_id]} />
+								<Transfers {time_format} transfer_calls={transfers[st.sequence]} />
 							</div>
 						{/if}
 					{/if}

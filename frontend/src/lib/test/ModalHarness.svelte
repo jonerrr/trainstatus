@@ -3,6 +3,7 @@
 
 	import { onDestroy } from 'svelte';
 
+	import { chartFixture } from '../charts/fixtures';
 	import Modal from '../Modal.svelte';
 	import { setTransitData } from '../transit/store.svelte';
 	import { createCurrentTime, setCurrentTime } from '../url_params.svelte';
@@ -11,7 +12,16 @@
 	setCurrentTime(createCurrentTime());
 	const transit = setTransitData(
 		fixtureTransitData({
-			catalogs: { njt_bus: { source: 'njt_bus', routes: [], stops: [] } },
+			catalogs: {
+				njt_bus: {
+					...chartFixture('njt_bus', 0).catalog,
+					routes: ['First', 'Second', 'Third'].map((id) => ({
+						...chartFixture('njt_bus', 0).catalog.routes[0],
+						id,
+						short_name: id
+					}))
+				}
+			},
 			services: {}
 		})
 	);

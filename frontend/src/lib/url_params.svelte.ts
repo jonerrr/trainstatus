@@ -113,7 +113,7 @@ export function open_modal(state: ModalData) {
  * A list-opened modal pushed a history entry, so closing pushes the dismissed
  * entry and Back restores the modal. A fresh load replaces the current entry.
  */
-export function close_modal(at: number | undefined) {
+export function close_modal(at: number | undefined, replace = false) {
 	const url = new SvelteURL(page.url.href);
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
 	url.searchParams.delete('src');
@@ -126,7 +126,7 @@ export function close_modal(at: number | undefined) {
 	const opened_from_list = (page.state?.index ?? 0) > 0;
 	goto(url.pathname + url.search, {
 		shallow: true,
-		replace: !opened_from_list,
+		replace: replace || !opened_from_list,
 		state: { modal: null }
 	});
 }

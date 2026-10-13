@@ -6,11 +6,9 @@ CREATE TYPE source_enum AS ENUM ('mta_subway', 'mta_bus', 'njt_bus');
 CREATE TABLE IF NOT EXISTS source (
     id source_enum PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     trip_patterns JSONB NOT NULL DEFAULT '{}'::jsonb,
-    stop_remap JSONB NOT NULL DEFAULT '{}'::jsonb,
-    schedules_initialized BOOLEAN NOT NULL DEFAULT FALSE
-
+    stop_remap JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE EXTENSION IF NOT EXISTS postgis;
 

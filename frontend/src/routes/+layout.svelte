@@ -12,6 +12,7 @@
 	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
+		close_modal,
 		createCurrentTime,
 		modal_from_url,
 		setCurrentTime
@@ -46,6 +47,8 @@
 	onMount(() => {
 		const modal = modal_from_url(page.url);
 		if (modal) void tick().then(() => goto('', { shallow: true, replace: true, state: { modal } }));
+		else if (['s', 'r', 't'].some((key) => page.url.searchParams.has(key)))
+			close_modal(current_time.value, true);
 	});
 
 	// The service worker posts catalogs that changed after it served a saved copy.

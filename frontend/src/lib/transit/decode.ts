@@ -68,13 +68,6 @@ export function upcomingCalls(calls: readonly Call[], now: number): Call[] {
 	return calls.filter((call) => Math.max(call.arrival, call.departure) >= now);
 }
 
-/** Whether live route data has gone unrefreshed past the stale threshold. */
-export function isStale(route: RouteData, now: number): boolean {
-	if (route.at !== null || route.fetched_at === null) return false;
-	const refreshed_at = Math.min(route.fetched_at, route.source_updated_at ?? route.fetched_at);
-	return now - refreshed_at > STALE_AFTER_MS;
-}
-
 function index(name: string, value: number, length: number) {
 	if (!Number.isInteger(value) || value < 0 || value >= length) {
 		throw new Error(`Service ${name} index ${value} is out of bounds`);
