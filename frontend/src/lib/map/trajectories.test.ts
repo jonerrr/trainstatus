@@ -2,7 +2,42 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { watchTrajectories } from './trajectories';
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+	vi.restoreAllMocks();
+	vi.useRealTimers();
+});
+
+test('a stalled trajectory request times out and refresh recovers', async () => {
+	vi.useFakeTimers();
+	const deadline = new AbortController();
+	const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(deadline.signal);
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let requests = 0;
+	let latest: import('./trajectories').TrajectorySnapshot | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: null, refreshInterval: 30_000 },
+		(snapshot) => (latest = snapshot),
+		async (_url, init) => {
+			if (++requests > 1) return new Response(trajectoryFixture());
+			const signal = init!.signal!;
+			return new Promise<Response>((_resolve, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason));
+			});
+		}
+	);
+	try {
+		expect(timeout).toHaveBeenCalledWith(15_000);
+		deadline.abort(new DOMException('Request timed out', 'TimeoutError'));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(latest?.statuses.get('mta_bus')?.error?.name).toBe('TimeoutError');
+		await stop.refresh();
+		expect(requests).toBe(2);
+		expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
+		expect(latest?.statuses.get('mta_bus')?.error).toBeNull();
+	} finally {
+		stop();
+	}
+});
 
 test('a failed historical Arrow update retries until network recovery', async () => {
 	vi.useFakeTimers();

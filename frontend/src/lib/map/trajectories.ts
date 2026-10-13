@@ -59,7 +59,10 @@ export function watchTrajectories(
 
 		async function request() {
 			try {
-				const response = await fetcher(url, { signal: controller.signal, cache: 'no-store' });
+				const response = await fetcher(url, {
+					signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+					cache: 'no-store'
+				});
 				if (!response.ok) throw new Error(`Trajectory service returned ${response.status}`);
 				const table = renderUnitTableFromIPC(await response.arrayBuffer());
 				if (controller.signal.aborted) return;

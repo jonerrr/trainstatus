@@ -22,7 +22,7 @@ test('a reopened offline app navigates to an unvisited page using saved catalogs
 	await context.setOffline(true);
 	await page.goto('/stops');
 	await expect.poll(() => page.locator('main .list-item').count()).toBeGreaterThan(1);
-	await expect(page.getByRole('status').first()).toHaveText(/Offline/);
+	await expect(page.getByRole('status').first()).toHaveText('Can’t update data');
 
 	const saved = await page.evaluate(async () => {
 		const urls: string[] = [];

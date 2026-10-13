@@ -280,6 +280,8 @@
 							</div>
 						{/if}
 					{/if}
+				{:else}
+					<p class="p-2 text-center text-neutral-400">No predictions to show</p>
 				{/each}
 			</ModalList>
 		{/if}

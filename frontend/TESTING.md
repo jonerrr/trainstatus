@@ -14,6 +14,8 @@ Run commands from `frontend/`, prefixed with `mise exec --`. These tasks do not 
 
 ## Layers
 
+Catalog, service, alert and trajectory requests combine lifecycle cancellation with native 15-second timeout signals, including response-body loading. Service-worker catalog revalidation has its own timeout. Owner tests control the timeout signal to cover stalled requests and bodies, Retry, and retained values without waiting for native timers.
+
 - **Unit.** Pure functions and request-shaping hooks. No browser, no network. Synthetic inputs stay next to the behavior. `chartFixture` remains the deterministic chart cases, including loops that live service may never produce. `hooks.server.test.ts` stays here: it checks how the hook rewrites a request, using an echo `fetch`, and does not stand in for the API.
 - **Component.** Browser tests for modal history, focus, chart SVG rendering, map panels and route badges, and real MapLibre/deck.gl rendering with synthetic data. They share one `$app` stand-in. Chart-only dependencies stay in the chart test. They do not intercept HTTP.
 - **Integration.** The live chart itinerary audit only. It runs `buildChartData` on real payloads from `:3055` and fails immediately if that server is down. Connection refused, non-OK HTTP, a payload that breaks while building, and an itinerary that reverses or drops stops fail the run. Expected trip membership and visits are derived from the inputs before building, so dropping an entire active trip also fails. Zero trips, or zero groups with future predictions, passes. Empty stops fail when any input trip has future visits that cannot be resolved.

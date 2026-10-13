@@ -59,6 +59,7 @@ async function revalidate(cache: Cache, request: Request, saved: Response) {
 	try {
 		const response = await fetch(request.url, {
 			cache: 'no-store',
+			signal: AbortSignal.timeout(15_000),
 			headers: etag ? { 'if-none-match': etag } : {}
 		});
 		if (!response.ok) return; // 304 keeps the saved body.

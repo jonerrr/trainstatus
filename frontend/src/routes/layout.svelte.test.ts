@@ -120,6 +120,35 @@ test('reconnecting retries failed reads without a click', async () => {
 	await view.unmount();
 });
 
+for (const source of ['njt_bus', 'mta_subway'] as const) {
+	test(`a ${source} route alert dialog on the map uses catalogs without passenger requests`, async () => {
+		const fixture = chartFixture(source, 0);
+		const respond = fixtureFetcher({ catalogs: { [source]: fixture.catalog }, services: {} });
+		const requests: string[] = [];
+		vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
+			requests.push(String(input));
+			return respond(input, init);
+		}) as typeof fetch);
+		page.data.selected_sources = [source];
+		page.url = new SvelteURL(`http://localhost/map?r=4&src=${source}`);
+		const view = await render(Layout, {
+			children: createRawSnippet(() => ({ render: () => '<div>Map content</div>' }))
+		});
+		await expect.element(view.getByRole('dialog').getByText('No alerts')).toBeVisible();
+		expect(requests.some((url) => url.includes('/service/'))).toBe(false);
+		expect(page.state.modal).toEqual({ type: 'route', source, id: '4' });
+		// The saved route remains usable until a revalidated catalog actually removes it.
+		navigator.serviceWorker.dispatchEvent(
+			new MessageEvent('message', {
+				data: { type: 'catalog', body: { ...fixture.catalog, routes: [] } }
+			})
+		);
+		await expect.poll(() => page.state.modal ?? null).toBeNull();
+		expect(requests.some((url) => url.includes('/service/'))).toBe(false);
+		await view.unmount();
+	});
+}
+
 test('historical layouts load background data at the URL time and follow URL changes', async () => {
 	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 	const now = vi.spyOn(Date, 'now').mockReturnValue(1_780_000_000_000);

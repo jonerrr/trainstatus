@@ -631,7 +631,10 @@ export class TransitData {
 		entry.in_flight = true;
 		const revision = entry.revision;
 		try {
-			const response = await this.#fetcher(url, { ...init, signal });
+			const response = await this.#fetcher(url, {
+				...init,
+				signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)])
+			});
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
 			const body = (await response.json()) as B;
 			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
@@ -700,12 +703,13 @@ export class TransitData {
 		}
 		try {
 			const response = await this.#fetcher(serviceUrl(source, routes, at), {
-				signal,
+				signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
 				cache: 'no-store'
 			});
 			if (signal.aborted || this.#destroyed) return;
 			if (response.status === 404 && routes) {
 				const unknown = new Set(((await response.json()) as UnknownRoutes).unknown_route_ids);
+				if (signal.aborted || this.#destroyed) return;
 				for (const entry of entries) {
 					if (!this.#owns(entry)) continue;
 					entry.in_flight = false;
@@ -717,14 +721,14 @@ export class TransitData {
 				return;
 			}
 			if (!response.ok) throw new Error(`Service returned ${response.status}`);
+			const service = (await response.json()) as Service;
 			const now = this.#now();
-			const body = (await response.json()) as Service;
-			const decoded = decodeService(body, now);
+			const decoded = decodeService(service, now);
 			for (const entry of entries) {
 				if (signal.aborted || !this.#owns(entry)) continue;
 				entry.in_flight = false;
 				entry.source_updated_at =
-					at === null && body.updated_at != null ? body.updated_at * 1000 : null;
+					at === null && service.updated_at != null ? service.updated_at * 1000 : null;
 				if (routes === null) entry.install(decoded, now);
 				else {
 					const route = decoded.get(entry.route_id!);

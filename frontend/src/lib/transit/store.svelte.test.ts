@@ -511,6 +511,89 @@ test('destroying the owner aborts its requests', async () => {
 	expect(http.calls[0].signal.aborted).toBe(true);
 });
 
+test.each(['request', 'response body'])(
+	'a stalled initial service %s times out and Retry can recover',
+	async (stalled) => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+		let deadline = new AbortController();
+		const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => deadline.signal);
+		const http = transport();
+		const data = store(http.fetcher);
+		await render(TransitDataHarness, {
+			data,
+			source: 'mta_bus',
+			readers: [{ id: '1', route: 'A' }]
+		});
+		await tick();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(http.calls).toHaveLength(1);
+		if (stalled === 'response body') {
+			http.calls[0].respond(
+				new Response(
+					new ReadableStream({
+						start(controller) {
+							http.calls[0].signal.addEventListener('abort', () =>
+								controller.error(http.calls[0].signal.reason)
+							);
+						}
+					})
+				)
+			);
+			await vi.advanceTimersByTimeAsync(0);
+		}
+		expect(timeout).toHaveBeenCalledWith(15_000);
+		deadline.abort(new DOMException('Request timed out', 'TimeoutError'));
+		await vi.advanceTimersByTimeAsync(0);
+		await tick();
+		expect(http.calls[0].signal.reason.name).toBe('TimeoutError');
+		expect(document.querySelector('[data-failed="A"]')).not.toBeNull();
+		expect(data.status.warning).toBe(true);
+		deadline = new AbortController();
+		data.retry();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(http.calls).toHaveLength(2);
+		http.calls[1].respond(http.json(http.service('mta_bus', { A: ['recovered'] })));
+		await vi.advanceTimersByTimeAsync(0);
+		await tick();
+		expect(text('A')).toEqual(['recovered']);
+		expect(data.status.warning).toBe(false);
+	}
+);
+
+test('a stalled refresh keeps loaded service and releases Retry after its deadline', async () => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+	let deadline = new AbortController();
+	vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => deadline.signal);
+	const http = transport();
+	const data = store(http.fetcher);
+	await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [{ id: '1', route: 'A' }]
+	});
+	await tick();
+	await vi.advanceTimersByTimeAsync(0);
+	http.calls[0].respond(http.json(http.service('mta_bus', { A: ['retained'] })));
+	await vi.advanceTimersByTimeAsync(0);
+	await tick();
+	data.retry();
+	await vi.advanceTimersByTimeAsync(0);
+	deadline.abort(new DOMException('Request timed out', 'TimeoutError'));
+	await vi.advanceTimersByTimeAsync(0);
+	await tick();
+	expect(text('A')).toEqual(['retained']);
+	expect(data.status.warning).toBe(true);
+	deadline = new AbortController();
+	data.retry();
+	await vi.advanceTimersByTimeAsync(0);
+	expect(http.calls).toHaveLength(3);
+	http.calls[2].respond(http.json(http.service('mta_bus', { A: ['fresh'] })));
+	await vi.advanceTimersByTimeAsync(0);
+	await tick();
+	expect(text('A')).toEqual(['fresh']);
+	expect(data.status.warning).toBe(false);
+});
+
 test('a replacement catalog retries an active route previously reported unknown', async () => {
 	const http = transport();
 	const data = store(http.fetcher);

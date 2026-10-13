@@ -9,10 +9,16 @@ import { readJson } from '../support/api.js';
 for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 	test(`${source}: active route/direction charts preserve their itineraries`, async () => {
 		const now = Date.now();
-		const [catalog, service] = await Promise.all([
-			readJson<Catalog>(`/api/v1/catalog/${source}`),
-			readJson<Service>(`/api/v1/service/${source}`)
-		]);
+		const catalog = await readJson<Catalog>(`/api/v1/catalog/${source}`);
+		if (!catalog.routes.length) {
+			console.info(`${source}: no catalog routes to audit`);
+			return;
+		}
+		const query =
+			source === 'mta_subway'
+				? ''
+				: `?${new URLSearchParams({ route_ids: catalog.routes.map((route) => route.id).join(',') })}`;
+		const service = await readJson<Service>(`/api/v1/service/${source}${query}`);
 		const stopsById = decodeCatalog(catalog).stops_by_id;
 		const graphs = new Map<string, ChartInput[]>();
 		for (const [route_id, route] of decodeService(service, now)) {

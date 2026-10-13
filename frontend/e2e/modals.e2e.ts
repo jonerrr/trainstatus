@@ -89,6 +89,7 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	await expect(dialog(page)).toBeHidden();
 
 	await page.goto('/?s=not-a-real-stop&src=mta_subway');
-	await expect(dialog(page)).toContainText('not in the saved stop list');
+	await expect.poll(() => new URL(page.url()).searchParams.get('s')).toBeNull();
+	await expect(dialog(page)).toBeHidden();
 	expect(errors).toEqual([]);
 });

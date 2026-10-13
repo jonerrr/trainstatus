@@ -10,6 +10,48 @@ import { render } from 'vitest-browser-svelte';
 
 import Modal from './Modal.svelte';
 
+for (const empty of ['zero calls', 'all arrivals passed'] as const) {
+	test(`trip details explain ${empty}`, async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+		const fixture = chartFixture('njt_bus', 0, [['a']]);
+		const calls = fixture.service.routes['4'].calls;
+		if (empty === 'zero calls') {
+			for (const column of Object.values(calls)) column.length = 0;
+		} else {
+			calls.arrival = [chartNow / 1000 - 90];
+			calls.departure = [chartNow / 1000 - 60];
+		}
+		const data = fixtureTransitData({
+			catalogs: { njt_bus: fixture.catalog },
+			services: { njt_bus: fixture.service }
+		});
+		const child_props: ComponentProps<typeof Modal> = {
+			source: 'njt_bus',
+			route_id: '4',
+			trip_id: 'trip-0',
+			show_previous: false,
+			time_format: 'countdown'
+		};
+		try {
+			const view = await render(TransitProvider<ComponentProps<typeof Modal>>, {
+				data,
+				component: Modal,
+				child_props
+			});
+			await expect.element(view.getByText('No predictions to show')).toBeVisible();
+			if (empty === 'all arrivals passed') {
+				await view.rerender({ child_props: { ...child_props, show_previous: true } });
+				await expect.element(view.getByText('No predictions to show')).not.toBeInTheDocument();
+				await expect.element(view.getByRole('button', { name: /a/ })).toBeVisible();
+			}
+			await view.unmount();
+		} finally {
+			data.destroy();
+			vi.restoreAllMocks();
+		}
+	});
+}
+
 test('repeated stop visits keep independent transfer times and disclosure state', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const fixture = chartFixture('njt_bus', 0, [['a', 'b', 'a']]);

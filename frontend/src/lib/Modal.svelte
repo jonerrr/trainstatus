@@ -58,11 +58,13 @@
 
 	let modal_transition: ViewTransition | undefined;
 
-	function slide_to(next_state: typeof page.state, forward: boolean) {
+	function slide_to(forward: boolean) {
 		document.documentElement.dataset.modalDirection = forward ? 'forward' : 'backward';
 
 		const apply = () => {
-			current_page_state = $state.snapshot(next_state);
+			// Catalog validation or another navigation can change the selection while
+			// the transition waits to capture its old view. Apply the latest selection.
+			current_page_state = $state.snapshot(page.state);
 		};
 
 		// experimental.async makes tick() wait for a frame, which a view transition
@@ -94,7 +96,7 @@
 		const next_state = page.state;
 		if (untrack(() => modal_changed(next_state.modal, current_page_state.modal))) {
 			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
-			slide_to(next_state, forward);
+			slide_to(forward);
 		}
 	});
 
@@ -102,12 +104,7 @@
 	const selected_service = transit.route(() => {
 		const selected = page.state.modal;
 		const catalog = selected_catalog.current.value;
-		const route_id =
-			selected?.type === 'route'
-				? selected.id
-				: selected?.type === 'trip'
-					? selected.route_id
-					: null;
+		const route_id = selected?.type === 'trip' ? selected.route_id : null;
 		return selected && route_id && catalog?.routes_by_id.has(route_id)
 			? { source: selected.source, route_id, at: current_time.value }
 			: null;
@@ -122,7 +119,7 @@
 			selected.type === 'stop'
 				? !catalog.stops_by_id.has(selected.id)
 				: selected.type === 'route'
-					? !catalog.routes_by_id.has(selected.id) || service.error instanceof UnknownRouteError
+					? !catalog.routes_by_id.has(selected.id)
 					: !selected.route_id ||
 						!catalog.routes_by_id.has(selected.route_id) ||
 						service.error instanceof UnknownRouteError ||
