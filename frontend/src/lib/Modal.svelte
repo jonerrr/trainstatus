@@ -56,6 +56,8 @@
 		);
 	}
 
+	let modal_transition: ViewTransition | undefined;
+
 	function slide_to(next_state: typeof page.state, forward: boolean) {
 		document.documentElement.dataset.modalDirection = forward ? 'forward' : 'backward';
 
@@ -76,8 +78,12 @@
 						});
 					})
 			);
+			modal_transition = transition;
 			transition.ready.catch(() => {});
-			transition.finished.catch(() => {});
+			const clear_transition = () => {
+				if (modal_transition === transition) modal_transition = undefined;
+			};
+			transition.finished.then(clear_transition, clear_transition);
 		} else {
 			apply();
 		}
@@ -158,8 +164,10 @@
 		let pointer_start: { id: number; x: number; y: number } | undefined;
 
 		function handle_pointer_down(event: PointerEvent) {
+			// The animated sheet is a snapshot with pointer events disabled, so a
+			// rapid tap on it can hit the live backdrop underneath.
 			pointer_start =
-				event.target === node.parentElement && event.button === 0
+				!modal_transition && event.target === node.parentElement && event.button === 0
 					? { id: event.pointerId, x: event.pageX, y: event.pageY }
 					: undefined;
 		}
@@ -167,7 +175,13 @@
 		function handle_pointer_up(event: PointerEvent) {
 			const start = pointer_start;
 			pointer_start = undefined;
-			if (!start || start.id !== event.pointerId || event.target !== node.parentElement) return;
+			if (
+				modal_transition ||
+				!start ||
+				start.id !== event.pointerId ||
+				event.target !== node.parentElement
+			)
+				return;
 			const diffX = Math.abs(event.pageX - start.x);
 			const diffY = Math.abs(event.pageY - start.y);
 

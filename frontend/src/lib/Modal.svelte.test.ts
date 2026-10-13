@@ -153,6 +153,35 @@ test('backdrop drags keep the sheet open and a backdrop tap dismisses it', async
 	expect(document.querySelector('[role="dialog"]')?.getBoundingClientRect().height).toBe(0);
 });
 
+test('a rapid tap on the sheet during navigation does not dismiss the modal', async () => {
+	page.state = state('First', 1);
+	await render(ModalHarness);
+	await settle();
+	const original = document.startViewTransition.bind(document);
+	let transition: ViewTransition | undefined;
+	vi.spyOn(document, 'startViewTransition').mockImplementation((update) => {
+		transition = original(update);
+		return transition;
+	});
+	flushSync(() => {
+		page.state = state('Second', 2);
+	});
+	await transition!.ready;
+	const sheet = document.querySelector<HTMLElement>('[role="dialog"]')!;
+	const box = sheet.getBoundingClientRect();
+	const clientX = box.x + box.width / 2;
+	const clientY = box.y + box.height / 2;
+	const target = document.elementFromPoint(clientX, clientY)!;
+	for (const type of ['pointerdown', 'pointerup']) {
+		target.dispatchEvent(
+			new PointerEvent(type, { clientX, clientY, pointerType: 'touch', bubbles: true })
+		);
+	}
+	await settle();
+	expect(page.state.modal?.id).toBe('Second');
+	expect(sheet.getBoundingClientRect().height).toBeGreaterThan(0);
+});
+
 test('includes trip disclosure summaries when wrapping keyboard focus', async () => {
 	await render(ModalFocusHarness);
 	const summary = document.querySelector('summary')!;
