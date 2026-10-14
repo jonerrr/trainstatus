@@ -1,4 +1,9 @@
 use crate::support;
+use backend::operations::CollectedTrip as TripRun;
+use backend::operations::CollectedVisit as StopVisit;
+use backend::operations::types::trip::MtaBusData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::TripData;
 
 use backend::source::Source;
 use support::{mta_bus_dataset, test_owners};
@@ -19,11 +24,6 @@ const B94_REAL_SHAPE: &str = "B940017";
 const DECOY_SHAPE: &str = "TEST_DECOY_SHAPE";
 
 fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::CollectedSnapshot {
-    use backend::operations::CollectedTrip as TripRun;
-    use backend::operations::CollectedVisit as StopVisit;
-    use backend::operations::types::trip::MtaBusData;
-    use backend::operations::types::trip::StopTimeData;
-    use backend::operations::types::trip::TripData;
     let id: backend::operations::RunKey = Uuid::now_v7().into();
     let now = crate::support::fixtures::fixed_time();
     let trip = TripRun {
@@ -87,7 +87,10 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         .unwrap()
         .shape_ids
         .push(DECOY_SHAPE.into());
-    stores.network.network_index().publish(revision);
+    stores
+        .network
+        .network_index()
+        .publish_bundle(vec![revision]);
     let committed = stores
         .ingestor
         .ingest(collected_trip("B94", &B94_STOP_IDS))
@@ -117,7 +120,10 @@ async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
 
     let mut revision = backend::network::index::NetworkRevision::from_dataset(&dataset);
     std::sync::Arc::make_mut(&mut revision.route_stop_shapes).clear();
-    stores.network.network_index().publish(revision);
+    stores
+        .network
+        .network_index()
+        .publish_bundle(vec![revision]);
     let committed = stores
         .ingestor
         .ingest(collected_trip("B94", &B94_STOP_IDS))

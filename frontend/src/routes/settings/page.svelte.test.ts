@@ -20,7 +20,7 @@ test('editing time waits for Apply, and returning to live clears the URL time', 
 	expect(page.url.searchParams.get('keep')).toBe('value');
 	await field.fill('2026-10-02T12:00');
 	expect(page.url.searchParams.get('at')).toBe(at);
-	await view.getByRole('button', { name: 'Return to live data' }).click();
+	await view.getByRole('button', { name: 'Return to live', exact: true }).click();
 	await expect.poll(() => page.url.searchParams.has('at')).toBe(false);
 	await expect.element(view.getByText('live', { exact: true })).toBeVisible();
 	await expect.element(field).toHaveValue('');

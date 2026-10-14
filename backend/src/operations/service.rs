@@ -121,7 +121,7 @@ pub struct ServiceEncoder {
     pub service: fn(ServiceInputs<'_>) -> anyhow::Result<Bytes>,
 }
 
-pub struct PassengerSnapshot {
+pub struct ServiceSnapshot {
     encoder: ServiceEncoder,
     source: Source,
     at: Option<i64>,
@@ -138,7 +138,7 @@ pub struct PassengerSnapshot {
     whole: OnceLock<Bytes>,
 }
 
-impl PassengerSnapshot {
+impl ServiceSnapshot {
     fn new(
         source: Source,
         at: Option<i64>,
@@ -283,7 +283,7 @@ pub struct Operations {
     pg_pool: PgPool,
     live_snapshots: LiveSnapshots,
     network: NetworkIndex,
-    current: Arc<[Mutex<Option<Arc<PassengerSnapshot>>>; Source::ALL.len()]>,
+    current: Arc<[Mutex<Option<Arc<ServiceSnapshot>>>; Source::ALL.len()]>,
 }
 
 impl Operations {
@@ -304,7 +304,7 @@ impl Operations {
 
     /// Passenger indexes for the latest committed generation, built once per generation.
     /// Only the latest generation is retained; earlier ones live while requests hold them.
-    pub fn live(&self, source: Source) -> Result<Arc<PassengerSnapshot>, ServiceError> {
+    pub fn live(&self, source: Source) -> Result<Arc<ServiceSnapshot>, ServiceError> {
         let persisted = self
             .live_snapshots
             .get(source)
@@ -317,7 +317,7 @@ impl Operations {
             return Ok(snapshot.clone());
         }
         let route_ids: Vec<String> = persisted.network_revision.routes.keys().cloned().collect();
-        let snapshot = Arc::new(PassengerSnapshot::new(
+        let snapshot = Arc::new(ServiceSnapshot::new(
             source,
             None,
             Inputs::Live(persisted),
@@ -365,7 +365,7 @@ impl Operations {
             .await?;
         let trips = retained.trips;
         let stop_times = retained.stop_times;
-        let snapshot = PassengerSnapshot::new(
+        let snapshot = ServiceSnapshot::new(
             source,
             Some(at.timestamp()),
             Inputs::Historical { trips, stop_times },

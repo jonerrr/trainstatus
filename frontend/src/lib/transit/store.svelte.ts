@@ -4,6 +4,8 @@ import { createContext, untrack } from 'svelte';
 
 import { on } from 'svelte/events';
 
+import { browser } from '$app/env';
+
 import type {
 	ApiAlert,
 	Catalog,
@@ -12,21 +14,22 @@ import type {
 	Source,
 	UnknownRoutes
 } from '#lib/client/index.js';
+import { source_config } from '#lib/sources.js';
 
 import { decodeAlerts, type AlertsData } from './alerts.js';
 import {
 	callsAtStop,
 	decodeCatalog,
 	decodeService,
-	emptyRoute,
 	STALE_AFTER_MS,
 	type Call,
 	type CatalogData,
 	type RouteData
 } from './decode.js';
+import { Entry, type Resource, type ResourceSnapshot } from './resource.svelte.js';
 
-/** Sources whose service is always loaded and refreshed as one whole-source entry. */
-const WHOLE_SOURCES: ReadonlySet<Source> = new Set(['mta_subway']);
+export type { Resource, ResourceSnapshot } from './resource.svelte.js';
+
 const MAX_BATCH_ROUTES = 40;
 const FIRST_RETRY_MS = 5_000;
 const TICK_MS = 1_000;
@@ -43,7 +46,6 @@ export interface TransitDataOptions {
 	history_limit?: number;
 	/** Quiet window for new bus routes to share a request (defaults to 200 ms). */
 	batch_ms?: number;
-	now?: () => number;
 }
 
 export interface TripRead {
@@ -64,7 +66,7 @@ export interface StopArrivals {
 /** Separately polled data that reports into the shared status. */
 export interface TrackedUpdate {
 	/** Historical queries report failures but do not age into a live warning. */
-	readonly at?: number | null;
+	readonly at?: number;
 	readonly active: boolean;
 	readonly error: Error | null;
 	readonly fetched_at: number | null;
@@ -73,93 +75,18 @@ export interface TrackedUpdate {
 
 export class UnknownRouteError extends Error {}
 
-export interface ResourceSnapshot<T> {
-	value: T | undefined;
-	loading: boolean;
-	/** Initial-load failure. Refresh failures retain a loaded value. */
-	error: Error | null;
-}
-
-export interface Resource<T> {
-	readonly current: ResourceSnapshot<T>;
-}
-
-type Kind = 'catalog' | 'alerts' | 'service';
-
-class Entry<T> {
-	state = $state.raw<{ data: T | undefined; error: Error | null }>({
-		data: undefined,
-		error: null
-	});
-	readers = 0;
-	eager = false;
-	in_flight = false;
-	fetched_at: number | null = null;
-	source_updated_at: number | null = null;
-	attempted_at: number | null = null;
-	failures = 0;
-	used_at = 0;
-	/** Invalidates a request if another publisher installs newer data. */
-	revision = 0;
-
-	constructor(
-		readonly source: Source,
-		readonly at: number | null,
-		readonly route_id: string | null,
-		readonly kind: Kind = 'service'
-	) {}
-
-	get data() {
-		return this.state.data;
-	}
-	get error() {
-		return this.state.error;
-	}
-	get active() {
-		return this.readers > 0;
-	}
-	get current(): ResourceSnapshot<T> {
-		const { data, error } = this.state;
-		return {
-			value: data,
-			loading: data === undefined && !error,
-			error: data === undefined ? error : null
-		};
-	}
-
-	install(data: T, now: number) {
-		this.revision++;
-		this.fetched_at = now;
-		this.failures = 0;
-		this.state = { data, error: null };
-	}
-
-	fail(error: Error) {
-		this.failures++;
-		this.state = { data: this.data, error };
-	}
-
-	reset() {
-		if (this.data !== undefined || !this.error) return;
-		this.state = { data: undefined, error: null };
-	}
-}
-
 type ServiceEntry = Entry<ReadonlyMap<string, RouteData>>;
 
-class DataStatus {
-	warning = $state(false);
-}
-
+// One binding may combine several request entries (for example, all routes at a stop).
 interface Selection<T> {
 	entries: Entry<unknown>[];
-	project(): ResourceSnapshot<T>;
+	read(): T;
 }
 
 export interface RouteKey {
 	source: Source;
 	route_id: string;
-	at?: number | null;
+	at?: number;
 }
 
 export interface CatalogRead {
@@ -175,10 +102,10 @@ export interface RouteRead extends RouteKey {
 	error: Error | null;
 }
 
-function serviceUrl(source: Source, routes: readonly string[] | null, at: number | null) {
+function serviceUrl(source: Source, routes: readonly string[] | null, at: number | undefined) {
 	const params = new URLSearchParams();
 	if (routes) params.set('route_ids', routes.join(','));
-	if (at !== null) params.set('at', String(at));
+	if (at !== undefined) params.set('at', String(at));
 	return `/api/v1/service/${source}${params.size ? `?${params}` : ''}`;
 }
 
@@ -187,14 +114,13 @@ function serviceUrl(source: Source, routes: readonly string[] | null, at: number
  * native snapshots through bindings whose explicit effects own reader interest and first loads.
  */
 export class TransitData {
-	readonly status = new DataStatus();
+	readonly status = $state({ warning: false });
 	#fetcher: typeof fetch;
-	#refresh_ms: number;
+	#refresh_ms: number | undefined;
 	#history_limit: number;
 	#batch_ms: number;
 	#eager_service: boolean;
-	#at: number | null;
-	#now: () => number;
+	#at: number | undefined;
 	#sources = new Set<Source>();
 	#generation = $state(0);
 	#catalogs = new Map<Source, Entry<CatalogData>>();
@@ -204,19 +130,19 @@ export class TransitData {
 	#queue = new Map<string, Set<ServiceEntry>>();
 	#flush_timers = new Map<string, ReturnType<typeof setTimeout>>();
 	#controllers = new Map<Source, AbortController>();
+	// Fetch completions may outlive the layout that owns this instance.
 	#destroyed = false;
 	#cleanup: (() => void)[] = [];
 
 	constructor(options: TransitDataOptions) {
 		this.#fetcher = options.fetcher ?? ((...args) => fetch(...args));
-		this.#refresh_ms = options.refresh_ms ?? 30_000;
+		this.#refresh_ms = options.refresh_ms;
 		this.#history_limit = options.history_limit ?? 6;
 		this.#batch_ms = options.batch_ms ?? 200;
 		this.#eager_service = options.eager_service ?? true;
-		this.#at = options.at ?? null;
-		this.#now = options.now ?? Date.now;
+		this.#at = options.at;
 		untrack(() => this.setSources(options.sources));
-		if (typeof window === 'undefined') return;
+		if (!browser) return;
 		const tick = () => this.#tick();
 		const interval = setInterval(tick, TICK_MS);
 		this.#cleanup.push(
@@ -232,50 +158,42 @@ export class TransitData {
 		const next = new Set(sources);
 		for (const source of this.#sources) if (!next.has(source)) this.#release(source);
 		for (const source of next) {
-			if (typeof window === 'undefined') break;
+			if (!browser) break;
 			if (this.#sources.has(source)) continue;
-			const catalog = new Entry<CatalogData>(source, null, null, 'catalog');
+			const catalog = new Entry<CatalogData>(source, undefined, null, 'catalog');
 			catalog.eager = true;
 			this.#catalogs.set(source, catalog);
 			void this.#loadCatalog(catalog);
-			const alerts = this.#alertEntry(source, this.#at);
-			alerts.eager = true;
-			void this.#loadAlerts(alerts);
-			if (!this.#eager_service || !WHOLE_SOURCES.has(source)) continue;
-			const entry = this.#service(source, null, this.#at);
-			entry.eager = true;
-			this.#enqueue(entry);
 		}
 		if (next.size !== this.#sources.size || [...next].some((source) => !this.#sources.has(source)))
 			this.#generation++;
 		this.#sources = next;
+		this.#background();
 	}
 
 	/** Enable whole-source background service outside the map, keeping acquired readers active. */
 	setEagerService(enabled: boolean) {
 		if (enabled === this.#eager_service) return;
 		this.#eager_service = enabled;
-		for (const source of this.#sources) {
-			if (!WHOLE_SOURCES.has(source)) continue;
-			const entry = this.#service(source, null, this.#at);
-			entry.eager = enabled;
-			if (enabled) this.#ensure(entry);
-		}
-		this.#updateStatus();
+		this.#background();
 	}
 
-	/** Move background readers to the same time as the layout's passenger readers. */
+	/** Move background readers to the layout's passenger time. */
 	setTime(at: number | undefined) {
-		const next = at ?? null;
-		if (next === this.#at) return;
-		this.#at = next;
+		if (at === this.#at) return;
+		this.#at = at;
+		this.#background();
+	}
+
+	#background() {
 		for (const entry of [...this.#alerts.values(), ...this.#services.values()]) entry.eager = false;
+		if (!browser) return;
 		for (const source of this.#sources) {
-			const alerts = this.#alertEntry(source, next);
+			const alerts = this.#alertEntry(source, this.#at);
 			alerts.eager = true;
 			this.#ensure(alerts);
-			if (!this.#eager_service || !WHOLE_SOURCES.has(source)) continue;
-			const service = this.#service(source, null, next);
+			if (!this.#eager_service || !source_config[source].whole_service) continue;
+			const service = this.#service(source, null, this.#at);
 			service.eager = true;
 			this.#ensure(service);
 		}
@@ -293,7 +211,7 @@ export class TransitData {
 			return untrack(() => {
 				for (const entry of entries) {
 					entry.readers++;
-					entry.used_at = this.#now();
+					entry.used_at = Date.now();
 					this.#ensure(entry);
 				}
 				this.#updateStatus();
@@ -304,24 +222,25 @@ export class TransitData {
 		});
 		return {
 			get current() {
-				return selection.project();
+				return selection.read();
 			}
 		};
 	}
 
 	#catalogEntry(source: Source) {
 		let entry = this.#catalogs.get(source);
-		if (!entry) this.#catalogs.set(source, (entry = new Entry(source, null, null, 'catalog')));
+		if (!entry) this.#catalogs.set(source, (entry = new Entry(source, undefined, null, 'catalog')));
 		return entry;
 	}
 
-	catalog(source: () => Source | null): Resource<CatalogData> {
+	/** Getters keep reused component props reactive without recreating a binding. */
+	catalog(source: () => Source | null): Resource<ResourceSnapshot<CatalogData>> {
 		return this.#bind(() => {
 			const key = source();
 			const entry = key === null ? undefined : this.#catalogEntry(key);
 			return {
 				entries: entry ? [entry] : [],
-				project: () => entry?.current ?? { value: undefined, loading: false, error: null }
+				read: () => entry?.current ?? { value: undefined, loading: false, error: null }
 			};
 		});
 	}
@@ -331,43 +250,44 @@ export class TransitData {
 			const entries = sources().map((source) => this.#catalogEntry(source));
 			return {
 				entries,
-				project: () => ({
-					value: entries.map((entry) => ({
+				read: () =>
+					entries.map((entry) => ({
 						source: entry.source,
 						catalog: entry.data,
 						loading: entry.current.loading,
 						error: entry.current.error
-					})),
-					loading: false,
-					error: null
-				})
+					}))
 			};
 		});
 	}
 
-	alerts(key: () => { source: Source; at?: number | null } | null): Resource<AlertsData> {
+	alerts(
+		key: () => { source: Source; at?: number } | null
+	): Resource<ResourceSnapshot<AlertsData>> {
 		return this.#bind(() => {
 			const selected = key();
-			const entry = selected && this.#alertEntry(selected.source, selected.at ?? null);
+			const entry = selected && this.#alertEntry(selected.source, selected.at);
 			return {
 				entries: entry ? [entry] : [],
-				project: () => entry?.current ?? { value: undefined, loading: false, error: null }
+				read: () => entry?.current ?? { value: undefined, loading: false, error: null }
 			};
 		});
 	}
 
 	#routeSnapshot(entry: ServiceEntry, route_id: string): ResourceSnapshot<RouteData> {
 		const current = entry.current;
+		const value = current.value?.get(route_id);
 		return {
 			...current,
-			value:
-				current.value &&
-				(current.value.get(route_id) ??
-					emptyRoute(entry.source, route_id, entry.at, entry.fetched_at))
+			value,
+			error:
+				current.value && !value
+					? new UnknownRouteError(`Unknown ${entry.source} route ${route_id}`)
+					: current.error
 		};
 	}
 
-	route(key: () => RouteKey | null): Resource<RouteData> {
+	route(key: () => RouteKey | null): Resource<ResourceSnapshot<RouteData>> {
 		return this.#bind(() => {
 			const selected = key();
 			const entry =
@@ -375,11 +295,11 @@ export class TransitData {
 				this.#service(
 					selected.source,
 					this.#key_route(selected.source, selected.route_id),
-					selected.at ?? null
+					selected.at
 				);
 			return {
 				entries: entry ? [entry] : [],
-				project: () =>
+				read: () =>
 					selected && entry
 						? this.#routeSnapshot(entry, selected.route_id)
 						: { value: undefined, loading: false, error: null }
@@ -391,23 +311,20 @@ export class TransitData {
 		return this.#bind(() => {
 			const selected = keys().map((key) => ({
 				key,
-				entry: this.#service(key.source, this.#key_route(key.source, key.route_id), key.at ?? null)
+				entry: this.#service(key.source, this.#key_route(key.source, key.route_id), key.at)
 			}));
 			return {
 				entries: [...new Set(selected.map(({ entry }) => entry))],
-				project: () => ({
-					value: selected.map(({ key, entry }) => {
+				read: () =>
+					selected.map(({ key, entry }) => {
 						const { value, loading, error } = this.#routeSnapshot(entry, key.route_id);
 						return { ...key, route: value, loading, error };
-					}),
-					loading: false,
-					error: null
-				})
+					})
 			};
 		});
 	}
 
-	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<TripRead> {
+	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<ResourceSnapshot<TripRead>> {
 		const route = this.route(key);
 		const project = (current: ResourceSnapshot<RouteData>): ResourceSnapshot<TripRead> => {
 			const selected = key();
@@ -429,10 +346,10 @@ export class TransitData {
 	}
 
 	stopArrivals(
-		key: () => { source: Source; stop_id: string; at?: number | null }
-	): Resource<StopArrivals> {
+		key: () => { source: Source; stop_id: string; at?: number }
+	): Resource<ResourceSnapshot<StopArrivals>> {
 		return this.#bind(() => {
-			const { source, stop_id, at = null } = key();
+			const { source, stop_id, at } = key();
 			const catalog = this.#catalogEntry(source);
 			const ids = [
 				...new Set(catalog.data?.stops_by_id.get(stop_id)?.routes.map((route) => route.route_id))
@@ -443,7 +360,7 @@ export class TransitData {
 			}));
 			return {
 				entries: [catalog, ...new Set(selected.map(({ entry }) => entry))],
-				project: () => {
+				read: () => {
 					if (!catalog.data) return { ...catalog.current, value: undefined };
 					const routes = new Map<string, RouteData>();
 					const pending: string[] = [];
@@ -467,13 +384,13 @@ export class TransitData {
 	/** Pure peeks: observe available snapshots without acquiring service interest. */
 	peekCatalog(source: Source): CatalogData | undefined {
 		void this.#generation;
-		return this.#catalogEntry(source).data;
+		return this.#catalogs.get(source)?.data;
 	}
 
 	loadedStopArrivals(
 		source: Source,
 		stop_id: string,
-		at: number | null = null
+		at: number | undefined = undefined
 	): Pick<StopArrivals, 'calls' | 'routes'> {
 		const catalog = this.peekCatalog(source);
 		const routes = new Map<string, RouteData>();
@@ -488,7 +405,7 @@ export class TransitData {
 		source: Source,
 		route_id: string,
 		trip_id: string,
-		at: number | null = null
+		at: number | undefined = undefined
 	): TripRead | undefined {
 		const route = this.#peek(source, route_id, at);
 		const trip = route?.trips.get(trip_id);
@@ -507,7 +424,7 @@ export class TransitData {
 	replaceCatalog(body: Catalog) {
 		if (!this.#sources.has(body.source)) return;
 		const catalog = decodeCatalog(body);
-		this.#catalogEntry(body.source).install(catalog, this.#now());
+		this.#catalogEntry(body.source).install(catalog, Date.now());
 		for (const entry of this.#services.values())
 			if (
 				entry.source === body.source &&
@@ -522,10 +439,10 @@ export class TransitData {
 
 	#ensure(entry: Entry<unknown>) {
 		if (this.#destroyed || entry.in_flight) return;
-		if (entry.data !== undefined && (entry.kind === 'catalog' || entry.at !== null)) return;
+		if (entry.data !== undefined && (entry.kind === 'catalog' || entry.at !== undefined)) return;
 		if (
 			(entry.data !== undefined || entry.error) &&
-			(this.#due(entry) > this.#now() || !this.#may_poll())
+			(this.#due(entry) > Date.now() || !this.#may_poll())
 		)
 			return;
 		this.#start(entry);
@@ -547,7 +464,8 @@ export class TransitData {
 			...this.#services.values()
 		]) {
 			if (!entry.active && !entry.eager) continue;
-			if (entry.kind === 'catalog' ? !entry.error : entry.at !== null && !entry.error) continue;
+			if (entry.kind === 'catalog' ? !entry.error : entry.at !== undefined && !entry.error)
+				continue;
 			this.#start(entry);
 		}
 		for (const update of this.#tracked) if (update.active) update.retry();
@@ -564,40 +482,43 @@ export class TransitData {
 	}
 
 	#key_route(source: Source, route_id: string) {
-		return WHOLE_SOURCES.has(source) ? null : route_id;
+		return source_config[source].whole_service ? null : route_id;
 	}
 
-	#service(source: Source, route_id: string | null, at: number | null): ServiceEntry {
+	#service(source: Source, route_id: string | null, at: number | undefined): ServiceEntry {
 		const key = `${source}|${at ?? ''}|${route_id ?? '*'}`;
 		let entry = this.#services.get(key);
 		if (!entry) this.#services.set(key, (entry = new Entry(source, at, route_id)));
 		return entry;
 	}
 
-	#peek(source: Source, route_id: string, at: number | null): RouteData | undefined {
+	#peek(source: Source, route_id: string, at: number | undefined): RouteData | undefined {
 		void this.#generation;
 		const entry = this.#service(source, this.#key_route(source, route_id), at);
 		if (!entry.data) return undefined;
-		return entry.data.get(route_id) ?? emptyRoute(source, route_id, at, entry.fetched_at);
+		return entry.data.get(route_id);
 	}
 
-	#alertEntry(source: Source, at: number | null) {
+	#alertEntry(source: Source, at: number | undefined) {
 		const key = `${source}|${at ?? ''}`;
 		let entry = this.#alerts.get(key);
 		if (!entry) this.#alerts.set(key, (entry = new Entry(source, at, null, 'alerts')));
 		return entry;
 	}
 
-	#due(entry: Pick<ServiceEntry, 'error' | 'attempted_at' | 'failures' | 'fetched_at'>) {
+	#due(entry: Pick<ServiceEntry, 'error' | 'attempted_at' | 'failures' | 'fetched_at' | 'source'>) {
 		if (entry.error && entry.attempted_at !== null) {
 			const backoff = FIRST_RETRY_MS * 2 ** Math.max(0, entry.failures - 1);
-			return entry.attempted_at + Math.min(this.#refresh_ms, backoff);
+			return (
+				entry.attempted_at +
+				Math.min(this.#refresh_ms ?? source_config[entry.source].refresh_ms, backoff)
+			);
 		}
-		return (entry.fetched_at ?? 0) + this.#refresh_ms;
+		return (entry.fetched_at ?? 0) + (this.#refresh_ms ?? source_config[entry.source].refresh_ms);
 	}
 
 	#may_poll() {
-		if (typeof document === 'undefined') return false;
+		if (!browser) return false;
 		return document.visibilityState !== 'hidden' && navigator.onLine;
 	}
 
@@ -614,7 +535,7 @@ export class TransitData {
 	}
 
 	#loadAlerts(entry: Entry<AlertsData>) {
-		const query = entry.at === null ? '' : `?at=${entry.at}`;
+		const query = entry.at === undefined ? '' : `?at=${entry.at}`;
 		return this.#load(
 			entry,
 			`/api/v1/alerts/${entry.source}${query}`,
@@ -625,9 +546,9 @@ export class TransitData {
 
 	async #load<B, T>(entry: Entry<T>, url: string, init: RequestInit, decode: (body: B) => T) {
 		// Server renders show pending UI; the per-request owner never fetches.
-		if (typeof window === 'undefined' || this.#destroyed) return;
+		if (!browser || this.#destroyed) return;
 		const { signal } = this.#controller(entry.source);
-		entry.attempted_at = this.#now();
+		entry.attempted_at = Date.now();
 		entry.in_flight = true;
 		const revision = entry.revision;
 		try {
@@ -638,7 +559,7 @@ export class TransitData {
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
 			const body = (await response.json()) as B;
 			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
-				entry.install(decode(body), this.#now());
+				entry.install(decode(body), Date.now());
 		} catch (error) {
 			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
 				entry.fail(error as Error);
@@ -650,7 +571,7 @@ export class TransitData {
 	}
 
 	#enqueue(entry: ServiceEntry) {
-		if (typeof window === 'undefined' || this.#destroyed) return;
+		if (!browser || this.#destroyed) return;
 		const group = `${entry.source}|${entry.at ?? ''}`;
 		let entries = this.#queue.get(group);
 		if (!entries) this.#queue.set(group, (entries = new Set()));
@@ -696,7 +617,7 @@ export class TransitData {
 		const { source, at } = entries[0];
 		const routes = entries[0].route_id === null ? null : entries.map((entry) => entry.route_id!);
 		const { signal } = this.#controller(source);
-		const attempted = this.#now();
+		const attempted = Date.now();
 		for (const entry of entries) {
 			entry.in_flight = true;
 			entry.attempted_at = attempted;
@@ -707,6 +628,7 @@ export class TransitData {
 				cache: 'no-store'
 			});
 			if (signal.aborted || this.#destroyed) return;
+			// A saved catalog can name a retired route; isolate it so valid batch peers still load.
 			if (response.status === 404 && routes) {
 				const unknown = new Set(((await response.json()) as UnknownRoutes).unknown_route_ids);
 				if (signal.aborted || this.#destroyed) return;
@@ -722,13 +644,13 @@ export class TransitData {
 			}
 			if (!response.ok) throw new Error(`Service returned ${response.status}`);
 			const service = (await response.json()) as Service;
-			const now = this.#now();
+			const now = Date.now();
 			const decoded = decodeService(service, now);
 			for (const entry of entries) {
 				if (signal.aborted || !this.#owns(entry)) continue;
 				entry.in_flight = false;
 				entry.source_updated_at =
-					at === null && service.updated_at != null ? service.updated_at * 1000 : null;
+					at === undefined && service.updated_at != null ? service.updated_at * 1000 : null;
 				if (routes === null) entry.install(decoded, now);
 				else {
 					const route = decoded.get(entry.route_id!);
@@ -754,10 +676,10 @@ export class TransitData {
 		for (const entries of [this.#services, this.#alerts] as Map<string, Evictable>[]) {
 			const evictable = [...entries.entries()]
 				.filter(
-					([, entry]) => entry.at !== null && !entry.active && !entry.eager && !entry.in_flight
+					([, entry]) => entry.at !== undefined && !entry.active && !entry.eager && !entry.in_flight
 				)
 				.sort(([, a], [, b]) => a.used_at - b.used_at);
-			const historical = [...entries.values()].filter((entry) => entry.at !== null).length;
+			const historical = [...entries.values()].filter((entry) => entry.at !== undefined).length;
 			for (const [key] of evictable.slice(0, Math.max(0, historical - this.#history_limit))) {
 				entries.delete(key);
 			}
@@ -773,7 +695,7 @@ export class TransitData {
 			...this.#alerts.values()
 		]) {
 			if (!entry.active && !entry.eager) continue;
-			if (entry.kind === 'catalog' ? !entry.error : entry.at !== null) continue;
+			if (entry.kind === 'catalog' ? !entry.error : entry.at !== undefined) continue;
 			this.#ensure(entry);
 		}
 		this.#evictHistory();
@@ -781,8 +703,8 @@ export class TransitData {
 
 	#updateStatus() {
 		if (this.#destroyed) return;
-		let warning = typeof navigator !== 'undefined' && !navigator.onLine;
-		const now = this.#now();
+		let warning = browser && !navigator.onLine;
+		const now = Date.now();
 		for (const entry of [
 			...this.#catalogs.values(),
 			...this.#services.values(),
@@ -790,7 +712,7 @@ export class TransitData {
 		]) {
 			if (entry.error instanceof UnknownRouteError || (!entry.active && !entry.eager)) continue;
 			if (entry.error) warning = true;
-			if (entry.kind === 'catalog' || entry.at !== null || entry.fetched_at === null) continue;
+			if (entry.kind === 'catalog' || entry.at !== undefined || entry.fetched_at === null) continue;
 			const refreshed = Math.min(entry.fetched_at, entry.source_updated_at ?? entry.fetched_at);
 			if (now - refreshed > STALE_AFTER_MS) warning = true;
 		}

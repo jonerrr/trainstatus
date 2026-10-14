@@ -63,7 +63,7 @@ fn vehicle(stop_id: Option<&str>) -> VehicleObservation {
 fn published_revision_contains_trip_patterns_and_stop_remap() {
     let dataset = njt_bus_dataset();
     let index = NetworkIndex::new();
-    index.publish(NetworkRevision::from_dataset(&dataset));
+    index.publish_bundle(vec![NetworkRevision::from_dataset(&dataset)]);
 
     let revision = index.get(Source::NjtBus).expect("published revision");
     assert_eq!(

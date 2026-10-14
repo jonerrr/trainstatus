@@ -3,6 +3,7 @@ use backend::alerts::types::ActivePeriod;
 use backend::alerts::types::AlertFormat;
 use backend::alerts::types::AlertSection;
 use backend::alerts::types::AlertTranslation;
+use backend::alerts::types::{AffectedEntity, MtaAlert, MtaAlertData};
 use backend::alerts::types::{AlertCollection, AlertDetails};
 use backend::source::Source;
 use chrono::Utc;
@@ -218,8 +219,6 @@ async fn replacement_removes_children_and_empty_poll_clears_live_but_keeps_decla
 
 #[sqlx::test]
 async fn typed_writes_inherit_source_and_keep_other_sources_current(pool: sqlx::PgPool) {
-    use backend::alerts::types::{AffectedEntity, MtaAlert, MtaAlertData};
-
     let owners = crate::support::test_owners(pool.clone());
     let njt = seed(&pool, &owners.alerts).await;
     let dataset = crate::support::mta_bus_dataset();

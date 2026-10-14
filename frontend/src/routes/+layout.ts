@@ -4,9 +4,9 @@ import { layout_sources, sources_cookie } from '#lib/source_preferences.svelte.j
 
 import type { LayoutLoad } from './$types';
 
-// Offline boots reuse the shell's build-time layout data, so the browser reads the cookie itself.
+// Normal loads receive parsed server data. Offline boots reuse the shell's build-time layout data, so the browser reads the cookie itself.
 export const load: LayoutLoad = ({ data, url }) =>
-	browser
+	browser && data.offline_shell
 		? {
 				...data,
 				selected_sources: layout_sources(

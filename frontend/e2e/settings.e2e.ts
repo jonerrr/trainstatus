@@ -53,6 +53,6 @@ test('applying the time sets at and a reload keeps it', async ({ page }) => {
 	await expect(page).toHaveURL(new RegExp(`\\/settings\\?at=${at}$`));
 	await page.reload();
 	await expect(page).toHaveURL(new RegExp(`[?&]at=${at}(?:&|$)`));
-	await page.getByRole('button', { name: 'Return to live data' }).click();
+	await page.getByRole('button', { name: 'Return to live', exact: true }).click();
 	await expect(page).toHaveURL(/\/settings$/);
 });

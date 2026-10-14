@@ -28,7 +28,7 @@
 	const transit = getTransitData();
 	const current_time = getCurrentTime();
 	const catalog_resource = transit.catalog(() => source);
-	const alerts_resource = transit.alerts(() => ({ source, at: current_time.value ?? null }));
+	const alerts_resource = transit.alerts(() => ({ source, at: current_time.value }));
 	const catalog = $derived(catalog_resource.current);
 	const route = $derived(catalog.value?.routes_by_id.get(route_id));
 	const alerts_state = $derived(alerts_resource.current);
@@ -69,6 +69,7 @@
 	onDestroy(debounce_scroll_to_alert.cancel);
 </script>
 
+<!-- Keep the identity visible during a cold catalog load or a retryable catalog failure. -->
 <header class="flex flex-col gap-3 p-3">
 	{#if route}
 		<FeatureSummary feature={{ route, title: route.long_name }} />

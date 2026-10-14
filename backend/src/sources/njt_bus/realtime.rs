@@ -304,6 +304,8 @@ impl RealtimeSource for NjtBusRealtime {
     }
 }
 
+// TODO: Capture an unmodified overnight NJT feed with its matching schedule to validate
+// the inference windows against provider delays; current capture is a morning run.
 /// A missing date is recoverable only when one pinned schedule covers the provider time.
 fn infer_service_date(
     revision: &NetworkRevision,
@@ -312,6 +314,9 @@ fn infer_service_date(
 ) -> Option<String> {
     let dates = revision.scheduled_trips.get(trip_id)?;
     let mut candidates = dates.values().filter(|entry| {
+        if entry.expires_at <= Utc::now() {
+            return false;
+        }
         let trip = &entry.trip;
         let end = trip
             .stop_times
@@ -328,3 +333,7 @@ fn infer_service_date(
     }
     Some(candidate.trip.start_date.clone())
 }
+
+#[cfg(test)]
+#[path = "tests/realtime.rs"]
+mod tests;

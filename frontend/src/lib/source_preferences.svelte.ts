@@ -1,7 +1,9 @@
+import { SvelteSet } from 'svelte/reactivity';
+
 import { browser } from '$app/env';
 
 import type { Source } from '#lib/client/index.js';
-import { all_sources } from '#lib/source_info.js';
+import { all_sources, is_source } from '#lib/sources.js';
 import { LocalStorage } from '#lib/storage.svelte.js';
 
 export const COOKIE_NAME = 'selected_sources';
@@ -15,24 +17,16 @@ export const default_sources: Source[] = ['mta_subway', 'mta_bus'];
 export function parse_sources(value: string | null | undefined): Source[] {
 	if (!value) return default_sources;
 
-	try {
-		const parsed = value
-			.split(',')
-			.map((s) => s.trim())
-			.filter((s): s is Source => all_sources.includes(s as Source));
-
-		return parsed.length > 0 ? parsed : default_sources;
-	} catch {
-		return default_sources;
-	}
+	const selected = value
+		.split(',')
+		.map((value) => value.trim())
+		.filter(is_source);
+	return selected.length ? [...new SvelteSet(selected)] : default_sources;
 }
-
 /** Sources a page shows: the saved list plus a deep link's valid `src`. */
 export function layout_sources(cookie_value: string | null | undefined, src: string | null) {
 	const selected = parse_sources(cookie_value);
-	return src && all_sources.includes(src as Source) && !selected.includes(src as Source)
-		? [...selected, src as Source]
-		: selected;
+	return is_source(src) && !selected.includes(src) ? [...selected, src] : selected;
 }
 
 /** The saved source list from a `document.cookie` string. */

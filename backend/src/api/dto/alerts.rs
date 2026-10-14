@@ -2,6 +2,7 @@ use crate::alerts::types::{AlertData, AlertTranslation};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
 /// API response for alerts - flattened with all related data
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiAlert {

@@ -1,17 +1,3 @@
-//! Static source catalog served to passenger clients.
-//!
-//! Field audit (frontend consumers as of the transit API rewrite):
-//! - Routes: `id`, names, colors (badges, search, map styling); MTA bus `sort_key`,
-//!   `service_types`, `borough`, name parts (sorting, filters, search) and `directions`
-//!   (bus destination). Routing-only `shape_ids` are omitted.
-//! - Stops: `id`, `name`, `lat`/`lon` (nearby sorting, map), `transfers` (transfer
-//!   links), source `data` including subway headsigns and platform edges, and serving
-//!   `routes`.
-//! - Stop routes: `route_id`, `stop_sequence` (route ordering), and direction, headsign,
-//!   subway stop type and bus opposite stop. The parent `stop_id` and routing-only
-//!   `shape_ids` are omitted.
-//!
-//! `data.source` tags are retained so generated TypeScript types stay discriminated.
 use crate::geometry::Geom;
 use crate::network::types::route::MtaBusDirection;
 use crate::network::types::route::Route;
@@ -163,6 +149,8 @@ impl From<&Stop> for CatalogStop {
     }
 }
 
+// A stop already supplies its ID. Omit that redundant field and the MTA bus
+// shape candidates used only by trajectory resolution.
 impl From<&RouteStop> for CatalogStopRoute {
     fn from(route_stop: &RouteStop) -> Self {
         Self {

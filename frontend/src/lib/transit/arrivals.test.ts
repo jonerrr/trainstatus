@@ -2,14 +2,19 @@ import type { ServiceTrip } from '#lib/client/index.js';
 
 import { describe, expect, it } from 'vitest';
 
-import { emptyRoute, type Call, type RouteData } from './decode.js';
-import { stop_arrivals } from './view.js';
+import { stop_arrivals } from './arrivals.js';
+import { type Call, type RouteData } from './decode.js';
 
 const now = Date.parse('2026-10-05T12:00:00Z');
 
 function route(route_id: string, trips: [string, number][]): RouteData {
 	return {
-		...emptyRoute('mta_subway', route_id),
+		source: 'mta_subway',
+		route_id,
+		at: undefined,
+		fetched_at: null,
+		calls_by_trip: new Map(),
+		calls_by_stop: new Map(),
 		trips: new Map(
 			trips.map(([id, direction]): [string, ServiceTrip] => [
 				id,

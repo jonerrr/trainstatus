@@ -23,7 +23,7 @@
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.value ?? []);
+	const catalogs = $derived(catalog_resources.current);
 
 	type RouteKey = { source: Source; id: string };
 	let selected = $state<RouteKey[]>(
@@ -50,10 +50,10 @@
 		selected.map((key) => ({
 			source: key.source,
 			route_id: key.id,
-			at: current_time.value ?? null
+			at: current_time.value
 		}))
 	);
-	const reads = $derived(route_resources.current.value ?? []);
+	const reads = $derived(route_resources.current);
 	const trips_loading = $derived(
 		catalogs.some((c) => !c.catalog && !c.error) || reads.some((r) => !r.route && !r.error)
 	);

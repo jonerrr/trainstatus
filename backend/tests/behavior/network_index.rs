@@ -7,7 +7,7 @@ use backend::source::Source;
 fn static_index_publishes_one_coherent_revision() {
     let dataset = mta_bus_dataset();
     let index = NetworkIndex::new();
-    index.publish(NetworkRevision::from_dataset(&dataset));
+    index.publish_bundle(vec![NetworkRevision::from_dataset(&dataset)]);
 
     let revision = index.get(Source::MtaBus).expect("published revision");
     let route = &revision.routes["B100"];

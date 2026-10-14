@@ -66,7 +66,7 @@ let clock = 1_780_000_000_000;
 const created: TransitData[] = [];
 
 function store(fetcher: typeof fetch, sources: Source[] = ['mta_bus'], history_limit = 6) {
-	const data = new TransitData({ sources, fetcher, history_limit, batch_ms: 0, now: () => clock });
+	const data = new TransitData({ sources, fetcher, history_limit, batch_ms: 0 });
 	created.push(data);
 	return data;
 }
@@ -83,6 +83,7 @@ async function settle() {
 }
 
 beforeEach(() => {
+	vi.spyOn(Date, 'now').mockImplementation(() => clock);
 	vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 });
 
@@ -96,7 +97,7 @@ afterEach(() => {
 test('fast-changing bus rows wait for a pause and fetch only routes still being read', async () => {
 	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	const http = transport();
-	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher, now: () => clock });
+	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher });
 	created.push(data);
 	const view = await render(TransitDataHarness, {
 		data,
@@ -141,7 +142,7 @@ test('fast-changing bus rows wait for a pause and fetch only routes still being 
 test('bus rows removed before the debounce expires make no request', async () => {
 	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 	const http = transport();
-	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher, now: () => clock });
+	const data = new TransitData({ sources: ['mta_bus'], fetcher: http.fetcher });
 	created.push(data);
 	const view = await render(TransitDataHarness, {
 		data,
@@ -164,8 +165,7 @@ test('bus debouncing does not delay subway service and slow changes make their o
 	const http = transport();
 	const data = new TransitData({
 		sources: ['mta_subway', 'mta_bus'],
-		fetcher: http.fetcher,
-		now: () => clock
+		fetcher: http.fetcher
 	});
 	created.push(data);
 	const view = await render(TransitDataHarness, {
@@ -448,7 +448,7 @@ test('whole-source subway loads eagerly and serves every route from one request'
 	await settle();
 	expect(http.calls.map((call) => call.url.pathname)).toEqual(['/api/v1/service/mta_subway']);
 	http.calls[0].respond(
-		http.json({ ...http.service('mta_subway', { '1': ['t1'] }), source: 'mta_subway' })
+		http.json({ ...http.service('mta_subway', { '1': ['t1'], '7': [] }), source: 'mta_subway' })
 	);
 	await render(TransitDataHarness, {
 		data,
@@ -470,8 +470,7 @@ test('map-only owners and loaded peeks defer passenger requests until an itinera
 		sources: ['mta_subway'],
 		eager_service: false,
 		fetcher: http.fetcher,
-		batch_ms: 0,
-		now: () => clock
+		batch_ms: 0
 	});
 	created.push(data);
 	await settle();

@@ -2,8 +2,9 @@
 	import { goto, refreshAll } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import { all_sources, source_info } from '#lib/source_info.js';
+	import { source_icons } from '#lib/source_icons.js';
 	import { source_preferences } from '#lib/source_preferences.svelte.js';
+	import { all_sources, source_config } from '#lib/sources.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { BookText, CodeXml, ExternalLink, Hourglass, Info, Layers } from '@lucide/svelte';
@@ -55,7 +56,7 @@
 
 				<div class="flex flex-col gap-3 pl-6">
 					{#each all_sources as source (source)}
-						{const info = $derived(source_info[source])}
+						{const info = $derived(source_config[source])}
 						{const enabled = $derived(source_preferences.current.includes(source))}
 						<label
 							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"
@@ -72,7 +73,7 @@
 							/>
 							<div class="flex items-center gap-2">
 								<enhanced:img
-									src={info.icon}
+									src={source_icons[source]}
 									sizes="24px"
 									alt=""
 									class="size-6 rounded-sm object-contain"

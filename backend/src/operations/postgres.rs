@@ -1,3 +1,4 @@
+//! Shared persistence conversions used by ingestion and retained-history reads.
 use super::types::position::*;
 use super::types::trip::*;
 use crate::geometry::Geom;
@@ -29,33 +30,11 @@ impl TryFrom<TripRow> for TripRun {
             direction: row.direction,
             created_at: row.created_at,
             updated_at: row.updated_at,
-            data: crate::persistence::decode(row.source, row.data)?,
+            data: crate::postgres::decode(row.source, row.data)?,
         })
     }
 }
 
-pub(super) struct VisitRow {
-    pub(super) source: Source,
-    pub(super) trip_id: Uuid,
-    pub(super) stop_sequence: i32,
-    pub(super) stop_id: String,
-    pub(super) arrival: DateTime<Utc>,
-    pub(super) departure: DateTime<Utc>,
-    pub(super) data: serde_json::Value,
-}
-impl TryFrom<VisitRow> for StopVisit {
-    type Error = anyhow::Error;
-    fn try_from(row: VisitRow) -> anyhow::Result<Self> {
-        Ok(Self {
-            trip_id: row.trip_id,
-            stop_sequence: row.stop_sequence,
-            stop_id: row.stop_id,
-            arrival: row.arrival,
-            departure: row.departure,
-            data: crate::persistence::decode(row.source, row.data)?,
-        })
-    }
-}
 pub(super) struct ObservationRow {
     pub(super) source: Source,
     pub(super) vehicle_id: String,
@@ -73,7 +52,7 @@ impl TryFrom<ObservationRow> for VehicleObservation {
             trip_id: row.trip_id,
             stop_id: row.stop_id,
             updated_at: row.updated_at,
-            data: crate::persistence::decode(row.source, row.data)?,
+            data: crate::postgres::decode(row.source, row.data)?,
             geom: row.geom,
         })
     }

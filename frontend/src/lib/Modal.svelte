@@ -16,7 +16,7 @@
 	import { getTransitData, UnknownRouteError } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
 	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
-	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
+	import { close_modal, getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import {
 		AlarmClock,
@@ -36,25 +36,11 @@
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
-	let current_page_state = $state(page.state);
+	let current_page_state = $state.raw(page.state);
+	const selected_modal = $derived(current_page_state.modal);
 	const has_modal = $derived(!!current_page_state.modal);
 
-	// $state proxies and the objects they wrap are not ===. Compare the modal
-	// itself, or assigning page.state back into current_page_state retriggers
-	// the effect and starts another view transition on every flush.
-	function modal_changed(next: ModalData | null | undefined, local: ModalData | null | undefined) {
-		const next_modal = $state.snapshot(next);
-		const local_modal = $state.snapshot(local);
-		if (!next_modal || !local_modal) return !!next_modal !== !!local_modal;
-		return (
-			next_modal.type !== local_modal.type ||
-			next_modal.id !== local_modal.id ||
-			next_modal.source !== local_modal.source ||
-			(next_modal.type === 'trip' &&
-				local_modal.type === 'trip' &&
-				next_modal.route_id !== local_modal.route_id)
-		);
-	}
+	// Raw state preserves modal identity across shallow navigation and animation snapshots.
 
 	let modal_transition: ViewTransition | undefined;
 
@@ -64,7 +50,7 @@
 		const apply = () => {
 			// Catalog validation or another navigation can change the selection while
 			// the transition waits to capture its old view. Apply the latest selection.
-			current_page_state = $state.snapshot(page.state);
+			current_page_state = page.state;
 		};
 
 		// experimental.async makes tick() wait for a frame, which a view transition
@@ -94,7 +80,7 @@
 	$effect(() => {
 		// $inspect.trace('modal state transition effect');
 		const next_state = page.state;
-		if (untrack(() => modal_changed(next_state.modal, current_page_state.modal))) {
+		if (untrack(() => next_state.modal !== current_page_state.modal)) {
 			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
 			slide_to(forward);
 		}
@@ -113,20 +99,24 @@
 		const selected = page.state.modal;
 		if (!selected) return;
 		const catalog = selected_catalog.current.value;
-		if (!catalog) return; // Failed or pending catalog reads cannot establish validity.
+		// Keep the requested modal and its shared Retry available during catalog failures.
+		if (!catalog) return;
 		const service = selected_service.current;
-		const invalid =
-			selected.type === 'stop'
-				? !catalog.stops_by_id.has(selected.id)
-				: selected.type === 'route'
-					? !catalog.routes_by_id.has(selected.id)
-					: !selected.route_id ||
-						!catalog.routes_by_id.has(selected.route_id) ||
-						service.error instanceof UnknownRouteError ||
-						(!service.loading &&
-							!service.error &&
-							service.value !== undefined &&
-							!service.value.trips.has(selected.id));
+		let invalid: boolean;
+		switch (selected.type) {
+			case 'stop':
+				invalid = !catalog.stops_by_id.has(selected.id);
+				break;
+			case 'route':
+				invalid = !catalog.routes_by_id.has(selected.id);
+				break;
+			case 'trip':
+				invalid =
+					!catalog.routes_by_id.has(selected.route_id) ||
+					service.error instanceof UnknownRouteError ||
+					(!!service.value && !service.value.trips.has(selected.id));
+				break;
+		}
 		if (invalid) untrack(() => close_modal(current_time.value, true));
 	});
 
@@ -215,12 +205,13 @@
 </script>
 
 <!-- TODO: refactor actions now that we have sources -->
+
 {#snippet actions(
 	history: boolean,
 	id: string,
 	title: string,
 	source: Source,
-	pins: LocalStorage<Pins> | undefined
+	pins: LocalStorage<Pins>
 )}
 	<div class="flex h-16 items-center justify-between gap-1 px-1">
 		<button
@@ -236,8 +227,7 @@
 		<div class="flex items-center gap-1 text-xs">
 			{#if history}
 				<button
-					class:text-neutral-400={!show_previous}
-					class:text-neutral-50={show_previous}
+					class={{ 'text-neutral-400': !show_previous, 'text-neutral-50': show_previous }}
 					aria-label="Show previous"
 					onclick={() => {
 						show_previous = !show_previous;
@@ -322,9 +312,7 @@
 				</button>
 			{/if}
 
-			{#if pins}
-				<Pin {id} {pins} {source} size="2rem" />
-			{/if}
+			<Pin {id} {pins} {source} size="2rem" />
 		</div>
 	</div>
 {/snippet}
@@ -340,44 +328,47 @@
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 	>
 		{#if has_modal}<UpdateIndicator compact />{/if}
-		{#if current_page_state.modal?.type === 'stop'}
-			{const { source, id } = $derived(current_page_state.modal)}
-			<StopModal {source} stop_id={id} {show_previous} time_format={time_format.current} />
-
-			{@render actions(
-				true,
-				id,
-				`Arrivals at ${catalog_of(source)?.stops_by_id.get(id)?.name ?? id}`,
-				source,
-				stop_pins
-			)}
-		{:else if current_page_state.modal?.type === 'route'}
-			{const { source, id } = $derived(current_page_state.modal)}
-			<RouteModal {source} route_id={id} time_format={time_format.current} />
-
-			{@render actions(
-				false,
-				id,
-				`Alerts for ${catalog_of(source)?.routes_by_id.get(id)?.short_name ?? id}`,
-				source,
-				route_pins
-			)}
-		{:else if current_page_state.modal?.type === 'trip'}
-			{const { source, id, route_id } = $derived(current_page_state.modal)}
-			<TripModal
-				{source}
-				{route_id}
-				trip_id={id}
+		{#if selected_modal?.type === 'stop'}
+			<StopModal
+				source={selected_modal.source}
+				stop_id={selected_modal.id}
 				{show_previous}
 				time_format={time_format.current}
 			/>
-
 			{@render actions(
 				true,
-				route_id ? trip_pin_key(route_id, id) : id,
-				`${route_id ?? ''} Trip`,
-				source,
-				route_id ? trip_pins : undefined
+				selected_modal.id,
+				`Arrivals at ${catalog_of(selected_modal.source)?.stops_by_id.get(selected_modal.id)?.name ?? selected_modal.id}`,
+				selected_modal.source,
+				stop_pins
+			)}
+		{:else if selected_modal?.type === 'route'}
+			<RouteModal
+				source={selected_modal.source}
+				route_id={selected_modal.id}
+				time_format={time_format.current}
+			/>
+			{@render actions(
+				false,
+				selected_modal.id,
+				`Alerts for ${catalog_of(selected_modal.source)?.routes_by_id.get(selected_modal.id)?.short_name ?? selected_modal.id}`,
+				selected_modal.source,
+				route_pins
+			)}
+		{:else if selected_modal?.type === 'trip'}
+			<TripModal
+				source={selected_modal.source}
+				route_id={selected_modal.route_id}
+				trip_id={selected_modal.id}
+				{show_previous}
+				time_format={time_format.current}
+			/>
+			{@render actions(
+				true,
+				trip_pin_key(selected_modal.route_id, selected_modal.id),
+				`${selected_modal.route_id} Trip`,
+				selected_modal.source,
+				trip_pins
 			)}
 		{/if}
 	</div>

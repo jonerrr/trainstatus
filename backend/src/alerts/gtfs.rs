@@ -4,6 +4,7 @@ use crate::alerts::types::AlertCollection;
 use crate::alerts::types::AlertFormat;
 use crate::alerts::types::AlertSection;
 use crate::alerts::types::AlertTranslation;
+use crate::alerts::types::{AffectedEntity, AlertDetails, MtaAlert, MtaAlertData};
 use crate::feed::Alert as GtfsAlert;
 use crate::feed::FeedMessage;
 use crate::source::Source;
@@ -60,7 +61,6 @@ pub(crate) fn mta_alert<T: GtfsAlertSource>(
     entity_id: String,
     alert: GtfsAlert,
 ) -> Option<crate::alerts::types::MtaAlert> {
-    use crate::alerts::types::{AffectedEntity, AlertDetails, MtaAlert, MtaAlertData};
     let mercury = alert.mercury_alert.as_ref()?;
     let created_at = DateTime::from_timestamp(mercury.created_at as i64, 0)?;
     let updated_at = DateTime::from_timestamp(mercury.updated_at as i64, 0)?;

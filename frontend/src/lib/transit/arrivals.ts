@@ -1,6 +1,6 @@
-import type { ServiceTrip, VehicleStatus } from '#lib/client/index.js';
+import type { ServiceTrip } from '#lib/client/index.js';
 
-import type { Call, CatalogData, RouteData } from './decode.js';
+import type { Call, RouteData } from './decode.js';
 
 export type StopArrival = Call & { trip: ServiceTrip; eta: number };
 
@@ -27,14 +27,4 @@ export function stop_arrivals(
 		active_routes.add(call.route_id);
 	}
 	return { arrivals, active_routes };
-}
-
-/** Name of the stop a vehicle is at or approaching, from its status or next call. */
-export function current_stop_name(
-	status: VehicleStatus | null | undefined,
-	upcoming: readonly Call[],
-	catalog: CatalogData | undefined
-): string {
-	const stop_id = status?.stop_id || upcoming[0]?.stop_id;
-	return (stop_id && catalog?.stops_by_id.get(stop_id)?.name) || 'Unknown';
 }

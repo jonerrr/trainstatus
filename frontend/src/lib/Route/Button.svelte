@@ -18,7 +18,7 @@
 	// Rows render as their alerts arrive; a suspending read per row would batch them.
 	const alerts_resource = transit.alerts(() => ({
 		source: data.data.source,
-		at: current_time.value ?? null
+		at: current_time.value
 	}));
 	const alerts_state = $derived(alerts_resource.current);
 	const alerts = $derived(alerts_state.value && route_alerts(alerts_state.value, data.id));

@@ -1,7 +1,10 @@
 use crate::support;
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
 use backend::operations::CollectedSnapshot;
 use backend::operations::OperationsIngestor;
 use backend::source::Source;
+use backend::sources::mta_bus::realtime::MtaBusRealtime;
 use uuid::Uuid;
 
 /// Fixture-derived workload matching the original approximately 95k-row cycle.
@@ -9,10 +12,6 @@ use uuid::Uuid;
 #[sqlx::test]
 #[ignore = "large snapshot WAL benchmark; run explicitly against local PostgreSQL"]
 async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
-    use backend::fixtures;
-    use backend::fixtures::FixtureKind;
-    use backend::sources::mta_bus::realtime::MtaBusRealtime;
-
     let stores = support::test_owners(pool.clone());
     let dataset = support::mta_bus_dataset();
     let import_started = std::time::Instant::now();

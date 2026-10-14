@@ -1,14 +1,11 @@
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{StatusCode, header},
     response::Response,
 };
 
-use super::{
-    AppError,
-    query::{RequestTime, TimeQuery},
-};
+use super::{AppError, query::TimeQuery};
 use crate::AppState;
 use crate::source::Source;
 use crate::trajectory::RenderUnit;
@@ -33,7 +30,7 @@ use crate::trajectory::encode_render_units;
 pub async fn trajectories_handler(
     State(state): State<AppState>,
     Path(source): Path<Source>,
-    time: RequestTime,
+    Query(time): Query<TimeQuery>,
 ) -> Result<Response, AppError> {
     let snapshot = state.trajectories.snapshot(source, time.at).await?;
 

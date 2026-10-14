@@ -164,12 +164,9 @@ fn names(source: Source, names: &[&str]) -> Vec<String> {
 async fn seed(stores: &support::TestOwners, source: Source) {
     let static_data = dataset(source);
     stores.network.persist(&static_data).await.unwrap();
-    stores
-        .network
-        .network_index()
-        .publish(backend::network::index::NetworkRevision::from_dataset(
-            &static_data,
-        ));
+    stores.network.network_index().publish_bundle(vec![
+        backend::network::index::NetworkRevision::from_dataset(&static_data),
+    ]);
 }
 
 async fn membership_case(pool: sqlx::PgPool) {

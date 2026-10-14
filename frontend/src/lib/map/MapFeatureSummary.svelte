@@ -15,7 +15,7 @@
 	// Hover summaries use loaded service only; opening the trip loads its route.
 	const read = $derived(
 		target.kind === 'trip' && target.routeId
-			? transit.loadedTrip(target.source, target.routeId, target.id, current_time.value ?? null)
+			? transit.loadedTrip(target.source, target.routeId, target.id, current_time.value)
 			: undefined
 	);
 	const feature = $derived(

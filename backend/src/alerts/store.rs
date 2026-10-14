@@ -43,7 +43,7 @@ impl TryFrom<AlertRow> for Alert {
                 active_periods: row.active_periods,
                 entities: row.entities,
             },
-            data: crate::persistence::decode::<AlertData>(row.source, row.data)?,
+            data: crate::postgres::decode::<AlertData>(row.source, row.data)?,
         })
     }
 }
@@ -235,7 +235,7 @@ impl Alerts {
         let recorded_ats = alerts.iter().map(|a| a.recorded_at).collect::<Vec<_>>();
         let data_jsons = alerts
             .iter()
-            .map(|a| crate::persistence::attributes(&a.data))
+            .map(|a| crate::postgres::attributes(&a.data))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Use a CTE to get the actual IDs (either inserted or existing due to conflict)

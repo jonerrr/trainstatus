@@ -26,7 +26,9 @@ impl Network {
         }
     }
 
-    pub(super) async fn import_due(
+    /// Decide whether to collect upstream data, restoring a fresh persisted
+    /// revision on startup when the in-memory index is still empty.
+    pub(super) async fn needs_import(
         &self,
         source: Source,
         refresh: std::time::Duration,
@@ -35,7 +37,12 @@ impl Network {
         let updated = sqlx::query_scalar!("SELECT updated_at FROM source WHERE id = $1", source)
             .fetch_one(&self.pool)
             .await?;
-        Ok(Utc::now().signed_duration_since(updated).num_seconds() > refresh.as_secs() as i64)
+        let due =
+            Utc::now().signed_duration_since(updated).num_seconds() > refresh.as_secs() as i64;
+        if due || self.index.get(source).is_some() {
+            return Ok(due);
+        }
+        Ok(self.restore_revision(source).await?.is_none())
     }
 
     /// Clone the shared read handle; no network data or database rows are copied.
@@ -103,7 +110,7 @@ impl Network {
         )
         .execute(&mut *tx)
         .await?;
-        let mut schedules = Self::load_schedules_on(source, &mut tx).await?;
+        let mut schedules: Vec<ScheduledTripEntry> = Self::load_schedules(source, &mut tx).await?;
         schedules.extend(
             dataset
                 .scheduled_trips
@@ -177,7 +184,7 @@ impl Network {
                     &stop::query_all_on(affected, &mut tx).await?,
                 )?));
                 bundle.push(revision);
-            } else if let Some(revision) = self.load_revision_on(affected, &mut tx).await? {
+            } else if let Some(revision) = self.load_revision(affected, &mut tx).await? {
                 bundle.push(revision);
             }
         }
@@ -206,7 +213,7 @@ impl Network {
 
     /// Restore all network inputs and catalog bytes within one repeatable-read
     /// transaction and publish it under the import lock. Imports also use
-    /// `load_revision_on` inside their write transaction.
+    /// `load_revision` inside their write transaction.
     pub async fn restore_revision(
         &self,
         source: Source,
@@ -216,15 +223,15 @@ impl Network {
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             .execute(&mut *tx)
             .await?;
-        let revision = self.load_revision_on(source, &mut tx).await?;
+        let revision = self.load_revision(source, &mut tx).await?;
         tx.commit().await?;
         if let Some(revision) = &revision {
-            self.index.publish(revision.clone());
+            self.index.publish_bundle(vec![revision.clone()]);
         }
         Ok(revision)
     }
 
-    async fn load_revision_on(
+    async fn load_revision(
         &self,
         source: Source,
         connection: &mut sqlx::PgConnection,
@@ -257,7 +264,7 @@ impl Network {
         let stops = stop::query_all_on(source, &mut *connection).await?;
         let catalog = crate::api::dto::catalog::encode(source, &routes, &stops)?;
         let shapes = route::get_all_shapes_on(source, &mut *connection).await?;
-        let schedules = Self::load_schedules_on(source, &mut *connection).await?;
+        let schedules = Self::load_schedules(source, &mut *connection).await?;
         let Some(mut revision) =
             NetworkRevision::try_from_persisted(source, routes, stops, shapes, patterns, remap)
         else {
@@ -268,7 +275,7 @@ impl Network {
         Ok(Some(revision))
     }
 
-    async fn load_schedules_on(
+    async fn load_schedules(
         source: Source,
         connection: &mut sqlx::PgConnection,
     ) -> anyhow::Result<Vec<ScheduledTripEntry>> {

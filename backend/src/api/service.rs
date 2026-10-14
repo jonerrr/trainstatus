@@ -1,4 +1,4 @@
-use super::{AppError, query::historical_time};
+use super::{AppError, query::TimeQuery};
 use crate::AppState;
 use crate::api::dto::service::Service;
 use crate::operations::service::RouteSelection;
@@ -19,8 +19,6 @@ pub struct ServiceQuery {
     /// Comma-separated route IDs. Required and nonempty for bus sources; duplicates are
     /// ignored. Not accepted for `mta_subway`, which always returns every route.
     route_ids: Option<String>,
-    /// Unix seconds for a historical read. Omit for the latest committed snapshot.
-    at: Option<i64>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -35,7 +33,7 @@ pub struct UnknownRoutes {
     tag = "REALTIME",
     summary = "Get passenger service",
     description = "Returns complete passenger service for routes: trips with vehicle status and every stop call. `mta_subway` returns every route; bus sources return exactly the requested `route_ids`. All routes come from one committed source snapshot. With `at`, returns retained trips with any arrival or departure in `[at, at + 4h]` and all of their calls, without vehicle status.",
-    params(("source" = Source, Path, description = "Data source"), ServiceQuery),
+    params(("source" = Source, Path, description = "Data source"), ServiceQuery, TimeQuery),
     responses(
         (status = 200, description = "Service for the requested routes", body = Service),
         (status = 400, description = "Missing, empty or malformed `route_ids`, `route_ids` on `mta_subway`, or an invalid `at`"),
@@ -44,10 +42,11 @@ pub struct UnknownRoutes {
         (status = 500, description = "Database or internal service error")
     )
 )]
-pub async fn service_handler(
+pub(super) async fn service_handler(
     State(state): State<AppState>,
     Path(source): Path<Source>,
     Query(params): Query<ServiceQuery>,
+    Query(time): Query<TimeQuery>,
 ) -> Response {
     let selection = match (source, params.route_ids.as_deref()) {
         (Source::MtaSubway, None) => RouteSelection::All,
@@ -60,11 +59,7 @@ pub async fn service_handler(
             None => return bad_request("route_ids must be a nonempty comma-separated list"),
         },
     };
-    let at = match historical_time(params.at) {
-        Ok(at) => at,
-        Err(error) => return error.into_response(),
-    };
-    let result = match at {
+    let result = match time.at {
         None => state
             .operations
             .live(source)

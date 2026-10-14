@@ -24,7 +24,7 @@
 		const now = current_time.ms;
 		const active_routes = new Set(
 			transit
-				.loadedStopArrivals(stop.data.source, stop.id, current_time.value ?? null)
+				.loadedStopArrivals(stop.data.source, stop.id, current_time.value)
 				.calls.filter((call) => call.arrival >= now)
 				.map((call) => call.route_id)
 		);

@@ -16,8 +16,7 @@ declare global {
 				| null
 				| { type: 'stop'; source: Source; id: string }
 				| { type: 'route'; source: Source; id: string }
-				// route_id is null for an unsupported trip link without route context.
-				| { type: 'trip'; source: Source; route_id: string | null; id: string };
+				| { type: 'trip'; source: Source; route_id: string; id: string };
 			// used to determine if page.state update was forward or backwards
 			index?: number;
 		}

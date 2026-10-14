@@ -1,28 +1,6 @@
-//! Shared scalar conversion used only at private PostgreSQL boundaries.
-use crate::{geometry::Geom, source::Source};
+use crate::geometry::Geom;
 use geozero::{GeozeroGeometry, wkb::FromWkb};
-use serde::{Serialize, de::DeserializeOwned};
-
-pub(crate) fn attributes(value: &impl Serialize) -> anyhow::Result<serde_json::Value> {
-    let mut value = serde_json::to_value(value)?;
-    if let Some(fields) = value.as_object_mut() {
-        fields.remove("source");
-    }
-    Ok(value)
-}
-pub(crate) fn decode<T: DeserializeOwned>(
-    source: Source,
-    mut value: serde_json::Value,
-) -> anyhow::Result<T> {
-    value
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("Attributes must be an object"))?
-        .insert(
-            "source".into(),
-            serde_json::Value::String(source.as_str().into()),
-        );
-    Ok(serde_json::from_value(value)?)
-}
+use sqlx::ValueRef;
 
 impl sqlx::Type<sqlx::Postgres> for Geom {
     fn type_info() -> sqlx::postgres::PgTypeInfo {
@@ -40,7 +18,6 @@ impl<'de> sqlx::Decode<'de, sqlx::Postgres> for Geom {
     fn decode(
         value: sqlx::postgres::PgValueRef<'de>,
     ) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        use sqlx::ValueRef;
         if value.is_null() {
             return Err(Box::new(sqlx::Error::Decode(
                 "Cannot decode NULL value".into(),

@@ -3,7 +3,6 @@
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { current_stop_name } from '#lib/transit/view.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
 
@@ -19,7 +18,7 @@
 	}
 	let { source, route_id, trip_id }: Props = $props();
 
-	const at = $derived(current_time.value ?? null);
+	const at = $derived(current_time.value);
 	// Rows render as their route arrives; a suspending read per row would batch them.
 	const catalog_resource = transit.catalog(() => source);
 	const route_resource = transit.route(() => ({ source, route_id, at }));
@@ -28,6 +27,7 @@
 	const catalog = $derived(catalog_state.value);
 	const route_data = $derived(route_state.value);
 	const error = $derived(catalog_state.error ?? route_state.error);
+	// A pin outlives the realtime run it refers to.
 	const read = $derived(
 		route_data?.trips.has(trip_id)
 			? {
@@ -66,7 +66,7 @@
 				{#if status && 'status' in status.data && status.data.status}
 					<span>{status.data.status}</span>
 				{/if}
-				{upcoming.length ? current_stop_name(status, upcoming, catalog) : 'Unknown'}
+				{catalog.stops_by_id.get(status?.stop_id || upcoming[0]?.stop_id)?.name ?? 'Unknown'}
 			</div>
 		{/if}
 	</div>

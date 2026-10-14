@@ -1,4 +1,3 @@
-use super::rows::{RouteRow, ShapeRow};
 use crate::network::types::route::Route;
 use crate::network::types::shape::Shape;
 use crate::source::Source;
@@ -9,8 +8,7 @@ pub(in crate::network) async fn query_all_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Route>> {
-    sqlx::query_as!(
-        RouteRow,
+    sqlx::query!(
         r#"SELECT
                 id,
                 source,
@@ -29,7 +27,18 @@ pub(in crate::network) async fn query_all_on(
     .fetch_all(connection)
     .await?
     .into_iter()
-    .map(TryInto::try_into)
+    .map(|row| {
+        Ok(Route {
+            id: row.id,
+            long_name: row.long_name,
+            short_name: row.short_name,
+            color: row.color,
+            text_color: row
+                .text_color
+                .ok_or_else(|| anyhow::anyhow!("Route has no text color"))?,
+            data: crate::postgres::decode(row.source, row.data)?,
+        })
+    })
     .collect::<anyhow::Result<Vec<Route>>>()
 }
 
@@ -56,7 +65,7 @@ pub(in crate::network) async fn save_all_on(
         .collect();
     let datas: Vec<_> = routes
         .iter()
-        .map(|r| crate::persistence::attributes(&r.data).unwrap())
+        .map(|r| crate::postgres::attributes(&r.data).unwrap())
         .collect();
 
     sqlx::query!(
@@ -93,6 +102,7 @@ pub(in crate::network) async fn save_all_on(
 
     Ok(())
 }
+
 pub(in crate::network) async fn save_all_shapes_on(
     connection: &mut PgConnection,
     source: Source,
@@ -102,7 +112,7 @@ pub(in crate::network) async fn save_all_shapes_on(
     let geoms: Vec<_> = shapes.iter().map(|s| s.geom.clone()).collect();
     let datas: Vec<_> = shapes
         .iter()
-        .map(|s| crate::persistence::attributes(&s.data).unwrap())
+        .map(|s| crate::postgres::attributes(&s.data).unwrap())
         .collect();
 
     let assets = shapes
@@ -155,8 +165,7 @@ pub(in crate::network) async fn get_all_shapes_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Shape>> {
-    Ok(sqlx::query_as!(
-        ShapeRow,
+    Ok(sqlx::query!(
         r#"
             SELECT
                 s.id,
@@ -172,6 +181,11 @@ pub(in crate::network) async fn get_all_shapes_on(
     .fetch_all(connection)
     .await?
     .into_iter()
-    .map(Into::into)
+    .map(|row| Shape {
+        id: row.id,
+        source: row.source,
+        geom: row.geom,
+        data: row.data,
+    })
     .collect::<Vec<Shape>>())
 }

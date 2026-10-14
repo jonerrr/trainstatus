@@ -10,7 +10,7 @@
 	import Skeleton from '#lib/Skeleton.svelte';
 	import type { Call, CatalogData } from '#lib/transit/decode.js';
 	import { getTransitData, type TripRead } from '#lib/transit/store.svelte.js';
-	import Transfers, { type TransferCall } from '#lib/Trip/Transfers.svelte';
+	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 	import VehicleCapacity from '#lib/VehicleCapacity.svelte';
@@ -24,19 +24,18 @@
 		show_previous: boolean;
 		time_format: 'time' | 'countdown';
 		source: Source;
-		/** Null for an unsupported trip link without route context. */
-		route_id: string | null;
+		route_id: string;
 		trip_id: string;
 	}
 
 	const { source, route_id, trip_id, show_previous, time_format }: Props = $props();
 
-	const at = $derived(current_time.value ?? null);
+	const at = $derived(current_time.value);
 	const catalog_resource = transit.catalog(() => source);
-	const trip_resource = transit.trip(() => (route_id ? { source, route_id, trip_id, at } : null));
+	const trip_resource = transit.trip(() => ({ source, route_id, trip_id, at }));
 	// The header stays mounted across loading states and shows whatever has loaded.
 	const loaded_catalog = $derived(transit.peekCatalog(source));
-	const route = $derived(route_id ? loaded_catalog?.routes_by_id.get(route_id) : undefined);
+	const route = $derived(loaded_catalog?.routes_by_id.get(route_id));
 	const loaded_read = $derived(trip_resource.current.value);
 	const open_transfers = $state<Record<number, boolean>>({});
 
@@ -49,9 +48,9 @@
 
 	/** Up to four later departures on other routes at each stop, from loaded routes only. */
 	function transfers_at(read: TripRead, calls: readonly Call[], catalog: CatalogData) {
-		const transfers: Record<number, TransferCall[]> = {};
+		const transfers: Record<number, (Call & { source: Source })[]> = {};
 		for (const st of calls) {
-			const list: TransferCall[] = (transfers[st.sequence] = []);
+			const list: (Call & { source: Source })[] = (transfers[st.sequence] = []);
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const added = new Set<string>();
 			const stop = catalog?.stops_by_id.get(st.stop_id);
@@ -73,11 +72,11 @@
 					// Direction numbers are only comparable within one source.
 					if (!trip || (candidate.source === source && trip.direction !== read.trip.direction))
 						continue;
-					list.push({ source: candidate.source, call });
+					list.push({ ...call, source: candidate.source });
 					added.add(call.route_id);
 				}
 			}
-			list.sort((a, b) => a.call.arrival - b.call.arrival);
+			list.sort((a, b) => a.arrival - b.arrival);
 		}
 		return transfers;
 	}
@@ -203,87 +202,83 @@
 	</details>
 {/snippet}
 
-{#if route_id === null}
-	<p class="p-3 text-center text-neutral-400">
-		This trip link has no route and is no longer supported. Open the trip from its stop or route.
-	</p>
-{:else}
-	{@render title_row(loaded_read)}
-	<svelte:boundary>
-		{const catalog_state = $derived(catalog_resource.current)}
-		{const trip_state = $derived(trip_resource.current)}
-		{const catalog = $derived(catalog_state.value)}
-		{const read = $derived(trip_state.value)}
+{@render title_row(loaded_read)}
+<svelte:boundary>
+	{const catalog_state = $derived(catalog_resource.current)}
+	{const trip_state = $derived(trip_resource.current)}
+	{const catalog = $derived(catalog_state.value)}
+	{const read = $derived(trip_state.value)}
 
-		{#if catalog_state.loading || trip_state.loading}
-			<Skeleton lines={6} class="p-2" />
-		{:else if !read && !catalog_state.error && !trip_state.error}
-			<p class="p-2 text-center text-neutral-400">This trip is not currently running.</p>
-		{:else if read}
-			{#if source === 'mta_subway'}
-				{@render consist(read)}
-			{/if}
+	{#if catalog_state.loading || trip_state.loading}
+		<Skeleton lines={6} class="p-2" />
+	{:else if !read && !catalog_state.error && !trip_state.error}
+		<p class="p-2 text-center text-neutral-400">This trip is not currently running.</p>
+	{:else if read}
+		{#if source === 'mta_subway'}
+			{@render consist(read)}
+		{/if}
 
-			{const calls = $derived(visible_calls(read))}
-			{const transfers = $derived(catalog ? transfers_at(read, calls, catalog) : {})}
-			<ModalList>
-				{#each calls as st (st.sequence)}
-					{const stop = $derived(catalog?.stops_by_id.get(st.stop_id))}
-					{#if stop}
-						<div class="relative text-base">
-							{#if transfers[st.sequence]?.length}
-								<button
-									tabindex="0"
-									onclick={() => {
-										open_transfers[st.sequence] = !open_transfers[st.sequence];
-									}}
-									aria-label="Show transfers at stop"
-									class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
-								>
-									<div class="mx-1 flex items-center">
-										{#if !open_transfers[st.sequence]}
-											<ChevronDown />
-										{:else}
-											<ChevronUp />
-										{/if}
+		{const calls = $derived(visible_calls(read))}
+		{const transfers = $derived(catalog ? transfers_at(read, calls, catalog) : {})}
+		<ModalList>
+			{#each calls as st (st.sequence)}
+				{const stop = $derived(catalog?.stops_by_id.get(st.stop_id))}
+				{#if stop}
+					<div class="relative text-base">
+						{#if transfers[st.sequence]?.length}
+							<button
+								tabindex="0"
+								onclick={() => {
+									open_transfers[st.sequence] = !open_transfers[st.sequence];
+								}}
+								aria-label="Show transfers at stop"
+								class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
+							>
+								<div class="mx-1 flex items-center">
+									{#if !open_transfers[st.sequence]}
+										<ChevronDown />
+									{:else}
+										<ChevronUp />
+									{/if}
+								</div>
+							</button>
+						{/if}
+
+						<Button state={{ type: 'stop', source, id: stop.id }}>
+							<div
+								class={[
+									'flex w-full flex-col',
+									{ 'text-neutral-400': st.arrival < current_time.ms }
+								]}
+							>
+								<div class="flex items-center justify-between">
+									<div class="pl-10 text-left">
+										{stop.name}
 									</div>
-								</button>
-							{/if}
 
-							<Button state={{ type: 'stop', source, id: stop.id }}>
-								<div
-									class="flex w-full flex-col"
-									class:text-neutral-400={st.arrival < current_time.ms}
-								>
-									<div class="flex items-center justify-between">
-										<div class="pl-10 text-left">
-											{stop.name}
-										</div>
-
-										<div class="flex items-center gap-1 text-right">
-											<div class="text-left">
-												{#if time_format === 'time'}
-													{new Date(st.arrival).toLocaleTimeString().replace(/AM|PM/, '')}
-												{:else}
-													{((st.arrival - current_time.ms) / 1000 / 60).toFixed(0)}m
-												{/if}
-											</div>
+									<div class="flex items-center gap-1 text-right">
+										<div class="text-left">
+											{#if time_format === 'time'}
+												{new Date(st.arrival).toLocaleTimeString().replace(/AM|PM/, '')}
+											{:else}
+												{((st.arrival - current_time.ms) / 1000 / 60).toFixed(0)}m
+											{/if}
 										</div>
 									</div>
 								</div>
-							</Button>
-						</div>
-
-						{#if open_transfers[st.sequence]}
-							<div transition:slide>
-								<Transfers {time_format} transfer_calls={transfers[st.sequence]} />
 							</div>
-						{/if}
+						</Button>
+					</div>
+
+					{#if open_transfers[st.sequence]}
+						<div transition:slide>
+							<Transfers {time_format} transfer_calls={transfers[st.sequence]} />
+						</div>
 					{/if}
-				{:else}
-					<p class="p-2 text-center text-neutral-400">No predictions to show</p>
-				{/each}
-			</ModalList>
-		{/if}
-	</svelte:boundary>
-{/if}
+				{/if}
+			{:else}
+				<p class="p-2 text-center text-neutral-400">No predictions to show</p>
+			{/each}
+		</ModalList>
+	{/if}
+</svelte:boundary>

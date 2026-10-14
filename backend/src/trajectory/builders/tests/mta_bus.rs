@@ -1,5 +1,11 @@
 use super::*;
 use crate::network::types::stop::MtaBusStopData;
+use crate::operations::types::position::MtaBusPositionData;
+use crate::operations::types::position::PositionData;
+use crate::operations::types::position::VehicleObservation;
+use crate::trajectory::geometry::build_shape_geometry;
+use crate::trajectory::interpolation::InterpolationMethod;
+use crate::trajectory::interpolation::PchipMethod;
 use crate::trajectory::types::TrajectoryStop;
 use geo::LineString;
 
@@ -62,8 +68,6 @@ fn dwell_knots_preserve_stationary_plateau() {
     let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
 
     assert_eq!(knots[1].s_m, knots[2].s_m, "dwell knots should share s_m");
-    use crate::trajectory::interpolation::InterpolationMethod;
-    use crate::trajectory::interpolation::PchipMethod;
     let midpoint = (knots[1].t_event + knots[2].t_event) / 2.0;
     let motion = PchipMethod
         .sample_motion(&knots, &[midpoint], midpoint)
@@ -113,9 +117,6 @@ fn make_position(
     lon: f64,
     lat: f64,
 ) -> crate::operations::types::position::VehicleObservation {
-    use crate::operations::types::position::MtaBusPositionData;
-    use crate::operations::types::position::PositionData;
-    use crate::operations::types::position::VehicleObservation;
     VehicleObservation {
         vehicle_id: "v1".to_string(),
         trip_id: None,
@@ -150,7 +151,6 @@ fn does_not_overshoot_reported_next_stop() {
     trip.positions = vec![make_position("A", -74.0, 40.7)];
 
     let builder = MtaBusBuilder;
-    use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
 
     let result = builder.generate_knots(&trip, &shape_geom).unwrap();
@@ -181,7 +181,6 @@ fn live_anchor_is_kept_when_the_next_stop_is_already_late() {
     trip.positions = vec![make_position("B", -74.0, 40.7)];
 
     let builder = MtaBusBuilder;
-    use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
     let result = builder.generate_knots(&trip, &shape_geom).unwrap();
 
@@ -203,7 +202,6 @@ fn knots_are_time_ordered() {
     let stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1200.0, 300.0)];
     let trip = make_trip(stops, 500.0);
     let builder = MtaBusBuilder;
-    use crate::trajectory::geometry::build_shape_geometry;
     let shape_geom = build_shape_geometry(&trip.shape, 6538).unwrap();
 
     let result = builder.generate_knots(&trip, &shape_geom).unwrap();

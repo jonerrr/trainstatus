@@ -84,11 +84,10 @@ pub async fn run(network: &Network, adapters: Vec<Arc<dyn StaticAdapter>>) -> Ne
         senders.insert(adapter.source(), tx);
 
         let network = network.clone();
-        let source_static_index = network_index.clone();
 
         // Spawn handler for each source
         tasks.push(tokio::spawn(async move {
-            run_source_handler(network, source_static_index, adapter, rx).await;
+            run_source_handler(network, adapter, rx).await;
         }));
     }
 
@@ -107,7 +106,6 @@ pub async fn run(network: &Network, adapters: Vec<Arc<dyn StaticAdapter>>) -> Ne
 #[instrument(skip_all, fields(source = %adapter.source()))]
 async fn run_source_handler(
     network: Network,
-    network_index: NetworkIndex,
     adapter: Arc<dyn StaticAdapter>,
     mut rx: mpsc::Receiver<UpdateRequest>,
 ) {
@@ -138,7 +136,7 @@ async fn run_source_handler(
                     continue;
                 }
                 if !force {
-                    match check_needs_update(adapter.as_ref(), &network_index, &network).await {
+                    match network.needs_import(adapter.source(), adapter.refresh_interval()).await {
                         Ok(false) => { let _ = waiter.send(Ok(())); continue; }
                         Err(error) => { let _ = waiter.send(Err(error)); continue; }
                         Ok(true) => {}
@@ -161,31 +159,6 @@ async fn run_source_handler(
             }
         }
     }
-}
-
-#[instrument(skip_all, fields(source = %adapter.source()))]
-async fn check_needs_update(
-    adapter: &dyn StaticAdapter,
-    network_index: &NetworkIndex,
-    network: &Network,
-) -> anyhow::Result<bool> {
-    let source = adapter.source();
-    if network_index.get(source).is_none() {
-        // The index starts empty on every process start. When the last import
-        // is still inside the refresh window, rebuild it from Postgres instead
-        // of downloading the upstream static files again.
-        if !network
-            .import_due(source, adapter.refresh_interval())
-            .await?
-            && network.restore_revision(source).await?.is_some()
-        {
-            info!(source = %source, "Loaded static revision from the database");
-            return Ok(false);
-        }
-        return Ok(true);
-    }
-
-    network.import_due(source, adapter.refresh_interval()).await
 }
 
 #[cfg(test)]

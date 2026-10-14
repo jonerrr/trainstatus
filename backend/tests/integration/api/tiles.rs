@@ -1,4 +1,5 @@
 use crate::support::geometry::ingest_case;
+use backend::network::types::stop::{CompassDirection, StopData};
 use backend::source::Source;
 use prost::Message;
 
@@ -162,7 +163,6 @@ async fn stop_tiles_exclude_retired_identities_and_keep_selection_fields(pool: s
 
 #[sqlx::test]
 async fn stop_tiles_supply_supported_filter_properties(pool: sqlx::PgPool) {
-    use backend::network::types::stop::{CompassDirection, StopData};
     let stores = crate::support::test_owners(pool.clone());
     let mut subway = crate::support::mta_subway_dataset();
     for stop in &mut subway.stops {

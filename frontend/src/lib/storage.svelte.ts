@@ -1,5 +1,7 @@
 /* eslint-disable svelte/prefer-svelte-reactivity -- this registry is listener
    bookkeeping; views track each instance's native value, not registry membership. */
+import { createSubscriber } from 'svelte/reactivity';
+
 import { browser } from '$app/env';
 
 interface StoredValue {
@@ -8,7 +10,6 @@ interface StoredValue {
 
 // Weak references let temporary list/tab preferences disappear with their component.
 const instances = new Map<string, Set<WeakRef<StoredValue>>>();
-let mounts = 0;
 
 function refresh(key: string | null) {
 	for (const [name, values] of instances) {
@@ -22,21 +23,16 @@ function refresh(key: string | null) {
 	}
 }
 
-function storageChanged(event: StorageEvent) {
-	if (event.storageArea === localStorage) refresh(event.key);
-}
-
-/** One cross-tab listener, owned by mounted application layouts/providers. */
-export function syncLocalStorage() {
+// createSubscriber ties the single external listener to mounted readers, including module-level preferences.
+const subscribe = createSubscriber(() => {
 	if (!browser) return;
-	if (mounts++ === 0) {
-		refresh(null);
-		window.addEventListener('storage', storageChanged);
-	}
-	return () => {
-		if (--mounts === 0) window.removeEventListener('storage', storageChanged);
+	refresh(null);
+	const changed = (event: StorageEvent) => {
+		if (event.storageArea === localStorage) refresh(event.key);
 	};
-}
+	window.addEventListener('storage', changed);
+	return () => window.removeEventListener('storage', changed);
+});
 
 /** Cached preferences. Replace `current` to change and persist a value. */
 export class LocalStorage<T> {
@@ -67,6 +63,7 @@ export class LocalStorage<T> {
 	}
 
 	get current(): T {
+		subscribe();
 		return this.#value!;
 	}
 

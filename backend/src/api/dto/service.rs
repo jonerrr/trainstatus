@@ -94,7 +94,8 @@ pub enum VehicleStatusData {
     },
 }
 
-// This passenger projection omits map-only bearing and provider phase fields.
+// VehicleObservation also carries geometry, vehicle/run IDs and provider fields.
+// Passenger status omits those and encodes the report time as Unix seconds.
 impl From<&VehicleObservation> for VehicleStatus {
     fn from(position: &VehicleObservation) -> Self {
         Self {
@@ -118,6 +119,8 @@ impl From<&VehicleObservation> for VehicleStatus {
     }
 }
 
+/// Encode one route on demand. Operations caches these bytes per committed
+/// snapshot so overlapping bus selections can reuse the same route blocks.
 pub fn encode_route(
     input: crate::operations::service::RouteInputs<'_>,
 ) -> anyhow::Result<bytes::Bytes> {
@@ -165,6 +168,9 @@ pub fn encode_route(
 }
 
 /// Assemble cached route blocks without decoding or re-encoding their payloads.
+/// Catalogs are encoded once per import; service requests combine different
+/// selections of cached routes, so serializing an owned `Service` would repeat
+/// route decoding and encoding on every request.
 fn encode_service(
     input: crate::operations::service::ServiceInputs<'_>,
 ) -> anyhow::Result<bytes::Bytes> {

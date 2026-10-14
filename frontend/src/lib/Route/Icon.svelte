@@ -22,7 +22,7 @@
 	const transit = getTransitData();
 	const current_time = getCurrentTime();
 	const alerts_resource = transit.alerts(() =>
-		show_alerts && route ? { source: route.data.source, at: current_time.value ?? null } : null
+		show_alerts && route ? { source: route.data.source, at: current_time.value } : null
 	);
 	const hasAlert = $derived(
 		show_alerts && !!route && alerts_resource.current.value?.by_route.has(route.id)

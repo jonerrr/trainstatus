@@ -6,6 +6,9 @@ use crate::network::types::stop::RouteStop;
 use crate::network::types::stop::Stop;
 use crate::source::Source;
 
+/// Collected import records, validated and written in one transaction. The committed
+/// `NetworkRevision` retains only shared lookup indexes and the resulting catalog;
+/// collectors never publish a revision directly.
 pub struct NetworkDataset {
     pub source: Source,
     pub routes: Vec<Route>,

@@ -7,6 +7,7 @@ pub mod geometry;
 pub mod integrations;
 pub mod network;
 pub mod operations;
+mod postgres;
 pub mod source;
 pub mod sources;
 pub mod trajectory;
@@ -78,5 +79,3 @@ pub fn prefixed_path(prefix: &str, path: &str) -> String {
         path.trim_start_matches('/')
     )
 }
-
-mod persistence;

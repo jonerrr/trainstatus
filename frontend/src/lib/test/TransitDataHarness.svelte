@@ -7,7 +7,7 @@
 	interface Reader {
 		id: string;
 		route: string;
-		at?: number | null;
+		at?: number;
 	}
 
 	let { data, source, readers }: { data: TransitData; source: Source; readers: Reader[] } =
@@ -15,5 +15,5 @@
 </script>
 
 {#each readers as reader (reader.id)}
-	<TransitRouteReader {data} {source} route_id={reader.route} at={reader.at ?? null} />
+	<TransitRouteReader {data} {source} route_id={reader.route} at={reader.at} />
 {/each}

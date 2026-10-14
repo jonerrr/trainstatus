@@ -6,6 +6,7 @@ use axum::{
     extract::{Path, State},
     response::{IntoResponse, Response},
 };
+use http::header;
 use http::{HeaderMap, StatusCode};
 
 #[utoipa::path(
@@ -35,7 +36,6 @@ pub async fn catalog_handler(
 }
 
 fn cache_headers(etag_hash: &str) -> HeaderMap {
-    use http::header;
     let mut headers = HeaderMap::new();
     headers.insert("content-type", "application/json".parse().unwrap());
     // ETag must be a quoted string per RFC 7232

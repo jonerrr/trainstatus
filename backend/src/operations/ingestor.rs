@@ -218,7 +218,7 @@ async fn upsert_trips(
     let data: Vec<_> = inputs
         .iter()
         .map(|(trip, _)| {
-            crate::persistence::attributes(&trip.data).expect("Serializable trip attributes")
+            crate::postgres::attributes(&trip.data).expect("Serializable trip attributes")
         })
         .collect();
     let changed = sqlx::query_scalar!(r#"
@@ -278,9 +278,7 @@ async fn upsert_stop_times(
     let departures: Vec<_> = stops.iter().map(|stop| stop.departure).collect();
     let data: Vec<_> = stops
         .iter()
-        .map(|stop| {
-            crate::persistence::attributes(&stop.data).expect("Serializable visit attributes")
-        })
+        .map(|stop| crate::postgres::attributes(&stop.data).expect("Serializable visit attributes"))
         .collect();
     let changed = sqlx::query_scalar!(r#"
         WITH input_rows AS (
@@ -345,7 +343,7 @@ async fn upsert_positions(
     let data: Vec<_> = positions
         .iter()
         .map(|position| {
-            crate::persistence::attributes(&position.data)
+            crate::postgres::attributes(&position.data)
                 .expect("Serializable observation attributes")
         })
         .collect();

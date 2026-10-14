@@ -1,15 +1,7 @@
-<script lang="ts" module>
-	import type { Source } from '#lib/client/index.js';
-	import type { Call } from '#lib/transit/decode.js';
-
-	export interface TransferCall {
-		source: Source;
-		call: Call;
-	}
-</script>
-
 <script lang="ts">
+	import type { Source } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
+	import type { Call } from '#lib/transit/decode.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
@@ -17,7 +9,7 @@
 	const transit = getTransitData();
 
 	interface Props {
-		transfer_calls: TransferCall[];
+		transfer_calls: (Call & { source: Source })[];
 		time_format: 'time' | 'countdown';
 	}
 
@@ -27,12 +19,17 @@
 <div class="flex flex-col bg-neutral-900 px-1 pb-1">
 	<div class="font-medium">Transfers:</div>
 	<div class="flex items-center justify-evenly gap-2 overflow-x-auto">
-		{#each transfer_calls as { source, call } (`${source}:${call.trip_id}`)}
-			{const route = $derived(transit.peekCatalog(source)?.routes_by_id.get(call.route_id))}
+		{#each transfer_calls as call (`${call.source}:${call.trip_id}:${call.sequence}`)}
+			{const route = $derived(transit.peekCatalog(call.source)?.routes_by_id.get(call.route_id))}
 			{#if route}
 				<button
 					onclick={() =>
-						open_modal({ type: 'trip', source, route_id: call.route_id, id: call.trip_id })}
+						open_modal({
+							type: 'trip',
+							source: call.source,
+							route_id: call.route_id,
+							id: call.trip_id
+						})}
 					class="flex items-center gap-1 rounded-sm bg-neutral-800 p-1 shadow-2xl transition-colors duration-200 hover:bg-neutral-700 active:bg-neutral-900"
 				>
 					<Icon width={18} height={18} {route} link={false} />

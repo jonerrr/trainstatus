@@ -242,7 +242,7 @@ async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPoo
     scenario
         .restarted
         .network_index()
-        .publish(empty_pattern_revision);
+        .publish_bundle(vec![empty_pattern_revision]);
     assert!(
         !scenario
             .restarted
@@ -299,7 +299,7 @@ async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction(pool: 
         .stores
         .network
         .network_index()
-        .publish(unmatched_revision);
+        .publish_bundle(vec![unmatched_revision]);
     let mut incomplete = scenario.update.clone();
     incomplete.trip.route_id = None;
     incomplete.trip.direction_id = None;
@@ -333,7 +333,7 @@ async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction(pool: 
         .stores
         .network
         .network_index()
-        .publish(mismatched_revision);
+        .publish_bundle(vec![mismatched_revision]);
     let mut mismatched_feed = scenario.feed;
     mismatched_feed.entity[0].trip_update = Some(mismatched);
     let snapshot = NjtBusRealtime::build_snapshot(

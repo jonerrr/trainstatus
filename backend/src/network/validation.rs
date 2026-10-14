@@ -18,6 +18,7 @@ pub struct ImportReport {
     pub duplicate_route_ids: Vec<String>,
     pub duplicate_stop_ids: Vec<String>,
     pub duplicate_shape_ids: Vec<String>,
+    pub duplicate_route_stops: Vec<(String, String)>,
     pub missing_route_references: Vec<String>,
     pub missing_stop_references: Vec<String>,
     pub orphaned_stops: Vec<String>,
@@ -36,6 +37,7 @@ impl Default for ImportReport {
             duplicate_route_ids: Vec::new(),
             duplicate_stop_ids: Vec::new(),
             duplicate_shape_ids: Vec::new(),
+            duplicate_route_stops: Vec::new(),
             missing_route_references: Vec::new(),
             missing_stop_references: Vec::new(),
             orphaned_stops: Vec::new(),
@@ -44,8 +46,6 @@ impl Default for ImportReport {
         }
     }
 }
-
-impl ImportReport {}
 
 impl NetworkDataset {
     pub fn validate(&self) -> anyhow::Result<ImportReport> {
@@ -100,7 +100,25 @@ impl NetworkDataset {
         report.invalid_geometries = invalid_geometries(dataset);
         report.missing_shape_references = missing_shape_references(dataset, &shape_ids);
 
+        // Check the same keys that persistence writes, including case folding.
+        // Providers must collapse directional entries before returning a dataset.
+        let mut seen = HashSet::new();
+        report.duplicate_route_stops = dataset
+            .route_stops
+            .iter()
+            .map(|rs| (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase()))
+            .filter(|key| !seen.insert(key.clone()))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+
         let mut errors = Vec::new();
+        if !report.duplicate_route_stops.is_empty() {
+            errors.push(format!(
+                "duplicate route-stop memberships after normalization: {:?}",
+                report.duplicate_route_stops
+            ));
+        }
         if !report.duplicate_route_ids.is_empty() {
             errors.push(format!(
                 "duplicate route ids after normalization: {:?}",
@@ -143,21 +161,6 @@ impl NetworkDataset {
                 dataset.source,
                 errors.join("; ")
             );
-        }
-
-        #[cfg(debug_assertions)]
-        {
-            let mut counts = HashMap::new();
-            for route_stop in &dataset.route_stops {
-                *counts
-                    .entry((&route_stop.route_id, &route_stop.stop_id))
-                    .or_insert(0) += 1;
-            }
-            for ((route_id, stop_id), count) in counts {
-                if count > 1 {
-                    warn!(source = %dataset.source, %route_id, %stop_id, count, "Repeated route-stop membership");
-                }
-            }
         }
 
         Ok(report)

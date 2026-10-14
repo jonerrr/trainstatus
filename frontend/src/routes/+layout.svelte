@@ -8,7 +8,6 @@
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
 	import SEO from '#lib/SEO.svelte';
-	import { syncLocalStorage } from '#lib/storage.svelte.js';
 	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
@@ -47,7 +46,6 @@
 		});
 	});
 	onDestroy(() => transit.destroy());
-	onMount(syncLocalStorage);
 
 	// Open the modal a direct link identifies; the modal loads its own data.
 	onMount(() => {
@@ -57,7 +55,8 @@
 			close_modal(current_time.value, true);
 	});
 
-	// The service worker posts catalogs that changed after it served a saved copy.
+	// CacheStorage does not perform HTTP-cache validation. The worker serves saved data
+	// immediately, then sends replacements to this already-mounted app.
 	onMount(() => {
 		const worker = navigator.serviceWorker;
 		const message = (event: MessageEvent<{ type?: string; body?: Catalog }>) => {

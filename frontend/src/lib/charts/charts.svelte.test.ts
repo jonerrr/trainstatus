@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 async function renderChart() {
-	data = fixtureTransitData(fixture, () => chartNow);
+	data = fixtureTransitData(fixture);
 	const { container } = await render(TransitProvider, {
 		props: {
 			data,

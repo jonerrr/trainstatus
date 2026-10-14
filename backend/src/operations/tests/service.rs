@@ -85,7 +85,7 @@ fn revision(route_ids: &[&str]) -> Arc<NetworkRevision> {
 }
 
 struct Case {
-    snapshot: PassengerSnapshot,
+    snapshot: ServiceSnapshot,
     linked: TripRun,
     vehicle_only: TripRun,
 }
@@ -118,7 +118,7 @@ fn live_case() -> Case {
         .cloned()
         .collect::<Vec<_>>();
     Case {
-        snapshot: PassengerSnapshot::new(
+        snapshot: ServiceSnapshot::new(
             Source::MtaBus,
             None,
             Inputs::Live(persisted),
@@ -233,7 +233,7 @@ fn whole_source_encoding_is_shared_within_a_generation() {
 fn historical_snapshot_echoes_at_and_has_no_status() {
     let retained = trip("A", "bus-1");
     let stop_times = vec![call(&retained, 0, "X", 0), call(&retained, 1, "Y", 300)];
-    let snapshot = PassengerSnapshot::new(
+    let snapshot = ServiceSnapshot::new(
         Source::MtaBus,
         Some(1_780_000_000),
         Inputs::Historical {

@@ -11,6 +11,38 @@ use backend::source::Source;
 use geo::Point;
 
 #[test]
+fn validation_rejects_duplicate_route_stop_memberships() {
+    for case_variant in [false, true] {
+        let mut dataset = crate::support::mta_bus_dataset();
+        let mut duplicate = dataset.route_stops[0].clone();
+        if case_variant {
+            duplicate.route_id = duplicate.route_id.to_lowercase();
+            duplicate.stop_id = duplicate.stop_id.to_lowercase();
+        }
+        // A different sequence does not make this a distinct database key.
+        duplicate.stop_sequence += 1;
+        let expected = format!(
+            "{:?}",
+            (
+                duplicate.route_id.to_uppercase(),
+                duplicate.stop_id.to_uppercase()
+            )
+        );
+        dataset.route_stops.push(duplicate);
+
+        let error = dataset
+            .validate()
+            .expect_err("duplicate membership must fail")
+            .to_string();
+        assert!(
+            error.contains("duplicate route-stop memberships"),
+            "{error}"
+        );
+        assert!(error.contains(&expected), "{error}");
+    }
+}
+
+#[test]
 fn validation_catches_missing_route_stop_references() {
     let dataset = NetworkDataset {
         source: Source::MtaSubway,

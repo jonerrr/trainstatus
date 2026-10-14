@@ -5,7 +5,7 @@ import { createSubscriber, SvelteURL } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 
-import type { Source } from '#lib/client/index.js';
+import { is_source } from '#lib/sources.js';
 
 /**
  * Unix seconds from `?at=`. Blank and non-numeric values mean live, so callers
@@ -59,22 +59,19 @@ export const MODAL_PARAM = {
 } as const satisfies Record<string, 'r' | 's' | 't'>;
 
 export type ModalParamKey = (typeof MODAL_PARAM)[keyof typeof MODAL_PARAM];
-
-const sources: readonly string[] = ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[];
-
-/**
- * The modal a URL identifies. Trip links carry their route in `r`; a trip link
- * without one is kept with a null route so the modal can reject it explicitly.
- */
+/** Resolve supported links; trips must carry their route context. */
 export function modal_from_url(url: {
 	searchParams: Pick<URLSearchParams, 'get'>;
 }): ModalData | null {
 	const params = url.searchParams;
 	const source = params.get('src');
-	if (!source || !sources.includes(source)) return null;
-	const src = source as Source;
+	if (!is_source(source)) return null;
+	const src = source;
 	const trip_id = params.get('t');
-	if (trip_id) return { type: 'trip', source: src, route_id: params.get('r'), id: trip_id };
+	if (trip_id) {
+		const route_id = params.get('r');
+		return route_id ? { type: 'trip', source: src, route_id, id: trip_id } : null;
+	}
 	const stop_id = params.get('s');
 	if (stop_id) return { type: 'stop', source: src, id: stop_id };
 	const route_id = params.get('r');

@@ -445,35 +445,9 @@ fn build_route_stops(
     // TODO: figure out what to do about bus stops where the same route id but different direction have the same stop_id
     // for example route_id=605 stop_id=15142 count=2 examples=["(route_id=605, stop_id=15142, direction=1, headsign=Quaker Br Mall via Griggs Frm)", "(route_id=605, stop_id=15142, direction=0, headsign=Princeton Montgomery Twp via Griggs Frm)"]
 
-    // A route serving the same stop in both directions produces two entries that
-    // differ only by `direction`; the dedup below collapses them. This is normal
-    // and expected, so just tally how many pairs get collapsed (one summary line)
-    // rather than emitting a WARN per pair — which floods the terminal on a feed
-    // the size of NJT's.
-    #[cfg(debug_assertions)]
-    {
-        let mut counts: HashMap<(String, String), usize> = HashMap::new();
-        for rs in &result {
-            let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-            *counts.entry(key).or_insert(0) += 1;
-        }
-        let collapsed = counts.values().filter(|&&c| c > 1).count();
-        if collapsed > 0 {
-            tracing::debug!(
-                collapsed_pairs = collapsed,
-                "njt_bus route_stops with the same (route_id, stop_id) across directions; collapsing to one row each"
-            );
-        }
-    }
-
-    // The database schema only permits one row per (route_id, stop_id), so we
-    // need to collapse any entries that differ only by `direction`.  When two
-    // directions are present we arbitrarily keep the one with the smaller
-    // `stop_sequence` (matching what `StopStore` will do when deduplicating).
-    //
-    // The debug check above will still warn about duplicates, but this step
-    // prevents the insertion error when running the importer.
-    // perform deduplication in-place to avoid large allocations
+    // The schema permits one membership per (route_id, stop_id). Collapse
+    // directional entries here; dataset validation rejects any remaining duplicates.
+    // Keep the entry with the smaller stop sequence.
     let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
     for rs in result.into_iter() {
         let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());

@@ -42,7 +42,7 @@ export function fixtureFetcher(fixture: TransitFixture): typeof fetch {
 	}) as typeof fetch;
 }
 
-export function fixtureTransitData(fixture: TransitFixture, now: () => number = Date.now) {
+export function fixtureTransitData(fixture: TransitFixture) {
 	const sources = Object.keys(fixture.catalogs) as Source[];
-	return new TransitData({ sources, fetcher: fixtureFetcher(fixture), batch_ms: 0, now });
+	return new TransitData({ sources, fetcher: fixtureFetcher(fixture), batch_ms: 0 });
 }

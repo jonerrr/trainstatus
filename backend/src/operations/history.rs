@@ -1,4 +1,4 @@
-use super::postgres::{TripRow, VisitRow};
+use super::postgres::TripRow;
 use crate::geometry::Geom;
 use crate::network::index::IndexedStop;
 use crate::operations::types::trip::StopVisit;
@@ -113,8 +113,7 @@ impl History {
         .map(TryInto::try_into)
         .collect::<anyhow::Result<Vec<TripRun>>>()?;
         let ids: Vec<_> = trips.iter().map(|trip| trip.id).collect();
-        let stop_times = sqlx::query_as!(
-            VisitRow,
+        let stop_times = sqlx::query!(
             r#"
             SELECT
                 *
@@ -129,7 +128,16 @@ impl History {
         .fetch_all(&mut *tx)
         .await?
         .into_iter()
-        .map(TryInto::try_into)
+        .map(|row| {
+            Ok(StopVisit {
+                trip_id: row.trip_id,
+                stop_sequence: row.stop_sequence,
+                stop_id: row.stop_id,
+                arrival: row.arrival,
+                departure: row.departure,
+                data: crate::postgres::decode(row.source, row.data)?,
+            })
+        })
         .collect::<anyhow::Result<Vec<StopVisit>>>()?;
         Ok(RetainedService { trips, stop_times })
     }
@@ -240,7 +248,7 @@ impl History {
                         stop.id,
                         IndexedStop {
                             geom: stop.geom,
-                            data: crate::persistence::decode(stop.source, stop.data)?,
+                            data: crate::postgres::decode(stop.source, stop.data)?,
                         },
                     ))
                 })

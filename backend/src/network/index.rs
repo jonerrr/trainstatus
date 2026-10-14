@@ -37,6 +37,7 @@ pub struct IndexedStop {
 #[derive(Debug, Clone)]
 pub struct NetworkRevision {
     pub source: Source,
+    /// Installed by import/restore before publishing; absent on dataset-only revisions.
     pub catalog: Option<Arc<crate::network::catalog::CatalogResponse>>,
     pub routes: Arc<HashMap<String, IndexedRoute>>,
     pub stops: Arc<HashMap<String, IndexedStop>>,
@@ -208,10 +209,6 @@ pub struct NetworkIndex {
 impl NetworkIndex {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn publish(&self, revision: NetworkRevision) {
-        self.publish_bundle(vec![revision]);
     }
 
     pub fn publish_bundle(&self, revisions: Vec<NetworkRevision>) {

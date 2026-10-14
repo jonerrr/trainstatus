@@ -6,8 +6,8 @@
 		data,
 		source,
 		route_id,
-		at = null
-	}: { data: TransitData; source: Source; route_id: string; at?: number | null } = $props();
+		at = undefined
+	}: { data: TransitData; source: Source; route_id: string; at?: number } = $props();
 	// The owner is fixed for this reader; source, route and time remain reactive.
 	// svelte-ignore state_referenced_locally
 	const resource = data.route(() => ({ source, route_id, at }));

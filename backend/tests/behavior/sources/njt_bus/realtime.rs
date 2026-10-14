@@ -5,6 +5,7 @@ use backend::network::schedule::ScheduledTrip;
 use backend::operations::CollectedSnapshot;
 use backend::source::Source;
 use backend::sources::njt_bus::realtime::NjtBusRealtime;
+use chrono::TimeZone;
 
 use crate::support::fixture_root;
 
@@ -40,7 +41,6 @@ async fn realtime_infers_missing_service_date_from_schedule() {
         .and_then(gtfs_structures::Gtfs::try_from)
         .unwrap();
     let service_date = chrono::NaiveDate::from_ymd_opt(2026, 10, 13).unwrap();
-    use chrono::TimeZone;
     let midnight = chrono_tz::America::New_York
         .from_local_datetime(&service_date.and_hms_opt(0, 0, 0).unwrap())
         .single()

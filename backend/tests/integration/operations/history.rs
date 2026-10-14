@@ -1,4 +1,15 @@
 use crate::support;
+use backend::geometry::Geom;
+use backend::operations::CollectedObservation as VehicleObservation;
+use backend::operations::CollectedObservation;
+use backend::operations::CollectedTrip as TripRun;
+use backend::operations::CollectedVisit as StopVisit;
+use backend::operations::history::History;
+use backend::operations::types::position::MtaBusPositionData;
+use backend::operations::types::position::PositionData;
+use backend::operations::types::trip::MtaBusData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::TripData;
 
 use backend::source::Source;
 use support::{mta_bus_dataset, test_owners};
@@ -96,11 +107,6 @@ async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
 }
 
 fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::CollectedSnapshot {
-    use backend::operations::CollectedTrip as TripRun;
-    use backend::operations::CollectedVisit as StopVisit;
-    use backend::operations::types::trip::MtaBusData;
-    use backend::operations::types::trip::StopTimeData;
-    use backend::operations::types::trip::TripData;
     let id: backend::operations::RunKey = Uuid::now_v7().into();
     let now = crate::support::fixtures::fixed_time();
     let trip = TripRun {
@@ -140,12 +146,6 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::Col
 
 #[sqlx::test]
 async fn historical_inputs_use_final_departure_and_past_history_points(pool: sqlx::PgPool) {
-    use backend::geometry::Geom;
-    use backend::operations::CollectedObservation as VehicleObservation;
-    use backend::operations::history::History;
-    use backend::operations::types::position::MtaBusPositionData;
-    use backend::operations::types::position::PositionData;
-
     let stores = test_owners(pool.clone());
     let dataset = mta_bus_dataset();
     stores.network.persist(&dataset).await.unwrap();
@@ -197,10 +197,6 @@ async fn historical_inputs_use_final_departure_and_past_history_points(pool: sql
 async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
     pool: sqlx::PgPool,
 ) {
-    use backend::geometry::Geom;
-    use backend::operations::CollectedObservation;
-    use backend::operations::types::position::{MtaBusPositionData, PositionData};
-
     let stores = test_owners(pool.clone());
     let dataset = mta_bus_dataset();
     stores.network.persist(&dataset).await.unwrap();

@@ -1,9 +1,25 @@
-use super::rows::StopRow;
+use crate::geometry::Geom;
 use crate::network::types::stop::RouteStop;
 use crate::network::types::stop::Stop;
+use crate::network::types::stop::Transfer;
 use crate::source::Source;
 use sqlx::PgConnection;
-use std::collections::HashMap;
+
+// The nested JSON projection needs FromRow; its source column is used only to
+// decode the domain's tagged data and is not part of Stop itself.
+#[derive(sqlx::FromRow)]
+struct StopRow {
+    source: Source,
+    id: String,
+    name: String,
+    geom: Geom,
+    #[sqlx(json)]
+    transfers: Vec<Transfer>,
+    #[sqlx(json)]
+    data: serde_json::Value,
+    #[sqlx(json)]
+    routes: Vec<RouteStop>,
+}
 
 /// Raw DB query for all stops of a source (with embedded transfers and route associations).
 pub(in crate::network) async fn query_all_on(
@@ -51,7 +67,20 @@ pub(in crate::network) async fn query_all_on(
     )
     .bind(source)
     .fetch_all(connection)
-    .await?.into_iter().map(TryInto::try_into).collect::<anyhow::Result<Vec<Stop>>>()
+    .await?
+    .into_iter()
+    // Decode may fail per row; collect propagates the first error.
+    .map(|row| {
+        Ok(Stop {
+            id: row.id,
+            name: row.name,
+            geom: row.geom,
+            transfers: row.transfers,
+            data: crate::postgres::decode(row.source, row.data)?,
+            routes: row.routes,
+        })
+    })
+    .collect()
 }
 
 /// Persist stops inside the owning static import transaction.
@@ -66,7 +95,7 @@ pub(in crate::network) async fn save_all_on(
     let geoms: Vec<_> = stops.iter().map(|r| r.geom.clone()).collect();
     let datas = stops
         .iter()
-        .map(|s| crate::persistence::attributes(&s.data).unwrap())
+        .map(|s| crate::postgres::attributes(&s.data).unwrap())
         .collect::<Vec<_>>();
     // let route_types: Vec<_> = values.iter().map(|s| &s.route_type).collect();
 
@@ -103,34 +132,6 @@ pub(in crate::network) async fn save_all_route_stops_on(
     source: Source,
     route_stops: &[RouteStop],
 ) -> anyhow::Result<()> {
-    // Each source is responsible for emitting at most one row per
-    // (route_id, stop_id) — they collapse their directional entries as part of
-    // building `route_stops` (njt_bus/gtfs_static dedupe explicitly, mta_bus
-    // keys its map on the pair). The `ON CONFLICT DO UPDATE` below therefore
-    // only reconciles against rows already committed by an earlier import; a
-    // duplicate *within* this batch would still trip Postgres with "ON CONFLICT
-    // DO UPDATE command cannot affect row a second time", so warn loudly in
-    // debug if an adapter ever regresses.
-    #[cfg(debug_assertions)]
-    {
-        let mut seen: HashMap<(String, String), usize> = HashMap::new();
-        for rs in route_stops {
-            let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-            *seen.entry(key).or_insert(0) += 1;
-        }
-        for ((rid, sid), count) in seen {
-            if count > 1 {
-                tracing::warn!(
-                    source = %source,
-                    route_id = %rid,
-                    stop_id = %sid,
-                    count,
-                    "route_stops batch has a duplicate (route_id, stop_id) after uppercasing; the adapter should collapse these"
-                );
-            }
-        }
-    }
-
     let route_ids: Vec<_> = route_stops
         .iter()
         .map(|rs| rs.route_id.to_uppercase())
@@ -142,7 +143,7 @@ pub(in crate::network) async fn save_all_route_stops_on(
     let stop_sequences: Vec<i16> = route_stops.iter().map(|rs| rs.stop_sequence).collect();
     let datas: Vec<serde_json::Value> = route_stops
         .iter()
-        .map(|rs| crate::persistence::attributes(&rs.data).unwrap())
+        .map(|rs| crate::postgres::attributes(&rs.data).unwrap())
         .collect();
 
     sqlx::query!(

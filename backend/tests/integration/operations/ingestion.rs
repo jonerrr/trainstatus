@@ -1,4 +1,9 @@
 use crate::support;
+use backend::geometry::Geom;
+use backend::network::index::NetworkRevision;
+use backend::operations::history::History;
+use backend::operations::types::position::MtaBusPositionData;
+use backend::operations::types::trip::MtaBusData;
 
 use backend::operations::CollectedObservation as VehicleObservation;
 use backend::operations::CollectedSnapshot;
@@ -264,9 +269,6 @@ async fn position_failure_rolls_back_existing_trip_and_stop_changes(pool: sqlx::
 
 #[sqlx::test]
 async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sqlx::PgPool) {
-    use backend::geometry::Geom;
-    use backend::network::index::NetworkRevision;
-
     let stores = support::test_owners(pool.clone());
     let dataset = support::mta_subway_dataset();
     stores.network.persist(&dataset).await.unwrap();
@@ -292,7 +294,7 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
     std::sync::Arc::make_mut(&mut revision.route_stop_shapes)
         .insert(("A".into(), "101".into()), vec!["far".into()]);
     let index = stores.network.network_index();
-    index.publish(revision.clone());
+    index.publish_bundle(vec![revision.clone()]);
     let ingestor = OperationsIngestor::new(pool, stores.live_snapshots.clone(), index.clone());
     let first = ingestor.ingest(snapshot()).await.unwrap();
     assert_eq!(
@@ -310,7 +312,7 @@ async fn resolves_shapes_by_membership_then_geometry_and_pins_revision(pool: sql
         &index.get(Source::MtaSubway).unwrap()
     ));
     std::sync::Arc::make_mut(&mut revision.route_stop_shapes).clear();
-    index.publish(revision);
+    index.publish_bundle(vec![revision]);
     assert!(!std::sync::Arc::ptr_eq(
         &first.network_revision,
         &index.get(Source::MtaSubway).unwrap()
@@ -412,7 +414,6 @@ async fn stop_time_shared_snapshot_matches_committed_microseconds_on_replay(pool
 
 #[sqlx::test]
 async fn gps_samples_are_atomic_deduplicated_stationary_and_time_scoped(pool: sqlx::PgPool) {
-    use backend::{geometry::Geom, operations::history::History};
     let (ingestor, live) = ingestor(&pool).await;
     let mut input = snapshot();
     let at = input.positions[0].updated_at;
@@ -482,10 +483,6 @@ async fn gps_samples_are_atomic_deduplicated_stationary_and_time_scoped(pool: sq
 
 #[sqlx::test]
 async fn equal_time_oba_recovery_updates_status_without_replacing_gps(pool: sqlx::PgPool) {
-    use backend::geometry::Geom;
-    use backend::operations::types::position::MtaBusPositionData;
-    use backend::operations::types::trip::MtaBusData;
-
     let owners = support::test_owners(pool.clone());
     let dataset = support::mta_bus_dataset();
     owners.network.persist(&dataset).await.unwrap();
@@ -545,7 +542,6 @@ async fn equal_time_oba_recovery_updates_status_without_replacing_gps(pool: sqlx
 
 #[sqlx::test]
 async fn equal_time_report_can_link_a_run_without_replacing_coordinates(pool: sqlx::PgPool) {
-    use backend::geometry::Geom;
     let (ingestor, live) = ingestor(&pool).await;
     let mut input = snapshot();
     let run = input.positions[0].trip_id;
@@ -604,7 +600,6 @@ async fn conflicting_visit_sequence_rejects_collection_without_publication(pool:
 
 #[sqlx::test]
 async fn removed_static_membership_preserves_runs_and_original_shape_assets(pool: sqlx::PgPool) {
-    use backend::operations::history::History;
     let stores = support::test_owners(pool.clone());
     let mut dataset = support::mta_subway_dataset();
     stores.network.persist(&dataset).await.unwrap();

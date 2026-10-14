@@ -25,7 +25,7 @@
 
 	const transit = getTransitData();
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.value ?? []);
+	const catalogs = $derived(catalog_resources.current);
 	const all_stops = $derived(
 		Object.fromEntries(
 			catalogs.map(({ source, catalog }) => [source, catalog?.stops ?? []])
@@ -97,7 +97,6 @@
 		container_class="flex-1 min-h-0"
 		bind:selected_source
 		height_calc={calculate_stop_height}
-		loading={catalogs.some((c) => !c.catalog && !c.error)}
 	/>
 
 	<div class="w-full">

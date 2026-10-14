@@ -24,9 +24,11 @@
 	import type { Pins } from '#lib/pins.svelte.js';
 	import RouteButton from '#lib/Route/Button.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import { source_info } from '#lib/source_info.js';
+	import { source_icons } from '#lib/source_icons.js';
+	import { source_config } from '#lib/sources.js';
 	import StopButton from '#lib/Stop/Button.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import TripButton from '#lib/Trip/Button.svelte';
 	import { open_modal } from '#lib/url_params.svelte.js';
 
@@ -80,8 +82,11 @@
 		items_before_scroll,
 		ssr_min = 10,
 		overscan = 5,
-		loading = false
+		loading
 	}: Props = $props();
+
+	const catalogs = getTransitData().catalogs(() => page.data.selected_sources);
+	const pending = $derived(loading ?? catalogs.current.some((catalog) => catalog.loading));
 
 	const source_entries = $derived(
 		page.data.selected_sources.map((source) => ({
@@ -266,7 +271,7 @@
 			<div class="rounded-md border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
 				<div class="flex gap-1">
 					{#each source_entries as { source, data: source_data } (source)}
-						{const info = $derived(source_info[source])}
+						{const info = $derived(source_config[source])}
 						{#if source_data.length > 0}
 							<div transition:slide={{ axis: 'x', duration: 250 }}>
 								<button
@@ -283,10 +288,10 @@
 									aria-label={`Show ${info.name} items`}
 								>
 									<!-- TODO: improve icons (they are kinda ugly rn) -->
-									<enhanced:img alt="" src={info.icon} sizes="20px" class="size-5" />
+									<enhanced:img alt="" src={source_icons[source]} sizes="20px" class="size-5" />
 									<!-- <Icon class="h-4 w-4" /> -->
 									<!-- TODO: only show text if theres enough room -->
-									<!-- <span>{source_info[source].name}</span> -->
+									<!-- <span>{sources[source].name}</span> -->
 
 									{#if active_source === source}
 										<div
@@ -356,7 +361,7 @@
 				{/each}
 			</div>
 		</div>
-		{#if loading && !items.length}
+		{#if pending && !items.length}
 			<Skeleton lines={6} class="p-2" />
 		{/if}
 	</div>

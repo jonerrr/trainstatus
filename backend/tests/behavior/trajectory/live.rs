@@ -1,20 +1,31 @@
 use crate::support;
+use backend::fixtures::FixtureKind;
+use backend::fixtures::load_manifest_for;
+use backend::fixtures::read_json_payload;
 use backend::geometry::Geom;
 use backend::network::index::NetworkRevision;
+use backend::network::types::stop::StopData;
 use backend::operations::IngestionChanges;
 use backend::operations::SourceSnapshot;
 use backend::operations::types::position::MtaBusPositionData;
 use backend::operations::types::position::PositionData;
 use backend::operations::types::position::VehicleObservation;
+use backend::operations::types::trip::Consist;
 use backend::operations::types::trip::MtaBusData;
+use backend::operations::types::trip::MtaSubwayStopTimeData;
+use backend::operations::types::trip::MtaSubwayTripData;
 use backend::operations::types::trip::StopTimeData;
 use backend::operations::types::trip::StopVisit;
 use backend::operations::types::trip::TripData;
 use backend::operations::types::trip::TripRun;
 use backend::source::Source;
+use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
+use backend::trajectory::HotSnapshot;
 use backend::trajectory::TrajectoryCache;
 use backend::trajectory::TrajectoryCalculator;
 use backend::trajectory::TrajectoryDeriver;
+use backend::trajectory::TrajectoryState;
+use backend::trajectory::snapshot_from_persisted_trip;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
 
@@ -100,7 +111,6 @@ async fn trajectory_from_persisted_snapshot() {
 
 #[tokio::test]
 async fn trajectory_uses_pinned_stop_geometry_and_color() {
-    use backend::trajectory::snapshot_from_persisted_trip;
     let snapshot = fixture();
     let cache = TrajectoryCache::new();
     let first = snapshot_from_persisted_trip(
@@ -171,8 +181,6 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
 
 #[tokio::test]
 async fn trajectory_preserves_previous_hot_state_continuity() {
-    use backend::trajectory::HotSnapshot;
-    use backend::trajectory::TrajectoryState;
     let mut snapshot = fixture();
     let id = snapshot.trips[0].id;
     snapshot.positions.clear();
@@ -204,11 +212,6 @@ async fn trajectory_preserves_previous_hot_state_continuity() {
 
 #[tokio::test]
 async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data() {
-    use backend::network::types::stop::StopData;
-    use backend::operations::types::trip::Consist;
-    use backend::operations::types::trip::MtaSubwayStopTimeData;
-    use backend::operations::types::trip::MtaSubwayTripData;
-    use backend::trajectory::snapshot_from_persisted_trip;
     let now = Utc::now();
     let mut trip = fixture().trips.remove(0);
     trip.route_id = "A".into();
@@ -312,7 +315,6 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
 
 #[tokio::test]
 async fn trajectory_disconnected_subway_segments_are_rejected() {
-    use backend::trajectory::snapshot_from_persisted_trip;
     let snapshot = fixture();
     let mut trip = snapshot.trips[0].clone();
     let mut revision = (*snapshot.network_revision).clone();
@@ -338,7 +340,6 @@ async fn trajectory_disconnected_subway_segments_are_rejected() {
 
 #[tokio::test]
 async fn trajectory_bus_uses_one_resolved_whole_route_shape() {
-    use backend::trajectory::snapshot_from_persisted_trip;
     let mut snapshot = fixture();
     snapshot.trips[0].shape_ids.push("committed-shape".into());
     let error = snapshot_from_persisted_trip(
@@ -379,11 +380,6 @@ async fn trajectory_nonfinite_position_does_not_hide_other_trips() {
 
 #[tokio::test]
 async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
-    use backend::fixtures::FixtureKind;
-    use backend::fixtures::load_manifest_for;
-    use backend::fixtures::read_json_payload;
-    use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
-    use backend::trajectory::snapshot_from_persisted_trip;
     let root = support::fixture_root();
     let manifest =
         load_manifest_for(&root, Source::MtaSubway, FixtureKind::Realtime, "basic").unwrap();
@@ -439,7 +435,6 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
 
 #[tokio::test]
 async fn trajectory_subway_rejects_unrelated_topological_legs_even_with_shared_coordinates() {
-    use backend::trajectory::snapshot_from_persisted_trip;
     let snapshot = fixture();
     let mut trip = snapshot.trips[0].clone();
     let mut revision = (*snapshot.network_revision).clone();

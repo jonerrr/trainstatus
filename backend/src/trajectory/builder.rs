@@ -1,4 +1,5 @@
 use crate::source::Source;
+use geo::{Distance, Euclidean, Point};
 
 use super::geometry::ShapeGeometry;
 use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
@@ -50,7 +51,6 @@ pub(super) fn recorded_anchor_knot(
         &geometry.cum_dist,
     )?;
     if source == Source::NjtBus {
-        use geo::{Distance, Euclidean, Point};
         let snapped = super::geometry::distance_to_coord(
             distance,
             &geometry.projected_line,

@@ -3,7 +3,8 @@
 
 	import { page } from '$app/state';
 
-	import { source_info } from '#lib/source_info.js';
+	import { source_icons } from '#lib/source_icons.js';
+	import { source_config } from '#lib/sources.js';
 
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
@@ -79,7 +80,7 @@
 		<div class="h-5 w-px shrink-0 bg-neutral-700"></div>
 		<div class="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Data sources">
 			{#each page.data.selected_sources as source (source)}
-				{const info = $derived(source_info[source])}
+				{const info = $derived(source_config[source])}
 				{const enabled = $derived(filters.isSourceEnabled(source))}
 				<button
 					type="button"
@@ -88,7 +89,12 @@
 					aria-label={`${enabled ? 'Hide' : 'Show'} ${info.name}`}
 					onclick={() => filters.toggleSource(source)}
 				>
-					<enhanced:img src={info.icon} sizes="20px" alt="" class="size-5 rounded object-contain" />
+					<enhanced:img
+						src={source_icons[source]}
+						sizes="20px"
+						alt=""
+						class="size-5 rounded object-contain"
+					/>
 					<span class="hidden lg:inline">{info.name.replace('MTA ', '')}</span>
 				</button>
 			{/each}
