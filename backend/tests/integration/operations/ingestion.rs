@@ -130,7 +130,6 @@ async fn unchanged_stops_keep_tuple_versions_and_one_arrival_changes_one_row(poo
     assert_eq!(replay.changes.stop_times, 0);
     assert_eq!(replay.changes.trips, 0);
     assert_eq!(replay.changes.positions, 0);
-    assert!(replay.changed_trip_ids.is_empty());
     let mut changed = snapshot();
     changed.trips[0].1[0].arrival += Duration::seconds(30);
     let saved = ingestor.ingest(changed).await.unwrap();
@@ -138,7 +137,6 @@ async fn unchanged_stops_keep_tuple_versions_and_one_arrival_changes_one_row(poo
     assert_ne!(after[0].1, before[0].1);
     assert_eq!(after[1].1, before[1].1);
     assert_eq!(saved.changes.stop_times, 1);
-    assert!(saved.changed_trip_ids.contains(&first.trips[0].id));
 }
 
 #[sqlx::test]

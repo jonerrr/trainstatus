@@ -150,3 +150,41 @@ async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
         assert_eq!(imports.load(Ordering::SeqCst), 0);
     }
 }
+
+#[sqlx::test]
+async fn fresh_and_restored_revisions_share_canonical_keys_and_colors(pool: sqlx::PgPool) {
+    let stores = test_owners(pool.clone());
+    let mut dataset = mta_bus_dataset();
+    for route in &mut dataset.routes {
+        route.id = route.id.to_lowercase();
+        route.color = "invalid".into();
+    }
+    for stop in &mut dataset.stops {
+        stop.id = stop.id.to_lowercase();
+    }
+    for relation in &mut dataset.route_stops {
+        relation.route_id = relation.route_id.to_lowercase();
+        relation.stop_id = relation.stop_id.to_lowercase();
+    }
+    stores.network.persist(&dataset).await.unwrap();
+    let fresh = stores.network.network_index().get(Source::MtaBus).unwrap();
+    let restarted = test_owners(pool);
+    let restored = restarted
+        .network
+        .restore_revision(Source::MtaBus)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        fresh.catalog.as_ref().unwrap().body,
+        restored.catalog.as_ref().unwrap().body
+    );
+    assert_eq!(fresh.routes.len(), restored.routes.len());
+    for (id, route) in fresh.routes.iter() {
+        let stored = &restored.routes[id];
+        assert_eq!(route.color, stored.color);
+        assert_eq!(route.shape_ids, stored.shape_ids);
+    }
+    assert_eq!(fresh.route_stop_shapes, restored.route_stop_shapes);
+    assert!(fresh.stops.keys().all(|id| restored.stops.contains_key(id)));
+}

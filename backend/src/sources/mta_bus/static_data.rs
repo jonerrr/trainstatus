@@ -133,8 +133,8 @@ impl StaticAdapter for MtaBusStatic {
     }
 
     async fn collect(&self) -> anyhow::Result<NetworkDataset> {
-        let client = reqwest::Client::new();
-        let infra = fetch_infrastructure(&client).await?;
+        let client = crate::integrations::http::static_data();
+        let infra = fetch_infrastructure(client).await?;
         let dataset = build_static_dataset(infra);
         Ok(dataset)
     }
@@ -468,8 +468,8 @@ async fn fetch_infrastructure(client: &reqwest::Client) -> anyhow::Result<Helium
 // TODO: fetch other data here as well
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, serde_json::Value>> {
-    let client = reqwest::Client::new();
-    let infrastructure = fetch_infrastructure(&client).await?;
+    let client = crate::integrations::http::static_data();
+    let infrastructure = fetch_infrastructure(client).await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert(

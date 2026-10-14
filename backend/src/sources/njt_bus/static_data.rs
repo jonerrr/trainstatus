@@ -105,7 +105,7 @@ impl StaticAdapter for NjtBusStatic {
 async fn download_gtfs(token: &str) -> anyhow::Result<Vec<u8>> {
     let form = reqwest::multipart::Form::new().text("token", token.to_owned());
 
-    let bytes = reqwest::Client::new()
+    let bytes = crate::integrations::http::static_data()
         .post(NJT_GTFS_URL)
         .multipart(form)
         .send()

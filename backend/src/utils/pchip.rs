@@ -181,13 +181,6 @@ impl PchipInterpolator {
         self.c0[seg] + s * (self.c1[seg] + s * (self.c2[seg] + s * self.c3[seg]))
     }
 
-    /// Evaluate the interpolant at multiple points. Returns `NaN` for out-of-bounds points.
-    pub fn evaluate_array(&self, xs: &[f64]) -> Vec<f64> {
-        xs.iter()
-            .map(|&x| self.evaluate(x).unwrap_or(f64::NAN))
-            .collect()
-    }
-
     /// Evaluate the derivative of the interpolant at a single point.
     ///
     /// Returns `None` if `x_eval` is outside the interpolation domain.

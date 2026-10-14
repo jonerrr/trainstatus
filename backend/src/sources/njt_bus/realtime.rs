@@ -237,17 +237,8 @@ impl NjtBusRealtime {
                         .map_or(&[], |trip| trip.stop_times.as_slice()),
                 )?;
 
-                let arrival = match st.arrival {
-                    Some(a) => a.time?,
-                    None => st.departure.as_ref()?.time?,
-                };
-                let departure = match st.departure {
-                    Some(d) => d.time?,
-                    None => st.arrival.as_ref()?.time?,
-                };
-
-                let arrival = DateTime::from_timestamp(arrival, 0)?;
-                let departure = DateTime::from_timestamp(departure, 0)?;
+                let (arrival, departure) =
+                    crate::integrations::gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
 
                 Some(StopVisit {
                     trip_id: trip.id,

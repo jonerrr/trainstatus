@@ -54,6 +54,55 @@ pub(crate) fn active_periods(alert: &GtfsAlert) -> Vec<ActivePeriod> {
         .collect()
 }
 
+/// Shared Mercury payload parsing; each source retains its route/stop ID policy.
+pub(crate) fn mta_alert<T: GtfsAlertSource>(
+    adapter: &T,
+    entity_id: String,
+    alert: GtfsAlert,
+) -> Option<crate::alerts::types::MtaAlert> {
+    use crate::alerts::types::{AffectedEntity, AlertDetails, MtaAlert, MtaAlertData};
+    let mercury = alert.mercury_alert.as_ref()?;
+    let created_at = DateTime::from_timestamp(mercury.created_at as i64, 0)?;
+    let updated_at = DateTime::from_timestamp(mercury.updated_at as i64, 0)?;
+    Some(MtaAlert {
+        data: MtaAlertData {
+            display_before_active: mercury.display_before_active.unwrap_or(0) as i32,
+            alert_type: mercury.alert_type.clone(),
+            clone_id: mercury.clone_id.clone(),
+        },
+        details: AlertDetails {
+            id: uuid::Uuid::now_v7(),
+            original_id: entity_id,
+            created_at,
+            updated_at,
+            recorded_at: chrono::Utc::now(),
+            translations: mta_translations(&alert),
+            active_periods: active_periods(&alert),
+            entities: alert
+                .informed_entity
+                .iter()
+                .map(|entity| AffectedEntity {
+                    route_id: entity
+                        .route_id
+                        .clone()
+                        .and_then(|id| adapter.parse_route_id(id)),
+                    stop_id: entity
+                        .stop_id
+                        .clone()
+                        .and_then(|id| adapter.parse_stop_id(id)),
+                    sort_order: entity
+                        .mercury_entity_selector
+                        .as_ref()
+                        .and_then(|selector| {
+                            selector.sort_order.split(':').next_back()?.parse().ok()
+                        })
+                        .unwrap_or(0),
+                })
+                .collect(),
+        },
+    })
+}
+
 #[cfg(test)]
 #[path = "tests/gtfs.rs"]
 mod tests;

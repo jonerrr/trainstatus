@@ -13,7 +13,6 @@ use crate::AppState;
 use crate::source::Source;
 use crate::trajectory::RenderUnit;
 use crate::trajectory::encode_render_units;
-use crate::trajectory::source_supports_trajectories;
 
 #[utoipa::path(
     get,
@@ -36,12 +35,6 @@ pub async fn trajectories_handler(
     Path(source): Path<Source>,
     time: RequestTime,
 ) -> Result<Response, AppError> {
-    if !source_supports_trajectories(source) {
-        return Err(AppError::from(anyhow::anyhow!(
-            "Unsupported source: {source:?}"
-        )));
-    }
-
     let snapshot = state.trajectories.snapshot(source, time.at).await?;
 
     let units: Vec<RenderUnit> = snapshot.render_units.values().cloned().collect();

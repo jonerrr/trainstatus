@@ -30,12 +30,16 @@ pub struct MtaBusRealtime;
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
     let adapter = MtaBusRealtime;
-    let trip_updates = reqwest::get("https://gtfsrt.prod.obanyc.com/tripUpdates")
+    let trip_updates = crate::integrations::http::realtime()
+        .get("https://gtfsrt.prod.obanyc.com/tripUpdates")
+        .send()
         .await?
         .error_for_status()?
         .bytes()
         .await?;
-    let vehicle_positions = reqwest::get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
+    let vehicle_positions = crate::integrations::http::realtime()
+        .get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
+        .send()
         .await?
         .error_for_status()?
         .bytes()
@@ -210,18 +214,8 @@ impl MtaBusRealtime {
                 // Bus stops use numeric IDs directly
                 let stop_id = st.stop_id?;
 
-                // Extract arrival/departure times
-                let arrival = match st.arrival {
-                    Some(a) => a.time?,
-                    None => st.departure.as_ref()?.time?,
-                };
-                let departure = match st.departure {
-                    Some(d) => d.time?,
-                    None => st.arrival.as_ref()?.time?,
-                };
-
-                let arrival = DateTime::from_timestamp(arrival, 0)?;
-                let departure = DateTime::from_timestamp(departure, 0)?;
+                let (arrival, departure) =
+                    crate::integrations::gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
 
                 Some(StopVisit {
                     trip_id: trip.id,

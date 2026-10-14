@@ -48,3 +48,25 @@ async fn an_undecodable_required_feed_rejects_the_collection() {
     .unwrap_err();
     assert!(error.to_string().contains("decode feed positions"));
 }
+
+#[test]
+fn stop_events_preserve_absolute_time_fallbacks() {
+    let event = |time| crate::feed::trip_update::StopTimeEvent {
+        time,
+        ..Default::default()
+    };
+    for (arrival, departure, expected) in [
+        (Some(event(Some(10))), Some(event(Some(20))), Some((10, 20))),
+        (Some(event(Some(10))), None, Some((10, 10))),
+        (None, Some(event(Some(20))), Some((20, 20))),
+        (Some(event(None)), Some(event(Some(20))), None),
+        (Some(event(Some(10))), Some(event(None)), None),
+        (None, None, None),
+        (Some(event(Some(i64::MAX))), None, None),
+    ] {
+        assert_eq!(
+            stop_event_times(arrival, departure).map(|(a, d)| (a.timestamp(), d.timestamp())),
+            expected
+        );
+    }
+}

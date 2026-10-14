@@ -130,7 +130,6 @@ async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
     assert_eq!(before.len(), after.len());
     assert_eq!(replay.changes.stop_times, 0);
     assert_eq!(changed_versions, 0);
-    assert!(replay.changed_trip_ids.is_empty());
     assert!(
         wal_bytes.0 < 7_160_000,
         "replay WAL must be at least 90% below the recorded 71.6 MB baseline"

@@ -17,7 +17,9 @@ pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
 pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
     let url = url.into();
     Box::pin(async move {
-        Ok(reqwest::get(&url)
+        Ok(crate::integrations::http::realtime()
+            .get(&url)
+            .send()
             .await?
             .error_for_status()?
             .bytes()
@@ -68,6 +70,25 @@ pub async fn fetch_feeds(
         .await
         .into_iter()
         .collect()
+}
+
+/// A missing event uses the other event; an event without an absolute time is rejected.
+pub(crate) fn stop_event_times(
+    arrival: Option<crate::feed::trip_update::StopTimeEvent>,
+    departure: Option<crate::feed::trip_update::StopTimeEvent>,
+) -> Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> {
+    let arrival_time = match &arrival {
+        Some(event) => event.time?,
+        None => departure.as_ref()?.time?,
+    };
+    let departure_time = match &departure {
+        Some(event) => event.time?,
+        None => arrival.as_ref()?.time?,
+    };
+    Some((
+        chrono::DateTime::from_timestamp(arrival_time, 0)?,
+        chrono::DateTime::from_timestamp(departure_time, 0)?,
+    ))
 }
 
 #[cfg(test)]

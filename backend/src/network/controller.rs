@@ -112,132 +112,55 @@ async fn run_source_handler(
     mut rx: mpsc::Receiver<UpdateRequest>,
 ) {
     let mut pending_waiters: Vec<ResponseSender> = Vec::new();
-    let (import_tx, mut import_rx) = mpsc::channel::<anyhow::Result<()>>(1);
-    let mut import_in_progress = false;
     let mut imports = tokio::task::JoinSet::new();
-
     loop {
         tokio::select! {
-            // Handle completion of import task
-            Some(result) = import_rx.recv(), if import_in_progress => {
-                import_in_progress = false;
-
-                // Notify all waiters
-                for tx in pending_waiters.drain(..) {
-                    let _ = match &result {
-                        Ok(_) => tx.send(Ok(())),
-                        Err(e) => tx.send(Err(anyhow::anyhow!(e.to_string()))),
-                    };
+            Some(result) = imports.join_next(), if !imports.is_empty() => {
+                let result = result.unwrap_or_else(|error| Err(error.into()));
+                if let Err(error) = &result {
+                    error!(error = %format!("{error:#}"), "Import failed");
+                } else {
+                    info!("Import successful");
+                }
+                for waiter in pending_waiters.drain(..) {
+                    let response = result.as_ref().map(|_| ()).map_err(|error| anyhow::anyhow!("{error:#}"));
+                    let _ = waiter.send(response);
                 }
             }
-
-            // Handle new requests
-            Some(req) = rx.recv() => {
-                match req {
-                    UpdateRequest::EnsureUpdated { respond_to } => {
-                        // Check if we need an update
-                        let needs_update = check_needs_update(
-                            adapter.as_ref(),
-                            &network_index,
-                            &network,
-                        )
-                        .await;
-
-                        match needs_update {
-                            Ok(true) if !import_in_progress => {
-                                // Need update and none in progress - start one
-                                info!(source = %adapter.source(), "Starting import triggered by ensure_updated");
-                                pending_waiters.push(respond_to);
-
-                                // Collect any other pending requests
-                                while let Ok(r) = rx.try_recv() {
-                                    pending_waiters.push(match r {
-                                        UpdateRequest::EnsureUpdated { respond_to } => respond_to,
-                                        UpdateRequest::ForceUpdate { respond_to } => respond_to,
-                                    });
-                                }
-
-                                spawn_import( &network, &adapter, &import_tx, &mut import_in_progress, &mut imports);
-                            }
-                            Ok(true) if import_in_progress => {
-                                // Update already in progress - queue this waiter
-                                pending_waiters.push(respond_to);
-                            }
-                            Ok(false) => {
-                                let _ = respond_to.send(Ok(()));
-                            }
-                            Err(e) => {
-                                // Error checking - respond with error
-                                error!(error = %e, "Error checking update status");
-                                let _ = respond_to.send(Err(e));
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                    UpdateRequest::ForceUpdate { respond_to } => {
-                        if import_in_progress {
-                            // Piggyback on the in-progress import
-                            pending_waiters.push(respond_to);
-                        } else {
-                            info!(source = %adapter.source(), "Starting forced import");
-                            pending_waiters.push(respond_to);
-
-                            // Drain any other queued requests
-                            while let Ok(r) = rx.try_recv() {
-                                pending_waiters.push(match r {
-                                    UpdateRequest::EnsureUpdated { respond_to } => respond_to,
-                                    UpdateRequest::ForceUpdate { respond_to } => respond_to,
-                                });
-                            }
-
-                            spawn_import( &network, &adapter, &import_tx, &mut import_in_progress, &mut imports);
-                        }
+            request = rx.recv() => {
+                let Some(request) = request else { break };
+                let (waiter, force) = match request {
+                    UpdateRequest::EnsureUpdated { respond_to } => (respond_to, false),
+                    UpdateRequest::ForceUpdate { respond_to } => (respond_to, true),
+                };
+                if !imports.is_empty() {
+                    pending_waiters.push(waiter);
+                    continue;
+                }
+                if !force {
+                    match check_needs_update(adapter.as_ref(), &network_index, &network).await {
+                        Ok(false) => { let _ = waiter.send(Ok(())); continue; }
+                        Err(error) => { let _ = waiter.send(Err(error)); continue; }
+                        Ok(true) => {}
                     }
                 }
+                pending_waiters.push(waiter);
+                while let Ok(request) = rx.try_recv() {
+                    pending_waiters.push(match request {
+                        UpdateRequest::EnsureUpdated { respond_to } |
+                        UpdateRequest::ForceUpdate { respond_to } => respond_to,
+                    });
+                }
+                let network = network.clone();
+                let adapter = adapter.clone();
+                imports.spawn(async move {
+                    let dataset = adapter.collect().await?;
+                    anyhow::ensure!(dataset.source == adapter.source(), "Static adapter returned another source");
+                    network.persist(&dataset).await
+                });
             }
-
-            // Break if both channels are closed
-            else => break,
         }
     }
-}
-
-#[instrument(skip_all, fields(source = %adapter.source()))]
-fn spawn_import(
-    network: &Network,
-    adapter: &Arc<dyn StaticAdapter>,
-    import_tx: &mpsc::Sender<anyhow::Result<()>>,
-    import_in_progress: &mut bool,
-    imports: &mut tokio::task::JoinSet<()>,
-) {
-    *import_in_progress = true;
-
-    let static_data_store_clone = network.clone();
-    let adapter_clone = adapter.clone();
-    let import_tx_clone = import_tx.clone();
-
-    while imports.try_join_next().is_some() {}
-    imports.spawn(async move {
-        let result = async {
-            let dataset = adapter_clone.collect().await?;
-            anyhow::ensure!(
-                dataset.source == adapter_clone.source(),
-                "Static adapter returned another source"
-            );
-            static_data_store_clone.persist(&dataset).await
-        }
-        .await;
-
-        if result.is_ok() {
-            info!(source = %adapter_clone.source(), "Import successful");
-        } else if let Err(e) = &result {
-            // `{:#}` prints the full anyhow context chain (e.g. the underlying DB
-            // error), not just the outermost "Failed to persist ..." wrapper.
-            error!(source = %adapter_clone.source(), error = %format!("{e:#}"), "Import failed");
-        }
-
-        let _ = import_tx_clone.send(result).await;
-    });
 }
 
 #[instrument(skip_all, fields(source = %adapter.source()))]
@@ -264,3 +187,7 @@ async fn check_needs_update(
 
     network.import_due(source, adapter.refresh_interval()).await
 }
+
+#[cfg(test)]
+#[path = "tests/controller.rs"]
+mod tests;

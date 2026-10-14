@@ -33,10 +33,16 @@ struct Feature {
 struct Value {
     #[prost(string, optional, tag = "1")]
     text: Option<String>,
+    #[prost(bool, optional, tag = "7")]
+    boolean: Option<bool>,
 }
 
 async fn assert_tile(pool: sqlx::PgPool, source: Source) {
     let _stores = ingest_case(pool.clone(), source).await;
+    if source == Source::MtaBus {
+        sqlx::query(r#"UPDATE static.route SET data = jsonb_set(data, '{service_types}', '["SHUTTLE"]') WHERE source = $1"#)
+            .bind(source).execute(&pool).await.unwrap();
+    }
     // This function intentionally uses the database clock's five-minute window.
     sqlx::query("UPDATE realtime.trip SET updated_at = NOW() WHERE source = $1")
         .bind(source)
@@ -74,6 +80,18 @@ async fn assert_tile(pool: sqlx::PgPool, source: Source) {
             Source::NjtBus => "87",
         })
     );
+    if source == Source::MtaBus {
+        let shuttle = feature.tags.as_chunks::<2>().0.iter().find_map(|pair| {
+            (layer.keys[pair[0] as usize] == "shuttle")
+                .then_some(layer.values[pair[1] as usize].boolean)
+                .flatten()
+        });
+        assert_eq!(
+            shuttle,
+            Some(true),
+            "the shuttle filter needs a Boolean property"
+        );
+    }
     sqlx::query("UPDATE realtime.trip SET shape_ids = '{}' WHERE source = $1")
         .bind(source)
         .execute(&pool)
@@ -140,4 +158,54 @@ async fn stop_tiles_exclude_retired_identities_and_keep_selection_fields(pool: s
         assert!(property("name").is_some());
         assert_eq!(feature.kind, 1);
     }
+}
+
+#[sqlx::test]
+async fn stop_tiles_supply_supported_filter_properties(pool: sqlx::PgPool) {
+    use backend::network::types::stop::{CompassDirection, StopData};
+    let stores = crate::support::test_owners(pool.clone());
+    let mut subway = crate::support::mta_subway_dataset();
+    for stop in &mut subway.stops {
+        if let StopData::MtaSubway(data) = &mut stop.data {
+            data.north_headsign = "Northbound".into();
+            data.south_headsign = "Southbound".into();
+        }
+    }
+    stores.network.persist(&subway).await.unwrap();
+    let mut bus = crate::support::mta_bus_dataset();
+    for stop in &mut bus.stops {
+        if let StopData::MtaBus(data) = &mut stop.data {
+            data.direction = CompassDirection::N;
+        }
+    }
+    stores.network.persist(&bus).await.unwrap();
+    let (bytes,): (Vec<u8>,) = sqlx::query_as("SELECT realtime.stop(0,0,0)")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let tile = Tile::decode(bytes.as_slice()).unwrap();
+    let layer = &tile.layers[0];
+    let mut sources = std::collections::HashSet::new();
+    for feature in &layer.features {
+        let property = |key| {
+            feature.tags.as_chunks::<2>().0.iter().find_map(|pair| {
+                (layer.keys[pair[0] as usize] == key)
+                    .then_some(layer.values[pair[1] as usize].text.as_deref())
+                    .flatten()
+            })
+        };
+        match property("source").unwrap() {
+            "mta_subway" => {
+                sources.insert("mta_subway");
+                assert_eq!(property("north_headsign"), Some("Northbound"));
+                assert_eq!(property("south_headsign"), Some("Southbound"));
+            }
+            "mta_bus" => {
+                sources.insert("mta_bus");
+                assert_eq!(property("direction"), Some("n"));
+            }
+            source => panic!("unexpected source {source}"),
+        }
+    }
+    assert_eq!(sources.len(), 2);
 }

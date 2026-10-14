@@ -247,7 +247,3 @@ pub(crate) async fn snapshot_from_geometry(
         as_of,
     })
 }
-
-pub fn source_supports_trajectories(source: Source) -> bool {
-    matches!(source, Source::MtaSubway | Source::MtaBus | Source::NjtBus)
-}

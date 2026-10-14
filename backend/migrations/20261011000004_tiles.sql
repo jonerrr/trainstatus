@@ -32,6 +32,7 @@ BEGIN
       r.long_name,
       r.color,
       r.text_color,
+      CASE WHEN r.source = 'mta_bus' THEN COALESCE(r.data->'service_types' ? 'SHUTTLE', false) END AS shuttle,
       ST_AsMVTGeom(
         ST_Transform(tl.geom, 3857),
         ST_TileEnvelope(z, x, y),
@@ -61,7 +62,8 @@ DO $do$ BEGIN
                     "short_name": "String",
                     "long_name": "String",
                     "color": "String",
-                    "text_color": "String"
+                    "text_color": "String",
+                    "shuttle": "Boolean"
                 }
             }
         ]
@@ -77,9 +79,12 @@ RETURNS bytea AS $$
     SELECT COALESCE(ST_AsMVT(tile, 'stop', 4096, 'geom'), ''::bytea)
     FROM (
         SELECT s.id, s.source::text AS source, s.name,
+            s.data->>'north_headsign' AS north_headsign,
+            s.data->>'south_headsign' AS south_headsign,
+            s.data->>'direction' AS direction,
             ST_AsMVTGeom(ST_Transform(s.geom, 3857), ST_TileEnvelope(z, x, y), 4096, 64, true) AS geom
         FROM static.stop s
         WHERE s.current AND s.geom && ST_Transform(ST_TileEnvelope(z, x, y, margin => 64.0 / 4096), 4326)
     ) tile WHERE geom IS NOT NULL;
 $$ LANGUAGE sql STABLE STRICT PARALLEL SAFE;
-COMMENT ON FUNCTION realtime.stop(integer, integer, integer) IS '{"description":"Current network stops","vector_layers":[{"id":"stop","fields":{"id":"String","source":"String","name":"String"}}]}';
+COMMENT ON FUNCTION realtime.stop(integer, integer, integer) IS '{"description":"Current network stops","vector_layers":[{"id":"stop","fields":{"id":"String","source":"String","name":"String","north_headsign":"String","south_headsign":"String","direction":"String"}}]}';

@@ -23,7 +23,6 @@ fn persisted(generation: usize) -> Arc<SourceSnapshot> {
         trips: vec![],
         stop_times: vec![],
         positions: vec![],
-        changed_trip_ids: Default::default(),
         changes: IngestionChanges {
             trips: generation,
             ..Default::default()

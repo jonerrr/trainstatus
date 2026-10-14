@@ -148,3 +148,38 @@ fn empty_tables_are_not_a_revision() {
         .is_none()
     );
 }
+
+#[test]
+fn dataset_revision_uses_the_same_canonical_keys_and_colors_as_persistence() {
+    let mut dataset = NetworkDataset::new(Source::NjtBus);
+    let mut route = subway_route();
+    route.id = "a".into();
+    route.data = RouteData::NjtBus;
+    route.color = "bad color".into();
+    dataset.routes.push(route);
+    let mut stop = njt_stop();
+    stop.id = "platform-a".into();
+    dataset.stops.push(stop);
+    dataset.route_stops.push(RouteStop {
+        route_id: "a".into(),
+        stop_id: "platform-a".into(),
+        stop_sequence: 1,
+        data: RouteStopData::NjtBus {
+            headsign: "Uptown".into(),
+            direction: 1,
+            opposite_stop_id: None,
+        },
+    });
+    let revision = NetworkRevision::from_dataset(&dataset);
+    assert!(revision.routes.contains_key("A"));
+    assert_eq!(
+        revision.routes["A"].color,
+        crate::utils::color::normalize_hex_color("bad color")
+    );
+    assert!(revision.stops.contains_key("PLATFORM-A"));
+    assert!(
+        revision
+            .route_stop_shapes
+            .contains_key(&("A".into(), "PLATFORM-A".into()))
+    );
+}

@@ -144,10 +144,6 @@ impl MtaBusBuilder {
 }
 
 impl TrajectoryBuilder for MtaBusBuilder {
-    fn source(&self) -> Source {
-        Source::MtaBus
-    }
-
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

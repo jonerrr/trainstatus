@@ -67,7 +67,6 @@ pub struct ComputedTrajectory {
     pub trajectory: Trajectory,
     pub end_state: TrajectoryState,
     pub continuity_stats: super::continuity::ContinuityStats,
-    pub knot_stats: KnotGenerationStats,
 }
 
 #[derive(Clone)]

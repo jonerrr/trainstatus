@@ -182,10 +182,10 @@ impl StaticAdapter for MtaSubwayStatic {
     }
 
     async fn collect(&self) -> anyhow::Result<NetworkDataset> {
-        let client = reqwest::Client::new();
-        let infra = fetch_infrastructure(&client).await?;
+        let client = crate::integrations::http::static_data();
+        let infra = fetch_infrastructure(client).await?;
 
-        let exit_data = fetch_exit_strategy(&client).await?;
+        let exit_data = fetch_exit_strategy(client).await?;
         let dataset = build_static_dataset(infra, exit_data);
         Ok(dataset)
     }
@@ -427,9 +427,9 @@ pub fn build_static_dataset_from_fixtures(
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, serde_json::Value>> {
-    let client = reqwest::Client::new();
-    let infrastructure = fetch_infrastructure(&client).await?;
-    let exit_strategy = fetch_exit_strategy(&client).await?;
+    let client = crate::integrations::http::static_data();
+    let infrastructure = fetch_infrastructure(client).await?;
+    let exit_strategy = fetch_exit_strategy(client).await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert(

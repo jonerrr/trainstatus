@@ -8,7 +8,7 @@ use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 
 #[sqlx::test]
-async fn alerts_project_owned_collections_without_changing_wire_shape(pool: sqlx::PgPool) {
+async fn alerts_project_owned_collections_with_unix_seconds(pool: sqlx::PgPool) {
     let owners = crate::support::test_owners(pool.clone());
     let dataset = crate::support::mta_bus_dataset();
     let route_id = dataset.routes[0].id.clone();
@@ -113,7 +113,9 @@ async fn alerts_project_owned_collections_without_changing_wire_shape(pool: sqlx
             wire["data"],
             json!({"source": "mta_bus", "display_before_active": 30, "alert_type": "detour", "clone_id": null})
         );
-        assert_eq!(wire["start_time"], json!(start));
+        assert_eq!(wire["start_time"], json!(start.timestamp()));
+        assert_eq!(wire["created_at"], json!(start.timestamp()));
+        assert_eq!(wire["updated_at"], json!(now.timestamp()));
         assert!(wire.get("end_time").is_none());
         assert!(wire.get("recorded_at").is_none());
         assert!(wire.get("active_periods").is_none());
@@ -139,5 +141,8 @@ async fn alerts_project_owned_collections_without_changing_wire_shape(pool: sqlx
         .await
         .unwrap();
     let ended: Value = server.get("/alerts/mta_bus").await.json();
-    assert_eq!(ended[0]["end_time"], json!(now + Duration::hours(3)));
+    assert_eq!(
+        ended[0]["end_time"],
+        json!((now + Duration::hours(3)).timestamp())
+    );
 }

@@ -19,12 +19,6 @@ pub struct ContinuityStats {
     pub backtracking_knots_removed: u32,
 }
 
-impl ContinuityStats {
-    pub fn knots_removed(&self) -> u32 {
-        self.knots_in.saturating_sub(self.knots_out)
-    }
-}
-
 /// Summed across trips in one trajectory refresh cycle.
 #[derive(Debug, Default)]
 pub struct ContinuityStatsBatch {

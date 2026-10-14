@@ -75,9 +75,9 @@ impl NetworkRevision {
                     RouteData::MtaSubway | RouteData::NjtBus => Vec::new(),
                 };
                 (
-                    route.id.clone(),
+                    route.id.to_uppercase(),
                     IndexedRoute {
-                        color: route.color.clone(),
+                        color: crate::utils::color::normalize_hex_color(&route.color),
                         shape_ids,
                     },
                 )
@@ -88,7 +88,7 @@ impl NetworkRevision {
             .iter()
             .map(|stop| {
                 (
-                    stop.id.clone(),
+                    stop.id.to_uppercase(),
                     IndexedStop {
                         data: stop.data.clone(),
                         geom: stop.geom.clone(),
@@ -110,7 +110,10 @@ impl NetworkRevision {
                     RouteStopData::MtaSubway { .. } | RouteStopData::NjtBus { .. } => Vec::new(),
                 };
                 (
-                    (route_stop.route_id.clone(), route_stop.stop_id.clone()),
+                    (
+                        route_stop.route_id.to_uppercase(),
+                        route_stop.stop_id.to_uppercase(),
+                    ),
                     shape_ids,
                 )
             })

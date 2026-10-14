@@ -171,41 +171,20 @@ pub(in crate::network) async fn save_all_route_stops_on(
     Ok(())
 }
 
-/// Compute proximity-based transfers (transfer_type = 6) across all sources.
-///
-/// Stops within 150 m of each other — measured in EPSG:6538 (NY State Plane, meters)
-/// via ST_Transform — receive a bidirectional proximity transfer entry, unless:
-///   - They already have an official (non-proximity) transfer entry, or
-///   - They are a designated `opposite_stop_id` bus-stop pair.
-///
-/// For stops that carry a `direction` field (i.e. mta_bus), only the single closest
-/// candidate sharing the same source and direction is kept per origin stop, preventing
-/// duplicate transfers to stops on the same side of the street.
-///
-/// All existing type-6 entries are deleted and recomputed atomically so stale
-/// pairs (e.g. after a stop moves) are always cleaned up.
-///
-/// ## Performance
-///
-/// When a `source` is provided, the self-join is structured so that the importing
-/// source drives one side (`a`), joining against all other stops (`b`). This avoids
-/// scanning the full NxN cross product — bus sources have 10-16K stops, making an
-/// unscoped self-join prohibitively expensive.
-///
-/// `ST_Transform` results are pre-computed in a CTE so each stop's projection to
-/// EPSG:6538 is done once, not once per candidate pair.
-///
-/// Candidates and relationship replacement share the network import transaction.
-/// Stored projected coordinates and their partial spatial index bound the join.
+/// Recompute bidirectional proximity transfers involving the importing source.
+/// Current stops within 150 m in EPSG:6538 qualify unless they have an official
+/// transfer, are opposite bus stops, or share the same bus source and direction.
+/// Stored projected coordinates and their spatial index bound the source-scoped
+/// join. Candidate selection and replacement share the network transaction.
 pub(in crate::network) async fn compute_proximity_transfers(
     connection: &mut PgConnection,
-    source: Option<Source>,
+    source: Source,
 ) -> anyhow::Result<()> {
     let start = std::time::Instant::now();
 
     // Compute candidates from the transaction's current membership.
     //
-    // When a source is provided, side `a` is restricted to that source while side
+    // Side `a` is restricted to the importing source while side
     // `b` includes ALL stops. This produces the same result set as the symmetric
     // `a.source = $1 OR b.source = $1` filter but lets Postgres plan a much
     // smaller driving set. The reverse direction (b→a) is captured by UNION ALL
@@ -218,11 +197,8 @@ pub(in crate::network) async fn compute_proximity_transfers(
     }
 
     // Keep the spatial CTE/UNION projections runtime; scalar writes below are checked.
-    let candidates: Vec<TransferCandidate> = if let Some(s) = source {
-        // Source-scoped: side `a` is restricted to the importing source,
-        // side `b` is all stops. We emit both directions (a→b and b→a)
-        // via UNION ALL so the result is symmetric.
-        sqlx::query_as::<_, (String, Source, String, Source)>(
+    // Emit both directions, with the importing source driving the spatial join.
+    let candidates: Vec<TransferCandidate> = sqlx::query_as::<_, (String, Source, String, Source)>(
                 r#"
                 WITH
                 stop_direction AS (
@@ -293,7 +269,7 @@ pub(in crate::network) async fn compute_proximity_transfers(
                 WHERE to_source != $1
                 "#,
             )
-            .bind(s)
+            .bind(source)
             .fetch_all(&mut *connection)
             .await?
             .into_iter()
@@ -305,80 +281,7 @@ pub(in crate::network) async fn compute_proximity_transfers(
                     to_source,
                 },
             )
-            .collect()
-    } else {
-        // No source filter — full cross-source recompute (symmetric join).
-        sqlx::query_as::<_, (String, Source, String, Source)>(
-            r#"
-                WITH
-                stop_direction AS (
-                    SELECT
-                        stop_id,
-                        source,
-                        mode() WITHIN GROUP (ORDER BY (data->>'direction')::integer) AS direction
-                    FROM static.route_stop
-                    GROUP BY stop_id, source
-                )
-                SELECT
-                    a.id   AS from_id,
-                    a.source AS from_source,
-                    b.id   AS to_id,
-                    b.source AS to_source
-                FROM static.stop a
-                LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source
-                JOIN static.stop b
-                    ON a.current AND b.current AND (a.id, a.source) != (b.id, b.source)
-                                        AND ST_DWithin(a.projected_geom, b.projected_geom, 150.0)
-                LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source
-                WHERE
-                    NOT EXISTS (
-                        SELECT 1 FROM static.stop_transfer st
-                        WHERE st.from_stop_id = a.id
-                          AND st.from_stop_source = a.source
-                          AND st.to_stop_id = b.id
-                          AND st.to_stop_source = b.source
-                          AND st.transfer_type != 6
-                    )
-                    AND NOT (
-                        a.source = b.source
-                        AND a.source IN ('mta_bus', 'njt_bus')
-                        AND sd_a.direction IS NOT NULL
-                        AND sd_b.direction IS NOT NULL
-                        AND sd_a.direction = sd_b.direction
-                    )
-                    AND NOT (
-                        a.source IN ('mta_bus', 'njt_bus')
-                        AND EXISTS (
-                            SELECT 1 FROM static.route_stop rs
-                            WHERE rs.stop_id = a.id
-                              AND rs.source = a.source
-                              AND rs.data->>'opposite_stop_id' = b.id
-                        )
-                    )
-                    AND NOT (
-                        b.source IN ('mta_bus', 'njt_bus')
-                        AND EXISTS (
-                            SELECT 1 FROM static.route_stop rs
-                            WHERE rs.stop_id = b.id
-                              AND rs.source = b.source
-                              AND rs.data->>'opposite_stop_id' = a.id
-                        )
-                    )
-                "#,
-        )
-        .fetch_all(&mut *connection)
-        .await?
-        .into_iter()
-        .map(
-            |(from_id, from_source, to_id, to_source)| TransferCandidate {
-                from_id,
-                from_source,
-                to_id,
-                to_source,
-            },
-        )
-        .collect()
-    };
+            .collect();
 
     let candidate_count = candidates.len();
     let compute_elapsed = start.elapsed();
@@ -391,15 +294,9 @@ pub(in crate::network) async fn compute_proximity_transfers(
 
     // Replace affected pairs in the same transaction.
 
-    if let Some(s) = source {
-        sqlx::query!("DELETE FROM static.stop_transfer WHERE transfer_type = 6 AND (from_stop_source = $1 OR to_stop_source = $1)" , s)
-            .execute(&mut *connection)
-            .await?;
-    } else {
-        sqlx::query!("DELETE FROM static.stop_transfer WHERE transfer_type = 6")
-            .execute(&mut *connection)
-            .await?;
-    }
+    sqlx::query!("DELETE FROM static.stop_transfer WHERE transfer_type = 6 AND (from_stop_source = $1 OR to_stop_source = $1)", source)
+        .execute(&mut *connection)
+        .await?;
 
     // Bulk insert candidates in batches to avoid excessive parameter counts.
     const BATCH_SIZE: usize = 10_000;

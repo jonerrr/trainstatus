@@ -87,10 +87,6 @@ impl NjtBusBuilder {
 }
 
 impl TrajectoryBuilder for NjtBusBuilder {
-    fn source(&self) -> Source {
-        Source::NjtBus
-    }
-
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

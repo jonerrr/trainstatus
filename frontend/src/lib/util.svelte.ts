@@ -179,29 +179,3 @@ export function calculate_stop_height(item: CatalogStop) {
 }
 
 export const calculate_trip_height = () => 94;
-
-// export function get_position(): Promise<GeolocationPosition> {
-// 	return new Promise<GeolocationPosition>((res, rej) => {
-// 		navigator.geolocation.getCurrentPosition(res, rej);
-// 	});
-// }
-
-// interface ItemHeights {
-// 	[key: string]: number;
-// }
-
-// export function list_max_height(init: number = 0) {
-// 	const height = browser
-// 		? document
-// 				.querySelectorAll('.sub-height')
-// 				.values()
-// 				.reduce((acc, el) => {
-// 					acc += (el as HTMLElement).offsetHeight;
-// 					return acc;
-// 				}, init)
-// 		: 124 + init;
-// 	return `max-h-[calc(100dvh-${height}px)]`;
-// }
-// TODO: remove if not used. Was used to store virtual list item heights.
-// need to test if its faster to calculate heights on the fly or store them in a map like this.
-// export const item_heights = $state<ItemHeights>({});

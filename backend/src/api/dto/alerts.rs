@@ -1,5 +1,4 @@
 use crate::alerts::types::{AlertData, AlertTranslation};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -10,13 +9,15 @@ pub struct ApiAlert {
     pub original_id: String,
     pub data: AlertData,
     pub translations: Vec<AlertTranslation>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    /// Start time of alert (earliest active period)
-    pub start_time: DateTime<Utc>,
-    /// End time of alert. If null, there is no end time yet.
+    /// Unix timestamp in seconds.
+    pub created_at: i64,
+    /// Unix timestamp in seconds.
+    pub updated_at: i64,
+    /// Unix timestamp in seconds of the earliest active period.
+    pub start_time: i64,
+    /// Unix timestamp in seconds. Absent while any active period has no end.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub end_time: Option<DateTime<Utc>>,
+    pub end_time: Option<i64>,
     /// Entities affected by alert
     pub entities: Vec<ApiAlertEntity>,
 }
@@ -58,18 +59,24 @@ impl From<&crate::alerts::types::Alert> for ApiAlert {
                     .cloned()
             })
             .collect(),
-            created_at: alert.created_at,
-            updated_at: alert.updated_at,
+            created_at: alert.created_at.timestamp(),
+            updated_at: alert.updated_at.timestamp(),
             start_time: alert
                 .active_periods
                 .iter()
                 .map(|p| p.start_time)
                 .min()
-                .expect("selected alerts have an active period"),
+                .expect("selected alerts have an active period")
+                .timestamp(),
             end_time: if alert.active_periods.iter().any(|p| p.end_time.is_none()) {
                 None
             } else {
-                alert.active_periods.iter().filter_map(|p| p.end_time).max()
+                alert
+                    .active_periods
+                    .iter()
+                    .filter_map(|p| p.end_time)
+                    .max()
+                    .map(|end| end.timestamp())
             },
             entities: alert
                 .entities

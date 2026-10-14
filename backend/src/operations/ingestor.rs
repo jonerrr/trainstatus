@@ -1,9 +1,6 @@
 use super::postgres::{ObservationRow, TripRow};
 use super::{CollectedObservation, CollectedVisit, RunKey};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
 use chrono::{DateTime, SubsecRound, Utc};
@@ -36,7 +33,6 @@ pub struct SourceSnapshot {
     pub trips: Vec<TripRun>,
     pub stop_times: Vec<StopVisit>,
     pub positions: Vec<VehicleObservation>,
-    pub changed_trip_ids: HashSet<Uuid>,
     pub changes: IngestionChanges,
     pub network_revision: Arc<NetworkRevision>,
 }
@@ -132,7 +128,6 @@ impl OperationsIngestor {
             trips: changed.len(),
             ..Default::default()
         };
-        let mut changed_trip_ids: HashSet<_> = changed.into_iter().collect();
         let persisted_ids: HashMap<_, _> =
             trips.iter().map(|trip| (identity(trip), trip.id)).collect();
         let id_map: HashMap<_, _> = aliases
@@ -166,14 +161,11 @@ impl OperationsIngestor {
         }
         let changed_stops = upsert_stop_times(&mut tx, source, &stop_times).await?;
         changes.stop_times = changed_stops.len();
-        changed_trip_ids.extend(changed_stops);
         let (positions, changed_positions) =
             upsert_positions(&mut tx, source, snapshot.positions, &id_map).await?;
         changes.positions = changed_positions.len();
-        changed_trip_ids.extend(changed_positions.into_iter().flatten());
         let resolved = resolve_shapes(&mut tx, &mut trips, &stop_times, &network_revision).await?;
         changes.resolved_shapes = resolved.len();
-        changed_trip_ids.extend(resolved);
         persist_run_shapes(&mut tx, source, &trips, &network_revision).await?;
         let mut persisted = SourceSnapshot {
             source,
@@ -181,7 +173,6 @@ impl OperationsIngestor {
             trips,
             stop_times,
             positions,
-            changed_trip_ids,
             changes,
             network_revision,
         };

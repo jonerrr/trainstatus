@@ -156,7 +156,7 @@ impl Network {
         sqlx::query("ANALYZE static.stop, static.route_stop")
             .execute(&mut *tx)
             .await?;
-        stop::compute_proximity_transfers(&mut tx, Some(source)).await?;
+        stop::compute_proximity_transfers(&mut tx, source).await?;
         let mut imported = NetworkRevision::from_dataset_with_schedules(dataset, schedules);
         imported.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
             source,

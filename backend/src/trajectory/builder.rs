@@ -70,8 +70,6 @@ pub(super) fn recorded_anchor_knot(
 
 /// Source-specific knot synthesis from trip snapshots.
 pub trait TrajectoryBuilder: Send + Sync {
-    fn source(&self) -> Source;
-
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

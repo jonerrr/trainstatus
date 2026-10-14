@@ -30,12 +30,15 @@ export type AlertTranslation = {
  * API response for alerts - flattened with all related data
  */
 export type ApiAlert = {
-    created_at: Date;
+    /**
+     * Unix timestamp in seconds.
+     */
+    created_at: number;
     data: AlertData;
     /**
-     * End time of alert. If null, there is no end time yet.
+     * Unix timestamp in seconds. Absent while any active period has no end.
      */
-    end_time?: Date | null;
+    end_time?: number | null;
     /**
      * Entities affected by alert
      */
@@ -43,11 +46,14 @@ export type ApiAlert = {
     id: string;
     original_id: string;
     /**
-     * Start time of alert (earliest active period)
+     * Unix timestamp in seconds of the earliest active period.
      */
-    start_time: Date;
+    start_time: number;
     translations: Array<AlertTranslation>;
-    updated_at: Date;
+    /**
+     * Unix timestamp in seconds.
+     */
+    updated_at: number;
 };
 
 export type ApiAlertEntity = {

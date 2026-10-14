@@ -86,7 +86,7 @@ pub struct MtaSubwayRealtime;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let response = reqwest::Client::new()
+    let response = crate::integrations::http::realtime()
         .get(SUBWAY_TRIPS_URL)
         .send()
         .await?
@@ -256,7 +256,7 @@ impl RealtimeSource for MtaSubwayRealtime {
         &self,
         revision: std::sync::Arc<crate::network::index::NetworkRevision>,
     ) -> anyhow::Result<CollectedSnapshot> {
-        let response = reqwest::Client::new()
+        let response = crate::integrations::http::realtime()
             .get(SUBWAY_TRIPS_URL)
             .send()
             .await?

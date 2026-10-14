@@ -108,7 +108,6 @@ fn live_case() -> Case {
             position(Some(linked.id), "bus-1", "Y"),
             position(None, "bus-2", "Y"),
         ],
-        changed_trip_ids: HashSet::new(),
         changes: IngestionChanges::default(),
         network_revision: revision(&["A", "B", "C"]),
     });

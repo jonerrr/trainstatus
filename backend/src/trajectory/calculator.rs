@@ -162,7 +162,6 @@ pub fn compute_trajectory(
             v_mps,
         },
         continuity_stats,
-        knot_stats: generated.stats,
     })
 }
 

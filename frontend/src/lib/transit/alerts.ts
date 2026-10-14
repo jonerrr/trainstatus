@@ -17,7 +17,7 @@ function parse_html(html: string) {
 	});
 }
 
-/** Decode the alerts JSON body, converting timestamps and inline subway icons. */
+/** Index alerts by route and render inline subway icons; timestamps stay in Unix seconds. */
 export function decodeAlerts(body: ApiAlert[]): AlertsData {
 	const by_route = new Map<string, ApiAlert[]>();
 	const alerts = body.map((alert): ApiAlert => {
@@ -26,11 +26,7 @@ export function decodeAlerts(body: ApiAlert[]): AlertsData {
 			translations: alert.translations.map((t) => ({
 				...t,
 				text: t.format === 'html' ? parse_html(t.text) : t.text
-			})),
-			start_time: new Date(alert.start_time),
-			end_time: alert.end_time ? new Date(alert.end_time) : undefined,
-			updated_at: new Date(alert.updated_at),
-			created_at: new Date(alert.created_at)
+			}))
 		};
 		for (const route_id of new Set(alert.entities.map((entity) => entity.route_id))) {
 			let list = by_route.get(route_id);

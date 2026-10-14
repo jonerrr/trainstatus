@@ -53,7 +53,7 @@ async fn authenticate() -> anyhow::Result<String> {
         .text("username", username)
         .text("password", password);
 
-    let resp: AuthResponse = reqwest::Client::new()
+    let resp: AuthResponse = crate::integrations::http::realtime()
         .post(NJT_GTFS_AUTH_URL)
         .multipart(form)
         .send()
@@ -69,7 +69,7 @@ async fn authenticate() -> anyhow::Result<String> {
 pub(super) fn njt_post_future(url: &'static str, token: String) -> FeedFuture {
     Box::pin(async move {
         let form = reqwest::multipart::Form::new().text("token", token);
-        Ok(reqwest::Client::new()
+        Ok(crate::integrations::http::realtime()
             .post(url)
             .multipart(form)
             .send()

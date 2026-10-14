@@ -501,7 +501,6 @@ dependencies = [
  "prost",
  "prost-build",
  "reqwest",
- "rgb",
  "serde",
  "serde_json",
  "sqlx",

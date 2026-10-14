@@ -16,7 +16,7 @@ use backend::trajectory::TrajectoryCache;
 use backend::trajectory::TrajectoryCalculator;
 use backend::trajectory::TrajectoryDeriver;
 use chrono::{Duration, Utc};
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 fn fixture() -> SourceSnapshot {
     let now = Utc::now();
@@ -73,7 +73,6 @@ fn fixture() -> SourceSnapshot {
                 phase: None,
             }),
         }],
-        changed_trip_ids: HashSet::from([id]),
         changes: IngestionChanges::default(),
         network_revision: Arc::new(revision),
     }
@@ -297,7 +296,6 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
         trips: vec![trip],
         stop_times,
         positions: vec![],
-        changed_trip_ids: HashSet::new(),
         changes: IngestionChanges::default(),
         network_revision: Arc::new(revision),
     };
