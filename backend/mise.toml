@@ -33,7 +33,7 @@ run = "mise run test:services full"
 
 [tasks."test:unit"]
 description = "Run private unit and public behavior tests without services"
-run = "cargo test --features fixture-capture --lib --test behavior"
+run = "cargo test --locked --features fixture-capture --lib --test behavior"
 
 [tasks."test:integration"]
 description = "Run database and private realtime engine integration tests"

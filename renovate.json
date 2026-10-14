@@ -5,15 +5,26 @@
     {
       "customType": "regex",
       "description": "Track the Node.js runtime in Dockerfiles",
-      "managerFilePatterns": [
-        "/(^|/)Dockerfile$/"
-      ],
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
       "matchStrings": [
         "# renovate: datasource=node-version depName=node\\s+RUN pnpm runtime set node (?<currentValue>\\d+(?:\\.\\d+){0,2}) -g"
       ],
       "datasourceTemplate": "node-version",
       "depNameTemplate": "node",
       "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "Keep hk Pkl package imports on the same release",
+      "managerFilePatterns": ["/(^|/)hk\\.pkl$/"],
+      "matchStrings": [
+        "package://github\\.com/jdx/hk/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/hk@\\d+\\.\\d+\\.\\d+"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "jdx/hk",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "autoReplaceStringTemplate": "package://github.com/jdx/hk/releases/download/v{{{newValue}}}/hk@{{{newValue}}}"
     }
   ],
   "packageRules": [
@@ -31,6 +42,11 @@
       "description": "Group all science dependencies",
       "matchFileNames": ["science/**"],
       "groupName": "science"
+    },
+    {
+      "description": "Update the hk executable and all Pkl imports together",
+      "matchDepNames": ["jdx/hk", "aqua:jdx/hk"],
+      "groupName": "hk"
     }
   ]
 }

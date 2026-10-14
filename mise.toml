@@ -8,6 +8,7 @@ config_roots = ["backend", "frontend", "geo", "science"]
 "core:rust" = "latest"
 "core:node" = "latest"
 "aqua:pnpm/pnpm" = "latest"
+"aqua:jdx/hk" = "latest"
 "pipx:pyvalhalla" = { version = "latest", uvx = true }
 "cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres,sqlx-toml", default-features = "false" }
 # installing with mise caused the rust vscode extension not to work, and a
@@ -19,6 +20,8 @@ lockfile = true
 
 [env]
 DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
+HK_MISE = "1"
+_.path = ["frontend/node_modules/.bin"]
 
 [tasks."podman-installed"]
 description = "Check that the podman command is on PATH."
@@ -175,6 +178,34 @@ run = { tasks = ["//backend:build", "//frontend:build"] }
 [tasks.demo]
 description = "Start the demo pod if it is not already running."
 depends = [{ task = "containers:up", args = ["demo"] }]
+
+[tasks.pre-commit]
+description = "Check staged files and run checks for affected projects"
+run = "hk run pre-commit"
+
+[tasks."hooks:install"]
+description = "Install repository-local hk hooks with mise integration"
+run = "hk install --mise"
+
+[tasks.bootstrap]
+description = "Install the repository's Git hooks"
+depends = ["hooks:install"]
+
+[tasks.check]
+description = "Run hk checks on changed files"
+run = "hk check"
+
+[tasks.fix]
+description = "Apply hk fixes to changed files without staging"
+run = "hk fix"
+
+[tasks."test:unit"]
+description = "Run backend and frontend service-free unit/behavior suites"
+run = { tasks = ["//backend:test:unit", "//frontend:test:unit"] }
+
+[tasks."test:hooks"]
+description = "Validate hk configuration and run its builtin utility tests"
+run = ["hk validate", "hk test --step trailing-whitespace --step newlines"]
 
 [task_templates.containers]
 depends = ["podman-installed"]

@@ -1,0 +1,35 @@
+amends "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Builtins.pkl"
+
+subprojects = List("frontend", "backend", "science")
+exclude = List("**/CHANGELOG.md", "frontend/src/lib/client/**")
+
+steps {
+  ["trailing-whitespace"] = Builtins.trailing_whitespace
+  ["newlines"] = Builtins.newlines
+  ["merge-conflict"] = Builtins.check_merge_conflict
+  ["mise-format"] = Builtins.mise
+  ["mise-lock"] {
+    glob = List("mise.toml", "mise.lock", "**/mise.toml", ".mise/locks/**")
+    fix = "mise lock && git diff --exit-code -- mise.lock .mise/locks"
+    exclusive = true
+  }
+  ["prettier-dependencies"] {
+    glob = Builtins.prettier.glob
+    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml")
+    check = "mise run //frontend:pnpm-install"
+  }
+  ["shared-prettier"] = (Builtins.prettier) {
+    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml")
+    depends = "prettier-dependencies"
+  }
+}
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    stage = false
+    fail_on_fix = true
+    stash = "git"
+  }
+}
