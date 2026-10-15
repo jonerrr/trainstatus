@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.6.0...frontend-v2.0.0) (2026-10-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* transit api ([#463](https://github.com/jonerrr/trainstatus/issues/463))
+
+### Features
+
+* enhance stop filtering logic and add comprehensive tests for route ID precedence ([b48b04d](https://github.com/jonerrr/trainstatus/commit/b48b04d9c85b7cf5c99f8d07987767ad31c981a3))
+
+
+### Bug Fixes
+
+* use custom throttle util for stop search ([8fe5269](https://github.com/jonerrr/trainstatus/commit/8fe526973c4072c5b7f44fed7ad36b9aa25aac09))
+
+
+### Code Refactoring
+
+* transit api ([#463](https://github.com/jonerrr/trainstatus/issues/463)) ([1779ead](https://github.com/jonerrr/trainstatus/commit/1779ead419e066a8cfe9b88c8f4db1a26037a2bf))
+
 ## [1.6.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.5.1...frontend-v1.6.0) (2026-10-10)
 
 
