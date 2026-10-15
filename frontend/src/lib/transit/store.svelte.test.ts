@@ -2,6 +2,8 @@ import { tick } from 'svelte';
 
 import { chartFixture } from '#lib/charts/fixtures.js';
 import type { RouteService, Service, Source } from '#lib/client/index.js';
+import { watchTrajectories } from '#lib/map/trajectories.svelte.js';
+import { trajectoryFixture } from '#lib/map/trajectoryFixture.js';
 import TransitDataHarness from '#lib/test/TransitDataHarness.svelte';
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -70,6 +72,42 @@ function store(fetcher: typeof fetch, sources: Source[] = ['mta_bus'], history_l
 	created.push(data);
 	return data;
 }
+
+test('successful map polls retain source age in the shared warning until a new commit', async () => {
+	const http = transport();
+	const data = store(http.fetcher);
+	let committed_at = clock - 91_000;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: undefined },
+		() => {},
+		async () =>
+			new Response(trajectoryFixture(), {
+				headers: { 'x-source-updated-at': String(committed_at / 1000) }
+			}),
+		(update) => data.track(update)
+	);
+	try {
+		await stop.refresh();
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(data.status.warning).toBe(true);
+		committed_at = clock;
+		await stop.refresh();
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(data.status.warning).toBe(false);
+		clock += 91_000;
+		await stop.refresh();
+		document.dispatchEvent(new Event('visibilitychange'));
+		await settle();
+		expect(data.status.warning).toBe(true);
+		committed_at = clock;
+		await stop.refresh();
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(data.status.warning).toBe(false);
+		expect(http.calls).toHaveLength(0);
+	} finally {
+		stop();
+	}
+});
 
 const text = (route: string) =>
 	[...document.querySelectorAll(`[data-route="${route}"]`)].map((node) => node.textContent);

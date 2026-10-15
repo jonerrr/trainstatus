@@ -59,6 +59,7 @@ export function watchTrajectories(
 			at: query.at,
 			error: null as Error | null,
 			fetched_at: null as number | null,
+			source_updated_at: null as number | null,
 			retry: () => void load()
 		};
 		statuses.set(source, { available: false, error: null });
@@ -76,6 +77,9 @@ export function watchTrajectories(
 				failures = 0;
 				update.error = null;
 				update.fetched_at = Date.now();
+				const committed_at = response.headers.get('x-source-updated-at');
+				update.source_updated_at =
+					query.at === undefined && committed_at !== null ? Number(committed_at) * 1000 : null;
 				statuses.set(source, { available: true, error: null });
 				if (query.at === undefined) schedule(refresh_ms);
 			} catch (error) {

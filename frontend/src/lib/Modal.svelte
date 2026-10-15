@@ -95,9 +95,15 @@
 			? { source: selected.source, route_id, at: current_time.value }
 			: null;
 	});
+	const initial_service = $derived.by(() => {
+		void page.state.modal;
+		return untrack(() => selected_service.current.value);
+	});
 	$effect(() => {
 		const selected = page.state.modal;
 		if (!selected) return;
+		// Capture cached membership before a cold catalog or service request completes.
+		const cached = initial_service;
 		const catalog = selected_catalog.current.value;
 		// Keep the requested modal and its shared Retry available during catalog failures.
 		if (!catalog) return;
@@ -114,7 +120,9 @@
 				invalid =
 					!catalog.routes_by_id.has(selected.route_id) ||
 					service.error instanceof UnknownRouteError ||
-					(!!service.value && !service.value.trips.has(selected.id));
+					(!!service.value &&
+						(current_time.value !== undefined || service.value !== cached) &&
+						!service.value.trips.has(selected.id));
 				break;
 		}
 		if (invalid) untrack(() => close_modal(current_time.value, true));

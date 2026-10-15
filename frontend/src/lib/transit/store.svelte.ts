@@ -70,6 +70,7 @@ export interface TrackedUpdate {
 	readonly active: boolean;
 	readonly error: Error | null;
 	readonly fetched_at: number | null;
+	readonly source_updated_at?: number | null;
 	retry(): void;
 }
 
@@ -325,16 +326,32 @@ export class TransitData {
 	}
 
 	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<ResourceSnapshot<TripRead>> {
-		const route = this.route(key);
+		const selected = $derived(key());
+		const route = this.route(() => selected);
+		$effect(() => {
+			const requested = selected;
+			if (!requested || requested.at !== undefined) return;
+			// A map generation can name a trip absent from cached passenger service.
+			// Check once on acquisition, so an absent trip does not create a refresh loop.
+			untrack(() => {
+				const entry = this.#service(
+					requested.source,
+					this.#key_route(requested.source, requested.route_id),
+					requested.at
+				);
+				const cached = entry.data?.get(requested.route_id);
+				if (cached && !cached.trips.has(requested.trip_id)) this.#start(entry);
+			});
+		});
 		const project = (current: ResourceSnapshot<RouteData>): ResourceSnapshot<TripRead> => {
-			const selected = key();
+			const requested = selected;
 			const data = current.value;
-			const trip = selected && data?.trips.get(selected.trip_id);
+			const trip = requested && data?.trips.get(requested.trip_id);
 			return {
 				...current,
 				value:
-					selected && data && trip
-						? { trip, calls: data.calls_by_trip.get(selected.trip_id) ?? [], route: data }
+					requested && data && trip
+						? { trip, calls: data.calls_by_trip.get(requested.trip_id) ?? [], route: data }
 						: undefined
 			};
 		};
@@ -722,7 +739,8 @@ export class TransitData {
 				update.error ||
 				(update.at == null &&
 					update.fetched_at !== null &&
-					now - update.fetched_at > STALE_AFTER_MS)
+					now - Math.min(update.fetched_at, update.source_updated_at ?? update.fetched_at) >
+						STALE_AFTER_MS)
 			)
 				warning = true;
 		}

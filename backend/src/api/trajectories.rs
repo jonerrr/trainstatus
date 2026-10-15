@@ -16,7 +16,7 @@ use crate::trajectory::encode_render_units;
     path = "/trajectories/{source}",
     tag = "REALTIME",
     summary = "Get rendered trajectories",
-    description = "Returns interpolated trip trajectories as an Apache Arrow IPC stream for animated map rendering. All currently supported sources are accepted. Historical requests use `at` to derive trajectories from retained trips and recorded vehicle locations.",
+    description = "Returns interpolated trip trajectories as an Apache Arrow IPC stream for animated map rendering. All currently supported sources are accepted. Live responses include `x-source-updated-at`, the source commit time in Unix seconds, once a snapshot has been committed. Historical requests use `at` to derive trajectories from retained trips and recorded vehicle locations.",
     params(
         ("source" = Source, Path, description = "Data source"),
         TimeQuery
@@ -37,8 +37,11 @@ pub async fn trajectories_handler(
     let units: Vec<RenderUnit> = snapshot.render_units.values().cloned().collect();
 
     let bytes = encode_render_units(&units)?;
-    Ok(Response::builder()
+    let mut response = Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/vnd.apache.arrow.stream")
-        .body(Body::from(bytes))?)
+        .header(header::CONTENT_TYPE, "application/vnd.apache.arrow.stream");
+    if let Some(committed_at) = snapshot.committed_at {
+        response = response.header("x-source-updated-at", committed_at.timestamp().to_string());
+    }
+    Ok(response.body(Body::from(bytes))?)
 }

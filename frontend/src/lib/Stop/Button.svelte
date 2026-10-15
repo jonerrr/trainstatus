@@ -70,6 +70,8 @@
 			<span class="rounded-sm bg-neutral-800/70 px-1.5 py-0.5 text-sm font-medium"
 				>{call.eta.toFixed(0)}m</span
 			>
+		{:else}
+			<span class="text-neutral-400">—</span>
 		{/each}
 	{/if}
 {/snippet}

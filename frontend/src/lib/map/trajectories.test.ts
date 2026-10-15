@@ -84,6 +84,34 @@ test('historical failures retry at the selected time', async () => {
 	stop();
 });
 
+test('successful historical trajectories ignore live commit age and do not poll again', async () => {
+	vi.useFakeTimers();
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let requests = 0;
+	let tracked: import('#lib/transit/store.svelte.js').TrackedUpdate | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: 0 },
+		() => {},
+		async () => {
+			requests++;
+			return new Response(trajectoryFixture(), { headers: { 'x-source-updated-at': '1' } });
+		},
+		(update) => {
+			tracked = update;
+			return () => {};
+		}
+	);
+	try {
+		await stop.refresh();
+		await vi.advanceTimersByTimeAsync(91_000);
+		expect(tracked?.source_updated_at).toBeNull();
+		expect(tracked?.error).toBeNull();
+		expect(requests).toBe(1);
+	} finally {
+		stop();
+	}
+});
+
 test('disposing a query aborts its requests and rejects late completions', async () => {
 	let signal: AbortSignal | null | undefined;
 	let finish!: (response: Response) => void;

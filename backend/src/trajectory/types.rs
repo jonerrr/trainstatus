@@ -134,6 +134,8 @@ pub struct GeneratedKnots {
 #[derive(Debug, Clone)]
 pub struct HotSnapshot {
     pub generated_at: DateTime<Utc>,
+    /// Source commit behind live geometry; absent for startup and historical reads.
+    pub committed_at: Option<DateTime<Utc>>,
     pub render_units: std::collections::HashMap<String, RenderUnit>,
     pub prev_states: std::collections::HashMap<Uuid, TrajectoryState>,
 }
@@ -142,6 +144,7 @@ impl HotSnapshot {
     pub fn empty() -> Self {
         Self {
             generated_at: Utc::now(),
+            committed_at: None,
             render_units: std::collections::HashMap::new(),
             prev_states: std::collections::HashMap::new(),
         }
@@ -150,6 +153,7 @@ impl HotSnapshot {
     pub fn historical_from(render_units: std::collections::HashMap<String, RenderUnit>) -> Self {
         Self {
             generated_at: Utc::now(),
+            committed_at: None,
             render_units,
             prev_states: std::collections::HashMap::new(),
         }

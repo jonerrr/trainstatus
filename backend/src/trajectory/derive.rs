@@ -69,6 +69,7 @@ impl TrajectoryDeriver {
         });
         let mut hot = HotSnapshot {
             generated_at: at,
+            committed_at: Some(snapshot.committed_at),
             render_units: HashMap::new(),
             prev_states: HashMap::new(),
         };
