@@ -91,6 +91,52 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 	return rad * c;
 }
 
+/** Run immediately, then at most once per interval using the latest arguments. */
+export function throttle<T extends (...args: never[]) => void>(func: T, wait: number) {
+	let last_call = -Infinity;
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	let pending: Parameters<T> | undefined;
+	const cancel = () => {
+		clearTimeout(timeout);
+		timeout = undefined;
+		pending = undefined;
+	};
+	const invoke = () => {
+		const args = pending!;
+		cancel();
+		last_call = Date.now();
+		func(...args);
+	};
+	const throttled = (...args: Parameters<T>) => {
+		pending = args;
+		const remaining = last_call + wait - Date.now();
+		if (remaining <= 0) invoke();
+		else if (timeout === undefined) timeout = setTimeout(invoke, remaining);
+	};
+	return Object.assign(throttled, { cancel });
+}
+
+/** Create during component initialization; get/set bind the input, current feeds consumers. */
+export function createThrottled<T>(initial: T, wait: number) {
+	let input = $state.raw(initial);
+	let current = $state.raw(initial);
+	const update = throttle((value: T) => {
+		current = value;
+	}, wait);
+	$effect(() => update.cancel);
+
+	return {
+		get: () => input,
+		set: (value: T) => {
+			input = value;
+			update(value);
+		},
+		get current() {
+			return current;
+		}
+	};
+}
+
 export function debounce<T extends (...args: never[]) => void>(func: T, wait: number = 75) {
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	const cancel = () => {

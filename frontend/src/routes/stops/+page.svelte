@@ -7,10 +7,9 @@
 	import { search_stops } from '#lib/search.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { calculate_stop_height } from '#lib/util.svelte.js';
+	import { calculate_stop_height, createThrottled } from '#lib/util.svelte.js';
 
 	import { CircleX, Search } from '@lucide/svelte';
-	import { Throttled } from 'runed';
 
 	let selected_source = $state(
 		new LocalStorage<Source>('stopsTab', page.data.selected_sources[0] ?? 'mta_subway')
@@ -32,8 +31,7 @@
 		) as Partial<Record<Source, readonly CatalogStop[]>>
 	);
 
-	let search_input: string = $state('');
-	const throttled_search_input = new Throttled(() => search_input, 150);
+	const search_input = createThrottled('', 150);
 
 	function matching_stops(term: string): readonly CatalogStop[] | undefined {
 		const catalog = catalogs.find((c) => c.source === selected_source.current)?.catalog;
@@ -71,7 +69,7 @@
 	}
 
 	const visible_stops = $derived.by(() => {
-		const matches = matching_stops(throttled_search_input.current);
+		const matches = matching_stops(search_input.current);
 		return (matches ? { ...all_stops, [selected_source.current]: matches } : all_stops) as Partial<
 			Record<Source, CatalogStop[]>
 		>;
@@ -79,7 +77,7 @@
 	// $inspect(visible_stops);
 
 	function clear_search() {
-		search_input = '';
+		search_input.set('');
 	}
 </script>
 
@@ -107,7 +105,7 @@
 			<!-- TODO: maybe add autocomplete="off" -->
 			<input
 				name="search"
-				bind:value={search_input}
+				bind:value={search_input.get, search_input.set}
 				type="search"
 				placeholder="Search stops by name, ID, or route..."
 				class="h-12 w-full rounded border

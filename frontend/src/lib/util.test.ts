@@ -1,7 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CatalogRoute, CatalogStopRoute } from './client';
-import { bus_headsign, debounce, main_route_stops } from './util.svelte';
+import { bus_headsign, debounce, main_route_stops, throttle } from './util.svelte';
+
+it('throttles continuous input to the latest value each interval and cancels pending work', () => {
+	vi.useFakeTimers();
+	try {
+		const search = vi.fn<(term: string) => void>();
+		const throttled = throttle(search, 150);
+		throttled('a');
+		expect(search.mock.calls).toEqual([['a']]);
+		vi.advanceTimersByTime(50);
+		throttled('ab');
+		vi.advanceTimersByTime(50);
+		throttled('abc');
+		vi.advanceTimersByTime(49);
+		expect(search.mock.calls).toEqual([['a']]);
+		vi.advanceTimersByTime(1);
+		expect(search.mock.calls).toEqual([['a'], ['abc']]);
+		throttled('abcd');
+		vi.advanceTimersByTime(150);
+		expect(search.mock.calls).toEqual([['a'], ['abc'], ['abcd']]);
+		throttled('');
+		throttled.cancel();
+		vi.runAllTimers();
+		expect(search.mock.calls).toEqual([['a'], ['abc'], ['abcd']]);
+		vi.advanceTimersByTime(150);
+		throttled('new');
+		expect(search.mock.calls.at(-1)).toEqual(['new']);
+	} finally {
+		vi.useRealTimers();
+	}
+});
 
 it('debounces rapid calls to the latest target and cancels pending work', () => {
 	vi.useFakeTimers();
