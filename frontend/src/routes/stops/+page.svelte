@@ -37,11 +37,8 @@
 		const catalog = catalogs.find((c) => c.source === selected_source.current)?.catalog;
 		if (!catalog || term === '') return undefined;
 
-		// check if its a stop / route id
+		// Route IDs take precedence when a stop shares the same ID.
 		const id_check = term.toUpperCase();
-		const stop = catalog.stops_by_id.get(id_check);
-		if (stop) return [stop];
-
 		const route = catalog.routes_by_id.get(id_check);
 		if (route) {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -50,18 +47,19 @@
 				const r = s.routes.find((r) => r.route_id === route.id);
 				if (
 					r &&
-					r.data.source === 'mta_subway' &&
-					['full_time', 'part_time', 'rush_hour'].includes(r.data.stop_type)
+					(r.data.source !== 'mta_subway' ||
+						['full_time', 'part_time', 'rush_hour'].includes(r.data.stop_type))
 				) {
 					sequences.set(s.id, r.stop_sequence);
 				}
 			}
-			if (sequences.size) {
-				return catalog.stops
-					.filter((s) => sequences.has(s.id))
-					.sort((a, b) => sequences.get(a.id)! - sequences.get(b.id)!);
-			}
+			const stops = catalog.stops.filter((s) => sequences.has(s.id));
+			return route.data.source === 'mta_subway'
+				? stops.sort((a, b) => sequences.get(a.id)! - sequences.get(b.id)!)
+				: stops;
 		}
+		const stop = catalog.stops_by_id.get(id_check);
+		if (stop) return [stop];
 
 		// TODO: no-match fallback is unfinished; see frontend/TESTING.md
 		const results = search_stops(catalog, term);

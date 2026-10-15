@@ -49,7 +49,7 @@ Navbar links set `aria-current="page"` when the link path equals `page.url.pathn
 
 Unit and component tests keep synthetic fixtures. The integration audit checks itinerary invariants (trip membership, order, and surviving visits), not fixed live ids. Stops E2E checks mounted route results and scrolls to the final stop instead of equating virtualized DOM row counts with total matches.
 
-The stops filter in `src/routes/stops/+page.svelte` is not extracted just so it can be unit-tested. Name search is unit-tested through `StopSearch`. Stop-id and route-id filtering are end-to-end. The no-match fallback stays untested because that behavior is still unfinished.
+The stops filter in `src/routes/stops/+page.svelte` is not extracted just so it can be unit-tested. Name matching is unit-tested through `search_stops`. `routes/stops/page.svelte.test.ts` mounts the real page with synthetic catalogs for all three sources to cover route-ID precedence over conflicting stop IDs, exact bus-route matches, stop-ID and name searches, and clearing the input. End-to-end tests also cover stop-ID and route-ID filtering. The no-match fallback stays untested because that behavior is still unfinished.
 
 ## Follow-up
 

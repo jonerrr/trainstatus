@@ -218,6 +218,7 @@ export class TransitData {
 				this.#updateStatus();
 				return () => {
 					for (const entry of entries) entry.readers--;
+					this.#updateStatus();
 				};
 			});
 		});
@@ -731,6 +732,8 @@ export class TransitData {
 			if (entry.error) warning = true;
 			if (entry.kind === 'catalog' || entry.at !== undefined || entry.fetched_at === null) continue;
 			const refreshed = Math.min(entry.fetched_at, entry.source_updated_at ?? entry.fetched_at);
+			// TODO: If revisiting stale rows causes distracting warning flashes, consider
+			// waiting for their refresh result before showing the freshness warning.
 			if (now - refreshed > STALE_AFTER_MS) warning = true;
 		}
 		for (const update of this.#tracked) {

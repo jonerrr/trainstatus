@@ -317,6 +317,27 @@ test('a due remount shows retained data and refreshes once in the background', a
 	expect(data.status.warning).toBe(false);
 });
 
+test('scrolling away from an aged bus row clears its warning without waiting for a request', async () => {
+	const http = transport();
+	const data = store(http.fetcher, ['njt_bus']);
+	const view = await render(TransitDataHarness, {
+		data,
+		source: 'njt_bus',
+		readers: [{ id: 'row', route: 'A' }]
+	});
+	await settle();
+	http.calls[0].respond(http.json(http.service('njt_bus', { A: [] })));
+	await settle();
+	expect(data.status.warning).toBe(false);
+	clock += 91_000;
+	document.dispatchEvent(new Event('visibilitychange'));
+	await settle();
+	expect(data.status.warning).toBe(true);
+	await view.rerender({ readers: [] });
+	await tick();
+	expect(data.status.warning).toBe(false);
+});
+
 test('failed refreshes retain data and empty replacements remove stale trips', async () => {
 	const http = transport();
 	const data = store(http.fetcher);
