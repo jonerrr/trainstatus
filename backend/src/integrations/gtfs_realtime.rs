@@ -1,10 +1,9 @@
 use crate::debug_rt_data;
 use crate::feed::FeedMessage;
-use crate::models::{
-    position::VehiclePosition as VehiclePositionModel,
-    trip::{StopTime, Trip},
-};
-use crate::static_data::index::StaticTransitRevision;
+use crate::network::index::NetworkRevision;
+use crate::operations::types::position::VehicleObservation as VehiclePositionModel;
+use crate::operations::types::trip::StopVisit;
+use crate::operations::types::trip::TripRun;
 use anyhow::Context;
 use futures::future::BoxFuture;
 use prost::Message;
@@ -18,7 +17,9 @@ pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
 pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
     let url = url.into();
     Box::pin(async move {
-        Ok(reqwest::get(&url)
+        Ok(crate::integrations::http::realtime()
+            .get(&url)
+            .send()
             .await?
             .error_for_status()?
             .bytes()
@@ -71,6 +72,25 @@ pub async fn fetch_feeds(
         .collect()
 }
 
+/// A missing event uses the other event; an event without an absolute time is rejected.
+pub(crate) fn stop_event_times(
+    arrival: Option<crate::feed::trip_update::StopTimeEvent>,
+    departure: Option<crate::feed::trip_update::StopTimeEvent>,
+) -> Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> {
+    let arrival_time = match &arrival {
+        Some(event) => event.time?,
+        None => departure.as_ref()?.time?,
+    };
+    let departure_time = match &departure {
+        Some(event) => event.time?,
+        None => arrival.as_ref()?.time?,
+    };
+    Some((
+        chrono::DateTime::from_timestamp(arrival_time, 0)?,
+        chrono::DateTime::from_timestamp(departure_time, 0)?,
+    ))
+}
+
 #[cfg(test)]
 #[path = "tests/gtfs_realtime.rs"]
 mod tests;
@@ -82,10 +102,10 @@ mod tests;
 /// source resolves to identity at no cost. This keeps the
 /// `stop_id -> static.stop` foreign keys satisfied when child stops have been
 /// collapsed away.
-pub fn remap_realtime_stop_ids(
-    revision: &StaticTransitRevision,
-    data: &mut [(Trip, Vec<StopTime>)],
-    positions: &mut [VehiclePositionModel],
+pub fn remap_realtime_stop_ids<I>(
+    revision: &NetworkRevision,
+    data: &mut [(TripRun<I>, Vec<StopVisit<I>>)],
+    positions: &mut [VehiclePositionModel<I>],
 ) {
     for (_trip, stop_times) in data.iter_mut() {
         for st in stop_times.iter_mut() {

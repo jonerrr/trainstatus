@@ -1,0 +1,6 @@
+**/node_modules/
+**/target/
+**/data/
+**/pnpm-lock.yaml
+**/src/lib/client/
+**/CHANGELOG.md

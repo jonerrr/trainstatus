@@ -6,22 +6,20 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use backend::{
-    fixtures::{self, FixtureKind, FixtureManifest, FixturePayload},
-    models::source::Source,
-    sources::{
-        mta_bus::{
-            alerts as mta_bus_alerts, realtime as mta_bus_realtime, static_data as mta_bus_static,
-        },
-        mta_subway::{
-            alerts as mta_subway_alerts, realtime as mta_subway_realtime,
-            static_data as mta_subway_static,
-        },
-        njt_bus::{
-            alerts as njt_bus_alerts, realtime as njt_bus_realtime, static_data as njt_bus_static,
-        },
-    },
-};
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
+use backend::fixtures::FixtureManifest;
+use backend::fixtures::FixturePayload;
+use backend::source::Source;
+use backend::sources::mta_bus::alerts as mta_bus_alerts;
+use backend::sources::mta_bus::realtime as mta_bus_realtime;
+use backend::sources::mta_bus::static_data as mta_bus_static;
+use backend::sources::mta_subway::alerts as mta_subway_alerts;
+use backend::sources::mta_subway::realtime as mta_subway_realtime;
+use backend::sources::mta_subway::static_data as mta_subway_static;
+use backend::sources::njt_bus::alerts as njt_bus_alerts;
+use backend::sources::njt_bus::realtime as njt_bus_realtime;
+use backend::sources::njt_bus::static_data as njt_bus_static;
 use serde_json::json;
 
 const DEFAULT_ROOT: &str = "tests/fixtures";

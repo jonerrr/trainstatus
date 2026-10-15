@@ -1,10 +1,8 @@
-use backend::{
-    fixtures::{self, FixtureKind},
-    models::source::Source,
-    realtime::CollectedSnapshot,
-    sources::mta_subway::realtime::build_realtime_from_fixture,
-};
-use chrono::{TimeZone, Utc};
+use backend::fixtures;
+use backend::fixtures::FixtureKind;
+use backend::operations::CollectedSnapshot;
+use backend::source::Source;
+use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
 
 use crate::support::fixture_root;
 
@@ -16,13 +14,8 @@ fn realtime_fixture_maps_trips_and_positions() {
             .expect("MTA subway realtime manifest should load");
     let payload = fixtures::read_json_payload(&root, &manifest, "trips")
         .expect("MTA subway realtime payload should load");
-    let now = Utc
-        .with_ymd_and_hms(2026, 1, 1, 12, 0, 0)
-        .single()
-        .expect("valid fixture time");
-
     let snapshot: CollectedSnapshot =
-        build_realtime_from_fixture(payload, now).expect("subway realtime fixture should build");
+        build_realtime_from_fixture(payload).expect("subway realtime fixture should build");
 
     assert_eq!(snapshot.source, Source::MtaSubway);
     for (trip, times) in &snapshot.trips {

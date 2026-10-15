@@ -9,12 +9,14 @@
 	import type { Source } from '#lib/client/index.js';
 	import { contain_modal_focus } from '#lib/modal_focus.js';
 	import Pin from '#lib/Pin.svelte';
-	import { route_pins, stop_pins, trip_pins, type Pins } from '#lib/pins.svelte.js';
+	import { route_pins, stop_pins, trip_pin_key, trip_pins, type Pins } from '#lib/pins.svelte.js';
 	import RouteModal from '#lib/Route/Modal.svelte';
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
+	import { getTransitData, UnknownRouteError } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
-	import { close_modal, getCurrentTime, type ModalData } from '#lib/url_params.svelte.js';
+	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
+	import { close_modal, getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import {
 		AlarmClock,
@@ -26,27 +28,29 @@
 	} from '@lucide/svelte';
 
 	const current_time = getCurrentTime();
+	const transit = getTransitData();
+
+	function catalog_of(source: Source) {
+		return transit.peekCatalog(source);
+	}
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
-	let current_page_state = $state(page.state);
+	let current_page_state = $state.raw(page.state);
+	const selected_modal = $derived(current_page_state.modal);
 	const has_modal = $derived(!!current_page_state.modal);
 
-	// $state proxies and the objects they wrap are not ===. Compare the modal
-	// itself, or assigning page.state back into current_page_state retriggers
-	// the effect and starts another view transition on every flush.
-	function modal_changed(next: ModalData | null | undefined, local: ModalData | null | undefined) {
-		const next_modal = $state.snapshot(next);
-		const local_modal = $state.snapshot(local);
-		if (!next_modal || !local_modal) return !!next_modal !== !!local_modal;
-		return next_modal.type !== local_modal.type || next_modal.id !== local_modal.id;
-	}
+	// Raw state preserves modal identity across shallow navigation and animation snapshots.
 
-	function slide_to(next_state: typeof page.state, forward: boolean) {
+	let modal_transition: ViewTransition | undefined;
+
+	function slide_to(forward: boolean) {
 		document.documentElement.dataset.modalDirection = forward ? 'forward' : 'backward';
 
 		const apply = () => {
-			current_page_state = $state.snapshot(next_state);
+			// Catalog validation or another navigation can change the selection while
+			// the transition waits to capture its old view. Apply the latest selection.
+			current_page_state = page.state;
 		};
 
 		// experimental.async makes tick() wait for a frame, which a view transition
@@ -62,8 +66,12 @@
 						});
 					})
 			);
+			modal_transition = transition;
 			transition.ready.catch(() => {});
-			transition.finished.catch(() => {});
+			const clear_transition = () => {
+				if (modal_transition === transition) modal_transition = undefined;
+			};
+			transition.finished.then(clear_transition, clear_transition);
 		} else {
 			apply();
 		}
@@ -72,10 +80,52 @@
 	$effect(() => {
 		// $inspect.trace('modal state transition effect');
 		const next_state = page.state;
-		if (untrack(() => modal_changed(next_state.modal, current_page_state.modal))) {
+		if (untrack(() => next_state.modal !== current_page_state.modal)) {
 			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
-			slide_to(next_state, forward);
+			slide_to(forward);
 		}
+	});
+
+	const selected_catalog = transit.catalog(() => page.state.modal?.source ?? null);
+	const selected_service = transit.route(() => {
+		const selected = page.state.modal;
+		const catalog = selected_catalog.current.value;
+		const route_id = selected?.type === 'trip' ? selected.route_id : null;
+		return selected && route_id && catalog?.routes_by_id.has(route_id)
+			? { source: selected.source, route_id, at: current_time.value }
+			: null;
+	});
+	const initial_service = $derived.by(() => {
+		void page.state.modal;
+		return untrack(() => selected_service.current.value);
+	});
+	$effect(() => {
+		const selected = page.state.modal;
+		if (!selected) return;
+		// Capture cached membership before a cold catalog or service request completes.
+		const cached = initial_service;
+		const catalog = selected_catalog.current.value;
+		// Keep the requested modal and its shared Retry available during catalog failures.
+		if (!catalog) return;
+		const service = selected_service.current;
+		let invalid: boolean;
+		switch (selected.type) {
+			case 'stop':
+				invalid = !catalog.stops_by_id.has(selected.id);
+				break;
+			case 'route':
+				invalid = !catalog.routes_by_id.has(selected.id);
+				break;
+			case 'trip':
+				invalid =
+					!catalog.routes_by_id.has(selected.route_id) ||
+					service.error instanceof UnknownRouteError ||
+					(!!service.value &&
+						(current_time.value !== undefined || service.value !== cached) &&
+						!service.value.trips.has(selected.id));
+				break;
+		}
+		if (invalid) untrack(() => close_modal(current_time.value, true));
 	});
 
 	const modal: Attachment<HTMLDivElement> = (node) => {
@@ -109,8 +159,10 @@
 		let pointer_start: { id: number; x: number; y: number } | undefined;
 
 		function handle_pointer_down(event: PointerEvent) {
+			// The animated sheet is a snapshot with pointer events disabled, so a
+			// rapid tap on it can hit the live backdrop underneath.
 			pointer_start =
-				event.target === node.parentElement && event.button === 0
+				!modal_transition && event.target === node.parentElement && event.button === 0
 					? { id: event.pointerId, x: event.pageX, y: event.pageY }
 					: undefined;
 		}
@@ -118,7 +170,13 @@
 		function handle_pointer_up(event: PointerEvent) {
 			const start = pointer_start;
 			pointer_start = undefined;
-			if (!start || start.id !== event.pointerId || event.target !== node.parentElement) return;
+			if (
+				modal_transition ||
+				!start ||
+				start.id !== event.pointerId ||
+				event.target !== node.parentElement
+			)
+				return;
 			const diffX = Math.abs(event.pageX - start.x);
 			const diffY = Math.abs(event.pageY - start.y);
 
@@ -155,6 +213,7 @@
 </script>
 
 <!-- TODO: refactor actions now that we have sources -->
+
 {#snippet actions(
 	history: boolean,
 	id: string,
@@ -176,8 +235,7 @@
 		<div class="flex items-center gap-1 text-xs">
 			{#if history}
 				<button
-					class:text-neutral-400={!show_previous}
-					class:text-neutral-50={show_previous}
+					class={{ 'text-neutral-400': !show_previous, 'text-neutral-50': show_previous }}
 					aria-label="Show previous"
 					onclick={() => {
 						show_previous = !show_previous;
@@ -277,42 +335,47 @@
 		{@attach modal}
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
 	>
-		{#if current_page_state.modal?.type === 'stop'}
+		{#if has_modal}<UpdateIndicator compact />{/if}
+		{#if selected_modal?.type === 'stop'}
 			<StopModal
-				stop={current_page_state.modal}
+				source={selected_modal.source}
+				stop_id={selected_modal.id}
 				{show_previous}
 				time_format={time_format.current}
 			/>
-
 			{@render actions(
 				true,
-				current_page_state.modal.id,
-				`Arrivals at ${current_page_state.modal.name}`,
-				current_page_state.modal.data.source,
+				selected_modal.id,
+				`Arrivals at ${catalog_of(selected_modal.source)?.stops_by_id.get(selected_modal.id)?.name ?? selected_modal.id}`,
+				selected_modal.source,
 				stop_pins
 			)}
-		{:else if current_page_state.modal?.type === 'route'}
-			<RouteModal route={current_page_state.modal} time_format={time_format.current} />
-
+		{:else if selected_modal?.type === 'route'}
+			<RouteModal
+				source={selected_modal.source}
+				route_id={selected_modal.id}
+				time_format={time_format.current}
+			/>
 			{@render actions(
 				false,
-				current_page_state.modal.id,
-				`Alerts for ${current_page_state.modal.short_name}`,
-				current_page_state.modal.data.source,
+				selected_modal.id,
+				`Alerts for ${catalog_of(selected_modal.source)?.routes_by_id.get(selected_modal.id)?.short_name ?? selected_modal.id}`,
+				selected_modal.source,
 				route_pins
 			)}
-		{:else if current_page_state.modal?.type === 'trip'}
+		{:else if selected_modal?.type === 'trip'}
 			<TripModal
-				trip={current_page_state.modal}
+				source={selected_modal.source}
+				route_id={selected_modal.route_id}
+				trip_id={selected_modal.id}
 				{show_previous}
 				time_format={time_format.current}
 			/>
-
 			{@render actions(
 				true,
-				current_page_state.modal.id,
-				`${current_page_state.modal.route_id} Trip`,
-				current_page_state.modal.data.source,
+				trip_pin_key(selected_modal.route_id, selected_modal.id),
+				`${selected_modal.route_id} Trip`,
+				selected_modal.source,
 				trip_pins
 			)}
 		{/if}

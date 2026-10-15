@@ -1,126 +1,45 @@
+//! HTTP handlers organized by API resource.
+
 use crate::AppState;
-use axum::{
-    extract::{FromRequestParts, Query},
-    response::{IntoResponse, Response},
-};
-use chrono::{DateTime, TimeZone, Utc};
-use http::{StatusCode, request::Parts};
-use serde::{Deserialize, Deserializer};
-use tracing::error;
-use utoipa::IntoParams;
+use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-pub mod health;
-pub mod realtime;
-pub mod static_data;
-pub mod trajectory;
-pub mod util;
+mod alerts;
+mod catalog;
+mod error;
+mod health;
+mod query;
+pub(crate) mod service;
+mod trajectories;
 
-pub struct AppError(anyhow::Error);
+pub use error::AppError;
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        error!(error = %self.0, "Internal server error");
-
-        (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong :(").into_response()
-    }
-}
-
-// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
-// `Result<_, AppError>`. That way you don't need to do that manually.
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
-}
-
-pub fn router(state: AppState) -> OpenApiRouter {
+fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .route("/health", axum::routing::get(health::liveness_handler))
         .routes(routes!(health::liveness_handler))
         .routes(routes!(health::readiness_handler))
-        .routes(routes!(static_data::routes_handler))
-        .routes(routes!(static_data::stops_handler))
-        .routes(routes!(realtime::trips_handler))
-        .routes(routes!(realtime::stop_times_handler))
-        .routes(routes!(realtime::positions_handler))
-        .routes(routes!(realtime::alerts_handler))
-        .routes(routes!(trajectory::trajectories_handler))
-        .with_state(state)
+        .routes(routes!(catalog::catalog_handler))
+        .routes(routes!(service::service_handler))
+        .routes(routes!(alerts::alerts_handler))
+        .routes(routes!(trajectories::trajectories_handler))
 }
 
-pub fn parse_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str_sequence = String::deserialize(deserializer)?;
+pub mod dto;
 
-    Ok(str_sequence
-        .split(',')
-        .map(|item| item.to_owned())
-        .collect())
+#[derive(OpenApi)]
+#[openapi(info(title = "Train Status API", version = crate::VERSION, description = "Live service for MTA subway, MTA bus and NJ Transit bus. Use ?at=<unix_timestamp> to view retained trips with an arrival or departure in the following four hours, alerts active at that time, and trajectories based on retained schedules and recorded vehicle locations."),
+    tags((name = "HEALTH"), (name = "STATIC"), (name = "REALTIME")),
+    components(schemas(crate::source::Source)))]
+pub struct ApiDoc;
+
+pub fn router(state: AppState) -> OpenApiRouter {
+    routes().with_state(state)
 }
 
-pub struct CurrentTime {
-    pub time: DateTime<Utc>,
-    pub user_specified: bool,
-    // not used currently
-    // pub finished: bool,
-}
-
-#[derive(Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct TimeParams {
-    /// Unix timestamp used for a historical query. If omitted, the latest committed realtime snapshot is returned.
-    #[serde(default)]
-    pub at: Option<i64>,
-}
-
-impl<S> FromRequestParts<S> for CurrentTime
-where
-    S: Send + Sync + Clone,
-{
-    type Rejection = Response;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        //  check if there is a querystring param "at"
-        //  if there is, parse it as a datetime
-        //  if there isn't, use the current time
-
-        let query = Query::<TimeParams>::from_request_parts(parts, state)
-            .await
-            .map_err(|err| err.into_response())?;
-
-        let time = match query.at {
-            Some(at) => {
-                let time = Utc.timestamp_opt(at, 0);
-                match time {
-                    chrono::LocalResult::Single(time) => CurrentTime {
-                        time,
-                        user_specified: true,
-                    },
-                    _ => {
-                        // TODO: maybe return a 400 instead of logging
-                        tracing::error!(timestamp = at, "Invalid timestamp");
-                        CurrentTime {
-                            time: Utc::now(),
-                            user_specified: false,
-                        }
-                    }
-                }
-            }
-            None => {
-                let now = chrono::Utc::now();
-                CurrentTime {
-                    time: now,
-                    user_specified: false,
-                }
-            }
-        };
-
-        Ok(time)
-    }
+pub fn openapi() -> utoipa::openapi::OpenApi {
+    OpenApiRouter::<AppState>::with_openapi(ApiDoc::openapi())
+        .nest(&crate::prefixed_path(crate::api_prefix(), "v1"), routes())
+        .split_for_parts()
+        .1
 }

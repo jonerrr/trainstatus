@@ -2,7 +2,7 @@ import { page } from '$app/state';
 
 import type { Source } from '#lib/client/index.js';
 import { COMPASS_DIRECTION_OPTIONS } from '#lib/compassDirections.js';
-import { all_sources } from '#lib/resources/index.svelte.js';
+import { all_sources } from '#lib/sources.js';
 
 import * as maplibregl from 'maplibre-gl';
 
@@ -34,15 +34,6 @@ export interface FilterFieldDef {
 // Stop filter definitions by source
 const stop_filter_defs = {
 	mta_subway: {
-		ada: {
-			type: 'boolean',
-			label: 'ADA Accessible'
-		} as FilterFieldDef,
-		borough: {
-			type: 'enum',
-			label: 'Borough',
-			options: ['brooklyn', 'queens', 'bronx', 'staten_island', 'manhattan'] as const
-		} as FilterFieldDef,
 		north_headsign: {
 			type: 'string',
 			label: 'North Headsign'
@@ -140,6 +131,7 @@ export function countActiveFilters({
 		for (const [source, sourceFilters] of Object.entries(group.filters)) {
 			for (const [property, value] of Object.entries(sourceFilters ?? {})) {
 				const fieldDef = groupDefinitions[source as Source]?.[property];
+				if (!fieldDef) continue;
 				if (hasFilterValue(value, fieldDef)) count += 1;
 			}
 		}
@@ -237,8 +229,8 @@ export class MapFilters {
 	 *
 	 * Property filters are ANDed only with the source that defines them, then
 	 * those clauses are ORed. A single `all` across every active source would
-	 * hide features that do not carry another source's properties — an ADA
-	 * subway filter would drop every bus stop.
+	 * hide features that do not carry another source's properties — a subway
+	 * headsign filter would drop every bus stop.
 	 */
 	#buildLayerFilter(
 		layerKey: LayerKey,

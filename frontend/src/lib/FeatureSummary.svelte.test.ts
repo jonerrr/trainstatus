@@ -1,19 +1,17 @@
 import '../app.css';
 
-import type { Route } from '#lib/client/index.js';
+import type { CatalogRoute } from '#lib/client/index.js';
+import { fixtureTransitData } from '#lib/test/transit-fixture.js';
+import TransitProvider from '#lib/test/TransitProvider.svelte';
 
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import FeatureSummary from './FeatureSummary.svelte';
 
-vi.mock('#lib/resources/alerts.svelte.js', () => ({
-	alert_context: { get: () => ({}) }
-}));
-
 for (const label of ['Q114-LTD', 'SIM34', '123X']) {
 	test(`route badge ${label} fits its text in a narrow feature card`, async () => {
-		const route: Route = {
+		const route: CatalogRoute = {
 			id: label,
 			short_name: label,
 			long_name: 'A long bus route destination',
@@ -21,11 +19,17 @@ for (const label of ['Q114-LTD', 'SIM34', '123X']) {
 			text_color: '#ffffff',
 			data: { source: 'njt_bus' }
 		};
-		const view = await render(FeatureSummary, {
-			feature: {
-				route,
-				title: 'A long destination with multiple words and a transfer station',
-				subtitle: 'NJ Transit Bus'
+		const view = await render(TransitProvider, {
+			props: {
+				data: fixtureTransitData({ catalogs: {}, services: {} }),
+				component: FeatureSummary as never,
+				child_props: {
+					feature: {
+						route,
+						title: 'A long destination with multiple words and a transfer station',
+						subtitle: 'NJ Transit Bus'
+					}
+				}
 			}
 		});
 		view.container.style.width = '240px';

@@ -1,13 +1,7 @@
 import { SvelteURL } from 'svelte/reactivity';
 
 function emptyData(): App.PageData {
-	return {
-		selected_sources: [],
-		stops: {},
-		stops_by_id: {},
-		routes: {},
-		routes_by_id: {}
-	};
+	return { selected_sources: [] };
 }
 
 export const page = $state<{ state: App.PageState; url: SvelteURL; data: App.PageData }>({

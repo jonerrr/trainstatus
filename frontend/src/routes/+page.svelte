@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import type { Route, Source, Stop, Trip } from '#lib/client/index.js';
-	import List from '#lib/List.svelte';
-	import { route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
-	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import type { CatalogRoute, CatalogStop, Source } from '#lib/client/index.js';
+	import List, { type TripItem } from '#lib/List.svelte';
+	import { parse_trip_pin, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import {
 		calculate_route_height,
 		calculate_stop_height,
@@ -14,62 +14,46 @@
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 
-	const all_trips = trip_context.get();
+	const transit = getTransitData();
 
-	$effect(() => {
-		for (const [source, resource] of Object.entries(all_trips)) {
-			if (!resource.available) continue;
-			const map = resource.current;
-			if (!map) continue;
-			const src = source as Source;
-			const current = trip_pins.current[src];
-			if (!current) continue;
-			const valid = current.filter((id) => map.has(id));
-			if (valid.length !== current.length) {
-				console.log(
-					`Removing invalid pins for source ${src}:`,
-					current.filter((id) => !map.has(id))
-				);
-				trip_pins.current[src] = valid;
-			}
-		}
-	});
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current);
+	const catalogs_loading = $derived(catalogs.some((c) => !c.catalog && !c.error));
 
-	const pinned_trips = $derived.by(() => {
+	function by_source<T>(pick: (source: Source) => T[]) {
 		const sources = Object.fromEntries(
-			page.data.selected_sources.map((source) => [
-				source,
-				trip_pins.current[source]
-					?.map((pin) => all_trips[source]?.current?.get(pin))
-					.filter((t) => t !== undefined) ?? []
-			])
-		) as Record<Source, Trip[]>;
-		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
-	});
+			page.data.selected_sources.map((source) => [source, pick(source)])
+		) as Record<Source, T[]>;
+		return { sources, exists: Object.values(sources).some((items) => items.length > 0) };
+	}
 
-	const pinned_stops = $derived.by(() => {
-		const sources = Object.fromEntries(
-			page.data.selected_sources.map((source) => [
-				source,
-				stop_pins.current[source]
-					?.map((pin) => page.data.stops_by_id[source]?.[pin])
-					.filter((s) => s !== undefined) ?? []
-			])
-		) as Record<Source, Stop[]>;
-		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
-	});
+	// Pins persist until unpinned; a trip that is not running shows that in its row.
+	const pinned_trips = $derived(
+		by_source((source) =>
+			(trip_pins.current[source] ?? []).flatMap((id): TripItem[] => {
+				const pin = parse_trip_pin(id);
+				return pin ? [{ id, source, ...pin }] : [];
+			})
+		)
+	);
 
-	const pinned_routes = $derived.by(() => {
-		const sources = Object.fromEntries(
-			page.data.selected_sources.map((source) => [
-				source,
-				route_pins.current[source]
-					?.map((pin) => page.data.routes_by_id[source]?.[pin])
-					.filter((r) => r !== undefined) ?? []
-			])
-		) as Record<Source, Route[]>;
-		return { sources, exists: Object.values(sources).some((pins) => pins.length > 0) };
-	});
+	const catalog_of = (source: Source) => catalogs.find((c) => c.source === source)?.catalog;
+
+	const pinned_stops = $derived(
+		by_source((source) =>
+			(stop_pins.current[source] ?? [])
+				.map((pin) => catalog_of(source)?.stops_by_id.get(pin))
+				.filter((s): s is CatalogStop => s !== undefined)
+		)
+	);
+
+	const pinned_routes = $derived(
+		by_source((source) =>
+			(route_pins.current[source] ?? [])
+				.map((pin) => catalog_of(source)?.routes_by_id.get(pin))
+				.filter((r): r is CatalogRoute => r !== undefined)
+		)
+	);
 
 	let watch_id: number;
 	// TODO: types
@@ -116,7 +100,7 @@
 	const position_loading = $derived(position === undefined && !position_denied);
 
 	// Interface for stops with distance
-	interface StopWithDistance extends Stop {
+	interface StopWithDistance extends CatalogStop {
 		distance: number;
 	}
 
@@ -127,15 +111,14 @@
 		// reassign to local var to prevent undefined error in map callback.
 		const current_coords = position.coords;
 
-		for (const source of page.data.selected_sources) {
-			const data = page.data.stops[source] ?? [];
-			result[source] = data
+		for (const { source, catalog } of catalogs) {
+			result[source] = (catalog?.stops ?? [])
 				.map((stop) => {
 					const distance = haversine(
 						current_coords.latitude,
 						current_coords.longitude,
-						stop.geom.Point.y,
-						stop.geom.Point.x
+						stop.lat,
+						stop.lon
 					);
 					return { ...stop, distance };
 				})
@@ -225,6 +208,7 @@
 			pins={stop_pins}
 			header_slot={locate_button}
 			height_calc={calculate_stop_height}
+			loading={catalogs_loading || (position === undefined && !position_denied)}
 		/>
 		<!-- {:else}
 			<p class="p-4 text-sm text-neutral-400">

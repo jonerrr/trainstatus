@@ -1,6 +1,6 @@
-use crate::models::source::Source;
+use crate::source::Source;
 use crate::trajectory::arrow::encode_render_units;
-use crate::trajectory::types::{RenderUnit, compute_path_bbox};
+use crate::trajectory::types::RenderUnit;
 use arrow::array::{Array, Float64Array, Int16Array, ListArray, StringArray};
 use arrow::datatypes::DataType;
 use arrow::ipc::reader::StreamReader;
@@ -40,7 +40,6 @@ fn encode_single_render_unit() {
         positions: vec![[-74.0, 40.7], [-73.9, 40.8]],
         timestamps: vec![1000.0, 1010.0],
         bearings: vec![350.0, 10.0],
-        path_bbox: compute_path_bbox(&[[-74.0, 40.7], [-73.9, 40.8]]),
     };
     let bytes = encode_render_units(&[unit]).expect("encode");
     let mut reader = StreamReader::try_new(Cursor::new(bytes), None).expect("read IPC stream");

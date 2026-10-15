@@ -1,68 +1,47 @@
 <script lang="ts">
-	import { page } from '$app/state';
-
-	import type { Trip } from '#lib/client/index.js';
-	import { source_info } from '#lib/resources/index.svelte.js';
-	import { awaitingRows, unavailableRows } from '#lib/resources/pending.js';
-	import { position_context } from '#lib/resources/positions.svelte.js';
-	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
+	import type { Source } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import UnavailableRows from '#lib/UnavailableRows.svelte';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_headsign } from '#lib/util.svelte.js';
 
 	import { ArrowBigRight } from '@lucide/svelte';
 
 	const current_time = getCurrentTime();
+	const transit = getTransitData();
 
 	interface Props {
-		data: Trip;
-		acquire_routes?: boolean;
+		source: Source;
+		route_id: string;
+		trip_id: string;
 	}
-	let { data, acquire_routes = true }: Props = $props();
+	let { source, route_id, trip_id }: Props = $props();
 
-	const source_stop_times = $derived(stop_time_context.getSource(data.data.source));
-
-	$effect(() => {
-		if (!acquire_routes || !source_info[data.data.source].monitor_routes) return;
-		return source_stop_times?.hold([data.route_id]);
-	});
-
-	const all_trip_stop_times = $derived(source_stop_times?.current.by_trip_id.get(data.id) ?? []);
-
-	const is_loading = $derived(
-		awaitingRows(
-			source_stop_times,
-			all_trip_stop_times.length,
-			source_info[data.data.source].monitor_routes ? data.route_id : undefined
-		)
+	const at = $derived(current_time.value);
+	// Rows render as their route arrives; a suspending read per row would batch them.
+	const catalog_resource = transit.catalog(() => source);
+	const route_resource = transit.route(() => ({ source, route_id, at }));
+	const catalog_state = $derived(catalog_resource.current);
+	const route_state = $derived(route_resource.current);
+	const catalog = $derived(catalog_state.value);
+	const route_data = $derived(route_state.value);
+	const error = $derived(catalog_state.error ?? route_state.error);
+	// A pin outlives the realtime run it refers to.
+	const read = $derived(
+		route_data?.trips.has(trip_id)
+			? {
+					trip: route_data.trips.get(trip_id)!,
+					calls: route_data.calls_by_trip.get(trip_id) ?? []
+				}
+			: undefined
 	);
-
-	const stop_times = $derived(
-		all_trip_stop_times.filter((st) => st.arrival.getTime() > current_time.ms)
-	);
-
-	const position = $derived(
-		position_context.getSource(data.data.source)?.current?.get(data.vehicle_id)
-	);
-
-	const route = $derived(page.data.routes_by_id?.[data.data.source]?.[data.route_id]);
-
-	const last_stop = $derived(
-		trip_headsign(data, route, all_trip_stop_times, page.data.stops_by_id?.[data.data.source])
-	);
-
-	const current_stop = $derived.by(() => {
-		const target_stop_id = position?.stop_id || stop_times[0]?.stop_id;
-		if (!stop_times.length) return 'Unknown';
-		return page.data.stops_by_id?.[data.data.source]?.[target_stop_id]?.name ?? 'Unknown';
-	});
+	const route = $derived(catalog?.routes_by_id.get(route_id));
 </script>
 
-{#if unavailableRows(source_stop_times, all_trip_stop_times.length)}
-	<UnavailableRows />
-{:else if is_loading}
+{#if error}
+	<span class="text-neutral-400">—</span>
+{:else if !catalog || !route_data}
 	<Skeleton lines={2} class="w-full" />
 {:else}
 	<div class="flex flex-col items-center gap-1 text-left">
@@ -73,14 +52,22 @@
 
 			<ArrowBigRight />
 
-			{last_stop}
+			{#if read}
+				{trip_headsign(read.trip, route, read.calls, catalog.stops_by_id)}
+			{:else}
+				Trip not running
+			{/if}
 		</div>
 
-		<div class="flex gap-1 self-start">
-			{#if position?.data && 'status' in position.data}
-				<span>{position.data.status}</span>
-			{/if}
-			{current_stop}
-		</div>
+		{#if read}
+			{const upcoming = $derived(read.calls.filter((call) => call.arrival > current_time.ms))}
+			{const status = $derived(read.trip.status)}
+			<div class="flex gap-1 self-start">
+				{#if status && 'status' in status.data && status.data.status}
+					<span>{status.data.status}</span>
+				{/if}
+				{catalog.stops_by_id.get(status?.stop_id || upcoming[0]?.stop_id)?.name ?? 'Unknown'}
+			</div>
+		{/if}
 	</div>
 {/if}

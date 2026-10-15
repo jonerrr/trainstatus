@@ -1,17 +1,16 @@
-use crate::alerts::gtfs::{self as gtfs_alert, GtfsAlertSource};
-use crate::feed::{Alert as GtfsAlert, FeedMessage};
+use crate::alerts::gtfs as gtfs_alert;
+use crate::alerts::gtfs::GtfsAlertSource;
+use crate::alerts::store::Alerts;
+use crate::alerts::types::AlertCollection;
+use crate::alerts::types::MtaAlert;
+use crate::feed::Alert as GtfsAlert;
+use crate::feed::FeedMessage;
 use crate::integrations::gtfs_realtime;
-use crate::models::alert::{
-    ActivePeriod, AffectedEntity, Alert, AlertData, AlertTranslation, MtaAlertData,
-};
-use crate::models::source::Source;
+use crate::source::Source;
 use crate::sources::AlertsAdapter;
-use crate::stores::alert::AlertStore;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
-use uuid::Uuid;
 
 // TODO: get alerts from helium api since this doesn't have the right stop ids
 // OR switch back to use gtfs stop id for everything
@@ -19,13 +18,13 @@ pub struct MtaSubwayAlerts;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let bytes = reqwest::get(
-        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
-    )
-    .await?
-    .error_for_status()?
-    .bytes()
-    .await?;
+    let bytes = crate::integrations::http::realtime()
+        .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts")
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert("alerts.pb".to_string(), bytes.to_vec());
@@ -34,8 +33,12 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 
 #[async_trait]
 impl GtfsAlertSource for MtaSubwayAlerts {
+    type Alert = MtaAlert;
     fn source(&self) -> Source {
         Source::MtaSubway
+    }
+    fn collection(&self, alerts: Vec<Self::Alert>) -> AlertCollection {
+        AlertCollection::MtaSubway(alerts)
     }
 
     async fn fetch_feeds(&self) -> anyhow::Result<Vec<FeedMessage>> {
@@ -64,90 +67,11 @@ impl GtfsAlertSource for MtaSubwayAlerts {
             stop_id.pop();
         }
 
-        // Filter out fake stop IDs
-        // TODO: FAKE_STOP_IDS is commented out since subway now uses stationIds
-        // if crate::models::stop::FAKE_STOP_IDS.contains(&stop_id.as_str()) {
-        //     return None;
-        // }
-
         Some(stop_id)
     }
 
-    fn process_alert(
-        &self,
-        entity_id: String,
-        alert: GtfsAlert,
-    ) -> Option<(
-        Alert,
-        Vec<AlertTranslation>,
-        Vec<ActivePeriod>,
-        Vec<AffectedEntity>,
-    )> {
-        // Get the Mercury extension - skip if not present (likely elevator outage)
-        let mercury_alert = alert.mercury_alert.as_ref()?;
-
-        // Parse timestamps
-        let created_at = DateTime::from_timestamp(mercury_alert.created_at as i64, 0)?;
-        let updated_at = DateTime::from_timestamp(mercury_alert.updated_at as i64, 0)?;
-
-        let alert_id = Uuid::now_v7();
-
-        // Build MTA-specific data
-        let mta_data = MtaAlertData {
-            display_before_active: mercury_alert.display_before_active.unwrap_or(0) as i32,
-            alert_type: mercury_alert.alert_type.clone(),
-            clone_id: mercury_alert.clone_id.clone(),
-        };
-
-        let parsed_alert = Alert {
-            id: alert_id,
-            original_id: entity_id,
-            source: Source::MtaSubway,
-            created_at,
-            updated_at,
-            recorded_at: Utc::now(),
-            data: AlertData::MtaSubway(mta_data),
-        };
-
-        let translations = gtfs_alert::mta_translations(alert_id, &alert);
-        let active_periods = gtfs_alert::active_periods(alert_id, &alert);
-
-        // Parse affected entities
-        let affected_entities: Vec<AffectedEntity> = alert
-            .informed_entity
-            .iter()
-            .map(|entity| {
-                let route_id = entity.route_id.clone().and_then(|r| self.parse_route_id(r));
-                let stop_id = entity.stop_id.clone().and_then(|s| self.parse_stop_id(s));
-
-                let sort_order = entity
-                    .mercury_entity_selector
-                    .as_ref()
-                    .and_then(|selector| {
-                        selector
-                            .sort_order
-                            .split(':')
-                            .next_back()
-                            .and_then(|s| s.parse().ok())
-                    })
-                    .unwrap_or(0);
-
-                AffectedEntity {
-                    alert_id,
-                    route_id,
-                    source: Source::MtaSubway,
-                    stop_id,
-                    sort_order,
-                }
-            })
-            .collect();
-
-        Some((
-            parsed_alert,
-            translations,
-            active_periods,
-            affected_entities,
-        ))
+    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<Self::Alert> {
+        gtfs_alert::mta_alert(self, entity_id, alert)
     }
 }
 
@@ -161,7 +85,7 @@ impl AlertsAdapter for MtaSubwayAlerts {
         std::time::Duration::from_secs(60)
     }
 
-    async fn run(&self, alert_store: &AlertStore) -> anyhow::Result<()> {
-        gtfs_alert::run_pipeline(self, alert_store).await
+    async fn run(&self, alerts: &Alerts) -> anyhow::Result<()> {
+        gtfs_alert::run_pipeline(self, alerts).await
     }
 }

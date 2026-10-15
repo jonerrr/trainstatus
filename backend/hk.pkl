@@ -1,0 +1,27 @@
+amends "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Builtins.pkl"
+
+local code = List("**/*.rs", "Cargo.toml", "Cargo.lock", "mise.toml", "migrations/**", ".sqlx/**", "protos/**", "tests/**")
+
+steps {
+  ["rustfmt"] = (Builtins.rustfmt) {
+    check = "rustfmt --check --edition 2024 --config skip_children=true {{files}}"
+    check_list_files = "rustfmt --check --edition 2024 --config skip_children=true --files-with-diff {{files}}"
+    fix = "rustfmt --edition 2024 --config skip_children=true {{files}}"
+  }
+  ["lock"] {
+    glob = code
+    check = "cargo metadata --locked --format-version 1 > /dev/null"
+  }
+  ["clippy"] = (Builtins.cargo_clippy) {
+    glob = code
+    check = "cargo clippy --locked --all-targets --all-features -- -D warnings"
+    fix = check
+  }
+  ["unit-tests"] {
+    glob = code
+    check = "mise run test:unit"
+    depends = "clippy"
+  }
+  ["mise-format"] = Builtins.mise
+}

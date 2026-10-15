@@ -1,0 +1,123 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                *\n            FROM realtime.stop_time\n            WHERE source = $1\n            AND trip_id = ANY($2)\n            ORDER BY trip_id, stop_sequence\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "trip_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_sequence",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "stop_sequence"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "stop_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "stop_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "source",
+        "type_info": {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "arrival",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "arrival"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "departure",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "departure"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "data",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "data"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "74549aca224b43473a770c06803b1d003f8bc42a0d0b7227dd60f7f89f7a2767"
+}

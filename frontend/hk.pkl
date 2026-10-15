@@ -1,0 +1,39 @@
+amends "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.6.0/hk@2.6.0#/Builtins.pkl"
+
+local code = List("**/*.{js,mjs,ts,svelte,css,json}", "pnpm-lock.yaml", "pnpm-workspace.yaml", "mise.toml", ".npmrc")
+
+steps {
+  ["dependencies"] {
+    glob = Builtins.prettier.glob
+    check = "mise run pnpm-install"
+  }
+  ["prettier"] = (Builtins.prettier) {
+    depends = "dependencies"
+  }
+  ["eslint"] = (Builtins.eslint) {
+    glob = List("**/*.{js,mjs,ts,svelte}")
+    check = "eslint --no-warn-ignored --max-warnings=0 {{files}}"
+    fix = "eslint --fix --no-warn-ignored --max-warnings=0 {{files}}"
+    depends = "dependencies"
+  }
+  ["stylelint"] = (Builtins.stylelint) {
+    glob = List("**/*.{css,svelte}")
+    check = "stylelint --max-warnings=0 --allow-empty-input {{files}}"
+    fix = "stylelint --fix --max-warnings=0 --allow-empty-input {{files}}"
+    depends = "dependencies"
+  }
+  ["lock"] {
+    glob = code
+    check = "pnpm install --lockfile-only --frozen-lockfile --ignore-scripts"
+  }
+  ["types"] {
+    glob = code
+    check = "mise run check"
+  }
+  ["unit-tests"] {
+    glob = code
+    check = "mise run test:unit"
+  }
+  ["mise-format"] = Builtins.mise
+}

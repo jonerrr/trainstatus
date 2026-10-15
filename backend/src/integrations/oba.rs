@@ -7,11 +7,13 @@ use tracing::error;
 
 /// Generic OBA API fetch function that works with any OneBusAway-compatible API
 pub async fn fetch_vehicles(url: &str, api_key: &str) -> anyhow::Result<Vec<VehicleStatus>> {
-    let res = reqwest::Client::new()
+    let res = crate::integrations::http::realtime()
         .get(url)
         .query(&[("key", api_key)])
+        .timeout(std::time::Duration::from_secs(5))
         .send()
         .await?
+        .error_for_status()?
         .json::<Response>()
         .await?;
 

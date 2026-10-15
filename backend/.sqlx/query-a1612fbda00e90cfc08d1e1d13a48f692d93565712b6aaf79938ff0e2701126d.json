@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT trip_patterns, stop_remap FROM source WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_patterns",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "source",
+            "name": "trip_patterns"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "stop_remap",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "source",
+            "name": "stop_remap"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a1612fbda00e90cfc08d1e1d13a48f692d93565712b6aaf79938ff0e2701126d"
+}

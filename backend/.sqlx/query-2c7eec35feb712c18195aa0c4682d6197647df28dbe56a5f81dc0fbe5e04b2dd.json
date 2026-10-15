@@ -18,10 +18,7 @@
                     "Enum": [
                       "mta_subway",
                       "mta_bus",
-                      "njt_rail",
-                      "njt_bus",
-                      "lirr",
-                      "mnr"
+                      "njt_bus"
                     ]
                   }
                 }

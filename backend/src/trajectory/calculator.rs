@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::models::source::Source;
+use crate::source::Source;
 
 use super::builder::{TrajectoryBuilder, validate_knots};
 use super::builders::{
@@ -92,7 +92,7 @@ pub fn compute_trajectory(
     let sample_max = t_max.min(window_end);
 
     if sample_min >= sample_max {
-        return Err(anyhow::anyhow!("Trip is outside the active time window"));
+        return Err(anyhow::anyhow!("TripRun is outside the active time window"));
     }
 
     let n_samples = ((sample_max - sample_min) / config.dt_s).ceil() as usize;
@@ -140,7 +140,6 @@ pub fn compute_trajectory(
         return Err(anyhow::anyhow!("Not enough sampled points"));
     }
 
-    let path_bbox = super::types::compute_path_bbox(&path);
     let end_t = state_t;
     let v_mps = sampled.state_speed_mps;
     let end_s = sampled.state_distance_m;
@@ -153,7 +152,6 @@ pub fn compute_trajectory(
         timestamps,
         distances_m,
         bearings,
-        path_bbox,
     };
 
     Ok(ComputedTrajectory {
@@ -164,7 +162,6 @@ pub fn compute_trajectory(
             v_mps,
         },
         continuity_stats,
-        knot_stats: generated.stats,
     })
 }
 

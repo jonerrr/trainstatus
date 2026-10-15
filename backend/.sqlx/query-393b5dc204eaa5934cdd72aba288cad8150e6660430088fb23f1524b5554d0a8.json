@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO realtime.trip AS existing (id, original_id, vehicle_id, route_id, shape_ids, source, direction, created_at, updated_at, data)\n        SELECT i.id, i.original_id, i.vehicle_id, i.route_id,\n            ARRAY(SELECT jsonb_array_elements_text(i.shapes))::varchar[], $10,\n            i.direction, i.created_at, i.updated_at, i.data\n        FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::jsonb[], $6::smallint[], $7::timestamptz[], $8::timestamptz[], $9::jsonb[])\n            AS i(id, original_id, vehicle_id, route_id, shapes, direction, created_at, updated_at, data)\n        ON CONFLICT (source, original_id, created_at, direction) DO UPDATE SET\n            vehicle_id = EXCLUDED.vehicle_id, route_id = EXCLUDED.route_id, data = EXCLUDED.data, updated_at = EXCLUDED.updated_at,\n            shape_ids = CASE WHEN cardinality(EXCLUDED.shape_ids) > 0 THEN EXCLUDED.shape_ids ELSE existing.shape_ids END\n        WHERE (existing.vehicle_id, existing.route_id, existing.data, existing.updated_at, existing.shape_ids)\n            IS DISTINCT FROM (EXCLUDED.vehicle_id, EXCLUDED.route_id, EXCLUDED.data, EXCLUDED.updated_at,\n                CASE WHEN cardinality(EXCLUDED.shape_ids) > 0 THEN EXCLUDED.shape_ids ELSE existing.shape_ids END)\n        RETURNING id AS \"id!\"\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.trip",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "JsonbArray",
+        "Int2Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "JsonbArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "393b5dc204eaa5934cdd72aba288cad8150e6660430088fb23f1524b5554d0a8"
+}

@@ -1,5 +1,6 @@
 use super::cache::PlatformMatch;
-use crate::models::stop::{PlatformDirection, PlatformEdge};
+use crate::network::types::stop::PlatformDirection;
+use crate::network::types::stop::PlatformEdge;
 pub(super) fn platform_position_for_direction(
     position_from_north_m: f64,
     platform_length_m: f64,

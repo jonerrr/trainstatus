@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
-
 	import { page } from '$app/state';
 
 	import type { Source } from '#lib/client/index.js';
-	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	import type { Map as MapInstance, MapMouseEvent } from 'maplibre-gl';
@@ -43,13 +41,9 @@
 	let hover = $state<{ target: MapTarget; point: ScreenPoint } | null>(null);
 	let chooser = $state<{ targets: MapTarget[]; point: ScreenPoint } | null>(null);
 	let selectionError = $state('');
-	let selectionVersion = 0;
 	let filters = $state(new MapFilters());
 	const interactions = new MapInteractionController();
-	const trips = trip_context.get();
-	onDestroy(() => {
-		selectionVersion++;
-	});
+	const transit = getTransitData();
 	const activeRoute = $derived<MapFeatureKey | null>(
 		hover?.target.kind === 'route'
 			? { id: hover.target.id, source: hover.target.source }
@@ -74,7 +68,6 @@
 		void interactionScope;
 		hover = null;
 		chooser = null;
-		selectionVersion++;
 	});
 	$effect(() => {
 		if (!map) return;
@@ -102,11 +95,8 @@
 						const source = feature.properties?.source as Source;
 						if (!id || !filters.sources.includes(source)) return [];
 						const kind = feature.layer.id.startsWith('stop-') ? 'stop' : 'route';
-						if (
-							kind === 'stop'
-								? !page.data.stops_by_id[source]?.[id]
-								: !page.data.routes_by_id[source]?.[id]
-						)
+						const catalog = transit.peekCatalog(source);
+						if (kind === 'stop' ? !catalog?.stops_by_id.has(id) : !catalog?.routes_by_id.has(id))
 							return [];
 						return [{ kind, id, source }];
 					})
@@ -123,38 +113,29 @@
 		const target = targetsAt(event.point)[0];
 		hover = target ? { target, point: event.point } : null;
 	}
-	async function openTarget(target: MapTarget) {
-		const version = ++selectionVersion;
+	function openTarget(target: MapTarget) {
 		hover = null;
 		chooser = null;
 		selectionError = '';
-		if (target.kind === 'stop') {
-			const stop = page.data.stops_by_id[target.source]?.[target.id];
-			if (stop) open_modal({ type: 'stop', ...stop });
-		} else if (target.kind === 'route') {
-			const route = page.data.routes_by_id[target.source]?.[target.id];
-			if (route) open_modal({ type: 'route', ...route });
+		if (target.kind !== 'trip') {
+			open_modal({ type: target.kind, source: target.source, id: target.id });
+		} else if (target.routeId) {
+			// The trip modal loads the vehicle's route service when it opens.
+			open_modal({
+				type: 'trip',
+				source: target.source,
+				route_id: target.routeId,
+				id: target.id
+			});
 		} else {
-			try {
-				const resource = trips[target.source];
-				const trip =
-					resource?.current?.get(target.id) ??
-					(resource && (await resource.whenAvailable()).get(target.id));
-				if (version !== selectionVersion) return;
-				if (trip) open_modal({ type: 'trip', ...trip });
-				else selectionError = 'This trip is no longer available. Select another vehicle.';
-			} catch {
-				if (version === selectionVersion)
-					selectionError = 'Trip details could not be loaded. Please try again.';
-			}
+			selectionError = 'This vehicle has no route. Select another vehicle.';
 		}
 	}
 	function click(event: MapMouseEvent) {
 		const targets = targetsAt(event.point);
-		selectionVersion++;
 		selectionError = '';
 		hover = null;
-		if (targets.length === 1) void openTarget(targets[0]);
+		if (targets.length === 1) openTarget(targets[0]);
 		else chooser = targets.length ? { targets, point: event.point } : null;
 	}
 </script>
@@ -197,7 +178,6 @@
 			moving = true;
 			hover = null;
 			chooser = null;
-			selectionVersion++;
 		}}
 		onmoveend={() => {
 			moving = false;

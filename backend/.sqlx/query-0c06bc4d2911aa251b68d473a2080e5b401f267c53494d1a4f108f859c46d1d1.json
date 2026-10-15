@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                run_id,\n                provider_shape_id,\n                asset_id\n            FROM realtime.run_shape\n            WHERE run_id = ANY($1)\n            ORDER BY run_id, ordinal\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "run_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.run_shape",
+            "name": "run_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_shape_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "realtime.run_shape",
+            "name": "provider_shape_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "asset_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "realtime.run_shape",
+            "name": "asset_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0c06bc4d2911aa251b68d473a2080e5b401f267c53494d1a4f108f859c46d1d1"
+}

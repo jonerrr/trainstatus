@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM static.shape_asset a\n            WHERE a.source = $1\n            AND NOT EXISTS(SELECT 1 FROM static.shape s WHERE s.source = a.source AND s.asset_id = a.id)\n            AND NOT EXISTS(SELECT 1 FROM realtime.run_shape r WHERE r.source = a.source AND r.asset_id = a.id)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "78c4b9cb01fc679b644868239e65ab23c011d810481b0d26bc9ee4caceadb83b"
+}

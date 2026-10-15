@@ -1,4 +1,5 @@
 import type { Source } from '#lib/client/index.js';
+import { decodeCatalog, decodeRoute } from '#lib/transit/decode.js';
 
 import { describe, expect, it } from 'vitest';
 
@@ -7,10 +8,14 @@ import { chartFixture, chartNow } from './fixtures.js';
 
 function inputs(source: Source, patterns?: string[][]): ChartInput[] {
 	const fixture = chartFixture(source, 0, patterns);
+	const route = decodeRoute(source, '4', fixture.service.routes['4']);
+	const { stops_by_id } = decodeCatalog(fixture.catalog);
 	return fixture.trips.map((trip) => ({
+		source,
+		route_id: '4',
 		trip,
-		stopTimes: fixture.stopTimes.get(trip.id)!,
-		stops: Object.fromEntries(fixture.stops.map((stop) => [stop.id, stop]))
+		calls: [...route.calls_by_trip.get(trip.id)!].reverse(),
+		stops: stops_by_id
 	}));
 }
 
@@ -21,11 +26,9 @@ function checkItineraries(input: ChartInput[]) {
 		const points = chart.route_trips[i].points;
 		// Preserve the actual itinerary, rather than sorting points into axis order
 		// or silently discarding visits to satisfy the monotonicity assertion.
-		const timedStops = [...input[i].stopTimes].sort(
-			(a, b) => a.arrival.getTime() - b.arrival.getTime()
-		);
+		const timedStops = [...input[i].calls].sort((a, b) => a.arrival - b.arrival);
 		expect(points.map((p) => p.stop_id)).toEqual(timedStops.map((st) => st.stop_id));
-		expect(points.map((p) => p.time)).toEqual(timedStops.map((st) => st.arrival));
+		expect(points.map((p) => p.time)).toEqual(timedStops.map((st) => new Date(st.arrival)));
 		const rows = points.map((p) => chart.yDomain.indexOf(p.stop_key));
 		expect(rows.every((row, j) => row >= 0 && (j === 0 || row > rows[j - 1]))).toBe(true);
 	}
@@ -74,7 +77,7 @@ describe('chart stop ordering', () => {
 		const input = inputs('mta_bus');
 		const original = buildChartData(input, chartNow);
 		const shuffled = buildChartData(
-			[...input].reverse().map((item) => ({ ...item, stopTimes: [...item.stopTimes].reverse() })),
+			[...input].reverse().map((item) => ({ ...item, calls: [...item.calls].reverse() })),
 			chartNow
 		);
 		expect(shuffled.yDomain).toEqual(original.yDomain);
@@ -94,10 +97,10 @@ describe('chart stop ordering', () => {
 
 	it('filters past visits, unknown stops and invalid dates without inventing points', () => {
 		const input = inputs('njt_bus', [['a', 'b', 'c']]);
-		input[0].stopTimes = [
-			...input[0].stopTimes,
-			{ ...input[0].stopTimes[0], stop_id: 'missing' },
-			{ ...input[0].stopTimes[0], arrival: new Date(NaN) }
+		input[0].calls = [
+			...input[0].calls,
+			{ ...input[0].calls[0], stop_id: 'missing' },
+			{ ...input[0].calls[0], arrival: NaN }
 		];
 		const chart = buildChartData(input, chartNow + 120_000);
 		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['b', 'c']);
@@ -108,10 +111,10 @@ describe('chart stop ordering', () => {
 
 	it('accepts simultaneous arrivals without losing either stop', () => {
 		const input = inputs('mta_bus', [['a', 'b']]);
-		input[0].stopTimes = input[0].stopTimes.map((st) => ({
+		input[0].calls = input[0].calls.map((st) => ({
 			...st,
-			arrival: new Date(chartNow),
-			departure: new Date(chartNow)
+			arrival: chartNow,
+			departure: chartNow
 		}));
 		const chart = buildChartData(input, chartNow);
 		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b']);
@@ -123,10 +126,8 @@ describe('chart stop ordering', () => {
 			['b', 'a', 'c'],
 			['b', 'a', 'c']
 		]);
-		input[1].stopTimes = input[1].stopTimes.map((st) =>
-			st.stop_id === 'a'
-				? { ...st, arrival: new Date(chartNow + 60_000), departure: new Date(chartNow + 60_000) }
-				: st
+		input[1].calls = input[1].calls.map((st) =>
+			st.stop_id === 'a' ? { ...st, arrival: chartNow + 60_000, departure: chartNow + 60_000 } : st
 		);
 		const chart = buildChartData(input, chartNow);
 		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['b', 'a', 'c']);
@@ -155,9 +156,9 @@ describe('chart stop ordering', () => {
 			['b', 'c', 'a'],
 			['d', 'e', 'd']
 		]);
-		input[1].stopTimes = input[1].stopTimes.map((st) =>
+		input[1].calls = input[1].calls.map((st) =>
 			st.stop_id === 'a'
-				? { ...st, arrival: new Date(chartNow + 120_000), departure: new Date(chartNow + 120_000) }
+				? { ...st, arrival: chartNow + 120_000, departure: chartNow + 120_000 }
 				: st
 		);
 		const chart = buildChartData(input, chartNow);

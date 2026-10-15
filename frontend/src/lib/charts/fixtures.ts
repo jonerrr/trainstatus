@@ -1,4 +1,11 @@
-import type { Route, Source, Stop, StopTime, Trip } from '#lib/client/index.js';
+import type {
+	Catalog,
+	CatalogRoute,
+	CatalogStop,
+	Service,
+	ServiceTrip,
+	Source
+} from '#lib/client/index.js';
 
 export const chartNow = new Date('2026-10-05T12:00:00Z').getTime();
 
@@ -14,7 +21,7 @@ export function chartFixture(
 	]
 ) {
 	patterns = directionIndex === 1 ? patterns.map((pattern) => [...pattern].reverse()) : patterns;
-	const route: Route = {
+	const route: CatalogRoute = {
 		id: '4',
 		short_name: '4',
 		long_name: `${source} route`,
@@ -22,13 +29,21 @@ export function chartFixture(
 		text_color: '#ffffff',
 		data:
 			source === 'mta_bus'
-				? { source, name_number: 4, name_prefix: '', service_types: [], sort_key: 0 }
+				? {
+						source,
+						name_number: 4,
+						name_prefix: '',
+						service_types: [],
+						sort_key: 0,
+						directions: []
+					}
 				: { source }
 	};
-	const stops: Stop[] = ['a', 'b', 'c', 'd', 'e'].map((id, i) => ({
+	const stops: CatalogStop[] = ['a', 'b', 'c', 'd', 'e'].map((id, i) => ({
 		id,
 		name: id === 'e' ? 'b' : id,
-		geom: { Point: { x: i, y: i } },
+		lat: i,
+		lon: i,
 		transfers: [],
 		data:
 			source === 'mta_subway'
@@ -49,7 +64,6 @@ export function chartFixture(
 		routes: [
 			{
 				route_id: route.id,
-				stop_id: id,
 				stop_sequence: [20, 1, 30, 2, 0][i],
 				data:
 					source === 'mta_subway'
@@ -58,15 +72,11 @@ export function chartFixture(
 			}
 		]
 	}));
-	const trips: Trip[] = patterns.map((_, i) => ({
+	const trips: ServiceTrip[] = patterns.map((_, i) => ({
 		id: `trip-${i}`,
-		route_id: route.id,
-		direction: source === 'mta_subway' ? (directionIndex === 0 ? 1 : 3) : directionIndex,
-		created_at: new Date(chartNow),
-		updated_at: new Date(chartNow),
-		original_id: `trip-${i}`,
 		vehicle_id: `vehicle-${i}`,
-		shape_ids: [],
+		direction: source === 'mta_subway' ? (directionIndex === 0 ? 1 : 3) : directionIndex,
+		status: null,
 		data:
 			source === 'mta_subway'
 				? { source, consist_cars: [] }
@@ -74,19 +84,28 @@ export function chartFixture(
 					? { source, headsign: '' }
 					: { source }
 	}));
-	const stopTimes = new Map<string, StopTime[]>(
-		trips.map((trip, i) => [
-			trip.id,
-			patterns[i]
-				.map((stop_id, j) => ({
-					trip_id: trip.id,
-					stop_id,
-					arrival: new Date(chartNow + (j + 1) * 60_000),
-					departure: new Date(chartNow + (j + 1) * 60_000),
-					data: { source }
-				}))
-				.reverse() // API array order must not define the polyline.
-		])
+	const stop_ids = stops.map((stop) => stop.id);
+	// API column order must not define the polyline, so each trip's calls are reversed.
+	const visits = patterns.flatMap((pattern, trip) =>
+		pattern.map((stop_id, sequence) => ({ trip, stop_id, sequence })).reverse()
 	);
-	return { route, stops, trips, stopTimes };
+	const at = (sequence: number) => chartNow / 1000 + (sequence + 1) * 60;
+	const service: Service = {
+		source,
+		routes: {
+			[route.id]: {
+				trips,
+				stops: stop_ids,
+				calls: {
+					trip: visits.map((v) => v.trip),
+					stop: visits.map((v) => stop_ids.indexOf(v.stop_id)),
+					sequence: visits.map((v) => v.sequence),
+					arrival: visits.map((v) => at(v.sequence)),
+					departure: visits.map((v) => at(v.sequence))
+				}
+			}
+		}
+	};
+	const catalog: Catalog = { source, routes: [route], stops };
+	return { route, stops, trips, patterns, catalog, service };
 }

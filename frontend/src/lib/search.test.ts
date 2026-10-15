@@ -1,14 +1,16 @@
-import type { Stop } from '#lib/client/index.js';
+import type { CatalogStop } from '#lib/client/index.js';
 
 import { describe, expect, it } from 'vitest';
 
-import { StopSearch } from './search.svelte';
+import { search_stops } from './search';
+import { decodeCatalog } from './transit/decode';
 
-function stop(id: string, name: string): Stop {
+function stop(id: string, name: string): CatalogStop {
 	return {
 		id,
 		name,
-		geom: { Point: { x: 0, y: 0 } },
+		lat: 0,
+		lon: 0,
 		routes: [],
 		transfers: [],
 		data: {
@@ -28,18 +30,24 @@ function stop(id: string, name: string): Stop {
 const timesSquare = stop('127', 'Times Sq-42 St');
 const astoria = stop('R01', 'Astoria-Ditmars Blvd');
 
-describe('StopSearch.query', () => {
-	const search = new StopSearch({ mta_subway: [timesSquare, astoria] });
+describe('search_stops', () => {
+	const catalog = decodeCatalog({
+		source: 'mta_subway',
+		routes: [],
+		stops: [timesSquare, astoria]
+	});
 
 	it('returns the stop whose name matches', () => {
-		expect(search.query('Ditmars', 'mta_subway')).toEqual([astoria]);
+		expect(search_stops(catalog, 'Ditmars')).toEqual([astoria]);
 	});
 
-	it('returns every stop for that source when the term is empty', () => {
-		expect(search.query('   ', 'mta_subway')).toEqual([timesSquare, astoria]);
+	it('returns every stop when the term is empty', () => {
+		expect(search_stops(catalog, '   ')).toEqual([timesSquare, astoria]);
 	});
 
-	it('returns nothing for a source that was not indexed', () => {
-		expect(search.query('Ditmars', 'njt_bus')).toEqual([]);
+	it('indexes a replacement catalog independently', () => {
+		const replacement = decodeCatalog({ source: 'mta_subway', routes: [], stops: [timesSquare] });
+		expect(search_stops(replacement, 'Ditmars')).toEqual([]);
+		expect(search_stops(catalog, 'Ditmars')).toEqual([astoria]);
 	});
 });

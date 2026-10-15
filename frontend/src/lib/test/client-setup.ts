@@ -9,7 +9,7 @@ vi.mock('$app/state', async () => {
 
 vi.mock('$app/navigation', async () => {
 	const mod = await import('./page.svelte');
-	return { goto: mod.goto };
+	return { goto: mod.goto, refreshAll: vi.fn(async () => {}) };
 });
 
 beforeEach(() => {

@@ -13,7 +13,7 @@ Choose the smallest sufficient test. For timestamp or linkage bugs, exercise the
 
 Use committed captures and explicit service dates. The fast suite must work without SQL, external services, provider credentials or a runtime tile extract. Service-backed tests reuse the existing PostgreSQL server through a maintenance connection; SQLx creates and migrates isolated per-test databases. Use the mise tasks rather than migrating the development `trains` database. Construct fresh stores/services for independent local caches; ordinary tests need no cache containers.
 
-`SQLX_OFFLINE` governs compile-time macro metadata, not runtime SQL. Keep ordinary offline compilation while legacy macros exist; validate metadata with the dedicated task. Follow the existing runtime query convention for new code.
+`SQLX_OFFLINE` governs compile-time macro metadata, not runtime SQL. Use SQLx query macros for describable SQL and runtime queries for complex nested JSON/spatial projections or utility commands. Keep ordinary builds/tests offline; refresh and validate committed metadata with `sqlx:prepare` and `sqlx:check` after checked SQL or schema changes.
 
 When asked for source parity, compare applicable contracts rather than copying NJT tests. Preserve source-specific OBA enrichment, exact-pattern/remap rules, and subway segment/consist behavior. Output contracts can share matched normalized input setup; adapter tests still need captured parsing assertions.
 

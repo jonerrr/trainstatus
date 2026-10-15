@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH input_rows AS (\n            SELECT i.*, $7::source_enum AS source FROM UNNEST($1::uuid[], $2::integer[], $3::text[], $4::timestamptz[], $5::timestamptz[], $6::jsonb[])\n                AS i(trip_id, stop_sequence, stop_id, arrival, departure, data)\n        ), changed_rows AS (\n            SELECT i.* FROM input_rows i LEFT JOIN realtime.stop_time existing\n                ON existing.source = i.source AND existing.trip_id = i.trip_id AND existing.stop_sequence = i.stop_sequence\n            WHERE existing.trip_id IS NULL OR (existing.stop_id, existing.arrival, existing.departure, existing.data)\n                IS DISTINCT FROM (i.stop_id, i.arrival, i.departure, i.data)\n        )\n        INSERT INTO realtime.stop_time AS existing (trip_id, stop_sequence, stop_id, arrival, departure, data, source)\n        SELECT trip_id, stop_sequence, stop_id, arrival, departure, data, source FROM changed_rows\n        ON CONFLICT (source, trip_id, stop_sequence) DO UPDATE SET stop_id = EXCLUDED.stop_id, arrival = EXCLUDED.arrival, departure = EXCLUDED.departure, data = EXCLUDED.data\n        WHERE (existing.stop_id, existing.arrival, existing.departure, existing.data) IS DISTINCT FROM (EXCLUDED.stop_id, EXCLUDED.arrival, EXCLUDED.departure, EXCLUDED.data)\n        RETURNING trip_id AS \"trip_id!\"\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trip_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.stop_time",
+            "name": "trip_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4Array",
+        "TextArray",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "JsonbArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d807357efc2a6739f533612e9e661905cc58f8496f48a5ebfea45ed08aefa23a"
+}

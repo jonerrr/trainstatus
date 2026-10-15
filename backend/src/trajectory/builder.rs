@@ -1,4 +1,5 @@
-use crate::models::source::Source;
+use crate::source::Source;
+use geo::{Distance, Euclidean, Point};
 
 use super::geometry::ShapeGeometry;
 use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
@@ -28,11 +29,47 @@ pub fn retain_anchor_consistent_knots(knots: &mut Vec<TrajectoryKnot>, anchor: &
         }
     });
 }
+/// Provider builders accept either live vehicle reports or this retained GPS fix.
+/// Historical samples use their observation time and never acquire live status.
+pub(super) fn recorded_anchor_knot(
+    trip: &TripSnapshot,
+    geometry: &ShapeGeometry,
+    source: Source,
+) -> Option<TrajectoryKnot> {
+    let sample = trip.recorded_anchor.as_ref()?;
+    let age = trip.as_of.signed_duration_since(sample.observed_at);
+    if age < chrono::Duration::zero() || age > chrono::Duration::minutes(5) {
+        return None;
+    }
+    let projected = super::geometry::project_wgs84_point_to_epsg(
+        &sample.point,
+        super::types::source_projected_epsg_code(source),
+    )?;
+    let distance = super::geometry::project_point_onto_line(
+        &projected,
+        &geometry.projected_line,
+        &geometry.cum_dist,
+    )?;
+    if source == Source::NjtBus {
+        let snapped = super::geometry::distance_to_coord(
+            distance,
+            &geometry.projected_line,
+            &geometry.cum_dist,
+        )?;
+        if Euclidean.distance(&projected, &Point::from(snapped))
+            > super::builders::njt_bus::NJT_MAX_GPS_OFFSET_METERS
+        {
+            return None;
+        }
+    }
+    Some(TrajectoryKnot::new(
+        sample.observed_at.timestamp_micros() as f64 / 1_000_000.0,
+        distance.clamp(0.0, trip.shape_length_m),
+    ))
+}
 
 /// Source-specific knot synthesis from trip snapshots.
 pub trait TrajectoryBuilder: Send + Sync {
-    fn source(&self) -> Source;
-
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

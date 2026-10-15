@@ -1,5 +1,5 @@
+mod alerts;
 mod api;
-mod realtime;
+mod network;
+mod operations;
 mod sources;
-mod static_data;
-mod stores;

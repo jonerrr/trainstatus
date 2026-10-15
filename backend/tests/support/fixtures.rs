@@ -1,17 +1,14 @@
-use backend::{
-    sources::{
-        mta_bus::static_data as mta_bus_static,
-        mta_subway::static_data as mta_subway_static,
-        njt_bus::{patterns::PatternFeature, static_data as njt_bus_static},
-    },
-    static_data::dataset::StaticDataset,
-};
+use backend::network::dataset::NetworkDataset;
+use backend::sources::mta_bus::static_data as mta_bus_static;
+use backend::sources::mta_subway::static_data as mta_subway_static;
+use backend::sources::njt_bus::patterns::PatternFeature;
+use backend::sources::njt_bus::static_data as njt_bus_static;
 
-pub fn mta_subway_dataset() -> StaticDataset {
+pub fn mta_subway_dataset() -> NetworkDataset {
     let root = fixture_root();
     let manifest = backend::fixtures::load_manifest_for(
         &root,
-        backend::models::source::Source::MtaSubway,
+        backend::source::Source::MtaSubway,
         backend::fixtures::FixtureKind::Static,
         "basic",
     )
@@ -25,11 +22,11 @@ pub fn mta_subway_dataset() -> StaticDataset {
         .expect("MTA subway static fixture should build")
 }
 
-pub fn mta_bus_dataset() -> StaticDataset {
+pub fn mta_bus_dataset() -> NetworkDataset {
     let root = fixture_root();
     let manifest = backend::fixtures::load_manifest_for(
         &root,
-        backend::models::source::Source::MtaBus,
+        backend::source::Source::MtaBus,
         backend::fixtures::FixtureKind::Static,
         "basic",
     )
@@ -41,11 +38,11 @@ pub fn mta_bus_dataset() -> StaticDataset {
         .expect("MTA bus static fixture should build")
 }
 
-pub fn njt_bus_dataset() -> StaticDataset {
+pub fn njt_bus_dataset() -> NetworkDataset {
     let root = fixture_root();
     let manifest = backend::fixtures::load_manifest_for(
         &root,
-        backend::models::source::Source::NjtBus,
+        backend::source::Source::NjtBus,
         backend::fixtures::FixtureKind::Static,
         "basic",
     )

@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                payload AS \"payload!: sqlx::types::Json<ScheduledTrip>\",\n                expires_at\n            FROM static.scheduled_trip\n            WHERE source = $1\n            AND expires_at > NOW()\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "payload!: sqlx::types::Json<ScheduledTrip>",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "static.scheduled_trip",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "static.scheduled_trip",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "9d9c45f61fc4c5323e2825b3bf09e330d35dc44852add8b81ed0d67025c2fd28"
+}

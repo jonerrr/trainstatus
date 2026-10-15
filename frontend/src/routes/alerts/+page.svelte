@@ -1,15 +1,22 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
+	import type { CatalogRoute, Source } from '#lib/client/index.js';
 	import List from '#lib/List.svelte';
 	import { route_pins } from '#lib/pins.svelte.js';
+	import { alert_routes } from '#lib/Route/alerts.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { calculate_route_height } from '#lib/util.svelte.js';
 
-	// remove special express mta_subway routes (FX, 6X, 7X, etc) since they won't have any alerts
-	const sources = $derived({
-		...page.data.routes,
-		mta_subway: page.data.routes['mta_subway']?.filter((route) => !route.id.endsWith('X'))
-	});
+	const transit = getTransitData();
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current);
+
+	const sources = $derived(
+		Object.fromEntries(
+			catalogs.map(({ source, catalog }) => [source, catalog ? alert_routes(catalog) : []])
+		) as Partial<Record<Source, CatalogRoute[]>>
+	);
 </script>
 
 <List

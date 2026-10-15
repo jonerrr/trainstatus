@@ -1,10 +1,11 @@
-import type { Route, Stop, StopTime, Trip } from '#lib/client/index.js';
+import type { CatalogRoute, CatalogStop, ServiceTrip } from '#lib/client/index.js';
+import type { Call } from '#lib/transit/decode.js';
 import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
 
 import type { MapTarget } from './interactions';
 
 export interface FeaturePresentation {
-	route?: Route;
+	route?: CatalogRoute;
 	title: string;
 	subtitle?: string;
 	detail?: string;
@@ -16,15 +17,15 @@ export function presentFeature(
 		route,
 		stop,
 		trip,
-		stopTimes = [],
-		stops = {},
+		calls = [],
+		stops = new Map(),
 		at = Date.now()
 	}: {
-		route?: Route;
-		stop?: Stop;
-		trip?: Trip;
-		stopTimes?: readonly StopTime[];
-		stops?: Record<string, Stop>;
+		route?: CatalogRoute;
+		stop?: CatalogStop;
+		trip?: ServiceTrip;
+		calls?: readonly Call[];
+		stops?: ReadonlyMap<string, CatalogStop>;
 		at?: number;
 	}
 ): FeaturePresentation {
@@ -39,16 +40,13 @@ export function presentFeature(
 	if (target.kind === 'stop') return { title: stop?.name ?? 'Stop unavailable', subtitle };
 	if (target.kind === 'route')
 		return { route, title: route?.long_name || route?.short_name || 'Route unavailable', subtitle };
-	const destination = trip ? trip_headsign(trip, route, stopTimes, stops) : undefined;
-	const next = stopTimes.find((time) => time.arrival.getTime() > at);
+	const destination = trip ? trip_headsign(trip, route, calls, stops) : undefined;
+	const next = calls.find((call) => call.arrival > at);
+	const next_stop = next && stops.get(next.stop_id);
 	return {
 		route,
 		title: trip_destination_title(destination, route),
 		subtitle,
-		detail: !trip
-			? 'Trip details unavailable'
-			: next && stops[next.stop_id]
-				? `Next: ${stops[next.stop_id].name}`
-				: undefined
+		detail: !trip ? 'Trip details unavailable' : next_stop ? `Next: ${next_stop.name}` : undefined
 	};
 }

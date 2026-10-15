@@ -1,21 +1,24 @@
-use backend::{
-    feed::vehicle_position::OccupancyStatus,
-    integrations::gtfs_realtime::remap_realtime_stop_ids,
-    models::{
-        position::{NjtBusPositionData, PositionData, VehiclePosition},
-        source::Source,
-        trip::{NjtBusData, StopTime, StopTimeData, Trip, TripData},
-    },
-    static_data::index::{StaticTransitIndex, StaticTransitRevision},
-};
+use backend::integrations::gtfs_realtime::remap_realtime_stop_ids;
+use backend::network::index::NetworkIndex;
+use backend::network::index::NetworkRevision;
+use backend::operations::types::position::NjtBusPositionData;
+use backend::operations::types::position::OccupancyStatus;
+use backend::operations::types::position::PositionData;
+use backend::operations::types::position::VehicleObservation;
+use backend::operations::types::trip::NjtBusData;
+use backend::operations::types::trip::StopTimeData;
+use backend::operations::types::trip::StopVisit;
+use backend::operations::types::trip::TripData;
+use backend::operations::types::trip::TripRun;
+use backend::source::Source;
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::support::njt_bus_dataset;
 
-fn trip() -> Trip {
+fn trip() -> TripRun {
     let now = Utc::now();
-    Trip {
+    TripRun {
         id: Uuid::now_v7(),
         original_id: "fixture_trip".into(),
         vehicle_id: "fixture_vehicle".into(),
@@ -31,10 +34,11 @@ fn trip() -> Trip {
     }
 }
 
-fn stop_time(stop_id: &str) -> StopTime {
+fn stop_time(stop_id: &str) -> StopVisit {
     let now = Utc::now();
-    StopTime {
+    StopVisit {
         trip_id: Uuid::now_v7(),
+        stop_sequence: 1,
         stop_id: stop_id.into(),
         arrival: now,
         departure: now,
@@ -42,8 +46,8 @@ fn stop_time(stop_id: &str) -> StopTime {
     }
 }
 
-fn vehicle(stop_id: Option<&str>) -> VehiclePosition {
-    VehiclePosition {
+fn vehicle(stop_id: Option<&str>) -> VehicleObservation {
+    VehicleObservation {
         vehicle_id: "fixture_vehicle".into(),
         trip_id: None,
         stop_id: stop_id.map(Into::into),
@@ -58,8 +62,8 @@ fn vehicle(stop_id: Option<&str>) -> VehiclePosition {
 #[test]
 fn published_revision_contains_trip_patterns_and_stop_remap() {
     let dataset = njt_bus_dataset();
-    let index = StaticTransitIndex::new();
-    index.publish(StaticTransitRevision::from_dataset(&dataset));
+    let index = NetworkIndex::new();
+    index.publish_bundle(vec![NetworkRevision::from_dataset(&dataset)]);
 
     let revision = index.get(Source::NjtBus).expect("published revision");
     assert_eq!(
@@ -73,7 +77,7 @@ fn published_revision_contains_trip_patterns_and_stop_remap() {
 /// leaves unmapped ids untouched, and covers both stop_times and positions.
 #[test]
 fn remaps_child_stop_ids_to_canonical() {
-    let revision = StaticTransitRevision::from_dataset(&njt_bus_dataset());
+    let revision = NetworkRevision::from_dataset(&njt_bus_dataset());
 
     // 16758 is a gate child collapsed into representative 6509; 500 is a plain
     // 1:1 stop with no remap entry.
@@ -92,9 +96,9 @@ fn remaps_child_stop_ids_to_canonical() {
     assert_eq!(positions[0].stop_id.as_deref(), Some("6509"));
     assert_eq!(positions[1].stop_id.as_deref(), Some("500"));
     assert_eq!(positions[2].stop_id, None, "None stop_id stays None");
-    let identity = StaticTransitRevision::from_dataset(
-        &backend::static_data::dataset::StaticDataset::new(Source::MtaBus),
-    );
+    let identity = NetworkRevision::from_dataset(&backend::network::dataset::NetworkDataset::new(
+        Source::MtaBus,
+    ));
     let before = data[0].1[0].stop_id.clone();
     remap_realtime_stop_ids(&identity, &mut data, &mut positions);
     assert_eq!(data[0].1[0].stop_id, before);

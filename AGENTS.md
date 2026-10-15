@@ -8,48 +8,43 @@ Real-time tracker for MTA subway, MTA buses and NJT buses. Rust/Axum backend, Sv
 
 ### Backend (`backend/src/`)
 
-**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` → `RealtimeIngestor` transaction → committed `Arc<PersistedSnapshot>` → shared `LiveSnapshots` watch channels → live stores / `TrajectoryDeriver` → Axum API. Static imports are transactional; static responses and current alerts are cached in process.
+**Realtime data flow**: Feeds → `RealtimeSource` → `CollectedSnapshot` with a pinned `NetworkRevision` → `OperationsIngestor` transaction → committed `Arc<SourceSnapshot>` → shared `LiveSnapshots` watch channels → `Operations` / `TrajectoryDeriver` → Axum API.
 
 **Key modules**:
 
-- `sources/` — `RealtimeSource` collectors plus `AlertsAdapter` and `StaticAdapter` implementations in `mta_subway/`, `mta_bus/` and `njt_bus/`
-- `realtime/` — `RealtimeEngine` collects each source independently; `RealtimeIngestor` commits trips, stop times, positions and resolved shapes together before publishing. `LiveSnapshots` shares the latest committed Arc with stores and trajectory workers; watch channels coalesce pending generations. `TrajectoryDeriver` uses the pinned static revision without SQL readback
-- `static_data/` — `StaticController`, collected datasets, transactional persistence and pinned static revisions; expanded NJT schedules persist in PostgreSQL and restore on restart
-- `alerts/` — Alert polling and shared processing; `AlertStore` persists alerts and coordinates its 30-second local cache
-- `stores/` — Default trip, stop-time and position reads use `LiveSnapshots`; their explicit historical reads use PostgreSQL. Static response snapshots pair exact JSON bytes with their ETag; `TrajectoryStore` loads historical trajectory inputs behind `TrajectoryService`
-- `api/` — Axum handlers; `AppState` holds all stores; OpenAPI docs at `/api/docs` (via utoipa/scalar)
-- `integrations/` — External GTFS-RT/OBA protocol helpers and the Valhalla routing-library wrapper
-- `trajectory/` — Live derivation, source builders, calculation, continuity and Arrow encoding; `TrajectoryService` owns live/historical reads and caches. Live snapshots never expire or evict
-- `models/` — DB row types; geometry decoded via `geozero` from WKB
-- `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`
+- `app.rs` — Application construction, owner handles and background worker startup/shutdown; `main.rs` handles HTTP and signals
+- `network/` — Transactional static imports, schedules, transfers, restore and atomic revision/catalog publication. `NetworkRevision` pairs routing inputs with exact catalog bytes and their ETag
+- `operations/` — Stable source-scoped run keys, latest run/visit/observation reconciliation, explicit GPS sample writes, committed live membership, passenger indexing and shared retained-history materialization
+- `alerts/` — Source-typed alert aggregates, transactional replacement of owned collections, current membership, declared-period historical reads and the local cache
+- `trajectory/` — Source builders, geometry, PCHIP, continuity and Arrow rendering. Live derivation consumes the committed Arc; historical rendering consumes operations' retained inputs and recorded GPS anchors
+- `sources/` — `RealtimeSource`, `AlertsAdapter` and `StaticAdapter` implementations for each provider
+- `api/` — Request validation, HTTP handlers, borrowed domain-to-DTO encoding and OpenAPI. `AppState` holds owner read handles and a readiness check; private SQL rows live behind owners
+- `integrations/` — External GTFS-RT/OBA protocol helpers and Valhalla routing
+- `protos/` — GTFS-RT protobuf compiled in `build.rs` into `crate::feed`; provider enums are translated at collection
 
-**`StaticController`**: `RealtimeEngine` calls `controller.ensure_updated(source)` before collection. A foreign-key violation triggers one `force_update` and one ingestion retry using the same collected snapshot.
+**Network refresh**: `RealtimeEngine` calls `NetworkController::ensure_updated(source)` before collection. A foreign-key failure triggers one forced import and one retry; network-dependent normalization retries the same decoded provider batch against the new pinned revision.
 
-**Live and historical reads**: Default trips, stop times and positions reflect the last committed source snapshot, with route filters applied within its membership. Collection/transaction failures preserve it; a successful empty snapshot clears it; startup is empty until the first commit. These live reads use no retained-history fallback. Explicit `?at=` trips and stop times use retained final arrival-or-departure values in the inclusive four-hour window, without a trip update-time gate; positions and trajectories use their historical store paths.
+**Reads**: Live service uses the last committed source snapshot without SQL. Failures preserve it; a successful empty collection clears membership; startup returns `503` until the first commit. Requested routes are present even when empty; unknown bus routes return `404`. Service and trajectories share the historical loader's inclusive four-hour arrival-or-departure selection, with all retained visits and no historical vehicle status.
 
 **API routes** (all under `/api/v1/`):
 
-- Static: `GET /routes/{source}`, `GET /stops/{source}`
-- Realtime: `GET /trips/{source}`, `GET /stop_times/{source}`, `GET /positions/{source}`, `GET /alerts/{source}`
-- All realtime endpoints accept `?at=<unix_timestamp>` for historical queries
+- Static: `GET /catalog/{source}` (the frontend's static source, ETag-validated)
+- Realtime: `GET /service/{source}` (subway: whole source; buses: required `?route_ids=`), `GET /alerts/{source}`, `GET /trajectories/{source}`
+- Realtime endpoints accept `?at=<unix_timestamp>` for historical queries
 
 ### Frontend (`frontend/src/`)
 
-**Type generation**: TypeScript types are generated from the OpenAPI spec via `@hey-api/openapi-ts` and stored in `frontend/src/lib/client`. Run codegen with `pnpm openapi-ts` (in frontend directory) after backend changes. Frontend must be running to generate types.
+**Type generation**: TypeScript types are generated from the OpenAPI spec via `@hey-api/openapi-ts` and stored in `frontend/src/lib/client`. After backend contract changes, export with `mise exec -- cargo run --bin openapi` from `backend/`, then run `mise exec -- pnpm openapi-ts --input <exported-json>` from `frontend/`. Export requires no running feeds, frontend or database.
 
-**Data loading pattern**:
+**Data loading**: The layout loads selected sources and `?at=` without waiting for API data. `+layout.svelte` creates one `TransitData` (`src/lib/transit/store.svelte.ts`) and shares it with `setTransitData`; components call `getTransitData()`. Create `catalog`, `route`, `trip`, `stopArrivals`, or `alerts` bindings during component initialization, supplying getters for reactive source/ID/time keys. Read `.current` synchronously inside `$derived`: single bindings expose `{ value, loading, error }`, while collection bindings expose an array of per-key reads; fetch failures are outcomes, while boundaries handle rendering errors. Each binding's explicit effect owns reader interest and idempotent request acquisition. Native `$state.raw` snapshots carry loaded data; reads never subscribe, create effects, or schedule requests. `peekCatalog`, `loadedTrip`, and `loadedStopArrivals` observe snapshots without acquiring requests. Subway service loads eagerly outside `/map`; bus routes load on demand and batch into shared `?route_ids=` requests. Remounts within the 30-second refresh reuse data. Historical (`at`) entries live in a small LRU protected by active bindings. `decode.ts` indexes columnar service by trip and stop.
 
-1. `+layout.ts` fetches selected sources' static routes and stops in parallel and returns indexed static data
-2. `+layout.svelte` initializes a layout-scoped current-time context, creates realtime `LiveResource<T>` instances with empty initial data, and sets resource contexts; realtime polling starts in the browser
-3. Components consume typed context via `trip_context.getSource(source)`, `stop_time_context.getSource(source)`, etc.
+**Freshness**: Live data older than 90 seconds since its last successful fetch or source commit triggers the shared warning. Passed calls are dropped and future predictions remain visible. Empty detail views say “No predictions to show”; list rows omit prediction labels when none remain. One “Can’t update data” indicator provides Retry, moving into the dialog while a modal is open. Refresh failures retain loaded values; successful historical data does not age into a live warning. Persisted preferences use cached `LocalStorage.current` snapshots: replace the value to mutate and persist, and let the wrapper subscribe to cross-tab updates while readers are mounted.
 
-**`LiveResource<T>`** (`src/lib/resources/index.svelte.ts`): Manages periodic polling + AbortController. Data stored as reactive `SvelteMap` keyed by entity ID.
+**Map**: `/map` polls its own trajectories and makes no passenger requests until an itinerary is opened.
 
-**Source-discriminated types**: Entity `data` fields vary by source. Use `TypedTrip<S>`, `TypedVehiclePosition<S>`, `TypedStopTime<S>` generics. `source_info` config in `index.svelte.ts` defines per-source refresh intervals and UI metadata.
+**Offline**: The service worker caches the shell per deployment and catalogs in a stable `catalogs` cache: saved catalogs are served immediately and revalidated with `If-None-Match`, and replacements are posted to the open app (`replaceCatalog`). Service, alerts and trajectories are never persisted. Offline navigations fall back to the prerendered `/offline` shell, which boots the real route from saved catalogs.
 
-**StopTimes** are double-indexed: `by_trip_id` and `by_stop_id` (`StopTimeResource<S>`).
-
-**Component pattern**: Each entity type has `Button.svelte` + `Modal.svelte` in `src/lib/{Route,Stop,Trip}/`. Modal routing uses shallow URL params (`?s=`, `?r=`, `?t=`). View transitions use `document.startViewTransition`.
+**Component pattern**: Each entity type has `Button.svelte` + `Modal.svelte` in `src/lib/{Route,Stop,Trip}/`. Modal routing uses shallow URL params with the source: `?s=&src=`, `?r=&src=`, and `?t=&r=&src=` (trips carry their route). View transitions use `document.startViewTransition`.
 
 **Reactive state files** use `.svelte.ts` (e.g., `url_params.svelte.ts`, `storage.svelte.ts`, `pins.svelte.ts`). Current time is scoped to each layout through `createCurrentTime`, `setCurrentTime`, and `getCurrentTime`; retrieve the context during component initialization.
 
@@ -72,18 +67,38 @@ See README.md for detailed development setup instructions, including environment
 
 - When adding, changing, reviewing, or running backend tests, read [.agents/skills/backend-testing/SKILL.md](.agents/skills/backend-testing/SKILL.md) and follow the linked testing policy.
 
-- Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `main.rs` and the per-source `LiveSnapshots` registry. Collectors return normalized entities; `RealtimeIngestor` owns persistence and committed publication
+- Add new transit sources by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `sources/<name>/`, then registering in `app.rs`, `Source::ALL` and the per-source `LiveSnapshots` registry. Collectors return source-scoped run keys and normalized owner types; `OperationsIngestor` resolves persistent IDs and owns committed publication
 - Error handling: `AppError(anyhow::Error)` in `api/` converts to 500; use `?` freely
+- Use SQLx compile-time query macros for describable SQL; complex JSON/spatial projections and utility commands may stay runtime queries. When changing checked SQL or schema, follow the metadata workflow in [backend/TESTING.md](backend/TESTING.md).
 
 ### Frontend
 
 - For Svelte/SvelteKit questions or work under `frontend/`, read [frontend/AGENTS.md](frontend/AGENTS.md) for the Svelte MCP workflow before proceeding.
 - When adding, changing, reviewing, or running frontend tests, read [.agents/skills/frontend-testing/SKILL.md](.agents/skills/frontend-testing/SKILL.md) and follow the linked testing policy.
 - All API types come from autogenerated client in src/lib/client. — do not manually define API response types
-- Use `TypedTrip<S>` / `TypedVehiclePosition<S>` etc. when source is known; use base `Trip` / `VehiclePosition` when source is unknown
-- The layout's `current_time.value` (obtained with `getCurrentTime()` from `url_params.svelte.ts`) drives `?at=` queries; updating it requests a refresh of each realtime resource via `$effect`
+- Narrow source-specific `data` fields (`CatalogRoute`, `CatalogStop`, `ServiceTrip`, `VehicleStatus`) on `data.source`
+- Read API data through `TransitData`; it owns fetching, sharing, refresh and retry, so components hold no request state
+- The layout's `current_time.value` (obtained with `getCurrentTime()` from `url_params.svelte.ts`) is the `at` argument for `TransitData` reads; `undefined` means live
 
 ## Database
 
 - PostgreSQL with PostGIS; geometry as WKB decoded by `geozero`
 - `source_enum` postgres enum maps to `Source` Rust enum (`mta_subway`, `mta_bus`, `njt_bus`)
+
+- Automatic historical-age retention remains deferred.
+
+## Maintainability Rules
+
+- Prefer the simplest, cleanest implementation that satisfies the requirements. Avoid unnecessary complexity, indirection, and overengineering.
+- Search for existing implementations and conventions before introducing new helpers, types, dependencies, or abstractions.
+- Favor maintainability and architectural consistency over minimizing the size of a diff. Larger refactors are acceptable when they meaningfully improve the codebase.
+- **Do not preserve backward compatibility unless explicitly required.** Prefer clean breaking changes over compatibility layers, deprecated interfaces, fallback logic, or workarounds.
+- Treat development databases and their data as disposable. Prefer updating schemas and resetting the development database over implementing complex migrations or compatibility logic solely to preserve development data. Ask before performing destructive operations.
+- When replacing functionality, fully remove obsolete implementations, unused code, and references. Do not leave behind legacy paths or redundant abstractions.
+- Avoid speculative future-proofing, unnecessary defensive programming, and abstractions that serve no concrete purpose.
+- Follow existing architectural conventions where reasonable, but do not perpetuate poor patterns merely for consistency.
+- Do not add functionality, dependencies, or architectural complexity beyond what is requested without discussing it first.
+- **Stop and ask for clarification whenever you encounter a meaningful decision, ambiguity, unexpected issue, or trade-off that the user should decide.** Present the available options and their implications rather than silently making assumptions or implementing workarounds.
+- Proactively identify opportunities for simplification, refactoring, or architectural improvement. Surface significant findings and recommendations, even when they fall outside the immediate task, but ask before expanding the scope.
+- Make routine, low-risk implementation decisions independently. Do not interrupt for trivial details that have an obvious solution.
+- Keep comments and documentation accurate and useful. Avoid comments that merely restate what the code does.

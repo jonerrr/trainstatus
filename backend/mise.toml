@@ -1,8 +1,16 @@
 [env]
 VALHALLA_TILE_EXTRACT = "../geo/data/valhalla_tiles.tar"
+SQLX_OFFLINE = "true"
 
-[tasks.csp]
-run = "cargo sqlx prepare"
+[tasks."sqlx:prepare"]
+description = "Refresh checked-query metadata against the configured migrated database"
+env = { SQLX_OFFLINE = "false" }
+run = "cargo sqlx prepare -- --all-targets --features fixture-capture,integration-tests"
+
+[tasks."sqlx:check"]
+description = "Check committed query metadata against the configured migrated database"
+env = { SQLX_OFFLINE = "false" }
+run = "cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests"
 
 [tasks.migrate]
 run = "sqlx migrate run"
@@ -17,18 +25,15 @@ run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t
 [tasks."fixtures"]
 description = "Capture, list, verify, or update expected fixture outputs; pass --help for command details"
 raw_args = true
-env = { SQLX_OFFLINE = "true" }
 run = "cargo run --features fixture-capture --bin fixtures -- $@"
 
-# Offline applies to compile-time query! metadata; SQLx tests still execute real SQL.
 [tasks.test]
 description = "Run the ordinary backend suite using existing PostgreSQL"
 run = "mise run test:services full"
 
 [tasks."test:unit"]
 description = "Run private unit and public behavior tests without services"
-env = { SQLX_OFFLINE = "true" }
-run = "cargo test --features fixture-capture --lib --test behavior"
+run = "cargo test --locked --features fixture-capture --lib --test behavior"
 
 [tasks."test:integration"]
 description = "Run database and private realtime engine integration tests"
@@ -37,15 +42,6 @@ run = "mise run test:services integration"
 [tasks."test:performance"]
 description = "Run the opt-in ingestion benchmark on an idle PostgreSQL server"
 run = "mise run test:services performance"
-
-[tasks."sqlx:check"]
-description = "Check committed query metadata against migrations in a dedicated metadata-check database"
-run = """
-export DATABASE_URL="${SQLX_CHECK_DATABASE_URL:-postgres://trains:trains@localhost:5432/trainstatus_sqlx_check}"
-sqlx database create
-sqlx migrate run
-cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests
-"""
 
 [tasks."test:services"]
 description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
@@ -67,7 +63,7 @@ case "$usage_suite" in
     cargo test --features fixture-capture --doc "$usage_filter"
     ;;
   integration)
-    cargo test --features fixture-capture,integration-tests --lib "realtime::tests::engine::$usage_filter"
+    cargo test --features fixture-capture,integration-tests --lib "operations::tests::engine::$usage_filter"
     cargo test --features fixture-capture,integration-tests --test integration "$usage_filter"
     ;;
   performance)
@@ -75,6 +71,10 @@ case "$usage_suite" in
     ;;
 esac
 '''
+
+[tasks.openapi]
+description = "Export the current OpenAPI contract without starting workers or connecting to PostgreSQL"
+run = "cargo run --bin openapi"
 
 # Host deps for compiling the valhalla crate (vendored C++).
 # Install with: mise bootstrap packages apply

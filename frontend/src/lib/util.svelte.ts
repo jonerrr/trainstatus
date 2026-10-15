@@ -1,14 +1,23 @@
-import type { Route, RouteStop, Stop, StopTime, Trip } from '#lib/client/index.js';
+import type {
+	CatalogRoute,
+	CatalogStop,
+	CatalogStopRoute,
+	ServiceTrip
+} from '#lib/client/index.js';
 import { calculateTextHeight } from '#lib/text_measurement.js';
+import type { Call } from '#lib/transit/decode.js';
 
 /**
  * Destination shown on an MTA bus for a given trip direction.
  *
  * The upstream feed maps headsigns to directions at the route level, not to
- * individual stops, so `RouteStop.data.headsign` is always empty for buses.
+ * individual stops, so route-stop headsigns are always empty for buses.
  * Resolve from the route's directions using the trip's `direction` instead.
  */
-export function bus_headsign(route: Route | undefined, direction: number): string | undefined {
+export function bus_headsign(
+	route: CatalogRoute | undefined,
+	direction: number
+): string | undefined {
 	if (route?.data.source !== 'mta_bus') return undefined;
 
 	const match = route.data.directions?.find((d) => d.direction_id === direction);
@@ -19,12 +28,13 @@ export function bus_headsign(route: Route | undefined, direction: number): strin
 
 /** Resolve destinations identically in trip cards and stop arrivals. */
 export function trip_headsign(
-	trip: Trip,
-	route: Route | undefined,
-	stop_times: readonly StopTime[] = [],
-	stops: Record<string, Stop> = {}
+	trip: ServiceTrip,
+	route: CatalogRoute | undefined,
+	calls: readonly Call[] = [],
+	stops?: ReadonlyMap<string, CatalogStop>
 ): string {
 	if (trip.data.source === 'mta_bus') {
+		// TODO: why make this a separate function when it's only used here?
 		return bus_headsign(route, trip.direction) || 'Unknown';
 	}
 
@@ -34,24 +44,29 @@ export function trip_headsign(
 
 		// Static route-stop labels may describe the opposite direction or a
 		// different branch. Only use labels on this trip in its own direction.
-		for (const st of stop_times) {
-			const route_stop = stops[st.stop_id]?.routes.find(
-				(rs) =>
-					rs.route_id === trip.route_id &&
-					rs.data.source === 'njt_bus' &&
-					rs.data.direction === trip.direction &&
-					rs.data.headsign
-			);
+		for (const call of calls) {
+			const route_stop = stops
+				?.get(call.stop_id)
+				?.routes.find(
+					(rs) =>
+						rs.route_id === call.route_id &&
+						rs.data.source === 'njt_bus' &&
+						rs.data.direction === trip.direction &&
+						rs.data.headsign
+				);
 			if (route_stop?.data.source === 'njt_bus') return route_stop.data.headsign;
 		}
 	}
 
-	const last_stop = stop_times[stop_times.length - 1];
-	return (last_stop && stops[last_stop.stop_id]?.name) || 'Unknown';
+	const last_stop = calls[calls.length - 1];
+	return (last_stop && stops?.get(last_stop.stop_id)?.name) || 'Unknown';
 }
 
 /** Title shared by trip modals and map cards when a headsign is missing. */
-export function trip_destination_title(destination: string | undefined, route?: Route): string {
+export function trip_destination_title(
+	destination: string | undefined,
+	route?: CatalogRoute
+): string {
 	return destination && destination !== 'Unknown'
 		? destination
 		: route?.long_name || 'Destination unavailable';
@@ -94,9 +109,9 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 
 // Get main routes for a stop, optionally hiding express variants without service.
 export const main_route_stops = (
-	route_stops: RouteStop[],
+	route_stops: readonly CatalogStopRoute[],
 	active_routes?: ReadonlySet<string>
-): RouteStop[] => {
+): CatalogStopRoute[] => {
 	return route_stops.filter(
 		(route) =>
 			route.data.source !== 'mta_subway' ||
@@ -124,7 +139,7 @@ const STOP_NAME_MAX_WIDTH = 300;
 // Headsigns inside the 2-column grid get roughly half the container width
 const HEADSIGN_MAX_WIDTH = 140;
 
-export function calculate_stop_height(item: Stop) {
+export function calculate_stop_height(item: CatalogStop) {
 	// 16px total padding (p-2 = 8px top + 8px bottom)
 	let height = 16;
 
@@ -164,29 +179,3 @@ export function calculate_stop_height(item: Stop) {
 }
 
 export const calculate_trip_height = () => 94;
-
-// export function get_position(): Promise<GeolocationPosition> {
-// 	return new Promise<GeolocationPosition>((res, rej) => {
-// 		navigator.geolocation.getCurrentPosition(res, rej);
-// 	});
-// }
-
-// interface ItemHeights {
-// 	[key: string]: number;
-// }
-
-// export function list_max_height(init: number = 0) {
-// 	const height = browser
-// 		? document
-// 				.querySelectorAll('.sub-height')
-// 				.values()
-// 				.reduce((acc, el) => {
-// 					acc += (el as HTMLElement).offsetHeight;
-// 					return acc;
-// 				}, init)
-// 		: 124 + init;
-// 	return `max-h-[calc(100dvh-${height}px)]`;
-// }
-// TODO: remove if not used. Was used to store virtual list item heights.
-// need to test if its faster to calculate heights on the fly or store them in a map like this.
-// export const item_heights = $state<ItemHeights>({});

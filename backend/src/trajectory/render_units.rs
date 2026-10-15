@@ -1,8 +1,8 @@
-use crate::models::position::PositionData;
-use crate::models::source::Source;
+use crate::operations::types::position::PositionData;
+use crate::source::Source;
 
 use super::geometry::{ShapeGeometry, bearing_at_distance, distance_to_coord};
-use super::types::{RenderUnit, Trajectory, TripSnapshot, compute_path_bbox};
+use super::types::{RenderUnit, Trajectory, TripSnapshot};
 
 const DEFAULT_SUBWAY_CAR_LENGTH_M: f32 = 18.288;
 const DEFAULT_BUS_LENGTH_M: f32 = 12.0;
@@ -127,7 +127,6 @@ fn expand_consist_units(
             length_m: car_length_m,
             passengers,
             color: trajectory.color,
-            path_bbox: compute_path_bbox(&positions),
             positions,
             timestamps,
             bearings,
@@ -167,7 +166,6 @@ fn build_single_unit(
         positions: trajectory.path.clone(),
         timestamps: trajectory.timestamps.clone(),
         bearings: trajectory.bearings.clone(),
-        path_bbox: trajectory.path_bbox,
     })
 }
 

@@ -4,12 +4,11 @@
 	import { SvelteMap } from 'svelte/reactivity';
 
 	import type { Source } from '#lib/client/index.js';
-	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import DeckOverlay from './DeckOverlay.svelte';
 	import type { MapFeatureKey, VehiclePicker } from './interactions';
-	import { watchTrajectories, type TrajectorySnapshot } from './trajectories';
+	import { createTrajectories } from './trajectories.svelte.js';
 	import { buildActiveVehiclesAtTime, type ActiveVehicle } from './trajectoryArrow';
 	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
 
@@ -28,31 +27,13 @@
 		selectedTrip?: MapFeatureKey | null;
 		onPickerReady: (picker: VehiclePicker | null) => void;
 	} = $props();
-	const fixedAt = $derived(current_time.value ?? null);
-	let snapshot = $state.raw<TrajectorySnapshot>({
-		tables: new Map(),
-		statuses: new Map()
-	});
+
+	const trajectories = createTrajectories(() => ({ sources, at: current_time.value }));
+	const snapshot = $derived(trajectories.current);
 	const identities = new WeakMap<ActiveVehicle[], string[]>();
 	const pools = new SvelteMap<Source, ActiveVehicle[]>();
 	let frame = $state(0);
 	let membership = $state(0);
-
-	const updates = getUpdateStatus();
-	$effect(() => {
-		const selected = [...sources];
-		const at = fixedAt;
-		return untrack(() => {
-			return watchTrajectories(
-				{ sources: selected, at, refreshInterval: 30_000 },
-				(next) => {
-					snapshot = next;
-				},
-				undefined,
-				updates
-			);
-		});
-	});
 
 	function update(time: number) {
 		let changed = false;
@@ -82,12 +63,12 @@
 
 	$effect(() => {
 		void snapshot;
-		const at = fixedAt;
+		const at = current_time.value;
 		untrack(() => {
 			update(at ?? Date.now() / 1000);
 			membership++;
 		});
-		if (at !== null) return;
+		if (at !== undefined) return;
 		let previous = 0;
 		let id: number;
 		function animate(now: number) {

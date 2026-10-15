@@ -3,17 +3,24 @@ use super::{
     geometry::{geom_to_linestring, shape_key_from_line},
     types::{TrajectoryStop, TripSnapshot},
 };
-use crate::{
-    models::{
-        position::VehiclePosition,
-        source::Source,
-        trip::{StopTime, Trip, TripData},
-    },
-    static_data::index::StaticTransitRevision,
-};
+use crate::network::index::NetworkRevision;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::StopVisit;
+use crate::operations::types::trip::TripData;
+use crate::operations::types::trip::TripRun;
+use crate::source::Source;
 use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};
-use geo::{Coord, LineString};
+use geo::{Coord, Distance, Euclidean, LineString};
+
+/// A borrowed geometry view can come from a live revision or retained inputs.
+pub(crate) struct GeometryInputs<'a> {
+    pub source: Source,
+    pub historical: bool,
+    pub route_color: &'a str,
+    pub stops: &'a std::collections::HashMap<String, crate::network::index::IndexedStop>,
+    pub shapes: &'a std::collections::HashMap<String, crate::geometry::Geom>,
+}
 
 fn connected(a: Coord<f64>, b: Coord<f64>) -> bool {
     a == b
@@ -24,7 +31,8 @@ fn connected(a: Coord<f64>, b: Coord<f64>) -> bool {
 /// same station need not coincide, so identity, not a distance cutoff, determines
 /// whether consecutive provider segments belong to one ordered path.
 fn subway_leg_stations(id: &str) -> Option<(&str, &str)> {
-    let (from, to) = id.split_once('-')?;
+    let provider_id = id.split_once('@').map_or(id, |(provider, _)| provider);
+    let (from, to) = provider_id.split_once('-')?;
     (!from.is_empty()
         && !to.is_empty()
         && from.bytes().all(|c| c.is_ascii_digit())
@@ -43,8 +51,8 @@ fn append_segment(coords: &mut Vec<Coord<f64>>, segment: Vec<Coord<f64>>) {
 /// chains preserve the provider's geometry order, bridging station junction gaps.
 /// Shapes without station identity can only join at exact shared endpoints and
 /// are oriented there. Bus IDs refer to one resolved whole-route shape.
-fn trip_shape(trip: &Trip, revision: &StaticTransitRevision) -> anyhow::Result<LineString<f64>> {
-    ensure!(!trip.shape_ids.is_empty(), "Trip has no resolved shape");
+fn trip_shape(trip: &TripRun, revision: &GeometryInputs<'_>) -> anyhow::Result<LineString<f64>> {
+    ensure!(!trip.shape_ids.is_empty(), "TripRun has no resolved shape");
     if revision.source != Source::MtaSubway {
         ensure!(
             trip.shape_ids.len() == 1,
@@ -113,10 +121,32 @@ fn trip_shape(trip: &Trip, revision: &StaticTransitRevision) -> anyhow::Result<L
 /// Build inputs entirely from a committed source snapshot and its pinned static
 /// revision. Stop projection uses the same meter-based geometry as interpolation.
 pub async fn snapshot_from_persisted_trip(
-    trip: &Trip,
-    mut stop_times: Vec<StopTime>,
-    positions: Vec<VehiclePosition>,
-    revision: &StaticTransitRevision,
+    trip: &TripRun,
+    stop_times: Vec<StopVisit>,
+    positions: Vec<VehicleObservation>,
+    revision: &NetworkRevision,
+    cache: &TrajectoryCache,
+    as_of: DateTime<Utc>,
+) -> anyhow::Result<TripSnapshot> {
+    let inputs = GeometryInputs {
+        source: revision.source,
+        historical: false,
+        route_color: &revision
+            .routes
+            .get(&trip.route_id)
+            .context("Missing static route")?
+            .color,
+        stops: &revision.stops,
+        shapes: &revision.shapes,
+    };
+    snapshot_from_geometry(trip, stop_times, positions, &inputs, cache, as_of).await
+}
+
+pub(crate) async fn snapshot_from_geometry(
+    trip: &TripRun,
+    mut stop_times: Vec<StopVisit>,
+    positions: Vec<VehicleObservation>,
+    revision: &GeometryInputs<'_>,
     cache: &TrajectoryCache,
     as_of: DateTime<Utc>,
 ) -> anyhow::Result<TripSnapshot> {
@@ -130,10 +160,6 @@ pub async fn snapshot_from_persisted_trip(
         geometry.length_m.is_finite() && geometry.length_m > 0.0,
         "Invalid projected shape length"
     );
-    let route = revision
-        .routes
-        .get(&trip.route_id)
-        .context("Missing static route")?;
     // TODO: shouldn't stop times already be sorted?
     stop_times.sort_by(|a, b| {
         a.arrival
@@ -155,6 +181,19 @@ pub async fn snapshot_from_persisted_trip(
             point.x().is_finite() && point.y().is_finite(),
             "Non-finite stop point"
         );
+        if revision.historical {
+            let projected = super::geometry::project_wgs84_point_to_epsg(
+                &point,
+                super::types::source_projected_epsg_code(revision.source),
+            )
+            .context("Stop projection failed")?;
+            // History uses today's descriptions, not an archived network. Avoid
+            // projecting a relocated stop onto a retained path kilometres away.
+            ensure!(
+                Euclidean.distance(&projected, &geometry.projected_line) <= 500.0,
+                "Retained stop location is incompatible with the run shape"
+            );
+        }
         let distance = cache
             .get_stop_projection(
                 revision.source,
@@ -193,7 +232,7 @@ pub async fn snapshot_from_persisted_trip(
     Ok(TripSnapshot {
         trip_id: trip.id,
         route_id: trip.route_id.clone(),
-        route_color: route.color.clone(),
+        route_color: revision.route_color.into(),
         direction: trip.direction,
         shape,
         shape_key,
@@ -203,10 +242,8 @@ pub async fn snapshot_from_persisted_trip(
         consist_car_length_m: consist.map(|c| c.car_length_feet as f32 * 0.3048),
         stops,
         positions,
+        // Live inputs have vehicle reports; history supplies a recorded GPS anchor.
+        recorded_anchor: None,
         as_of,
     })
-}
-
-pub fn source_supports_trajectories(source: Source) -> bool {
-    matches!(source, Source::MtaSubway | Source::MtaBus | Source::NjtBus)
 }

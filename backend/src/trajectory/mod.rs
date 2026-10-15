@@ -6,6 +6,7 @@ mod calculator;
 pub(crate) mod continuity;
 mod derive;
 pub(crate) mod geometry;
+mod history;
 pub(crate) mod interpolation;
 mod platform;
 pub(crate) mod render_units;
@@ -23,11 +24,10 @@ pub use calculator::{TrajectoryCalculator, compute_trajectory, compute_trajector
 pub use continuity::ContinuityDiscardReason;
 pub use geometry::{route_length_m, shape_key_from_line};
 pub use render_units::{expand_render_units, source_render_config};
-pub use snapshot::{snapshot_from_persisted_trip, source_supports_trajectories};
+pub use snapshot::snapshot_from_persisted_trip;
 pub use types::{
     ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit, Trajectory,
-    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, bbox_intersects,
-    compute_path_bbox, source_projected_epsg_code,
+    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, source_projected_epsg_code,
 };
 
 pub use derive::TrajectoryDeriver;

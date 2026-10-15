@@ -1,6 +1,7 @@
-use crate::models::source::Source;
-use crate::models::stop::{PlatformEdge, StopData};
-use crate::models::trip::StopTimeData;
+use crate::network::types::stop::PlatformEdge;
+use crate::network::types::stop::StopData;
+use crate::operations::types::trip::StopTimeData;
+use crate::source::Source;
 
 use super::super::builder::{
     TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
@@ -104,7 +105,17 @@ impl MtaSubwayBuilder {
         }
     }
 
-    fn live_anchor_knot(trip: &TripSnapshot, shape_geom: &ShapeGeometry) -> Option<TrajectoryKnot> {
+    fn vehicle_anchor_knot(
+        trip: &TripSnapshot,
+        shape_geom: &ShapeGeometry,
+    ) -> Option<TrajectoryKnot> {
+        if trip.recorded_anchor.is_some() {
+            return super::super::builder::recorded_anchor_knot(
+                trip,
+                shape_geom,
+                Source::MtaSubway,
+            );
+        }
         let position = trip
             .positions
             .iter()
@@ -132,10 +143,6 @@ impl MtaSubwayBuilder {
 }
 
 impl TrajectoryBuilder for MtaSubwayBuilder {
-    fn source(&self) -> Source {
-        Source::MtaSubway
-    }
-
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
@@ -189,7 +196,7 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
         });
 
         let mut stats = KnotGenerationStats::default();
-        if let Some(anchor) = Self::live_anchor_knot(trip, shape_geom) {
+        if let Some(anchor) = Self::vehicle_anchor_knot(trip, shape_geom) {
             stats.live_anchor_gap_m = all_knots.first().map(|k| (anchor.s_m - k.s_m).abs());
             let original_len = all_knots.len();
             retain_anchor_consistent_knots(&mut all_knots, &anchor);

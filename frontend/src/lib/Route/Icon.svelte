@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Route } from '#lib/client/index.js';
+	import type { CatalogRoute } from '#lib/client/index.js';
 	import icons from '#lib/icons.js';
-	import { alert_context } from '#lib/resources/alerts.svelte.js';
-	import { open_modal } from '#lib/url_params.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	let {
 		route,
@@ -12,16 +12,20 @@
 		height = 16,
 		show_alerts = false
 	}: {
-		route: Route;
+		route: CatalogRoute;
 		link: boolean;
 		class?: string;
 		width?: number;
 		height?: number;
 		show_alerts?: boolean;
 	} = $props();
-	const alerts = alert_context.get();
+	const transit = getTransitData();
+	const current_time = getCurrentTime();
+	const alerts_resource = transit.alerts(() =>
+		show_alerts && route ? { source: route.data.source, at: current_time.value } : null
+	);
 	const hasAlert = $derived(
-		show_alerts && alerts?.[route.data.source]?.current?.alerts_by_route.has(route.id)
+		show_alerts && !!route && alerts_resource.current.value?.by_route.has(route.id)
 	);
 	const classes = $derived([
 		'inline-flex shrink-0 items-center rounded-md',
@@ -30,10 +34,12 @@
 	]);
 	const size = $derived(Math.max(width, height));
 	const icon = $derived(
-		route.data.source === 'mta_subway' ? icons.find((item) => item.name === route.id) : undefined
+		route?.data.source === 'mta_subway' ? icons.find((item) => item.name === route.id) : undefined
 	);
-	const label = $derived(route.short_name);
-	const parts = $derived(route.data.source === 'mta_bus' ? label.match(/^([A-Za-z]+)(.*)$/) : null);
+	const label = $derived(route?.short_name ?? '');
+	const parts = $derived(
+		route?.data.source === 'mta_bus' ? label.match(/^([A-Za-z]+)(.*)$/) : null
+	);
 </script>
 
 {#snippet badge()}
@@ -53,8 +59,8 @@
 		<span
 			class="route-badge bus-badge"
 			style:--badge-size={`${size}px`}
-			style:background-color={route.color || '#526173'}
-			style:color={route.text_color || 'white'}
+			style:background-color={route?.color || '#526173'}
+			style:color={route?.text_color || 'white'}
 			aria-label={label}
 		>
 			{#if parts?.[2]}<span class="prefix">{parts[1]}</span>{parts[2]}{:else}{label}{/if}
@@ -67,7 +73,7 @@
 		type="button"
 		class={[classes, 'focus-visible:outline-2 focus-visible:outline-blue-400']}
 		aria-label={`Open route ${label}`}
-		onclick={() => open_modal({ type: 'route', ...route })}
+		onclick={() => open_modal({ type: 'route', source: route.data.source, id: route.id })}
 	>
 		{@render badge()}
 	</button>

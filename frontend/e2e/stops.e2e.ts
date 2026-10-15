@@ -1,10 +1,11 @@
-import type { Stop } from '../src/lib/client/index.js';
+import type { Catalog, CatalogStop } from '../src/lib/client/index.js';
 import { expect, test } from './fixtures';
 
 const qualifying = ['full_time', 'part_time', 'rush_hour'];
 
 test('subway stop search filters by name, stop id, and route id', async ({ page }) => {
-	const stops = (await (await page.request.get('/api/v1/stops/mta_subway')).json()) as Stop[];
+	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
+		.stops;
 	const counts = new Map<string, number>();
 	for (const stop of stops) {
 		for (const word of stop.name.toLowerCase().split(/[^a-z0-9]+/)) {
@@ -16,7 +17,7 @@ test('subway stop search filters by name, stop id, and route id', async ({ page 
 	expect(word).toBeTruthy();
 	const named = stops.filter((stop) => stop.name.toLowerCase().includes(word!));
 
-	const byRoute = new Map<string, Stop[]>();
+	const byRoute = new Map<string, CatalogStop[]>();
 	for (const stop of stops) {
 		for (const route of stop.routes) {
 			if (route.data.source !== 'mta_subway') continue;

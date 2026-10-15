@@ -1,4 +1,5 @@
-use crate::support::{contracts, njt_bus_dataset};
+use crate::support::contracts;
+use crate::support::njt_bus_dataset;
 
 #[test]
 fn static_fixture_preserves_exact_patterns_and_canonical_stops() {

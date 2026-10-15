@@ -1,8 +1,13 @@
 [tasks.pnpm-install]
 description = "Installs dependencies with pnpm"
-run = "pnpm install"
-sources = ["package.json", "pnpm-lock.yaml", "mise.toml"]
+run = "pnpm install --frozen-lockfile"
+sources = ["mise.toml", "package.json", "pnpm-lock.yaml"]
 outputs = ["node_modules/.pnpm/lock.yaml"]
+
+[tasks.check]
+description = "Check Svelte, TypeScript and service worker types"
+depends = ["pnpm-install"]
+run = "pnpm check"
 
 [tasks.dev]
 run = "pnpm dev"

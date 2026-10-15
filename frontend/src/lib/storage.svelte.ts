@@ -1,97 +1,80 @@
-// mostly from: https://github.com/Rich-Harris/local-storage-test/blob/main/src/lib/storage.svelte.ts (changed browser checks)
-import { tick } from 'svelte';
+/* eslint-disable svelte/prefer-svelte-reactivity -- this registry is listener
+   bookkeeping; views track each instance's native value, not registry membership. */
+import { createSubscriber } from 'svelte/reactivity';
 
 import { browser } from '$app/env';
 
-export class LocalStorage<T> {
-	#key: string;
-	#version = $state(0);
-	#listeners = 0;
-	#value: T;
+interface StoredValue {
+	refresh(): void;
+}
 
-	#handler = (e: StorageEvent) => {
-		if (e.storageArea !== localStorage) return;
-		if (e.key !== this.#key) return;
+// Weak references let temporary list/tab preferences disappear with their component.
+const instances = new Map<string, Set<WeakRef<StoredValue>>>();
 
-		this.#version += 1;
+function refresh(key: string | null) {
+	for (const [name, values] of instances) {
+		if (key !== null && name !== key) continue;
+		for (const ref of values) {
+			const value = ref.deref();
+			if (value) value.refresh();
+			else values.delete(ref);
+		}
+		if (!values.size) instances.delete(name);
+	}
+}
+
+// createSubscriber ties the single external listener to mounted readers, including module-level preferences.
+const subscribe = createSubscriber(() => {
+	if (!browser) return;
+	refresh(null);
+	const changed = (event: StorageEvent) => {
+		if (event.storageArea === localStorage) refresh(event.key);
 	};
+	window.addEventListener('storage', changed);
+	return () => window.removeEventListener('storage', changed);
+});
 
-	constructor(key: string, initial: T) {
-		this.#key = key;
-		this.#value = initial;
+/** Cached preferences. Replace `current` to change and persist a value. */
+export class LocalStorage<T> {
+	#value = $state.raw<T>();
 
+	constructor(
+		readonly key: string,
+		readonly initial: T
+	) {
+		this.refresh();
+		if (!browser) return;
+		let values = instances.get(key);
+		if (!values) instances.set(key, (values = new Set()));
+		values.add(new WeakRef(this));
+	}
+
+	refresh() {
+		let next = this.initial;
 		if (browser) {
-			if (localStorage.getItem(key) === null) {
-				localStorage.setItem(key, JSON.stringify(initial));
+			try {
+				const saved = localStorage.getItem(this.key);
+				if (saved !== null) next = JSON.parse(saved) as T;
+			} catch {
+				// An inaccessible or malformed saved value uses the in-memory default.
 			}
 		}
+		if (JSON.stringify(next) !== JSON.stringify(this.#value)) this.#value = next;
 	}
 
 	get current(): T {
-		void this.#version;
-
-		const root: T = browser ? JSON.parse(localStorage.getItem(this.#key) as string) : this.#value;
-
-		const proxies = new WeakMap();
-
-		const proxy = <V>(value: V): V => {
-			if (typeof value !== 'object' || value === null) {
-				return value;
-			}
-
-			let p = proxies.get(value);
-
-			if (!p) {
-				p = new Proxy(value as object, {
-					get: (target, property) => {
-						void this.#version;
-						return proxy(Reflect.get(target, property));
-					},
-					set: (target, property, value) => {
-						this.#version += 1;
-						Reflect.set(target, property, value);
-
-						if (browser) {
-							localStorage.setItem(this.#key, JSON.stringify(root));
-						}
-
-						return true;
-					}
-				});
-
-				proxies.set(value, p);
-			}
-
-			return p as V;
-		};
-
-		if ($effect.tracking()) {
-			$effect(() => {
-				if (this.#listeners === 0) {
-					window.addEventListener('storage', this.#handler);
-				}
-
-				this.#listeners += 1;
-
-				return () => {
-					tick().then(() => {
-						this.#listeners -= 1;
-						if (this.#listeners === 0) {
-							window.removeEventListener('storage', this.#handler);
-						}
-					});
-				};
-			});
-		}
-
-		return proxy(root);
+		subscribe();
+		return this.#value!;
 	}
 
 	set current(value: T) {
-		if (browser) {
-			localStorage.setItem(this.#key, JSON.stringify(value));
+		this.#value = value;
+		if (!browser) return;
+		try {
+			localStorage.setItem(this.key, JSON.stringify(value));
+			refresh(this.key);
+		} catch {
+			// Preferences still work in memory when persistence is unavailable.
 		}
-
-		this.#version += 1;
 	}
 }

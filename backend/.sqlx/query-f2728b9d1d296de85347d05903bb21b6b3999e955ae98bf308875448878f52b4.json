@@ -1,0 +1,128 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                *\n            FROM realtime.vehicle_position\n            WHERE source = $1\n            AND vehicle_id = ANY($2)\n            ORDER BY vehicle_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "vehicle_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "vehicle_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "source",
+        "type_info": {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "trip_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "trip_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "stop_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "stop_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "geom",
+        "type_info": {
+          "Custom": {
+            "name": "geometry",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "geom"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "data",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "data"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "realtime.vehicle_position",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f2728b9d1d296de85347d05903bb21b6b3999e955ae98bf308875448878f52b4"
+}

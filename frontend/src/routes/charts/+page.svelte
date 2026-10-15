@@ -7,13 +7,10 @@
 	import AxisY from '#lib/charts/AxisY.svelte';
 	import { buildChartData, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
-	import type { Route, Source } from '#lib/client/index.js';
-	import { source_info, type SourceMap } from '#lib/resources/index.svelte.js';
-	import { awaitingRows } from '#lib/resources/pending.js';
-	import { stop_time_context } from '#lib/resources/stop_times.svelte.js';
-	import { trip_context } from '#lib/resources/trips.svelte.js';
+	import type { CatalogRoute, Source } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
@@ -21,27 +18,16 @@
 	import { flatten, LayerCake, Svg } from 'layercake';
 
 	const current_time = getCurrentTime();
+	const transit = getTransitData();
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
-	const all_trips = trip_context.get();
-	const all_stop_times = stop_time_context.get();
+	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
+	const catalogs = $derived(catalog_resources.current);
 
-	const trips_loading = $derived(
-		page.data.selected_sources.some((source) =>
-			awaitingRows(all_trips[source], all_trips[source]?.current.size ?? 0)
-		)
-	);
-
-	let routes = $state<SourceMap<Route[]>>(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [
-				source,
-				source === 'mta_subway' && page.data.routes_by_id[source]?.['4']
-					? [page.data.routes_by_id[source]['4']]
-					: []
-			])
-		) as SourceMap<Route[]>
+	type RouteKey = { source: Source; id: string };
+	let selected = $state<RouteKey[]>(
+		page.data.selected_sources.includes('mta_subway') ? [{ source: 'mta_subway', id: '4' }] : []
 	);
 
 	// 0 = first direction (subway northbound / bus dir 0)
@@ -49,17 +35,28 @@
 	let direction_index = $state(0);
 
 	// Per-source direction values: subway uses 1 (north) / 3 (south), bus uses 0 / 1
-	const source_directions = $derived<SourceMap<number>>(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [
-				source,
-				source === 'mta_subway' ? (direction_index === 0 ? 1 : 3) : direction_index
-			])
-		) as SourceMap<number>
+	const direction_of = (source: Source) =>
+		source === 'mta_subway' ? (direction_index === 0 ? 1 : 3) : direction_index;
+
+	// Selected routes present in their source catalogs (for Lines, export filename, etc.)
+	const selected_routes_flat = $derived(
+		selected.flatMap(({ source, id }) => {
+			const route = catalogs.find((c) => c.source === source)?.catalog?.routes_by_id.get(id);
+			return route ? [route] : [];
+		})
 	);
 
-	// Flat list of all selected routes (for Lines component, export filename, etc.)
-	const selected_routes_flat = $derived(Object.values(routes).flat());
+	const route_resources = transit.routes(() =>
+		selected.map((key) => ({
+			source: key.source,
+			route_id: key.id,
+			at: current_time.value
+		}))
+	);
+	const reads = $derived(route_resources.current);
+	const trips_loading = $derived(
+		catalogs.some((c) => !c.catalog && !c.error) || reads.some((r) => !r.route && !r.error)
+	);
 
 	let stop_points = $state<boolean>(false);
 	let current_time_line = $state<boolean>(true);
@@ -67,47 +64,17 @@
 	let xAxisInterval = $state<number>(15);
 	let displayHours = $state<number>(3);
 
-	// TODO: add tabs so users have to choose the source
-	// Monitor bus routes in the stop_times resource
-	$effect(() => {
-		const releases = page.data.selected_sources.flatMap((source) => {
-			if (!source_info[source].monitor_routes) return [];
-			const release = all_stop_times[source]?.hold((routes[source] ?? []).map((route) => route.id));
-			return release ? [release] : [];
-		});
-		return () => {
-			for (const release of releases) release();
-		};
-	});
-
 	const data = $derived.by(() => {
 		const inputs: ChartInput[] = [];
-
-		for (const source of page.data.selected_sources) {
-			const source_routes = routes[source];
-			if (!source_routes?.length) continue;
-
-			const trips_map = all_trips?.[source]?.current;
-			if (!trips_map) continue;
-
-			const stop_times_resource = all_stop_times?.[source];
-			const direction = source_directions[source];
-
-			for (const trip of trips_map.values()) {
-				if (!source_routes.some((r) => r.id === trip.route_id)) continue;
-				if (trip.direction !== direction) continue;
-
-				const trip_st = stop_times_resource?.current.by_trip_id.get(trip.id);
-				if (!trip_st?.length) continue;
-
-				inputs.push({
-					trip,
-					stopTimes: trip_st,
-					stops: page.data.stops_by_id[source] ?? {}
-				});
+		for (const { source, route_id: id, route } of reads) {
+			const stops = catalogs.find((c) => c.source === source)?.catalog?.stops_by_id;
+			if (!route || !stops) continue;
+			for (const trip of route.trips.values()) {
+				if (trip.direction !== direction_of(source)) continue;
+				const calls = route.calls_by_trip.get(trip.id);
+				if (calls?.length) inputs.push({ source, route_id: id, trip, calls, stops });
 			}
 		}
-
 		return buildChartData(inputs, current_time.ms);
 	});
 
@@ -186,13 +153,15 @@
 
 	// Sorted flat list of all routes from all sources (subway first, then bus)
 	const sortedRoutes = $derived(
-		(Object.values(page.data.routes) as Route[][]).flat().sort((a, b) => {
-			// Subway routes come first
-			if (a.data.source === 'mta_subway' && b.data.source !== 'mta_subway') return -1;
-			if (a.data.source !== 'mta_subway' && b.data.source === 'mta_subway') return 1;
-			// Then sort by short_name
-			return a.short_name.localeCompare(b.short_name);
-		})
+		catalogs
+			.flatMap((c) => c.catalog?.routes ?? [])
+			.sort((a, b) => {
+				// Subway routes come first
+				if (a.data.source === 'mta_subway' && b.data.source !== 'mta_subway') return -1;
+				if (a.data.source !== 'mta_subway' && b.data.source === 'mta_subway') return 1;
+				// Then sort by short_name
+				return a.short_name.localeCompare(b.short_name);
+			})
 	);
 
 	// Filter routes based on search query
@@ -222,7 +191,7 @@
 	);
 
 	// Get display name for a route
-	function getRouteDisplayName(route: Route) {
+	function getRouteDisplayName(route: CatalogRoute) {
 		return route.short_name === 'S' ? route.id : route.short_name;
 	}
 
@@ -234,28 +203,26 @@
 	}
 
 	// Handle route selection
-	function selectRoute(selectedRoute: Route) {
-		const source = selectedRoute.data.source as Source;
-		if (!routes[source]?.some((r) => r.id === selectedRoute.id)) {
-			routes[source] = [...(routes[source] ?? []), selectedRoute];
+	function selectRoute(selectedRoute: CatalogRoute) {
+		if (!isRouteSelected(selectedRoute)) {
+			selected = [...selected, { source: selectedRoute.data.source, id: selectedRoute.id }];
 		}
 		isComboboxOpen = false;
 		searchQuery = ''; // Clear search when selection is made
 	}
 
 	// Remove a route from selection
-	function removeRoute(routeToRemove: Route) {
+	function removeRoute(routeToRemove: CatalogRoute) {
 		// Don't remove if it's the last route
-		const total = Object.values(routes).reduce((sum, arr) => sum + (arr?.length ?? 0), 0);
-		if (total <= 1) return;
-		const source = routeToRemove.data.source as Source;
-		routes[source] = routes[source]?.filter((r) => r.id !== routeToRemove.id);
+		if (selected.length <= 1) return;
+		selected = selected.filter(
+			(key) => key.source !== routeToRemove.data.source || key.id !== routeToRemove.id
+		);
 	}
 
 	// Check if route is already selected
-	function isRouteSelected(route: Route) {
-		const source = route.data.source as Source;
-		return routes[source]?.some((r) => r.id === route.id) ?? false;
+	function isRouteSelected(route: CatalogRoute) {
+		return selected.some((key) => key.source === route.data.source && key.id === route.id);
 	}
 
 	// Handle combobox keyboard navigation
@@ -279,7 +246,7 @@
 	}
 
 	// Handle option keyboard navigation
-	function handleOptionKeydown(event: KeyboardEvent, routeOption: Route) {
+	function handleOptionKeydown(event: KeyboardEvent, routeOption: CatalogRoute) {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
 			selectRoute(routeOption);
@@ -598,6 +565,10 @@
 						</Svg>
 					</LayerCake>
 				</div>
+			</div>
+		{:else if catalogs.some((c) => c.error) || reads.some((r) => r.error)}
+			<div class="flex h-full items-center justify-center text-neutral-400">
+				Couldn't load chart data
 			</div>
 		{:else}
 			<div class="flex h-full items-center justify-center text-neutral-400">No data available</div>

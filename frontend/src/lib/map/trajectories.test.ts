@@ -1,14 +1,49 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { watchTrajectories } from './trajectories';
+import { watchTrajectories } from './trajectories.svelte.js';
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+	vi.restoreAllMocks();
+	vi.useRealTimers();
+});
+
+test('a stalled trajectory request times out and refresh recovers', async () => {
+	vi.useFakeTimers();
+	const deadline = new AbortController();
+	const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(deadline.signal);
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let requests = 0;
+	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: undefined, refreshInterval: 30_000 },
+		(snapshot) => (latest = snapshot),
+		async (_url, init) => {
+			if (++requests > 1) return new Response(trajectoryFixture());
+			const signal = init!.signal!;
+			return new Promise<Response>((_resolve, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason));
+			});
+		}
+	);
+	try {
+		expect(timeout).toHaveBeenCalledWith(15_000);
+		deadline.abort(new DOMException('Request timed out', 'TimeoutError'));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(latest?.statuses.get('mta_bus')?.error?.name).toBe('TimeoutError');
+		await stop.refresh();
+		expect(requests).toBe(2);
+		expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
+		expect(latest?.statuses.get('mta_bus')?.error).toBeNull();
+	} finally {
+		stop();
+	}
+});
 
 test('a failed historical Arrow update retries until network recovery', async () => {
 	vi.useFakeTimers();
 	const { trajectoryFixture } = await import('./trajectoryFixture');
 	let calls = 0;
-	let latest: import('./trajectories').TrajectorySnapshot | undefined;
+	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
 	const stop = watchTrajectories(
 		{ sources: ['mta_bus'], at: 0, refreshInterval: 100 },
 		(snapshot) => {
@@ -49,12 +84,40 @@ test('historical failures retry at the selected time', async () => {
 	stop();
 });
 
+test('successful historical trajectories ignore live commit age and do not poll again', async () => {
+	vi.useFakeTimers();
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let requests = 0;
+	let tracked: import('#lib/transit/store.svelte.js').TrackedUpdate | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: 0 },
+		() => {},
+		async () => {
+			requests++;
+			return new Response(trajectoryFixture(), { headers: { 'x-source-updated-at': '1' } });
+		},
+		(update) => {
+			tracked = update;
+			return () => {};
+		}
+	);
+	try {
+		await stop.refresh();
+		await vi.advanceTimersByTimeAsync(91_000);
+		expect(tracked?.source_updated_at).toBeNull();
+		expect(tracked?.error).toBeNull();
+		expect(requests).toBe(1);
+	} finally {
+		stop();
+	}
+});
+
 test('disposing a query aborts its requests and rejects late completions', async () => {
 	let signal: AbortSignal | null | undefined;
 	let finish!: (response: Response) => void;
 	const updates: unknown[] = [];
 	const stop = watchTrajectories(
-		{ sources: ['mta_bus'], at: null, refreshInterval: 100 },
+		{ sources: ['mta_bus'], at: undefined, refreshInterval: 100 },
 		(update) => updates.push(update),
 		async (_url, init) => {
 			signal = init?.signal;
@@ -76,7 +139,7 @@ test('live polling reports a source failure and stops after disposal', async () 
 	let requests = 0;
 	const errors: string[] = [];
 	const stop = watchTrajectories(
-		{ sources: ['njt_bus'], at: null, refreshInterval: 100 },
+		{ sources: ['njt_bus'], at: undefined, refreshInterval: 100 },
 		(update) => {
 			for (const state of update.statuses.values()) {
 				if (state.error) errors.push(state.error.message);
@@ -101,7 +164,7 @@ test('a successful empty snapshot clears vehicles but a failed refresh preserves
 	let requests = 0;
 	const counts: number[] = [];
 	const stop = watchTrajectories(
-		{ sources: ['mta_subway'], at: null, refreshInterval: 100 },
+		{ sources: ['mta_subway'], at: undefined, refreshInterval: 100 },
 		(snapshot) => {
 			counts.push(snapshot.tables.get('mta_subway')?.table.numRows ?? -1);
 		},

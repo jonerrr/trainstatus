@@ -1,21 +1,19 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 
-	import type { Source } from '#lib/client/index.js';
+	import type { Catalog } from '#lib/client/index.js';
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
-	import { alert_context, createAlertResource } from '#lib/resources/alerts.svelte.js';
-	import { createPositionResource, position_context } from '#lib/resources/positions.svelte.js';
-	import { setUpdateStatus, UpdateStatus } from '#lib/resources/status.svelte.js';
-	import { createStopTimeResource, stop_time_context } from '#lib/resources/stop_times.svelte.js';
-	import { createTripResource, trip_context } from '#lib/resources/trips.svelte.js';
 	import SEO from '#lib/SEO.svelte';
+	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
+		close_modal,
 		createCurrentTime,
+		modal_from_url,
 		setCurrentTime
 	} from '#lib/url_params.svelte.js';
 
@@ -24,117 +22,57 @@
 
 	let { children } = $props();
 
-	const current_time = setCurrentTime(createCurrentTime(atParamToUnixSeconds(page.data.at)));
-
-	const update_status = setUpdateStatus(new UpdateStatus());
-
-	trip_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createTripResource(source)])
-		)
+	const current_time = setCurrentTime(
+		createCurrentTime(atParamToUnixSeconds(page.url.searchParams.get('at')))
 	);
 
-	stop_time_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createStopTimeResource(source)])
-		)
+	// One owner per layout instance; on the server it never fetches.
+	const transit = setTransitData(
+		new TransitData({
+			sources: page.data.selected_sources,
+			at: current_time.value,
+			eager_service: page.url.pathname !== '/map'
+		})
 	);
-
-	position_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createPositionResource(source)])
-		)
-	);
-
-	alert_context.set(
-		Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, createAlertResource(source)])
-		)
-	);
-
-	// Initialize modal from URL params on page load
-	onMount(() => {
-		const url = page.url;
-		const stop_id = url.searchParams.get('s');
-		const route_id = url.searchParams.get('r');
-		const source_id = url.searchParams.get('src') as Source | null;
-
-		if (!source_id) {
-			console.warn('No source specified in URL params, skipping modal initialization');
-			return;
-		}
-
-		if (stop_id) {
-			const stop = page.data.stops_by_id[source_id]?.[stop_id];
-			if (stop) {
-				tick().then(() =>
-					goto('', {
-						shallow: true,
-						replace: true,
-						state: { modal: { ...stop, type: 'stop' } }
-					})
-				);
-			}
-		} else if (route_id) {
-			const route = page.data.routes_by_id[source_id]?.[route_id];
-			if (route) {
-				tick().then(() =>
-					goto('', {
-						shallow: true,
-						replace: true,
-						state: { modal: { ...route, type: 'route' } }
-					})
-				);
-			}
-		}
-	});
-
-	// A direct trip URL can recover through the shared Retry or reconnect handler.
 	$effect(() => {
-		const params = page.url.searchParams;
-		const trip_id = params.get('t');
-		const source = params.get('src') as Source | null;
-		if (!trip_id || !source || params.has('s') || params.has('r') || page.state.modal) return;
-		const resource = trip_context.getSource(source);
-		if (!resource?.available) return;
-		const trip = resource.current.get(trip_id);
-		if (trip)
-			void goto('', {
-				shallow: true,
-				replace: true,
-				state: { ...page.state, modal: { ...trip, type: 'trip' } }
-			});
-	});
-
-	// Sync current_time.value with ?at URL param whenever it changes.
-	// Reads page.url inside untrack so this effect only re-runs when current_time changes.
-	$effect(() => {
-		const val = current_time.value;
+		const sources = page.data.selected_sources;
+		const eager = page.url.pathname !== '/map';
+		const at = atParamToUnixSeconds(page.url.searchParams.get('at'));
 		untrack(() => {
-			const current_at = page.url.searchParams.get('at');
-			const new_at = val !== undefined ? val.toString() : null;
-			console.log(
-				`current_time changed: ${current_time.value} (URL param at=${current_at}), syncing to ${new_at}`
-			);
-			if (current_at === new_at) return; // no change needed
-
-			const url = new URL(page.url.href);
-			if (val !== undefined) url.searchParams.set('at', val.toString());
-			else url.searchParams.delete('at');
-			console.log(`Updating URL search param at=${new_at} (was ${current_at})`);
-			goto(url.pathname + url.search, { shallow: true, replace: true, state: page.state });
+			current_time.value = at;
+			transit.setTime(at);
+			transit.setEagerService(eager);
+			transit.setSources(sources);
 		});
+	});
+	onDestroy(() => transit.destroy());
+
+	// Open the modal a direct link identifies; the modal loads its own data.
+	onMount(() => {
+		const modal = modal_from_url(page.url);
+		if (modal) void tick().then(() => goto('', { shallow: true, replace: true, state: { modal } }));
+		else if (['s', 'r', 't'].some((key) => page.url.searchParams.has(key)))
+			close_modal(current_time.value, true);
+	});
+
+	// CacheStorage does not perform HTTP-cache validation. The worker serves saved data
+	// immediately, then sends replacements to this already-mounted app.
+	onMount(() => {
+		const worker = navigator.serviceWorker;
+		const message = (event: MessageEvent<{ type?: string; body?: Catalog }>) => {
+			if (event.data?.type === 'catalog' && event.data.body)
+				transit.replaceCatalog(event.data.body);
+		};
+		worker?.addEventListener('message', message);
+		return () => worker?.removeEventListener('message', message);
 	});
 </script>
 
 <SEO />
 
 <svelte:window
-	onoffline={() => {
-		void update_status.retry(true);
-	}}
 	ononline={() => {
-		void update_status.retry(true);
+		transit.retry();
 	}}
 />
 

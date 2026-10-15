@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO static.route(id, source, long_name, short_name, color, text_color, data)\n            SELECT\n                u.id,\n                u.source,\n                u.long_name,\n                u.short_name,\n                u.color,\n                u.text_color,\n                u.data\n            FROM unnest($1::text[], $2::source_enum[], $3::text[], $4::text[], $5::text[], $6::text[], $7::jsonb[]) AS u(id, source, long_name, short_name, color, text_color, data)\n            ON CONFLICT(id, source)\n            DO UPDATE SET\n                current = TRUE,\n                long_name = EXCLUDED.long_name,\n                short_name = EXCLUDED.short_name,\n                color = EXCLUDED.color,\n                text_color = EXCLUDED.text_color,\n                data = EXCLUDED.data\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": [
+                      "mta_subway",
+                      "mta_bus",
+                      "njt_bus"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2914e5e405e2e5e2191e6c268937e5ea89b59edbd9035e525a79be5d3087e4a3"
+}

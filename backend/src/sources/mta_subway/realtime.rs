@@ -1,19 +1,25 @@
+use crate::operations::RunKey;
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 
-use crate::models::source::Source;
-use crate::models::{
-    position::{MtaSubwayPositionData, PositionData, VehiclePosition},
-    trip::{
-        Consist, MtaSubwayStopTimeData, MtaSubwayTripData, StopTime, StopTimeData, Trip, TripData,
-    },
-};
-use crate::realtime::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig};
+use crate::operations::CollectedSnapshot;
+use crate::operations::RealtimeSource;
+use crate::operations::RealtimeSourceConfig;
+use crate::operations::source::CollectedObservation as VehicleObservation;
+use crate::operations::source::CollectedTrip as TripRun;
+use crate::operations::source::CollectedVisit as StopVisit;
+use crate::operations::types::position::MtaSubwayPositionData;
+use crate::operations::types::position::PositionData;
+use crate::operations::types::trip::Consist;
+use crate::operations::types::trip::MtaSubwayStopTimeData;
+use crate::operations::types::trip::MtaSubwayTripData;
+use crate::operations::types::trip::StopTimeData;
+use crate::operations::types::trip::TripData;
+use crate::source::Source;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveTime, Utc};
 use serde::Deserialize;
 use tracing::warn;
-use uuid::Uuid;
 
 const SUBWAY_TRIPS_URL: &str = concat!(env!("MTA_API_URL"), "/v1/subway/trips");
 
@@ -80,7 +86,7 @@ pub struct MtaSubwayRealtime;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let response = reqwest::Client::new()
+    let response = crate::integrations::http::realtime()
         .get(SUBWAY_TRIPS_URL)
         .send()
         .await?
@@ -98,16 +104,12 @@ pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
 
 pub fn build_realtime_from_fixture(
     payload: serde_json::Value,
-    now: DateTime<Utc>,
 ) -> anyhow::Result<CollectedSnapshot> {
     let response = serde_json::from_value::<HeliumTripsResponse>(payload)?;
-    Ok(build_realtime_from_response(response, now))
+    Ok(build_realtime_from_response(response))
 }
 
-fn build_realtime_from_response(
-    response: HeliumTripsResponse,
-    now: DateTime<Utc>,
-) -> CollectedSnapshot {
+fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnapshot {
     let mut trips = Vec::new();
     let mut positions = Vec::new();
 
@@ -121,27 +123,43 @@ fn build_realtime_from_response(
             continue;
         };
 
-        let created_at = parse_created_at_from_trip_id(&helium_trip.trip_id, now).unwrap_or(now);
-
-        let updated_at_raw = helium_trip
+        // Date-less Helium IDs are placed relative to the provider observation,
+        // rather than the polling clock, so retries do not change run identity.
+        let reference = helium_trip
             .updated_at
             .and_then(|ts| DateTime::from_timestamp(ts, 0))
-            .unwrap_or(now);
-
-        let updated_at = if !helium_trip.is_assigned {
-            now
-        } else {
-            updated_at_raw
+            .or_else(|| {
+                helium_trip
+                    .stops
+                    .first()
+                    .and_then(|stop| DateTime::from_timestamp(stop.est_arrive_at, 0))
+            });
+        let Some(reference) = reference else {
+            continue;
+        };
+        let Some(created_at) = parse_created_at_from_trip_id(&helium_trip.trip_id, reference)
+        else {
+            warn!(trip_id = helium_trip.trip_id, "Invalid subway run identity");
+            continue;
         };
 
-        let trip_id = Uuid::now_v7();
+        let updated_at = helium_trip
+            .updated_at
+            .and_then(|ts| DateTime::from_timestamp(ts, 0))
+            .unwrap_or(reference);
 
         let consist = helium_trip.consist.as_ref().map(|c| Consist {
             car_count: c.car_count,
             car_length_feet: c.car_length_feet,
         });
 
-        let trip = Trip {
+        let trip_id = RunKey::new(
+            Source::MtaSubway,
+            &helium_trip.trip_id,
+            created_at,
+            direction,
+        );
+        let trip = TripRun {
             id: trip_id,
             original_id: helium_trip.trip_id.clone(),
             route_id: helium_trip.route_id.clone(),
@@ -155,7 +173,7 @@ fn build_realtime_from_response(
                 consist_cars: helium_trip
                     .consist_cars
                     .into_iter()
-                    .map(|c| crate::models::trip::ConsistCar {
+                    .map(|c| crate::operations::types::trip::ConsistCar {
                         number: c.number,
                         car_type: c.car_type,
                     })
@@ -163,13 +181,17 @@ fn build_realtime_from_response(
             }),
         };
 
+        // Helium lists the whole itinerary, departed stops included, so the array
+        // position is a stable visit order.
         let stop_times = helium_trip
             .stops
             .iter()
-            .filter_map(|stop| {
+            .enumerate()
+            .filter_map(|(index, stop)| {
                 let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
-                Some(StopTime {
+                Some(StopVisit {
                     trip_id,
+                    stop_sequence: i32::try_from(index).ok()?,
                     stop_id: stop.station_id.to_string(),
                     arrival,
                     departure: arrival,
@@ -196,7 +218,7 @@ fn build_realtime_from_response(
                 _ => None,
             };
 
-            positions.push(VehiclePosition {
+            positions.push(VehicleObservation {
                 vehicle_id: helium_trip.trip_id.clone(),
                 trip_id: Some(trip_id),
                 stop_id: Some(stop.station_id.to_string()),
@@ -214,6 +236,8 @@ fn build_realtime_from_response(
 
     CollectedSnapshot {
         source: Source::MtaSubway,
+        network_revision: None,
+        renormalize: None,
         trips,
         positions,
     }
@@ -228,15 +252,20 @@ impl RealtimeSource for MtaSubwayRealtime {
         }
     }
 
-    async fn collect(&self) -> anyhow::Result<CollectedSnapshot> {
-        let response = reqwest::Client::new()
+    async fn collect(
+        &self,
+        revision: std::sync::Arc<crate::network::index::NetworkRevision>,
+    ) -> anyhow::Result<CollectedSnapshot> {
+        let response = crate::integrations::http::realtime()
             .get(SUBWAY_TRIPS_URL)
             .send()
             .await?
             .error_for_status()?
             .json::<HeliumTripsResponse>()
             .await?;
-        Ok(build_realtime_from_response(response, Utc::now()))
+        let mut snapshot = build_realtime_from_response(response);
+        snapshot.network_revision = Some(revision);
+        Ok(snapshot)
     }
 }
 
@@ -264,7 +293,7 @@ pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
 // TODO: test this around midnight
 /// Try to parse a created_at timestamp from the Helium trip_id.
 ///
-/// Trip ID format: `<prefix><route> <HHMM>[+] <origin>/<dest>`
+/// TripRun ID format: `<prefix><route> <HHMM>[+] <origin>/<dest>`
 /// Examples: `"1W 2009 WHL/DIT"`, `"01 1845+ 242/SFT"`, `"0L 1941+RPY/8AV"`
 ///
 /// The 4-digit number is the scheduled origin departure time in Eastern Time (HHMM).
@@ -297,24 +326,24 @@ fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<Da
     let has_plus = time_token.chars().nth(digits.len()) == Some('+');
     let ss: u32 = if has_plus { 30 } else { 0 };
 
-    let origin_time = NaiveTime::from_hms_opt(hh, mm, ss)?;
+    let origin_time = format!("{hh}:{mm}:{ss}");
 
     // Determine the service date in Eastern Time
     let now_et = now.with_timezone(&chrono_tz::America::New_York);
     let today_et = now_et.date_naive();
 
     // Try today first
-    let candidate = Trip::created_at(today_et, origin_time)?;
+    let candidate = crate::operations::normalize::gtfs_start(today_et, &origin_time)?;
     let diff_hours = (candidate - now).num_hours();
 
     if diff_hours > 6 {
         // Origin time is far in the future — this trip is from yesterday's service
         let yesterday = today_et - chrono::Duration::days(1);
-        Trip::created_at(yesterday, origin_time)
+        crate::operations::normalize::gtfs_start(yesterday, &origin_time)
     } else if diff_hours < -18 {
         // Origin time is far in the past — this trip is from tomorrow's service (just past midnight)
         let tomorrow = today_et + chrono::Duration::days(1);
-        Trip::created_at(tomorrow, origin_time)
+        crate::operations::normalize::gtfs_start(tomorrow, &origin_time)
     } else {
         Some(candidate)
     }

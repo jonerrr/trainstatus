@@ -1,5 +1,8 @@
-use crate::trajectory::continuity::{ContinuityDiscardReason, apply};
-use crate::trajectory::types::{TrajectoryConfig, TrajectoryKnot, TrajectoryState};
+use crate::trajectory::continuity::ContinuityDiscardReason;
+use crate::trajectory::continuity::apply;
+use crate::trajectory::types::TrajectoryConfig;
+use crate::trajectory::types::TrajectoryKnot;
+use crate::trajectory::types::TrajectoryState;
 
 #[test]
 fn hold_prevents_distance_regression() {

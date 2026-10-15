@@ -1,12 +1,9 @@
-use crate::support::alerts::{assert_links, fixture_alert_where};
-use backend::{
-    alerts::gtfs::GtfsAlertSource,
-    models::{
-        alert::{AlertFormat, AlertSection},
-        source::Source,
-    },
-    sources::mta_bus::alerts::MtaBusAlerts,
-};
+use crate::support::alerts::fixture_alert_where;
+use backend::alerts::gtfs::GtfsAlertSource;
+use backend::alerts::types::AlertFormat;
+use backend::alerts::types::AlertSection;
+use backend::source::Source;
+use backend::sources::mta_bus::alerts::MtaBusAlerts;
 
 #[test]
 fn mercury_alert_preserves_detour_text_formats_and_routes() {
@@ -17,11 +14,15 @@ fn mercury_alert_preserves_detour_text_formats_and_routes() {
             && alert.description_text.is_some()
             && !alert.informed_entity.is_empty()
     });
-    let (alert, translations, periods, entities) = MtaBusAlerts
+    let alert = MtaBusAlerts
         .process_alert(entity_id.clone(), input)
-        .unwrap();
-    assert_links(&alert, &translations, &periods, &entities);
-    assert_eq!(alert.source, Source::MtaBus);
+        .unwrap()
+        .details;
+    let translations = &alert.translations;
+    let periods = &alert.active_periods;
+    let entities = &alert.entities;
+    assert!(!periods.is_empty());
+    assert!(!entities.is_empty());
     assert_eq!(alert.original_id, entity_id);
     assert_eq!(alert.created_at, periods[0].start_time);
     assert!(

@@ -1,17 +1,13 @@
 use super::*;
-use crate::{
-    models::{
-        position::{NjtBusPositionData, VehiclePosition},
-        stop::NjtBusStopData,
-        trip::StopTimeData,
-    },
-    trajectory::{
-        compute_trajectory,
-        geometry::build_shape_geometry,
-        interpolation::PchipMethod,
-        types::{TrajectoryConfig, TrajectoryStop},
-    },
-};
+use crate::network::types::stop::NjtBusStopData;
+use crate::operations::types::position::NjtBusPositionData;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::StopTimeData;
+use crate::trajectory::compute_trajectory;
+use crate::trajectory::geometry::build_shape_geometry;
+use crate::trajectory::interpolation::PchipMethod;
+use crate::trajectory::types::TrajectoryConfig;
+use crate::trajectory::types::TrajectoryStop;
 fn trip() -> (TripSnapshot, ShapeGeometry) {
     let shape = geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)]);
     let geometry = build_shape_geometry(&shape, 6538).unwrap();
@@ -43,20 +39,21 @@ fn trip() -> (TripSnapshot, ShapeGeometry) {
             consist_car_length_m: None,
             stops,
             positions: vec![],
+            recorded_anchor: None,
             as_of: chrono::DateTime::from_timestamp(1060, 0).unwrap(),
         },
         geometry,
     )
 }
-fn position(trip: &TripSnapshot, at: i64, lon: f64) -> VehiclePosition {
-    VehiclePosition {
+fn position(trip: &TripSnapshot, at: i64, lon: f64) -> VehicleObservation {
+    VehicleObservation {
         vehicle_id: "bus".into(),
         trip_id: Some(trip.trip_id),
         stop_id: Some("1".into()),
         updated_at: chrono::DateTime::from_timestamp(at, 0).unwrap(),
         geom: Some(geo::Geometry::Point(Point::new(lon, 40.7)).into()),
         data: PositionData::NjtBus(NjtBusPositionData {
-            occupancy_status: crate::feed::vehicle_position::OccupancyStatus::Empty,
+            occupancy_status: crate::operations::types::position::OccupancyStatus::Empty,
         }),
     }
 }

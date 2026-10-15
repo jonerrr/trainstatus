@@ -79,21 +79,6 @@ fn test_two_points() {
     assert!((interp.evaluate(10.0).unwrap() - 100.0).abs() < 1e-10);
 }
 
-/// Test evaluate_array.
-#[test]
-fn test_evaluate_array() {
-    let x = [0.0, 1.0, 2.0, 3.0];
-    let y = [0.0, 1.0, 4.0, 9.0];
-    let interp = PchipInterpolator::try_new(&x, &y).unwrap();
-
-    let result = interp.evaluate_array(&[0.0, 1.0, 2.0, 3.0, -1.0]);
-    assert!((result[0] - 0.0).abs() < 1e-10);
-    assert!((result[1] - 1.0).abs() < 1e-10);
-    assert!((result[2] - 4.0).abs() < 1e-10);
-    assert!((result[3] - 9.0).abs() < 1e-10);
-    assert!(result[4].is_nan());
-}
-
 /// Test evaluate_derivative.
 #[test]
 fn test_evaluate_derivative() {

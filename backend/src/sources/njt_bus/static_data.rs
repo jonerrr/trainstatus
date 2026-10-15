@@ -1,20 +1,23 @@
-use crate::static_data::dataset::StaticDataset;
+use crate::network::dataset::NetworkDataset;
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
     time::Duration,
 };
 
-use crate::{
-    models::{
-        route::{Route, RouteData},
-        source::Source,
-        stop::{NjtBusStopData, RouteStop, RouteStopData, Stop, StopData},
-    },
-    sources::{StaticAdapter, normalize_title, normalize_whitespace},
-    static_data::expansion::expand_gtfs,
-    static_data::index::TripPatternRevision,
-};
+use crate::network::expansion::expand_gtfs;
+use crate::network::index::TripPatternRevision;
+use crate::network::types::route::Route;
+use crate::network::types::route::RouteData;
+use crate::network::types::stop::NjtBusStopData;
+use crate::network::types::stop::RouteStop;
+use crate::network::types::stop::RouteStopData;
+use crate::network::types::stop::Stop;
+use crate::network::types::stop::StopData;
+use crate::source::Source;
+use crate::sources::StaticAdapter;
+use crate::sources::normalize_title;
+use crate::sources::normalize_whitespace;
 use anyhow::Context;
 use async_trait::async_trait;
 use geo::{Distance, Euclidean, Point};
@@ -38,7 +41,7 @@ impl StaticAdapter for NjtBusStatic {
         Duration::from_secs(60 * 60 * 24) // 24 hours
     }
 
-    async fn collect(&self) -> anyhow::Result<StaticDataset> {
+    async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         let token = super::get_token()
             .await
             .context("NJT authentication failed")?;
@@ -93,27 +96,6 @@ impl StaticAdapter for NjtBusStatic {
         );
         let dataset = build_static_dataset(&gtfs, patterns, scheduled_trips, stops, &stop_remap);
 
-        // TODO: move this to a standardized print method in StaticDataset
-        #[cfg(debug_assertions)]
-        {
-            // additional sanity check: look for duplicates in the raw vector (before storing)
-            let mut seen: HashMap<(String, String), usize> = HashMap::new();
-            for rs in &dataset.route_stops {
-                let key = (rs.route_id.clone(), rs.stop_id.clone());
-                *seen.entry(key).or_insert(0) += 1;
-            }
-            for ((rid, sid), count) in seen {
-                if count > 1 {
-                    tracing::warn!(
-                        route_id = %rid,
-                        stop_id = %sid,
-                        count,
-                        "Raw route_stops vector contains duplicate entries"
-                    );
-                }
-            }
-        }
-
         Ok(dataset)
     }
 }
@@ -123,7 +105,7 @@ impl StaticAdapter for NjtBusStatic {
 async fn download_gtfs(token: &str) -> anyhow::Result<Vec<u8>> {
     let form = reqwest::multipart::Form::new().text("token", token.to_owned());
 
-    let bytes = reqwest::Client::new()
+    let bytes = crate::integrations::http::static_data()
         .post(NJT_GTFS_URL)
         .multipart(form)
         .send()
@@ -150,7 +132,7 @@ pub async fn capture_fixtures() -> anyhow::Result<std::collections::BTreeMap<Str
 }
 
 pub struct PatternStaticBuild {
-    pub dataset: StaticDataset,
+    pub dataset: NetworkDataset,
     pub revision: TripPatternRevision,
 }
 
@@ -207,17 +189,17 @@ fn build_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
     patterns: PatternDataset,
-    mut scheduled_trips: Vec<crate::static_data::schedule::ScheduledTrip>,
+    mut scheduled_trips: Vec<crate::network::schedule::ScheduledTrip>,
     stops: Vec<Stop>,
     stop_remap: &HashMap<String, String>,
-) -> StaticDataset {
+) -> NetworkDataset {
     for trip in &mut scheduled_trips {
         trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
     }
 
     let PatternDataset { shapes, trips } = patterns;
 
-    StaticDataset {
+    NetworkDataset {
         source: Source::NjtBus,
         routes: build_routes(gtfs),
         stops,
@@ -463,35 +445,9 @@ fn build_route_stops(
     // TODO: figure out what to do about bus stops where the same route id but different direction have the same stop_id
     // for example route_id=605 stop_id=15142 count=2 examples=["(route_id=605, stop_id=15142, direction=1, headsign=Quaker Br Mall via Griggs Frm)", "(route_id=605, stop_id=15142, direction=0, headsign=Princeton Montgomery Twp via Griggs Frm)"]
 
-    // A route serving the same stop in both directions produces two entries that
-    // differ only by `direction`; the dedup below collapses them. This is normal
-    // and expected, so just tally how many pairs get collapsed (one summary line)
-    // rather than emitting a WARN per pair — which floods the terminal on a feed
-    // the size of NJT's.
-    #[cfg(debug_assertions)]
-    {
-        let mut counts: HashMap<(String, String), usize> = HashMap::new();
-        for rs in &result {
-            let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-            *counts.entry(key).or_insert(0) += 1;
-        }
-        let collapsed = counts.values().filter(|&&c| c > 1).count();
-        if collapsed > 0 {
-            tracing::debug!(
-                collapsed_pairs = collapsed,
-                "njt_bus route_stops with the same (route_id, stop_id) across directions; collapsing to one row each"
-            );
-        }
-    }
-
-    // The database schema only permits one row per (route_id, stop_id), so we
-    // need to collapse any entries that differ only by `direction`.  When two
-    // directions are present we arbitrarily keep the one with the smaller
-    // `stop_sequence` (matching what `StopStore` will do when deduplicating).
-    //
-    // The debug check above will still warn about duplicates, but this step
-    // prevents the insertion error when running the importer.
-    // perform deduplication in-place to avoid large allocations
+    // The schema permits one membership per (route_id, stop_id). Collapse
+    // directional entries here; dataset validation rejects any remaining duplicates.
+    // Keep the entry with the smaller stop sequence.
     let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
     for rs in result.into_iter() {
         let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());

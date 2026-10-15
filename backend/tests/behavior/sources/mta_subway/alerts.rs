@@ -1,12 +1,9 @@
-use crate::support::alerts::{assert_links, fixture_alert_where};
-use backend::{
-    alerts::gtfs::GtfsAlertSource,
-    models::{
-        alert::{AlertFormat, AlertSection},
-        source::Source,
-    },
-    sources::mta_subway::alerts::MtaSubwayAlerts,
-};
+use crate::support::alerts::fixture_alert_where;
+use backend::alerts::gtfs::GtfsAlertSource;
+use backend::alerts::types::AlertFormat;
+use backend::alerts::types::AlertSection;
+use backend::source::Source;
+use backend::sources::mta_subway::alerts::MtaSubwayAlerts;
 
 #[test]
 fn mercury_alert_preserves_formats_periods_and_affected_routes() {
@@ -17,11 +14,15 @@ fn mercury_alert_preserves_formats_periods_and_affected_routes() {
             && alert.description_text.is_some()
             && !alert.informed_entity.is_empty()
     });
-    let (alert, translations, periods, entities) = MtaSubwayAlerts
+    let alert = MtaSubwayAlerts
         .process_alert(entity_id.clone(), input)
-        .unwrap();
-    assert_links(&alert, &translations, &periods, &entities);
-    assert_eq!(alert.source, Source::MtaSubway);
+        .unwrap()
+        .details;
+    let translations = &alert.translations;
+    let periods = &alert.active_periods;
+    let entities = &alert.entities;
+    assert!(!periods.is_empty());
+    assert!(!entities.is_empty());
     assert_eq!(alert.original_id, entity_id);
     assert!(alert.updated_at >= alert.created_at);
     assert!(periods[0].start_time <= periods[0].end_time.unwrap_or(periods[0].start_time));

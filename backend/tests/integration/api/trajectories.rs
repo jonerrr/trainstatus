@@ -1,14 +1,16 @@
-use crate::support::{app_state_from_stores, fixtures::fixed_time, geometry::ingest_case};
+use crate::support::app_state_from_owners;
+use crate::support::fixtures::fixed_time;
+use crate::support::geometry::ingest_case;
 use arrow::array::{Array, FixedSizeListArray, Float64Array, Int16Array, ListArray, StringArray};
 use axum_test::TestServer;
-use backend::models::source::Source;
+use backend::source::Source;
 
 async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: usize) {
     let stores = ingest_case(pool.clone(), source).await;
     let trip_id = stores.live_snapshots.get(source).unwrap().trips[0]
         .id
         .to_string();
-    let state = app_state_from_stores(pool, stores);
+    let state = app_state_from_owners(pool, stores);
     let trajectories = state.trajectories.clone();
     let server = TestServer::new(backend::api::router(state).split_for_parts().0);
     let response = server
@@ -96,7 +98,9 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
             assert!(
                 coords
                     .values()
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .collect::<Vec<_>>()
                     .windows(2)
                     .any(|w| w[0] != w[1]),
@@ -104,7 +108,7 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
             );
         }
     }
-    // Exercise the live transport/filter path using the computed render generation.
+    // Exercise the live transport path using the computed render generation.
     let hot = trajectories
         .snapshot(source, Some(fixed_time()))
         .await
@@ -118,16 +122,6 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
             .map(|batch| batch.unwrap().num_rows())
             .sum::<usize>();
     assert_eq!(live_count, expected_units);
-    let excluded = server
-        .get(&format!("/trajectories/{source}?route_ids=missing"))
-        .await;
-    excluded.assert_status_ok();
-    let count =
-        arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(excluded.as_bytes()), None)
-            .unwrap()
-            .map(|batch| batch.unwrap().num_rows())
-            .sum::<usize>();
-    assert_eq!(count, 0);
 }
 
 #[sqlx::test]

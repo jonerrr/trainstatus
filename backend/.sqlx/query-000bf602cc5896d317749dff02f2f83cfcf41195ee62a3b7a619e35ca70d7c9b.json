@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO realtime.run_shape AS existing(run_id, ordinal, source, provider_shape_id, asset_id)\n            SELECT\n                i.run_id,\n                (a.ordinality - 1) ::integer,\n                $3,\n                a.asset ->> 'provider',\n                a.asset ->> 'asset'\n            FROM UNNEST($1::uuid[], $2::jsonb[]) AS i(run_id, assets)\n            CROSS JOIN LATERAL jsonb_array_elements(i.assets) WITH ORDINALITY AS a(asset, ordinality)\n            ON CONFLICT(run_id, ordinal)\n            DO UPDATE SET\n                asset_id = EXCLUDED.asset_id,\n                provider_shape_id = EXCLUDED.provider_shape_id\n            WHERE(existing.asset_id, existing.provider_shape_id) IS DISTINCT FROM(EXCLUDED.asset_id, EXCLUDED.provider_shape_id)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "JsonbArray",
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "000bf602cc5896d317749dff02f2f83cfcf41195ee62a3b7a619e35ca70d7c9b"
+}

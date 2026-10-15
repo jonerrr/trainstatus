@@ -1,8 +1,8 @@
-use backend::static_data::dataset::StaticDataset;
+use backend::network::dataset::NetworkDataset;
 
-use super::TestStores;
+use super::TestOwners;
 
-pub fn assert_static_dataset_contract(dataset: &StaticDataset) {
+pub fn assert_static_dataset_contract(dataset: &NetworkDataset) {
     let report = dataset.validate().expect("static dataset should validate");
     assert!(report.route_count > 0, "dataset must include routes");
     assert!(report.stop_count > 0, "dataset must include stops");
@@ -16,56 +16,50 @@ pub fn assert_static_dataset_contract(dataset: &StaticDataset) {
     );
 }
 
-pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores: &TestStores) {
+pub async fn assert_static_persistence_contract(dataset: &NetworkDataset, stores: &TestOwners) {
     stores
-        .static_data_store
-        .persist(&dataset)
+        .network
+        .persist(dataset)
         .await
         .expect("first static import should persist");
 
     stores
-        .static_data_store
-        .persist(&dataset)
+        .network
+        .persist(dataset)
         .await
         .expect("second static import should be idempotent");
 
-    let routes = stores
-        .route_store
-        .get_all(dataset.source)
-        .await
-        .expect("routes should load");
-    let stops = stores
-        .stop_store
-        .get_all(dataset.source)
-        .await
-        .expect("stops should load");
-
+    let response = stores.catalog.response(dataset.source).await.unwrap();
+    let catalog: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+    let routes = catalog["routes"].as_array().unwrap();
+    let stops = catalog["stops"].as_array().unwrap();
     assert_eq!(routes.len(), dataset.routes.len());
     assert_eq!(stops.len(), dataset.stops.len());
     let revision = stores
-        .static_data_store
-        .load_revision(dataset.source)
+        .network
+        .restore_revision(dataset.source)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(
-        serde_json::to_value(&revision.trip_patterns).unwrap(),
+        serde_json::to_value(revision.trip_patterns.as_ref()).unwrap(),
         serde_json::to_value(&dataset.trip_patterns).unwrap()
     );
-    assert_eq!(revision.stop_remap, dataset.stop_remap);
+    assert_eq!(*revision.stop_remap, dataset.stop_remap);
     for expected in &dataset.route_stops {
         let stop = stops
             .iter()
-            .find(|stop| stop.id == expected.stop_id)
-            .expect("route stop persisted");
+            .find(|stop| stop["id"] == expected.stop_id)
+            .unwrap();
         assert!(
-            stop.routes
+            stop["routes"]
+                .as_array()
+                .unwrap()
                 .iter()
-                .any(|actual| actual.route_id == expected.route_id.to_uppercase()
-                    && actual.stop_sequence == expected.stop_sequence
-                    && serde_json::to_value(&actual.data).unwrap()
-                        == serde_json::to_value(&expected.data).unwrap()),
-            "route-stop association persisted"
+                .any(
+                    |actual| actual["route_id"] == expected.route_id.to_uppercase()
+                        && actual["stop_sequence"] == expected.stop_sequence
+                )
         );
     }
     assert_eq!(revision.shapes.len(), dataset.shapes.len());
@@ -78,32 +72,22 @@ pub async fn assert_static_persistence_contract(dataset: &StaticDataset, stores:
     for expected in &dataset.routes {
         let actual = routes
             .iter()
-            .find(|route| route.id == expected.id)
-            .expect("route ID persisted");
-        assert_eq!(actual.long_name, expected.long_name);
-        assert_eq!(actual.short_name, expected.short_name);
+            .find(|route| route["id"] == expected.id)
+            .unwrap();
+        assert_eq!(actual["long_name"], expected.long_name);
+        assert_eq!(actual["short_name"], expected.short_name);
         assert_eq!(
-            actual.color,
+            actual["color"],
             format!("#{}", expected.color.trim_start_matches('#').to_uppercase())
-        );
-        assert_eq!(
-            serde_json::to_value(&actual.data).unwrap(),
-            serde_json::to_value(&expected.data).unwrap()
         );
     }
     for expected in &dataset.stops {
-        let actual = stops
-            .iter()
-            .find(|stop| stop.id == expected.id)
-            .expect("stop ID persisted");
-        assert_eq!(actual.name, expected.name);
+        let actual = stops.iter().find(|stop| stop["id"] == expected.id).unwrap();
+        assert_eq!(actual["name"], expected.name);
         assert_eq!(
-            serde_json::to_value(&actual.geom).unwrap(),
-            serde_json::to_value(&expected.geom).unwrap()
-        );
-        assert_eq!(
-            serde_json::to_value(&actual.data).unwrap(),
+            actual["data"],
             serde_json::to_value(&expected.data).unwrap()
         );
+        assert_eq!(revision.stops[&expected.id].geom.0, expected.geom.0);
     }
 }

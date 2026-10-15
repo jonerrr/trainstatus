@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { getUpdateStatus } from '#lib/resources/status.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
@@ -9,7 +8,6 @@
 	import UpdateIndicator from './UpdateIndicator.svelte';
 
 	const current_time = getCurrentTime();
-	const updates = getUpdateStatus();
 
 	interface Routes {
 		[key: string]: [
@@ -60,7 +58,7 @@
 <nav
 	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
 >
-	<div class="shrink-0 md:hidden"><UpdateIndicator /></div>
+	{#if !page.state.modal}<div class="shrink-0 md:hidden"><UpdateIndicator /></div>{/if}
 	<div
 		class="nav-links flex min-h-0 flex-1 items-stretch overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto"
 	>
@@ -69,18 +67,8 @@
 		{@render nav_button('Stops')}
 		{@render nav_button('Charts')}
 		{@render nav_button('Map')}
-		{#if current_time.value !== undefined}
-			<button
-				type="button"
-				class="nav-button"
-				onclick={() => {
-					void updates.retry(true);
-				}}
-				aria-label="Reload historical data"><Clock class="nav-icon" /><span>Reload</span></button
-			>
-		{/if}
 		<div class="md:mt-auto">
-			<div class="hidden md:block"><UpdateIndicator /></div>
+			{#if !page.state.modal}<div class="hidden md:block"><UpdateIndicator /></div>{/if}
 			{@render nav_button('Settings')}
 		</div>
 	</div>

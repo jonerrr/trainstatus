@@ -35,12 +35,24 @@ test('all agency icons load at their displayed size', async ({ page }) => {
 	}
 });
 
-test('setting the time sets at and a reload keeps it', async ({ page }) => {
+test('applying the time sets at and a reload keeps it', async ({ page }) => {
 	await page.goto('/settings');
 	await page.locator('input[type="datetime-local"]').fill('2026-10-01T12:00');
+	await expect(page).toHaveURL(/\/settings$/);
+	await page.getByRole('button', { name: 'Apply', exact: true }).click();
 	await expect(page).toHaveURL(/[?&]at=\d+/);
 	const at = new URL(page.url()).searchParams.get('at');
 	expect(at).toBeTruthy();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toHaveAttribute(
+		'href',
+		`/?at=${at}`
+	);
+	await page.getByRole('link', { name: 'Home', exact: true }).click();
+	await expect(page).toHaveURL(new RegExp(`\\/\\?at=${at}$`));
+	await page.getByRole('link', { name: 'Settings', exact: true }).click();
+	await expect(page).toHaveURL(new RegExp(`\\/settings\\?at=${at}$`));
 	await page.reload();
 	await expect(page).toHaveURL(new RegExp(`[?&]at=${at}(?:&|$)`));
+	await page.getByRole('button', { name: 'Return to live', exact: true }).click();
+	await expect(page).toHaveURL(/\/settings$/);
 });

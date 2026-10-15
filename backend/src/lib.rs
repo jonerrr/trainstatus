@@ -1,14 +1,15 @@
 pub mod alerts;
 pub mod api;
+pub mod app;
 #[cfg(feature = "fixture-capture")]
 pub mod fixtures;
+pub mod geometry;
 pub mod integrations;
-pub mod macros;
-pub mod models;
-pub mod realtime;
+pub mod network;
+pub mod operations;
+mod postgres;
+pub mod source;
 pub mod sources;
-pub mod static_data;
-pub mod stores;
 pub mod trajectory;
 pub mod utils;
 
@@ -24,13 +25,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone)]
 pub struct AppState {
-    pub pg_pool: sqlx::PgPool,
-    pub route_store: crate::stores::route::RouteStore,
-    pub stop_store: crate::stores::stop::StopStore,
-    pub trip_store: crate::stores::trip::TripStore,
-    pub stop_time_store: crate::stores::stop_time::StopTimeStore,
-    pub position_store: crate::stores::position::PositionStore,
-    pub alert_store: crate::stores::alert::AlertStore,
+    pub readiness: crate::app::Readiness,
+    pub alerts: crate::alerts::store::Alerts,
+    pub network: crate::network::catalog::CatalogReader,
+    pub operations: crate::operations::service::Operations,
     pub trajectories: crate::trajectory::TrajectoryService,
 }
 

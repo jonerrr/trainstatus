@@ -1,9 +1,11 @@
 import { createContext } from 'svelte';
 
-import { SvelteURL } from 'svelte/reactivity';
+import { createSubscriber, SvelteURL } from 'svelte/reactivity';
 
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
+
+import { is_source } from '#lib/sources.js';
 
 /**
  * Unix seconds from `?at=`. Blank and non-numeric values mean live, so callers
@@ -14,6 +16,12 @@ export function atParamToUnixSeconds(value: string | null | undefined): number |
 	const at = Number(value);
 	return Number.isFinite(at) ? at : undefined;
 }
+
+/** Re-runs live readers every 15 seconds while any are mounted. */
+const live_clock = createSubscriber((update) => {
+	const interval = setInterval(update, 15_000);
+	return () => clearInterval(interval);
+});
 
 export function createCurrentTime(initial?: number) {
 	let time = $state<number | undefined>(
@@ -27,7 +35,9 @@ export function createCurrentTime(initial?: number) {
 		},
 
 		get ms(): number {
-			return time !== undefined ? time * 1000 : Date.now();
+			if (time !== undefined) return time * 1000;
+			live_clock();
+			return Date.now();
 		},
 
 		set value(newValue: number | undefined) {
@@ -49,6 +59,25 @@ export const MODAL_PARAM = {
 } as const satisfies Record<string, 'r' | 's' | 't'>;
 
 export type ModalParamKey = (typeof MODAL_PARAM)[keyof typeof MODAL_PARAM];
+/** Resolve supported links; trips must carry their route context. */
+export function modal_from_url(url: {
+	searchParams: Pick<URLSearchParams, 'get'>;
+}): ModalData | null {
+	const params = url.searchParams;
+	const source = params.get('src');
+	if (!is_source(source)) return null;
+	const src = source;
+	const trip_id = params.get('t');
+	if (trip_id) {
+		const route_id = params.get('r');
+		return route_id ? { type: 'trip', source: src, route_id, id: trip_id } : null;
+	}
+	const stop_id = params.get('s');
+	if (stop_id) return { type: 'stop', source: src, id: stop_id };
+	const route_id = params.get('r');
+	if (route_id) return { type: 'route', source: src, id: route_id };
+	return null;
+}
 
 /**
  * Open a stop/route/trip modal and update the URL to reflect the open state.
@@ -64,9 +93,8 @@ export function open_modal(state: ModalData) {
 	url.searchParams.delete('src');
 
 	url.searchParams.set(key, state.id);
-	// if ('data' in state && 'source' in (state.data as any) && (state.data as any).source) {
-	url.searchParams.set('src', state.data.source);
-	// }
+	if (state.type === 'trip' && state.route_id) url.searchParams.set('r', state.route_id);
+	url.searchParams.set('src', state.source);
 
 	const snapshot = $state.snapshot(state);
 	const current_index = page.state?.index ?? 0;
@@ -82,7 +110,7 @@ export function open_modal(state: ModalData) {
  * A list-opened modal pushed a history entry, so closing pushes the dismissed
  * entry and Back restores the modal. A fresh load replaces the current entry.
  */
-export function close_modal(at: number | undefined) {
+export function close_modal(at: number | undefined, replace = false) {
 	const url = new SvelteURL(page.url.href);
 	for (const k of Object.values(MODAL_PARAM)) url.searchParams.delete(k);
 	url.searchParams.delete('src');
@@ -95,7 +123,7 @@ export function close_modal(at: number | undefined) {
 	const opened_from_list = (page.state?.index ?? 0) > 0;
 	goto(url.pathname + url.search, {
 		shallow: true,
-		replace: !opened_from_list,
+		replace: replace || !opened_from_list,
 		state: { modal: null }
 	});
 }

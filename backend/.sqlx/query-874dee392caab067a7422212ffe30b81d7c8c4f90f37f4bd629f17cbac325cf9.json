@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM static.scheduled_trip\n            WHERE source = $1\n            AND(expires_at <= NOW() OR service_date = ANY($2::text[]) OR $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": [
+                "mta_subway",
+                "mta_bus",
+                "njt_bus"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "874dee392caab067a7422212ffe30b81d7c8c4f90f37f4bd629f17cbac325cf9"
+}
