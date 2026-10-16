@@ -29,6 +29,13 @@
   ],
   "packageRules": [
     {
+      "description": "Link Planetiler image updates to its source and commit history",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/onthegomap/planetiler"],
+      "sourceUrl": "https://github.com/onthegomap/planetiler",
+      "changelogUrl": "https://github.com/onthegomap/planetiler/commits/main/"
+    },
+    {
       "description": "Group all frontend/client dependencies",
       "matchFileNames": ["frontend/**"],
       "groupName": "frontend"
