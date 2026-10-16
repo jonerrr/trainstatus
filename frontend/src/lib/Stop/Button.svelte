@@ -141,7 +141,7 @@
 						<Icon {route} link={false} width={32} height={32} />
 					{/if}
 					<div class="flex flex-col">
-						<div>
+						<div class="min-h-6">
 							{#if next}
 								{trip_headsign(
 									next.trip,
@@ -149,8 +149,8 @@
 									arrivals.value?.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id),
 									catalog?.stops_by_id
 								)}
-							{:else if 'headsign' in route_stop.data}
-								{route_stop.data.headsign}
+							{:else}
+								{('headsign' in route_stop.data && route_stop.data.headsign) || route?.long_name}
 							{/if}
 						</div>
 						<div class="flex gap-2 pr-1">
