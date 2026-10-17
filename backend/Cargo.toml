@@ -48,7 +48,7 @@ valhalla = "0.7.0"
 [dev-dependencies]
 axum-test = "=21.1.0"
 test-log = { version = "=0.2.21", default-features = false, features = ["trace"] }
-tokio = { version = "=1.53.2", features = ["test-util"] }
+tokio = { version = "=1.53.3", features = ["test-util"] }
 
 [build-dependencies]
 prost-build = "0.14.1"
