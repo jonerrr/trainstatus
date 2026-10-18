@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "schedule": ["* * * * 1"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* * 1-7 * 1"]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -29,6 +34,11 @@
   ],
   "packageRules": [
     {
+      "description": "Batch tooling and infrastructure updates outside the project groups",
+      "matchPackageNames": ["*"],
+      "groupName": "tooling and infrastructure"
+    },
+    {
       "description": "Link Planetiler image updates to its source and commit history",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/onthegomap/planetiler"],
@@ -54,6 +64,11 @@
       "description": "Update the hk executable and all Pkl imports together",
       "matchDepNames": ["jdx/hk", "aqua:jdx/hk"],
       "groupName": "hk"
+    },
+    {
+      "description": "Combine lockfile maintenance across all projects instead of splitting by directory",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "groupName": "all lockfiles"
     }
   ]
 }
