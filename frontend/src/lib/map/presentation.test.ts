@@ -18,7 +18,7 @@ const route: CatalogRoute = {
 		name_suffix: '-SBS',
 		service_types: [],
 		sort_key: 15,
-		directions: [{ direction_id: 0, destination: 'South Ferry', via: [] }]
+		directions: [{ direction_id: 0, headsign: 'South Ferry' }]
 	}
 };
 const trip: ServiceTrip = {

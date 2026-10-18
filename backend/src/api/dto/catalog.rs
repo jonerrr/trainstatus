@@ -8,7 +8,7 @@ use crate::network::types::stop::RouteStopData;
 use crate::network::types::stop::Stop;
 use crate::network::types::stop::StopData;
 use crate::network::types::stop::StopType;
-use crate::network::types::stop::Transfer;
+use crate::network::types::stop::{NearbyStop, NjtBusStopDirection};
 use crate::source::Source;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -65,7 +65,7 @@ pub struct CatalogStop {
     pub lat: f64,
     /// WGS 84 longitude in degrees.
     pub lon: f64,
-    pub transfers: Vec<Transfer>,
+    pub nearby_stops: Vec<NearbyStop>,
     pub data: StopData,
     /// Routes serving this stop, ordered by route ID.
     pub routes: Vec<CatalogStopRoute>,
@@ -86,16 +86,11 @@ pub enum CatalogStopRouteData {
         stop_type: StopType,
     },
     MtaBus {
-        headsign: String,
-        direction: i16,
-        /// Estimated from proximity, direction and headsign.
-        opposite_stop_id: Option<String>,
+        /// Published route direction IDs serving this stop. Empty means unknown.
+        direction_ids: Vec<i16>,
     },
     NjtBus {
-        headsign: String,
-        direction: i16,
-        /// Estimated from proximity and direction.
-        opposite_stop_id: Option<String>,
+        directions: Vec<NjtBusStopDirection>,
     },
 }
 
@@ -142,7 +137,7 @@ impl From<&Stop> for CatalogStop {
             name: stop.name.clone(),
             lat,
             lon,
-            transfers: stop.transfers.clone(),
+            nearby_stops: stop.nearby_stops.clone(),
             data: stop.data.clone(),
             routes: stop.routes.iter().map(CatalogStopRoute::from).collect(),
         }
@@ -160,24 +155,11 @@ impl From<&RouteStop> for CatalogStopRoute {
                 RouteStopData::MtaSubway { stop_type } => CatalogStopRouteData::MtaSubway {
                     stop_type: stop_type.clone(),
                 },
-                RouteStopData::MtaBus {
-                    headsign,
-                    direction,
-                    opposite_stop_id,
-                    ..
-                } => CatalogStopRouteData::MtaBus {
-                    headsign: headsign.clone(),
-                    direction: *direction,
-                    opposite_stop_id: opposite_stop_id.clone(),
+                RouteStopData::MtaBus { direction_ids, .. } => CatalogStopRouteData::MtaBus {
+                    direction_ids: direction_ids.clone(),
                 },
-                RouteStopData::NjtBus {
-                    headsign,
-                    direction,
-                    opposite_stop_id,
-                } => CatalogStopRouteData::NjtBus {
-                    headsign: headsign.clone(),
-                    direction: *direction,
-                    opposite_stop_id: opposite_stop_id.clone(),
+                RouteStopData::NjtBus { directions } => CatalogStopRouteData::NjtBus {
+                    directions: directions.clone(),
                 },
             },
         }

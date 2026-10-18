@@ -44,7 +44,7 @@ export function chartFixture(
 		name: id === 'e' ? 'b' : id,
 		lat: i,
 		lon: i,
-		transfers: [],
+		nearby_stops: [],
 		data:
 			source === 'mta_subway'
 				? {
@@ -68,7 +68,9 @@ export function chartFixture(
 				data:
 					source === 'mta_subway'
 						? { source, stop_type: 'full_time' }
-						: { source, direction: directionIndex, headsign: '' }
+						: source === 'mta_bus'
+							? { source, direction_ids: [directionIndex] }
+							: { source, directions: [{ direction_id: directionIndex, headsign: '' }] }
 			}
 		]
 	}));

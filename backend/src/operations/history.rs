@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 // Private SQL projections read only rendering inputs, including retired identities
 // and immutable assets. Current catalog queries omit retired rows and load unrelated
-// names, transfers and route memberships.
+// names, nearby stops and route memberships.
 struct RouteColorRow {
     id: String,
     color: String,

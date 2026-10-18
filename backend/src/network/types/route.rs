@@ -14,15 +14,12 @@ pub struct Route {
     pub data: RouteData,
 }
 
-/// One of a bus route's two terminals, as printed on the bus's headsign.
+/// Default headsign for one of a bus route's published direction IDs.
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct MtaBusDirection {
     /// Matches `TripRun.direction` for trips on this route.
     pub direction_id: i16,
-    pub destination: String,
-    /// Intermediate streets the MTA prints under the destination, e.g. `["Av U"]`.
-    #[serde(default)]
-    pub via: Vec<String>,
+    pub headsign: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -39,12 +36,7 @@ pub struct MtaBusRouteData {
     pub name_number: i32,
     /// Variant suffix, e.g. `-SBS` in `M15-SBS` or `A` in `Bx18A`.
     pub name_suffix: Option<String>,
-    /// Destination headsigns, ordered by `direction_id`.
-    ///
-    /// Headsigns live here rather than on `RouteStop` because the upstream feed
-    /// exposes no stop-to-direction mapping — a stop's route entry carries only
-    /// shape IDs. Consumers resolve a trip's headsign from its `direction`.
-    #[serde(default)]
+    /// Helium display labels, ordered by `direction_id`; shared by trips and stop memberships.
     pub directions: Vec<MtaBusDirection>,
     // TODO: double check if theres a better way to link mta bus shapes to live trips.
     /// All shape IDs associated with this route (from Helium infra, via stop-route data).

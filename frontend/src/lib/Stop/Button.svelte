@@ -6,7 +6,7 @@
 	import { upcomingCalls } from '#lib/transit/decode.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
-	import { main_route_stops, trip_headsign } from '#lib/util.svelte.js';
+	import { bus_headsign, main_route_stops, trip_headsign } from '#lib/util.svelte.js';
 
 	const current_time = getCurrentTime();
 	const transit = getTransitData();
@@ -133,6 +133,12 @@
 					predictions.arrivals.filter((call) => call.route_id === route_stop.route_id)
 				)}
 				{const next = $derived(calls[0])}
+				{const label_count =
+					route_stop.data.source === 'mta_bus'
+						? Math.max(1, route_stop.data.direction_ids.length)
+						: route_stop.data.source === 'njt_bus'
+							? Math.max(1, route_stop.data.directions.length)
+							: 1}
 				{const times = $derived(
 					calls.filter((call) => call.trip.direction === next?.trip.direction)
 				)}
@@ -141,7 +147,7 @@
 						<Icon {route} link={false} width={32} height={32} />
 					{/if}
 					<div class="flex flex-col">
-						<div class="min-h-6">
+						<div style:min-height={`${label_count * 24}px`}>
 							{#if next}
 								{trip_headsign(
 									next.trip,
@@ -149,8 +155,14 @@
 									arrivals.value?.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id),
 									catalog?.stops_by_id
 								)}
-							{:else}
-								{('headsign' in route_stop.data && route_stop.data.headsign) || route?.long_name}
+							{:else if route_stop.data.source === 'mta_bus'}
+								{#each route_stop.data.direction_ids as direction (direction)}
+									<div>{bus_headsign(route, direction)}</div>
+								{/each}
+							{:else if route_stop.data.source === 'njt_bus'}
+								{#each route_stop.data.directions as direction (direction.direction_id)}<div>
+										{direction.headsign || route?.long_name}
+									</div>{/each}
 							{/if}
 						</div>
 						<div class="flex gap-2 pr-1">

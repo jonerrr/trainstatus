@@ -4,11 +4,11 @@ import { resolve } from '$app/paths';
 import { self } from '$app/service-worker';
 import type { PathnameWithSearchOrHash } from '$app/types';
 
-// Deployment-scoped shell and assets; activation replaces only older shells.
+// Deployment-scoped shell and assets.
 const SHELL_PREFIX = 'shell-';
 const SHELL = `${SHELL_PREFIX}${version}`;
-// Static catalogs survive deployments; each response is revalidated by ETag.
-const CATALOGS = 'catalogs';
+// Catalogs survive deployments with the same schema; bump on breaking catalog changes.
+const CATALOGS = 'catalogs-v3';
 
 // Manifest paths are relative to the base path, not app route IDs.
 // `resolve` prefixes the base so they match `url.pathname`.
@@ -31,14 +31,18 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-	async function deleteOldShells() {
+	async function deleteOldCaches() {
 		for (const key of await caches.keys()) {
 			// `cache-*` held every GET response before catalogs had their own cache.
-			if ((key.startsWith(SHELL_PREFIX) && key !== SHELL) || key.startsWith('cache-'))
+			if (
+				(key.startsWith(SHELL_PREFIX) && key !== SHELL) ||
+				(key.startsWith('catalogs') && key !== CATALOGS) ||
+				key.startsWith('cache-')
+			)
 				await caches.delete(key);
 		}
 	}
-	event.waitUntil(deleteOldShells());
+	event.waitUntil(deleteOldCaches());
 });
 
 /** Saved catalog at once, refreshed in the background; network only when none is saved. */

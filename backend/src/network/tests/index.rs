@@ -22,7 +22,7 @@ fn njt_stop() -> Stop {
         id: "100".into(),
         name: "Journal Square".into(),
         geom: Geom(geo::Geometry::Point(geo::Point::new(-74.06, 40.73))),
-        transfers: Vec::new(),
+        nearby_stops: Vec::new(),
         data: StopData::NjtBus(NjtBusStopData {
             stop_code: "100".into(),
         }),
@@ -36,7 +36,7 @@ fn persisted_bus_revision_keeps_route_shape_membership() {
         id: "1".into(),
         name: "Bay Ridge".into(),
         geom: Geom(geo::Geometry::Point(geo::Point::new(-74.0, 40.6))),
-        transfers: Vec::new(),
+        nearby_stops: Vec::new(),
         data: StopData::MtaBus(crate::network::types::stop::MtaBusStopData {
             bearing: None,
             is_boardable: true,
@@ -47,9 +47,8 @@ fn persisted_bus_revision_keeps_route_shape_membership() {
             stop_id: "1".into(),
             stop_sequence: 1,
             data: RouteStopData::MtaBus {
-                headsign: "Bay Ridge".into(),
-                direction: 0,
-                opposite_stop_id: None,
+                direction_ids: vec![0],
+
                 shape_ids: vec!["shape-a".into()],
             },
         }],
@@ -165,9 +164,10 @@ fn dataset_revision_uses_the_same_canonical_keys_and_colors_as_persistence() {
         stop_id: "platform-a".into(),
         stop_sequence: 1,
         data: RouteStopData::NjtBus {
-            headsign: "Uptown".into(),
-            direction: 1,
-            opposite_stop_id: None,
+            directions: vec![crate::network::types::stop::NjtBusStopDirection {
+                direction_id: Some(1),
+                headsign: "Uptown".into(),
+            }],
         },
     });
     let revision = NetworkRevision::from_dataset(&dataset);

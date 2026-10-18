@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO static.nearby_stop\n                (from_stop_id, from_stop_source, to_stop_id, to_stop_source, distance_m)\n               SELECT * FROM UNNEST(\n                 $1::text[], $2::source_enum[], $3::text[], $4::source_enum[], $5::float8[]\n               )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": ["mta_subway", "mta_bus", "njt_bus"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        {
+          "Custom": {
+            "name": "source_enum[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "source_enum",
+                  "kind": {
+                    "Enum": ["mta_subway", "mta_bus", "njt_bus"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Float8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "220d50dc4f5b5138f7a266d4f2725d1e32d5720e539689204dfcbd518b69dd8e"
+}

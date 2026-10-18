@@ -15,7 +15,7 @@ test('a reopened offline app navigates to an unvisited page using saved catalogs
 	await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 	await expect
 		.poll(() =>
-			page.evaluate(async () => (await (await caches.open('catalogs')).keys()).map((r) => r.url))
+			page.evaluate(async () => (await (await caches.open('catalogs-v3')).keys()).map((r) => r.url))
 		)
 		.toContainEqual(expect.stringContaining('/api/v1/catalog/mta_subway'));
 
@@ -31,7 +31,9 @@ test('a reopened offline app navigates to an unvisited page using saved catalogs
 		}
 		return { names: await caches.keys(), urls };
 	});
-	expect(saved.names.every((name) => name === 'catalogs' || name.startsWith('shell-'))).toBe(true);
+	expect(saved.names.every((name) => name === 'catalogs-v3' || name.startsWith('shell-'))).toBe(
+		true
+	);
 	const api = saved.urls.filter((url) => new URL(url).pathname.startsWith('/api/'));
 	expect(api.every((url) => new URL(url).pathname.startsWith('/api/v1/catalog/'))).toBe(true);
 	await context.setOffline(false);

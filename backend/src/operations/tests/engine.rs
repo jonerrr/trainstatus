@@ -112,7 +112,7 @@ impl StaticAdapter for LiteralStatic {
             id: "STOP".into(),
             name: "Terminal".into(),
             geom: crate::geometry::Geom::from(geo::Point::new(-74.0, 40.7)),
-            transfers: vec![],
+            nearby_stops: vec![],
             routes: vec![],
             data: crate::network::types::stop::StopData::NjtBus(
                 crate::network::types::stop::NjtBusStopData {

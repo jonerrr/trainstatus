@@ -1,6 +1,7 @@
 use crate::network::dataset::NetworkDataset;
+use crate::utils::normalization::{normalize_title, normalize_whitespace};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Cursor,
     time::Duration,
 };
@@ -9,25 +10,21 @@ use crate::network::expansion::expand_gtfs;
 use crate::network::index::TripPatternRevision;
 use crate::network::types::route::Route;
 use crate::network::types::route::RouteData;
-use crate::network::types::stop::NjtBusStopData;
 use crate::network::types::stop::RouteStop;
 use crate::network::types::stop::RouteStopData;
 use crate::network::types::stop::Stop;
 use crate::network::types::stop::StopData;
+use crate::network::types::stop::{NjtBusStopData, NjtBusStopDirection};
 use crate::source::Source;
 use crate::sources::StaticAdapter;
-use crate::sources::normalize_title;
-use crate::sources::normalize_whitespace;
 use anyhow::Context;
 use async_trait::async_trait;
-use geo::{Distance, Euclidean, Point};
-use proj4rs::{Proj, transform::transform};
+use geo::Point;
 use tracing::warn;
 
 use super::patterns::{self, PatternDataset, PatternFeature};
 
 const NJT_DEFAULT_COLOR: &str = "1A2B57";
-const MAX_OPPOSITE_DIST: f64 = 500.0;
 const NJT_GTFS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getGTFS";
 pub struct NjtBusStatic;
 
@@ -260,7 +257,7 @@ fn collapse_stops(gtfs: &gtfs_structures::Gtfs) -> (Vec<Stop>, HashMap<String, S
             id: rep.id.clone(),
             name,
             geom: Point::new(lon, lat).into(),
-            transfers: vec![],
+            nearby_stops: vec![],
             routes: vec![],
             data: StopData::NjtBus(NjtBusStopData { stop_code }),
         });
@@ -319,201 +316,66 @@ fn stop_id_sort_key(id: &str) -> (u64, &str) {
 
 // ── Build route_stops ─────────────────────────────────────────────────────────
 
-/// Deduplication key: (route_id, stop_id, direction_id)
-type RouteStopKey = (String, String, i16);
-
 struct Accumulator {
     min_sequence: i16,
-    /// headsign text → occurrence count
-    headsign_counts: HashMap<String, usize>,
+    headsigns: BTreeMap<Option<i16>, HashMap<String, usize>>,
 }
 
 fn build_route_stops(
     gtfs: &gtfs_structures::Gtfs,
     stop_remap: &HashMap<String, String>,
 ) -> Vec<RouteStop> {
-    // Resolve a raw GTFS stop id to its canonical (collapsed) stop id.
-    let canonical = |id: &str| -> String {
-        stop_remap
-            .get(id)
-            .cloned()
-            .unwrap_or_else(|| id.to_string())
-    };
-
-    let proj_wgs84 = Proj::from_epsg_code(4326).expect("Failed to create WGS84 proj");
-    let proj_ny = Proj::from_epsg_code(6538).expect("Failed to create NY proj");
-
-    // Build a map of canonical stop_id -> projected Point. Members of a collapsed
-    // group share coordinates, so keying by canonical id is unambiguous.
-    let stop_geom_map: HashMap<String, Point<f64>> = gtfs
-        .stops
-        .values()
-        .filter_map(|s| {
-            let lat = s.latitude?;
-            let lon = s.longitude?;
-            let mut point = Point::new(lon.to_radians(), lat.to_radians());
-            transform(&proj_wgs84, &proj_ny, &mut point).ok()?;
-            Some((canonical(&s.id), point))
-        })
-        .collect();
-
-    // Map: route_id -> (Dir0 stops, Dir1 stops)
-    let mut route_dir_stops: HashMap<String, (Vec<String>, Vec<String>)> = HashMap::new();
-    let mut accum: HashMap<RouteStopKey, Accumulator> = HashMap::new();
-
+    let mut memberships: HashMap<(String, String), Accumulator> = HashMap::new();
     for trip in gtfs.trips.values() {
-        let direction: i16 = trip.direction_id.map(|d| d as i16).unwrap_or(0);
-        let trip_headsign = trip.trip_headsign.as_deref().unwrap_or("");
-
-        let (dir0, dir1) = route_dir_stops
-            .entry(trip.route_id.clone())
-            .or_insert_with(|| (Vec::new(), Vec::new()));
-
+        let direction = trip.direction_id.map(|d| d as i16);
         for st in &trip.stop_times {
-            let stop_id = canonical(&st.stop.id);
-
-            // Collect stops for opposite-stop matching
-            if direction == 0 {
-                if !dir0.contains(&stop_id) {
-                    dir0.push(stop_id.clone());
-                }
-            } else if direction == 1 && !dir1.contains(&stop_id) {
-                dir1.push(stop_id.clone());
-            }
-
-            // Prefer per-stop headsign, fall back to trip headsign
+            let stop_id = stop_remap.get(&st.stop.id).unwrap_or(&st.stop.id).clone();
             let raw_headsign = st
                 .stop_headsign
                 .as_deref()
                 .filter(|s| !s.trim().is_empty())
-                .unwrap_or(trip_headsign);
+                .or(trip.trip_headsign.as_deref())
+                .unwrap_or("");
             let headsign = normalize_headsign(&trip.route_id, raw_headsign);
-
-            let key: RouteStopKey = (trip.route_id.clone(), stop_id, direction);
-            let sequence = st.stop_sequence as i16;
-
-            let entry = accum.entry(key).or_insert_with(|| Accumulator {
-                min_sequence: sequence,
-                headsign_counts: HashMap::new(),
-            });
-
-            if sequence < entry.min_sequence {
-                entry.min_sequence = sequence;
-            }
+            let entry = memberships
+                .entry((trip.route_id.clone(), stop_id))
+                .or_insert_with(|| Accumulator {
+                    min_sequence: st.stop_sequence as i16,
+                    headsigns: BTreeMap::new(),
+                });
+            entry.min_sequence = entry.min_sequence.min(st.stop_sequence as i16);
+            let counts = entry.headsigns.entry(direction).or_default();
             if !headsign.is_empty() {
-                *entry.headsign_counts.entry(headsign).or_insert(0) += 1;
+                *counts.entry(headsign).or_default() += 1;
             }
         }
     }
-
-    // Map: route_id -> (stop_id -> opposite_stop_id)
-    let opposite_maps: HashMap<String, HashMap<String, String>> = route_dir_stops
+    memberships
         .into_iter()
-        .map(|(route_id, (dir0, dir1))| {
-            let map = compute_opposite_stops(&dir0, &dir1, &stop_geom_map, MAX_OPPOSITE_DIST);
-            (route_id, map)
+        .map(|((route_id, stop_id), entry)| RouteStop {
+            route_id,
+            stop_id,
+            stop_sequence: entry.min_sequence,
+            data: RouteStopData::NjtBus {
+                directions: entry
+                    .headsigns
+                    .into_iter()
+                    .map(|(direction_id, counts)| {
+                        // Resolve equal-frequency labels lexically so import order cannot change them.
+                        let headsign = counts
+                            .into_iter()
+                            .max_by(|(a, ac), (b, bc)| ac.cmp(bc).then_with(|| b.cmp(a)))
+                            .map(|(headsign, _)| headsign)
+                            .unwrap_or_default();
+                        NjtBusStopDirection {
+                            direction_id,
+                            headsign,
+                        }
+                    })
+                    .collect(),
+            },
         })
-        .collect();
-
-    let result: Vec<RouteStop> = accum
-        .into_iter()
-        .map(|((route_id, stop_id, direction), acc)| {
-            let headsign = acc
-                .headsign_counts
-                .into_iter()
-                .max_by_key(|(_, count)| *count)
-                .map(|(h, _)| h)
-                .unwrap_or_else(|| "Unknown".into());
-
-            let opposite_stop_id = opposite_maps
-                .get(&route_id)
-                .and_then(|m| m.get(&stop_id).cloned());
-
-            RouteStop {
-                route_id,
-                stop_id,
-                stop_sequence: acc.min_sequence,
-                data: RouteStopData::NjtBus {
-                    headsign,
-                    direction,
-                    opposite_stop_id,
-                },
-            }
-        })
-        .collect();
-
-    // TODO: figure out what to do about bus stops where the same route id but different direction have the same stop_id
-    // for example route_id=605 stop_id=15142 count=2 examples=["(route_id=605, stop_id=15142, direction=1, headsign=Quaker Br Mall via Griggs Frm)", "(route_id=605, stop_id=15142, direction=0, headsign=Princeton Montgomery Twp via Griggs Frm)"]
-
-    // The schema permits one membership per (route_id, stop_id). Collapse
-    // directional entries here; dataset validation rejects any remaining duplicates.
-    // Keep the entry with the smaller stop sequence.
-    let mut deduped: HashMap<(String, String), RouteStop> = HashMap::new();
-    for rs in result.into_iter() {
-        let key = (rs.route_id.to_uppercase(), rs.stop_id.to_uppercase());
-        deduped
-            .entry(key)
-            .and_modify(|existing| {
-                if rs.stop_sequence < existing.stop_sequence {
-                    *existing = rs.clone();
-                }
-            })
-            .or_insert(rs);
-    }
-
-    deduped.into_values().collect()
-}
-
-// --- Opposite-stop matching ---
-// TODO: combine mta_bus and njt_bus logic into a common module
-/// For each stop in `dir0_ids`, find the nearest stop in `dir1_ids` (and vice-versa) whose
-/// projected distance is within `max_dist` (EPSG:6538 meters).
-/// Returns a map of `stop_id → opposite_stop_id`.
-fn compute_opposite_stops(
-    dir0_ids: &[String],
-    dir1_ids: &[String],
-    stop_geom_map: &HashMap<String, Point<f64>>,
-    max_dist: f64,
-) -> HashMap<String, String> {
-    let mut opposite_map: HashMap<String, String> = HashMap::new();
-
-    // dir0 → nearest dir1 match
-    for stop_id in dir0_ids {
-        let Some(p0) = stop_geom_map.get(stop_id) else {
-            continue;
-        };
-        let best = dir1_ids
-            .iter()
-            .filter_map(|opp_id| {
-                let p1 = stop_geom_map.get(opp_id)?;
-                let dist = Euclidean.distance(p0, p1);
-                (dist <= max_dist).then_some((opp_id, dist))
-            })
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        if let Some((opp_id, _)) = best {
-            opposite_map.insert(stop_id.clone(), opp_id.clone());
-        }
-    }
-
-    // dir1 → nearest dir0 match
-    for stop_id in dir1_ids {
-        let Some(p1) = stop_geom_map.get(stop_id) else {
-            continue;
-        };
-        let best = dir0_ids
-            .iter()
-            .filter_map(|opp_id| {
-                let p0 = stop_geom_map.get(opp_id)?;
-                let dist = Euclidean.distance(p1, p0);
-                (dist <= max_dist).then_some((opp_id, dist))
-            })
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        if let Some((opp_id, _)) = best {
-            opposite_map.insert(stop_id.clone(), opp_id.clone());
-        }
-    }
-
-    opposite_map
+        .collect()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

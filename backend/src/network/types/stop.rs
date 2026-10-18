@@ -18,19 +18,17 @@ pub struct Stop {
     /// See https://gtfs.org/documentation/schedule/reference/#stopstxt location_type field for more details on what these values represent
     /// Values above 4 are not
     // pub location_type: i16,
-    pub transfers: Vec<Transfer>,
+    pub nearby_stops: Vec<NearbyStop>,
     pub data: StopData,
     pub routes: Vec<RouteStop>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
-pub struct Transfer {
-    pub to_stop_id: String,
-    pub to_stop_source: Source,
-    /// Numbers between 0-5 represent the GTFS-defined transfer types: https://gtfs.org/documentation/schedule/reference/#transferstxt
-    /// 6 are transfers that we calculated based on proximity.
-    pub transfer_type: i16,
-    pub min_transfer_time: Option<i16>,
+pub struct NearbyStop {
+    pub stop_id: String,
+    pub source: Source,
+    /// Straight-line distance between stop points, in metres; not a walking route.
+    pub distance_m: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, ToSchema)]
@@ -152,12 +150,8 @@ pub enum RouteStopData {
         stop_type: StopType,
     },
     MtaBus {
-        headsign: String,
-        /// Direction of bus trips that serve this stop
-        direction: i16,
-        // TODO: check if there are any stops where route stops each have a different opposite stop id. If not, we can move this field to the stop level (e.g. in transfers vec)
-        /// Populated by the backend based on proximity, direction, and headsign. Not guaranteed to be accurate.
-        opposite_stop_id: Option<String>,
+        /// OBA direction memberships. Empty means unknown; shared stops can have both.
+        direction_ids: Vec<i16>,
         /// Helium shape_ids (across all service types) known to pass through this stop
         /// for this route. Used to deterministically resolve which of a route's several
         /// candidate shapes a realtime trip is following, by counting how many of the
@@ -166,12 +160,16 @@ pub enum RouteStopData {
         shape_ids: Vec<String>,
     },
     NjtBus {
-        headsign: String,
-        /// 0 or 1 from GTFS direction_id
-        direction: i16,
-        /// Populated by the backend based on proximity and direction. Not guaranteed to be accurate.
-        opposite_stop_id: Option<String>,
+        directions: Vec<NjtBusStopDirection>,
     },
+}
+
+/// Published NJT direction membership and its most common destination at this stop.
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub struct NjtBusStopDirection {
+    /// Unknown provider direction remains null rather than becoming direction 0.
+    pub direction_id: Option<i16>,
+    pub headsign: String,
 }
 
 #[derive(Clone, Deserialize, Serialize, Debug, ToSchema)]

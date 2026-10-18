@@ -24,6 +24,30 @@ fn gtfs_with(stops: Vec<GtfsStop>) -> Gtfs {
     gtfs
 }
 
+#[test]
+fn stop_names_and_headsigns_use_transit_casing_without_changing_route_prefix_rules() {
+    let mut stop = make_stop("100", "100", LocationType::StopPoint, None);
+    stop.name = Some("US-30 at HADDON AVE".into());
+    let (stops, _) = collapse_stops(&gtfs_with(vec![stop]));
+    assert_eq!(stops[0].name, "US-30 at Haddon Ave");
+    for (route, raw, expected) in [
+        ("126", "126 HOBOKEN-PATH", "Hoboken-PATH"),
+        ("404", "404 CAMDEN WRTC", "Camden WRTC"),
+        (
+            "119",
+            "119P JERSEY CITY JFK BLVD",
+            "119P Jersey City JFK Blvd",
+        ),
+        (
+            "772G",
+            "772G HACKENSACK VIA GOTHAM PARKWAY",
+            "Hackensack via Gotham Parkway",
+        ),
+    ] {
+        assert_eq!(normalize_headsign(route, raw), expected, "{raw}");
+    }
+}
+
 fn stop_code_of(stop: &Stop) -> &str {
     match &stop.data {
         StopData::NjtBus(d) => &d.stop_code,
@@ -115,6 +139,50 @@ fn stop_id_sort_key_orders_numerically() {
     assert!(stop_id_sort_key("2") < stop_id_sort_key("10"));
     // Non-numeric ids sort after numeric ones.
     assert!(stop_id_sort_key("999999") < stop_id_sort_key("A1"));
+}
+
+#[test]
+fn shared_route_stops_keep_both_directions_unknowns_and_deterministic_labels() {
+    use gtfs_structures::DirectionType::{Inbound, Outbound};
+    let mut gtfs = Gtfs::from_path(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/njt_bus/static/basic/raw/patterns_gtfs.zip"
+    ))
+    .unwrap();
+    let template = gtfs.trips.values().next().unwrap().clone();
+    let stop_id = template.stop_times[0].stop.id.clone();
+    gtfs.trips.clear();
+    for (id, direction, label) in [
+        ("a", Some(Outbound), "ZEBRA"),
+        ("b", Some(Outbound), "ALPHA"),
+        ("c", Some(Inbound), "JFK AIRPORT"),
+        ("d", None, "PATH STATION"),
+    ] {
+        let mut trip = template.clone();
+        trip.id = id.into();
+        trip.direction_id = direction;
+        trip.trip_headsign = Some(label.into());
+        trip.stop_times.truncate(1);
+        trip.stop_times[0].stop_headsign = None;
+        gtfs.trips.insert(id.into(), trip);
+    }
+    let rows = build_route_stops(&gtfs, &HashMap::new());
+    let row = rows.iter().find(|r| r.stop_id == stop_id).unwrap();
+    let RouteStopData::NjtBus { directions } = &row.data else {
+        panic!("NJT membership")
+    };
+    let labels: Vec<_> = directions
+        .iter()
+        .map(|d| (d.direction_id, d.headsign.as_str()))
+        .collect();
+    assert_eq!(
+        labels,
+        vec![
+            (None, "PATH Station"),
+            (Some(0), "Alpha"),
+            (Some(1), "JFK Airport")
+        ]
+    );
 }
 
 /// End-to-end against the captured NJT GTFS feed. Ignored by default because

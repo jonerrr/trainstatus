@@ -4,6 +4,116 @@ use crate::support::test_owners;
 use std::sync::Arc;
 
 #[sqlx::test]
+async fn njt_shared_stop_direction_labels_survive_catalog_restore(pool: sqlx::PgPool) {
+    use backend::network::types::stop::{NjtBusStopDirection, RouteStopData};
+    let stores = test_owners(pool.clone());
+    let mut dataset = njt_bus_dataset();
+    let membership = &mut dataset.route_stops[0];
+    let stop_id = membership.stop_id.clone();
+    let route_id = membership.route_id.clone();
+    membership.data = RouteStopData::NjtBus {
+        directions: vec![
+            NjtBusStopDirection {
+                direction_id: Some(0),
+                headsign: "JFK Airport".into(),
+            },
+            NjtBusStopDirection {
+                direction_id: Some(1),
+                headsign: "PATH Station".into(),
+            },
+        ],
+    };
+    stores.network.persist(&dataset).await.unwrap();
+    let warm = stores.catalog.response(dataset.source).await.unwrap();
+    let cold = test_owners(pool);
+    cold.network
+        .restore_revision(dataset.source)
+        .await
+        .unwrap()
+        .unwrap();
+    let restored = cold.catalog.response(dataset.source).await.unwrap();
+    assert_eq!(warm.body, restored.body);
+    let catalog: serde_json::Value = serde_json::from_slice(&restored.body).unwrap();
+    let stop = catalog["stops"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == stop_id)
+        .unwrap();
+    let route = stop["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["route_id"] == route_id)
+        .unwrap();
+    assert_eq!(
+        route["data"]["directions"],
+        serde_json::json!([
+            { "direction_id": 0, "headsign": "JFK Airport" },
+            { "direction_id": 1, "headsign": "PATH Station" },
+        ])
+    );
+}
+
+#[sqlx::test]
+async fn nearby_stops_preserve_routes_and_directions_but_require_boardable_targets(
+    pool: sqlx::PgPool,
+) {
+    use backend::network::types::stop::{CompassDirection, StopData};
+    let stores = test_owners(pool);
+    let mut dataset = mta_bus_dataset();
+    dataset.stops.truncate(5);
+    let ids: Vec<_> = dataset.stops.iter().map(|stop| stop.id.clone()).collect();
+    dataset
+        .route_stops
+        .retain(|rs| ids[..4].contains(&rs.stop_id));
+    for (i, stop) in dataset.stops.iter_mut().enumerate() {
+        stop.geom = geo::Point::new(-74.0 + if i == 1 { 0.0005 } else { 0.0 }, 40.7).into();
+        let StopData::MtaBus(data) = &mut stop.data else {
+            panic!("MTA stop")
+        };
+        data.direction = match i {
+            2 => CompassDirection::S,
+            3 => CompassDirection::Unknown,
+            _ => CompassDirection::N,
+        };
+        data.is_boardable = i != 0;
+    }
+    stores.network.persist(&dataset).await.unwrap();
+    let response = stores.catalog.response(dataset.source).await.unwrap();
+    let catalog: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+    let stops = catalog["stops"].as_array().unwrap();
+    let origin = stops.iter().find(|stop| stop["id"] == ids[0]).unwrap();
+    let nearby = origin["nearby_stops"].as_array().unwrap();
+    for id in &ids[1..4] {
+        assert!(
+            nearby.iter().any(|n| n["stop_id"] == *id),
+            "every direction remains eligible"
+        );
+    }
+    assert!(
+        !nearby.iter().any(|n| n["stop_id"] == ids[4]),
+        "route-less targets excluded"
+    );
+    let distance = nearby.iter().find(|n| n["stop_id"] == ids[1]).unwrap()["distance_m"]
+        .as_f64()
+        .unwrap();
+    assert!(
+        distance > 30.0 && distance < 60.0,
+        "measured metres: {distance}"
+    );
+    let target = stops.iter().find(|stop| stop["id"] == ids[1]).unwrap();
+    assert!(
+        !target["nearby_stops"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n["stop_id"] == ids[0]),
+        "an alighting-only origin must not become a boarding target in reverse"
+    );
+}
+
+#[sqlx::test]
 async fn static_response_pairs_exact_bytes_with_etag_and_refreshes_after_import(
     pool: sqlx::PgPool,
 ) {
@@ -54,9 +164,12 @@ async fn static_response_pairs_exact_bytes_with_etag_and_refreshes_after_import(
 }
 
 #[sqlx::test]
-async fn proximity_refresh_updates_both_sources_including_deleted_pairs(pool: sqlx::PgPool) {
+async fn nearby_refresh_updates_both_sources_including_deleted_pairs(pool: sqlx::PgPool) {
     let stores = test_owners(pool.clone());
-    let bus = mta_bus_dataset();
+    let mut bus = mta_bus_dataset();
+    if let backend::network::types::stop::StopData::MtaBus(data) = &mut bus.stops[0].data {
+        data.is_boardable = true;
+    }
     let mut njt = njt_bus_dataset();
     let bus_id = bus.stops[0].id.clone();
     let njt_id = njt.stops[0].id.clone();
@@ -80,11 +193,11 @@ async fn proximity_refresh_updates_both_sources_including_deleted_pairs(pool: sq
         .find(|s| s["id"] == bus_id)
         .unwrap();
     assert!(
-        stop["transfers"]
+        stop["nearby_stops"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["to_stop_id"] == njt_id && t["to_stop_source"] == njt.source.as_str())
+            .any(|t| t["stop_id"] == njt_id && t["source"] == njt.source.as_str())
     );
     njt.stops[0].geom = geo::Point::new(-80., 35.).into();
     stores.network.persist(&njt).await.unwrap();
@@ -97,11 +210,11 @@ async fn proximity_refresh_updates_both_sources_including_deleted_pairs(pool: sq
         .find(|s| s["id"] == bus_id)
         .unwrap();
     assert!(
-        !stop["transfers"]
+        !stop["nearby_stops"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["to_stop_id"] == njt_id && t["to_stop_source"] == njt.source.as_str())
+            .any(|t| t["stop_id"] == njt_id && t["source"] == njt.source.as_str())
     );
     assert_ne!(response.etag, removed.etag);
 }

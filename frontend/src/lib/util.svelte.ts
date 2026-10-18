@@ -7,23 +7,14 @@ import type {
 import { calculateTextHeight } from '#lib/text_measurement.js';
 import type { Call } from '#lib/transit/decode.js';
 
-/**
- * Destination shown on an MTA bus for a given trip direction.
- *
- * The upstream feed maps headsigns to directions at the route level, not to
- * individual stops, so route-stop headsigns are always empty for buses.
- * Resolve from the route's directions using the trip's `direction` instead.
- */
+/** Shared direction headsign for a trip or a static stop membership. */
 export function bus_headsign(
 	route: CatalogRoute | undefined,
 	direction: number
 ): string | undefined {
 	if (route?.data.source !== 'mta_bus') return undefined;
 
-	const match = route.data.directions?.find((d) => d.direction_id === direction);
-	if (!match) return undefined;
-
-	return match.via?.length ? `${match.destination} via ${match.via.join('/')}` : match.destination;
+	return route.data.directions.find((d) => d.direction_id === direction)?.headsign;
 }
 
 /** Resolve destinations identically in trip cards and stop arrivals. */
@@ -34,7 +25,6 @@ export function trip_headsign(
 	stops?: ReadonlyMap<string, CatalogStop>
 ): string {
 	if (trip.data.source === 'mta_bus') {
-		// TODO: why make this a separate function when it's only used here?
 		return bus_headsign(route, trip.direction) || 'Unknown';
 	}
 
@@ -51,10 +41,14 @@ export function trip_headsign(
 					(rs) =>
 						rs.route_id === call.route_id &&
 						rs.data.source === 'njt_bus' &&
-						rs.data.direction === trip.direction &&
-						rs.data.headsign
+						rs.data.directions.some((d) => d.direction_id === trip.direction && d.headsign)
 				);
-			if (route_stop?.data.source === 'njt_bus') return route_stop.data.headsign;
+			if (route_stop?.data.source === 'njt_bus') {
+				const headsign = route_stop.data.directions.find(
+					(d) => d.direction_id === trip.direction
+				)?.headsign;
+				if (headsign) return headsign;
+			}
 		}
 	}
 
@@ -198,8 +192,16 @@ export function calculate_stop_height(item: CatalogStop) {
 	);
 
 	if (item.data.source === 'mta_bus' || item.data.source === 'njt_bus') {
-		// Each bus route row: icon (20px) + headsign text + ETAs line ≈ 56px fixed
-		height += item.routes.length * 56;
+		// Reserve every static label even when the next trip shows only one direction.
+		height += item.routes.reduce((total, route) => {
+			const labels =
+				route.data.source === 'mta_bus'
+					? route.data.direction_ids.length
+					: route.data.source === 'njt_bus'
+						? route.data.directions.length
+						: 1;
+			return total + 56 + (Math.max(1, labels) - 1) * 24;
+		}, 0);
 	} else if (item.data.source === 'mta_subway') {
 		// Two direction columns — measure the taller headsign
 		const north_h = calculateTextHeight(

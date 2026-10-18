@@ -77,7 +77,7 @@
 	}
 </script>
 
-<div class="flex flex-col items-start gap-3 p-3">
+<div class="flex flex-col items-start gap-3 border-b border-neutral-700 p-3">
 	<div class="flex w-full items-center gap-2">
 		{#if stop?.data.source === 'mta_bus'}
 			<BusArrow direction={stop.data.direction} />
@@ -102,13 +102,12 @@
 		{/if}
 	</div>
 </div>
+{#if stop}
+	{#key `${source}:${stop.id}`}<Transfers {stop} />{/key}
+{/if}
 {#if catalog_state.loading}
 	<Skeleton lines={5} class="p-2" />
 {:else if stop}
-	{#if stop.transfers.length}
-		<Transfers stop_source={source} transfers={stop.transfers} />
-	{/if}
-
 	{#if arrivals_state.loading}
 		<Skeleton lines={5} class="p-2" />
 	{:else if !visible_arrivals.length}

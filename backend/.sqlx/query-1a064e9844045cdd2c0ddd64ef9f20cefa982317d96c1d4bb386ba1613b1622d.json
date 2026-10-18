@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM static.nearby_stop WHERE from_stop_source = $1 OR to_stop_source = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "source_enum",
+            "kind": {
+              "Enum": ["mta_subway", "mta_bus", "njt_bus"]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1a064e9844045cdd2c0ddd64ef9f20cefa982317d96c1d4bb386ba1613b1622d"
+}

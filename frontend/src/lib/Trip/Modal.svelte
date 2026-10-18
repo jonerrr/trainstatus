@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { slide } from 'svelte/transition';
-
 	import { page } from '$app/state';
 
 	import Button from '#lib/Button.svelte';
@@ -8,7 +6,7 @@
 	import ModalList from '#lib/ModalList.svelte';
 	import Icon from '#lib/Route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import type { Call, CatalogData } from '#lib/transit/decode.js';
+	import { boardingOptions } from '#lib/transit/nearby.js';
 	import { getTransitData, type TripRead } from '#lib/transit/store.svelte.js';
 	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
@@ -37,48 +35,17 @@
 	const loaded_catalog = $derived(transit.peekCatalog(source));
 	const route = $derived(loaded_catalog?.routes_by_id.get(route_id));
 	const loaded_read = $derived(trip_resource.current.value);
-	const open_transfers = $state<Record<number, boolean>>({});
+	let open_transfer = $state<string | null>(null);
+	const transfer_catalogs_resource = transit.catalogs(() => page.data.selected_sources);
+	const transfer_catalogs = $derived(
+		transfer_catalogs_resource.current.flatMap((r) => (r.catalog ? [r.catalog] : []))
+	);
 
 	function visible_calls(read: TripRead) {
 		const now = current_time.ms;
 		// Charts only show trips that have already passed.
 		if (show_previous || page.url.pathname.startsWith('/charts')) return read.calls;
 		return read.calls.filter((call) => call.arrival > now);
-	}
-
-	/** Up to four later departures on other routes at each stop, from loaded routes only. */
-	function transfers_at(read: TripRead, calls: readonly Call[], catalog: CatalogData) {
-		const transfers: Record<number, (Call & { source: Source })[]> = {};
-		for (const st of calls) {
-			const list: (Call & { source: Source })[] = (transfers[st.sequence] = []);
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity
-			const added = new Set<string>();
-			const stop = catalog?.stops_by_id.get(st.stop_id);
-			if (!stop) continue;
-			const candidates = [
-				{ source, stop_id: st.stop_id, same_stop: true },
-				...stop.transfers
-					.filter((t) => page.data.selected_sources.includes(t.to_stop_source))
-					.map((t) => ({ source: t.to_stop_source, stop_id: t.to_stop_id, same_stop: false }))
-			];
-			for (const candidate of candidates) {
-				const loaded_calls = transit.loadedStopArrivals(candidate.source, candidate.stop_id, at);
-				for (const call of loaded_calls.calls) {
-					if (list.length > 3) break;
-					if (call.arrival < st.arrival || added.has(call.route_id)) continue;
-					if (candidate.same_stop && (call.trip_id === st.trip_id || call.route_id === route_id))
-						continue;
-					const trip = loaded_calls.routes.get(call.route_id)?.trips.get(call.trip_id);
-					// Direction numbers are only comparable within one source.
-					if (!trip || (candidate.source === source && trip.direction !== read.trip.direction))
-						continue;
-					list.push({ ...call, source: candidate.source });
-					added.add(call.route_id);
-				}
-			}
-			list.sort((a, b) => a.arrival - b.arrival);
-		}
-		return transfers;
 	}
 </script>
 
@@ -91,7 +58,7 @@
 			? trip_data.deviation / 60
 			: undefined
 	)}
-	<div class="p-3">
+	<div class="border-b border-neutral-700 p-3">
 		<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
 			{#if route}
 				<Icon
@@ -219,26 +186,33 @@
 		{/if}
 
 		{const calls = $derived(visible_calls(read))}
-		{const transfers = $derived(catalog ? transfers_at(read, calls, catalog) : {})}
 		<ModalList>
 			{#each calls as st (st.sequence)}
 				{const stop = $derived(catalog?.stops_by_id.get(st.stop_id))}
 				{#if stop}
+					{const incoming = $derived({
+						source,
+						route_id,
+						arrival: st.arrival
+					})}
+					{const nearby_options = $derived(boardingOptions(stop, transfer_catalogs, incoming))}
+					{const transfer_key = JSON.stringify([source, route_id, trip_id, st.sequence])}
 					<div class="relative text-base">
-						{#if transfers[st.sequence]?.length}
+						{#if nearby_options.length}
 							<button
 								tabindex="0"
 								onclick={() => {
-									open_transfers[st.sequence] = !open_transfers[st.sequence];
+									open_transfer = open_transfer === transfer_key ? null : transfer_key;
 								}}
-								aria-label="Show transfers at stop"
+								aria-label={`Transfers at ${stop.name}: nearby routes`}
+								aria-expanded={open_transfer === transfer_key}
 								class="absolute top-[50%] left-0 z-20 h-[95%] -translate-y-1/2 rounded-sm bg-neutral-800"
 							>
-								<div class="mx-1 flex items-center">
-									{#if !open_transfers[st.sequence]}
-										<ChevronDown />
+								<div class="mx-1 flex min-w-6 flex-col items-center">
+									{#if open_transfer !== transfer_key}
+										<ChevronDown size={18} />
 									{:else}
-										<ChevronUp />
+										<ChevronUp size={18} />
 									{/if}
 								</div>
 							</button>
@@ -270,10 +244,8 @@
 						</Button>
 					</div>
 
-					{#if open_transfers[st.sequence]}
-						<div transition:slide>
-							<Transfers {time_format} transfer_calls={transfers[st.sequence]} />
-						</div>
+					{#if open_transfer === transfer_key}
+						{#key transfer_key}<Transfers {time_format} {stop} {incoming} />{/key}
 					{/if}
 				{/if}
 			{:else}

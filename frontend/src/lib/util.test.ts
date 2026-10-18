@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CatalogRoute, CatalogStopRoute } from './client';
+import type { CatalogRoute, CatalogStopRoute, MtaBusDirection } from './client';
 import { bus_headsign, debounce, main_route_stops, throttle } from './util.svelte';
 
 it('throttles continuous input to the latest value each interval and cancels pending work', () => {
@@ -71,16 +71,7 @@ describe('main_route_stops', () => {
 	});
 });
 
-/**
- * The Helium feed maps headsigns to a route's directions, never to individual
- * stops, so `CatalogStopRoute.data.headsign` is always empty for MTA buses and every
- * bus headsign in the UI has to be resolved from the route plus the trip's
- * direction. These cover the shapes the feed actually produces.
- */
-
-function bus_route(
-	directions: { direction_id: number; destination: string; via: string[] }[] | undefined
-): CatalogRoute {
+function bus_route(directions: MtaBusDirection[]): CatalogRoute {
 	return {
 		id: 'B1',
 		short_name: 'B1',
@@ -97,34 +88,34 @@ function bus_route(
 			name_suffix: null,
 			directions
 		}
-	} as unknown as CatalogRoute;
+	};
 }
 
 describe('bus_headsign', () => {
 	it('resolves the destination for each direction', () => {
 		const route = bus_route([
-			{ direction_id: 0, destination: 'Bay Ridge 4 Av', via: [] },
-			{ direction_id: 1, destination: 'Manhattan Beach Kingsboro CC', via: [] }
+			{ direction_id: 0, headsign: 'Bay Ridge 4 Av' },
+			{ direction_id: 1, headsign: 'Manhattan Beach Kingsboro CC' }
 		]);
 
 		expect(bus_headsign(route, 0)).toBe('Bay Ridge 4 Av');
 		expect(bus_headsign(route, 1)).toBe('Manhattan Beach Kingsboro CC');
 	});
 
-	it('appends the via streets the MTA prints under the destination', () => {
+	it('preserves OBA service flags and via formatting', () => {
 		const route = bus_route([
-			{ direction_id: 0, destination: 'Bergen Beach E 71 St', via: ['Av U'] },
-			{ direction_id: 1, destination: 'Bed-Stuy Bway-Halsey', via: ['Kings Hwy', 'Utica'] }
+			{ direction_id: 0, headsign: 'LIMITED BERGEN BEACH E 71 ST via AV U' },
+			{ direction_id: 1, headsign: 'BED-STUY BWAY-HALSEY via KINGS HWY via UTICA' }
 		]);
 
-		expect(bus_headsign(route, 0)).toBe('Bergen Beach E 71 St via Av U');
-		expect(bus_headsign(route, 1)).toBe('Bed-Stuy Bway-Halsey via Kings Hwy/Utica');
+		expect(bus_headsign(route, 0)).toBe('LIMITED BERGEN BEACH E 71 ST via AV U');
+		expect(bus_headsign(route, 1)).toBe('BED-STUY BWAY-HALSEY via KINGS HWY via UTICA');
 	});
 
 	it('returns undefined for a direction the route does not publish', () => {
-		// Seven routes (B74, S81, Q70+, ...) only publish one direction, and the
+		// Routes such as B74, S81 and Q70-SBS only publish one direction, and the
 		// one they publish is not always direction 0.
-		const route = bus_route([{ direction_id: 1, destination: 'Stillwell Av', via: [] }]);
+		const route = bus_route([{ direction_id: 1, headsign: 'Stillwell Av' }]);
 
 		expect(bus_headsign(route, 1)).toBe('Stillwell Av');
 		expect(bus_headsign(route, 0)).toBeUndefined();
@@ -137,7 +128,7 @@ describe('bus_headsign', () => {
 		).toBeUndefined();
 	});
 
-	it('tolerates directions being absent, since the schema marks it optional', () => {
-		expect(bus_headsign(bus_route(undefined), 0)).toBeUndefined();
+	it('returns undefined for an empty direction list', () => {
+		expect(bus_headsign(bus_route([]), 0)).toBeUndefined();
 	});
 });

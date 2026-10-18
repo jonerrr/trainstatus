@@ -7,6 +7,11 @@
       "name": "infrastructure",
       "path": "raw/infrastructure.json",
       "format": "json"
+    },
+    {
+      "name": "oba",
+      "path": "raw/oba.json",
+      "format": "json"
     }
   ],
   "notes": "Captured by backend fixture CLI."

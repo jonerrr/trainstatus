@@ -78,12 +78,6 @@ impl Network {
         sqlx::query!("DELETE FROM static.route_stop WHERE source = $1", source)
             .execute(&mut *tx)
             .await?;
-        sqlx::query!(
-            "DELETE FROM static.stop_transfer WHERE from_stop_source = $1 AND transfer_type != 6",
-            source
-        )
-        .execute(&mut *tx)
-        .await?;
         route::save_all_on(&mut tx, source, &dataset.routes).await?;
         stop::save_all_on(&mut tx, source, &dataset.stops).await?;
         stop::save_all_route_stops_on(&mut tx, source, &dataset.route_stops).await?;
@@ -163,7 +157,7 @@ impl Network {
         sqlx::query("ANALYZE static.stop, static.route_stop")
             .execute(&mut *tx)
             .await?;
-        stop::compute_proximity_transfers(&mut tx, source).await?;
+        stop::compute_nearby_stops(&mut tx, source).await?;
         let mut imported = NetworkRevision::from_dataset_with_schedules(dataset, schedules);
         imported.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
             source,
@@ -176,7 +170,7 @@ impl Network {
             .filter(|affected| *affected != source)
         {
             if let Some(current) = self.index.get(affected) {
-                // Only proximity transfers changed; retain the pinned routing inputs.
+                // Only nearby stops changed; retain the pinned routing inputs.
                 let mut revision = (*current).clone();
                 revision.catalog = Some(Arc::new(crate::api::dto::catalog::encode(
                     affected,

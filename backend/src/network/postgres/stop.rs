@@ -1,7 +1,7 @@
 use crate::geometry::Geom;
+use crate::network::types::stop::NearbyStop;
 use crate::network::types::stop::RouteStop;
 use crate::network::types::stop::Stop;
-use crate::network::types::stop::Transfer;
 use crate::source::Source;
 use sqlx::PgConnection;
 
@@ -14,19 +14,19 @@ struct StopRow {
     name: String,
     geom: Geom,
     #[sqlx(json)]
-    transfers: Vec<Transfer>,
+    nearby_stops: Vec<NearbyStop>,
     #[sqlx(json)]
     data: serde_json::Value,
     #[sqlx(json)]
     routes: Vec<RouteStop>,
 }
 
-/// Raw DB query for all stops of a source (with embedded transfers and route associations).
+/// Raw DB query for all stops of a source (with embedded nearby stops and route associations).
 pub(in crate::network) async fn query_all_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Stop>> {
-    // Runtime projection: nested route/transfer JSON decodes through FromRow.
+    // Runtime projection: nested route/nearby-stop JSON decodes through FromRow.
     sqlx::query_as::<_, StopRow>(
         r#"SELECT
                 s.id,
@@ -37,18 +37,17 @@ pub(in crate::network) async fn query_all_on(
                     (
                         SELECT jsonb_agg(
                             jsonb_build_object(
-                                'to_stop_id', st.to_stop_id,
-                                'to_stop_source', st.to_stop_source,
-                                'transfer_type', st.transfer_type,
-                                'min_transfer_time', st.min_transfer_time
-                            ) ORDER BY st.to_stop_source, st.to_stop_id
+                                'stop_id', st.to_stop_id,
+                                'source', st.to_stop_source,
+                                'distance_m', st.distance_m
+                            ) ORDER BY st.distance_m, st.to_stop_source, st.to_stop_id
                         )
-                        FROM static.stop_transfer st
+                        FROM static.nearby_stop st
                         WHERE st.from_stop_id = s.id
                           AND st.from_stop_source = s.source
                     ),
                     '[]'::jsonb
-                ) AS transfers,
+                ) AS nearby_stops,
                 s.data,
                 COALESCE(
                     (
@@ -75,7 +74,7 @@ pub(in crate::network) async fn query_all_on(
             id: row.id,
             name: row.name,
             geom: row.geom,
-            transfers: row.transfers,
+            nearby_stops: row.nearby_stops,
             data: crate::postgres::decode(row.source, row.data)?,
             routes: row.routes,
         })
@@ -172,171 +171,79 @@ pub(in crate::network) async fn save_all_route_stops_on(
     Ok(())
 }
 
-/// Recompute bidirectional proximity transfers involving the importing source.
-/// Current stops within 150 m in EPSG:6538 qualify unless they have an official
-/// transfer, are opposite bus stops, or share the same bus source and direction.
-/// Stored projected coordinates and their spatial index bound the source-scoped
-/// join. Candidate selection and replacement share the network transaction.
-pub(in crate::network) async fn compute_proximity_transfers(
+/// Recompute source-scoped nearby boarding candidates inside the import transaction.
+/// Distance bounds candidate discovery; route/direction selection belongs to readers.
+pub(in crate::network) async fn compute_nearby_stops(
     connection: &mut PgConnection,
     source: Source,
 ) -> anyhow::Result<()> {
     let start = std::time::Instant::now();
+    // Drive the spatial join with the importing source. Eligibility is evaluated
+    // independently for each target: an alighting-only origin is still useful.
+    let candidates = sqlx::query_as::<_, (String, Source, String, Source, f64)>(
+        r#"
+        WITH pairs AS (
+            SELECT a.id AS a_id, a.source AS a_source,
+                   b.id AS b_id, b.source AS b_source,
+                   ST_Distance(a.projected_geom, b.projected_geom) AS distance_m,
+                   (a.source != 'mta_bus' OR a.data->>'is_boardable' = 'true')
+                     AND EXISTS (
+                       SELECT 1 FROM static.route_stop rs
+                       JOIN static.route r ON r.id = rs.route_id AND r.source = rs.source AND r.current
+                       WHERE rs.stop_id = a.id AND rs.source = a.source
+                     ) AS a_boardable,
+                   (b.source != 'mta_bus' OR b.data->>'is_boardable' = 'true')
+                     AND EXISTS (
+                       SELECT 1 FROM static.route_stop rs
+                       JOIN static.route r ON r.id = rs.route_id AND r.source = rs.source AND r.current
+                       WHERE rs.stop_id = b.id AND rs.source = b.source
+                     ) AS b_boardable
+            FROM static.stop a
+            JOIN static.stop b ON b.current
+              AND (a.id, a.source) != (b.id, b.source)
+              AND ST_DWithin(a.projected_geom, b.projected_geom, 150.0)
+            WHERE a.source = $1 AND a.current
+        )
+        SELECT a_id, a_source, b_id, b_source, distance_m FROM pairs WHERE b_boardable
+        UNION ALL
+        SELECT b_id, b_source, a_id, a_source, distance_m FROM pairs
+        WHERE b_source != $1 AND a_boardable
+        "#,
+    ).bind(source).fetch_all(&mut *connection).await?;
 
-    // Compute candidates from the transaction's current membership.
-    //
-    // Side `a` is restricted to the importing source while side
-    // `b` includes ALL stops. This produces the same result set as the symmetric
-    // `a.source = $1 OR b.source = $1` filter but lets Postgres plan a much
-    // smaller driving set. The reverse direction (b→a) is captured by UNION ALL
-    // with swapped roles.
-    struct TransferCandidate {
-        from_id: String,
-        from_source: Source,
-        to_id: String,
-        to_source: Source,
-    }
+    sqlx::query!(
+        "DELETE FROM static.nearby_stop WHERE from_stop_source = $1 OR to_stop_source = $1",
+        source
+    )
+    .execute(&mut *connection)
+    .await?;
 
-    // Keep the spatial CTE/UNION projections runtime; scalar writes below are checked.
-    // Emit both directions, with the importing source driving the spatial join.
-    let candidates: Vec<TransferCandidate> = sqlx::query_as::<_, (String, Source, String, Source)>(
-                r#"
-                WITH
-                stop_direction AS (
-                    SELECT
-                        stop_id,
-                        source,
-                        mode() WITHIN GROUP (ORDER BY (data->>'direction')::integer) AS direction
-                    FROM static.route_stop
-                    GROUP BY stop_id, source
-                ),
-                -- One-directional pairs: importing source (a) → all stops (b)
-                pairs AS (
-                    SELECT
-                        a.id   AS from_id,
-                        a.source AS from_source,
-                        b.id   AS to_id,
-                        b.source AS to_source
-                    FROM static.stop a
-                    LEFT JOIN stop_direction sd_a ON a.id = sd_a.stop_id AND a.source = sd_a.source
-                    JOIN static.stop b
-                        ON a.current AND b.current AND (a.id, a.source) != (b.id, b.source)
-                                                AND ST_DWithin(a.projected_geom, b.projected_geom, 150.0)
-                    LEFT JOIN stop_direction sd_b ON b.id = sd_b.stop_id AND b.source = sd_b.source
-                    WHERE
-                        a.source = $1 AND a.current AND b.current
-                        -- Skip pairs that already have an official (non-proximity) transfer
-                        AND NOT EXISTS (
-                            SELECT 1 FROM static.stop_transfer st
-                            WHERE st.from_stop_id = a.id
-                              AND st.from_stop_source = a.source
-                              AND st.to_stop_id = b.id
-                              AND st.to_stop_source = b.source
-                              AND st.transfer_type != 6
-                        )
-                        -- Skip same-bus-source pairs that share the same direction
-                        AND NOT (
-                            a.source = b.source
-                            AND a.source IN ('mta_bus', 'njt_bus')
-                            AND sd_a.direction IS NOT NULL
-                            AND sd_b.direction IS NOT NULL
-                            AND sd_a.direction = sd_b.direction
-                        )
-                        -- Skip opposite_stop_id pairs (a→b)
-                        AND NOT (
-                            a.source IN ('mta_bus', 'njt_bus')
-                            AND EXISTS (
-                                SELECT 1 FROM static.route_stop rs
-                                WHERE rs.stop_id = a.id
-                                  AND rs.source = a.source
-                                  AND rs.data->>'opposite_stop_id' = b.id
-                            )
-                        )
-                        -- Skip opposite_stop_id pairs (b→a)
-                        AND NOT (
-                            b.source IN ('mta_bus', 'njt_bus')
-                            AND EXISTS (
-                                SELECT 1 FROM static.route_stop rs
-                                WHERE rs.stop_id = b.id
-                                  AND rs.source = b.source
-                                  AND rs.data->>'opposite_stop_id' = a.id
-                            )
-                        )
-                )
-                -- Emit both directions: a→b and b→a
-                SELECT from_id, from_source, to_id, to_source FROM pairs
-                UNION ALL
-                SELECT to_id, to_source, from_id, from_source FROM pairs
-                WHERE to_source != $1
-                "#,
-            )
-            .bind(source)
-            .fetch_all(&mut *connection)
-            .await?
-            .into_iter()
-            .map(
-                |(from_id, from_source, to_id, to_source)| TransferCandidate {
-                    from_id,
-                    from_source,
-                    to_id,
-                    to_source,
-                },
-            )
-            .collect();
-
-    let candidate_count = candidates.len();
-    let compute_elapsed = start.elapsed();
-    tracing::info!(
-        source = ?source,
-        candidates = candidate_count,
-        elapsed_ms = compute_elapsed.as_millis() as u64,
-        "Computed proximity transfer candidates"
-    );
-
-    // Replace affected pairs in the same transaction.
-
-    sqlx::query!("DELETE FROM static.stop_transfer WHERE transfer_type = 6 AND (from_stop_source = $1 OR to_stop_source = $1)", source)
-        .execute(&mut *connection)
-        .await?;
-
-    // Bulk insert candidates in batches to avoid excessive parameter counts.
-    const BATCH_SIZE: usize = 10_000;
-    for chunk in candidates.chunks(BATCH_SIZE) {
-        let from_ids: Vec<&str> = chunk.iter().map(|c| c.from_id.as_str()).collect();
-        let from_sources: Vec<Source> = chunk.iter().map(|c| c.from_source).collect();
-        let to_ids: Vec<&str> = chunk.iter().map(|c| c.to_id.as_str()).collect();
-        let to_sources: Vec<Source> = chunk.iter().map(|c| c.to_source).collect();
-
+    for chunk in candidates.chunks(10_000) {
+        let from_ids: Vec<_> = chunk.iter().map(|c| c.0.as_str()).collect();
+        let from_sources: Vec<_> = chunk.iter().map(|c| c.1).collect();
+        let to_ids: Vec<_> = chunk.iter().map(|c| c.2.as_str()).collect();
+        let to_sources: Vec<_> = chunk.iter().map(|c| c.3).collect();
+        let distances: Vec<_> = chunk.iter().map(|c| c.4).collect();
         sqlx::query!(
-            r#"
-                INSERT INTO static.stop_transfer
-                    (from_stop_id, from_stop_source, to_stop_id, to_stop_source, transfer_type)
-                SELECT * FROM UNNEST(
-                    $1::TEXT[],
-                    $2::source_enum[],
-                    $3::TEXT[],
-                    $4::source_enum[],
-                    $5::SMALLINT[]
-                )
-                ON CONFLICT DO NOTHING
-                "#,
+            r#"INSERT INTO static.nearby_stop
+                (from_stop_id, from_stop_source, to_stop_id, to_stop_source, distance_m)
+               SELECT * FROM UNNEST(
+                 $1::text[], $2::source_enum[], $3::text[], $4::source_enum[], $5::float8[]
+               )"#,
             &from_ids as &[&str],
             &from_sources,
             &to_ids as &[&str],
             &to_sources,
-            &vec![6i16; chunk.len()]
+            &distances
         )
         .execute(&mut *connection)
         .await?;
     }
-
-    let total_elapsed = start.elapsed();
     tracing::info!(
-        source = ?source,
-        inserted = candidate_count,
-        total_ms = total_elapsed.as_millis() as u64,
-        "Proximity transfers committed"
+        ?source,
+        candidates = candidates.len(),
+        elapsed_ms = start.elapsed().as_millis() as u64,
+        "Recomputed nearby boarding stops"
     );
-
     Ok(())
 }

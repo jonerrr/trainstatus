@@ -5,8 +5,12 @@ subprojects = List("frontend", "backend", "science")
 exclude = List("**/CHANGELOG.md", "frontend/src/lib/client/**")
 
 steps {
-  ["trailing-whitespace"] = Builtins.trailing_whitespace
-  ["newlines"] = Builtins.newlines
+  ["trailing-whitespace"] = (Builtins.trailing_whitespace) {
+    exclude = List("backend/tests/fixtures/**")
+  }
+  ["newlines"] = (Builtins.newlines) {
+    exclude = List("backend/tests/fixtures/**")
+  }
   ["merge-conflict"] = Builtins.check_merge_conflict
   ["mise-format"] = Builtins.mise
   ["mise-lock"] {
@@ -16,11 +20,11 @@ steps {
   }
   ["prettier-dependencies"] {
     glob = Builtins.prettier.glob
-    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml")
+    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml", "backend/tests/fixtures/**")
     check = "mise run //frontend:pnpm-install"
   }
   ["shared-prettier"] = (Builtins.prettier) {
-    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml")
+    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml", "backend/tests/fixtures/**")
     depends = "prettier-dependencies"
   }
 }

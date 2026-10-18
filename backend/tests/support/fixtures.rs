@@ -34,7 +34,9 @@ pub fn mta_bus_dataset() -> NetworkDataset {
     let infrastructure = backend::fixtures::read_json_payload(&root, &manifest, "infrastructure")
         .expect("MTA bus infrastructure fixture should load");
 
-    mta_bus_static::build_static_dataset_from_fixture(infrastructure)
+    let oba = backend::fixtures::read_json_payload(&root, &manifest, "oba")
+        .expect("MTA bus OBA static fixture should load");
+    mta_bus_static::build_static_dataset_from_fixtures(infrastructure, oba)
         .expect("MTA bus static fixture should build")
 }
 

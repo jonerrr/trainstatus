@@ -1,13 +1,19 @@
 use crate::network::dataset::NetworkDataset;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
-use anyhow::Context;
+use anyhow::{Context, ensure};
 use async_trait::async_trait;
+use futures::{StreamExt, TryStreamExt, stream};
 use geo::{LineString, Point};
 use proj4rs::Proj;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::integrations::valhalla::ValhallaManager;
+use crate::mta_oba_api_key;
 use crate::network::types::route::MtaBusDirection;
 use crate::network::types::route::MtaBusRouteData;
 use crate::network::types::route::Route;
@@ -22,14 +28,12 @@ use crate::network::types::stop::Stop;
 use crate::network::types::stop::StopData;
 use crate::source::Source;
 use crate::sources::StaticAdapter;
+use crate::sources::mta_bus::AGENCIES;
 use crate::trajectory::geometry::cumulative_distances;
 use crate::trajectory::geometry::project_linestring_wgs84_to_epsg;
 use crate::trajectory::geometry::project_point_onto_line;
 use crate::trajectory::geometry::project_point_wgs84_to_epsg;
 use crate::trajectory::types::source_projected_epsg_code;
-
-#[cfg(feature = "fixture-capture")]
-use std::collections::BTreeMap;
 
 const BUS_INFRASTRUCTURE_URL: &str = concat!(
     env!("MTA_API_URL"),
@@ -68,7 +72,6 @@ struct HeliumBusRoute {
     text_color: Option<String>,
     sort_key: i32,
     service_types: Vec<String>,
-    #[serde(default)]
     directions: Vec<HeliumBusRouteDirection>,
 }
 
@@ -80,11 +83,61 @@ struct HeliumBusRouteDirection {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
 struct HeliumBusHeadsign {
     destination: String,
     #[serde(default)]
     via: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ObaRoute {
+    id: String,
+    short_name: String,
+    long_name: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ObaRouteStops {
+    stop_groupings: Vec<ObaStopGrouping>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ObaStopGrouping {
+    #[serde(rename = "type")]
+    kind: String,
+    stop_groups: Vec<ObaStopGroup>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ObaStopGroup {
+    id: String,
+    stop_ids: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct ObaStaticData {
+    routes: Vec<ObaRoute>,
+    stops_by_route: BTreeMap<String, ObaRouteStops>,
+}
+
+#[derive(Deserialize)]
+struct ObaResponse<T> {
+    code: u16,
+    data: T,
+}
+
+#[derive(Deserialize)]
+struct ObaRouteList {
+    list: Vec<ObaRoute>,
+}
+
+#[derive(Deserialize)]
+struct ObaStopsEntry {
+    entry: ObaRouteStops,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -134,33 +187,25 @@ impl StaticAdapter for MtaBusStatic {
 
     async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         let client = crate::integrations::http::static_data();
-        let infra = fetch_infrastructure(client).await?;
-        let dataset = build_static_dataset(infra);
-        Ok(dataset)
+        let (infra, oba) =
+            tokio::try_join!(fetch_infrastructure(client), fetch_oba_static(client))?;
+        build_static_dataset(infra, oba)
     }
 }
 
-/// The feed has no route long name, so build one out of the two terminals the
-/// way the MTA writes them on schedules ("Bay Ridge 4 Av - Manhattan Beach").
-/// Falls back to the route name for the handful of routes with one direction.
-fn route_long_name(route_name: &str, directions: &[MtaBusDirection]) -> String {
-    let mut terminals: Vec<&str> = directions
-        .iter()
-        .map(|d| d.destination.trim())
-        .filter(|d| !d.is_empty())
-        .collect();
-    terminals.dedup();
-
-    match terminals.len() {
-        0 => route_name.to_string(),
-        1 => terminals[0].to_string(),
-        // Direction 1 is the inbound/return trip, so naming it first reads as
-        // origin - destination.
-        _ => format!("{} - {}", terminals[terminals.len() - 1], terminals[0]),
+fn build_static_dataset(
+    infra: HeliumBusInfrastructure,
+    oba: ObaStaticData,
+) -> anyhow::Result<NetworkDataset> {
+    let mut oba_routes = HashMap::new();
+    for route in oba.routes {
+        let name = route.short_name.to_uppercase();
+        ensure!(
+            oba_routes.insert(name.clone(), route).is_none(),
+            "Ambiguous OBA route name: {name}"
+        );
     }
-}
-
-fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
+    let mut stop_directions: HashMap<(String, String), Vec<i16>> = HashMap::new();
     // First pass: collect all shape_ids per route from stop-route data.
     // The GTFS-RT feed does not include shape_id, so we store all shapes
     // for a route here so the trajectory engine can pick the best one at runtime.
@@ -181,7 +226,14 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
     let routes: Vec<Route> = infra
         .routes
         .iter()
-        .map(|r| {
+        .map(|r| -> anyhow::Result<Route> {
+            let oba_route = oba_routes
+                .get(&r.route_name.to_uppercase())
+                .with_context(|| format!("OBA route not found for {}", r.route_name))?;
+            let oba_stops = oba
+                .stops_by_route
+                .get(&oba_route.id)
+                .with_context(|| format!("OBA stop groups not found for {}", oba_route.id))?;
             route_id_map.insert(r.route_name.to_uppercase(), r.route_id.clone());
             let shape_ids = route_name_to_shape_ids
                 .get(&r.route_name.to_uppercase())
@@ -190,17 +242,42 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
             let mut directions: Vec<MtaBusDirection> = r
                 .directions
                 .iter()
-                .map(|d| MtaBusDirection {
-                    direction_id: d.direction_id,
-                    destination: d.headsign.destination.clone(),
-                    via: d.headsign.via.clone(),
+                .map(|direction| {
+                    let headsign = &direction.headsign;
+                    MtaBusDirection {
+                        direction_id: direction.direction_id,
+                        headsign: if headsign.via.is_empty() {
+                            headsign.destination.clone()
+                        } else {
+                            format!("{} via {}", headsign.destination, headsign.via.join("/"))
+                        },
+                    }
                 })
                 .collect();
-            directions.sort_by_key(|d| d.direction_id);
-
-            Route {
+            directions.sort_unstable_by_key(|direction| direction.direction_id);
+            for grouping in &oba_stops.stop_groupings {
+                if grouping.kind != "direction" {
+                    continue;
+                }
+                for group in &grouping.stop_groups {
+                    let direction_id = group
+                        .id
+                        .parse::<i16>()
+                        .context("Invalid OBA direction ID")?;
+                    for stop_id in &group.stop_ids {
+                        let stop_id = stop_id
+                            .strip_prefix("MTA_")
+                            .context("Invalid OBA stop ID")?;
+                        stop_directions
+                            .entry((r.route_id.clone(), stop_id.to_owned()))
+                            .or_default()
+                            .push(direction_id);
+                    }
+                }
+            }
+            Ok(Route {
                 id: r.route_id.clone(),
-                long_name: route_long_name(&r.route_name, &directions),
+                long_name: oba_route.long_name.clone(),
                 short_name: r.route_name.clone(),
                 color: r.color.clone(),
                 text_color: r
@@ -217,9 +294,13 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
                     directions,
                     shape_ids,
                 }),
-            }
+            })
         })
-        .collect();
+        .collect::<anyhow::Result<_>>()?;
+    for directions in stop_directions.values_mut() {
+        directions.sort_unstable();
+        directions.dedup();
+    }
 
     let stops: Vec<Stop> = infra
         .stops
@@ -230,7 +311,7 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
                 id: s.stop_id.to_string(),
                 name,
                 geom: Point::new(s.longitude, s.latitude).into(),
-                transfers: vec![],
+                nearby_stops: vec![],
                 data: StopData::MtaBus(MtaBusStopData {
                     bearing: s.bearing,
                     is_boardable: s.is_boardable,
@@ -277,18 +358,14 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
             };
 
             let key = (route_id.clone(), s.stop_id.to_string());
+            let direction_ids = stop_directions.get(&key).cloned().unwrap_or_default();
             let entry = route_stop_map.entry(key).or_insert_with(|| RouteStop {
                 route_id,
                 stop_id: s.stop_id.to_string(),
                 stop_sequence: 0,
                 data: RouteStopData::MtaBus {
-                    // The feed exposes no stop-to-direction mapping, so per-stop
-                    // headsigns and directions are not derivable here. Consumers
-                    // read headsigns off `MtaBusRouteData::directions` instead,
-                    // keyed by the trip's direction.
-                    headsign: String::new(),
-                    direction: 0,
-                    opposite_stop_id: None,
+                    direction_ids,
+
                     shape_ids: Vec::new(),
                 },
             });
@@ -334,7 +411,7 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
         .collect();
     shapes.sort_by(|a, b| a.id.cmp(&b.id));
 
-    NetworkDataset {
+    Ok(NetworkDataset {
         source: Source::MtaBus,
         routes,
         stops,
@@ -343,7 +420,7 @@ fn build_static_dataset(infra: HeliumBusInfrastructure) -> NetworkDataset {
         scheduled_trips: vec![],
         trip_patterns: HashMap::new(),
         stop_remap: HashMap::new(),
-    }
+    })
 }
 
 /// Reassemble each shape's polyline from the feed's shared segment pool.
@@ -447,12 +524,69 @@ fn shape_stop_orders<'a>(
 }
 
 #[cfg(feature = "fixture-capture")]
-pub fn build_static_dataset_from_fixture(
+pub fn build_static_dataset_from_fixtures(
     infrastructure: serde_json::Value,
+    oba: serde_json::Value,
 ) -> anyhow::Result<NetworkDataset> {
-    Ok(build_static_dataset(serde_json::from_value(
-        infrastructure,
-    )?))
+    build_static_dataset(
+        serde_json::from_value(infrastructure)?,
+        serde_json::from_value(oba)?,
+    )
+}
+
+async fn fetch_oba<T: DeserializeOwned>(
+    client: &reqwest::Client,
+    method: &str,
+    id: &str,
+) -> anyhow::Result<T> {
+    let mut url = reqwest::Url::parse("https://bustime.mta.info/api/where/")?;
+    url.path_segments_mut()
+        .expect("OBA URL has a path")
+        .pop_if_empty()
+        .push(method)
+        .push(&format!("{id}.json"));
+    let response: ObaResponse<T> = client
+        .get(url)
+        .query(&[
+            ("key", mta_oba_api_key()),
+            ("version", "2"),
+            ("includePolylines", "false"),
+        ])
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?
+        .error_for_status()
+        .map_err(reqwest::Error::without_url)?
+        .json()
+        .await
+        .map_err(reqwest::Error::without_url)?;
+    ensure!(
+        response.code == 200,
+        "OBA {method} {id} returned code {}",
+        response.code
+    );
+    Ok(response.data)
+}
+
+async fn fetch_oba_static(client: &reqwest::Client) -> anyhow::Result<ObaStaticData> {
+    let mut routes = Vec::new();
+    for agency in AGENCIES {
+        let response: ObaRouteList = fetch_oba(client, "routes-for-agency", agency).await?;
+        routes.extend(response.list);
+    }
+    let route_ids: Vec<_> = routes.iter().map(|route| route.id.clone()).collect();
+    let stops_by_route = stream::iter(route_ids)
+        .map(|id| async move {
+            let stops: ObaStopsEntry = fetch_oba(client, "stops-for-route", &id).await?;
+            Ok::<_, anyhow::Error>((id, stops.entry))
+        })
+        .buffer_unordered(4)
+        .try_collect()
+        .await?;
+    Ok(ObaStaticData {
+        routes,
+        stops_by_route,
+    })
 }
 
 async fn fetch_infrastructure(client: &reqwest::Client) -> anyhow::Result<HeliumBusInfrastructure> {
@@ -460,22 +594,24 @@ async fn fetch_infrastructure(client: &reqwest::Client) -> anyhow::Result<Helium
         .get(BUS_INFRASTRUCTURE_URL)
         .send()
         .await?
+        .error_for_status()?
         .json()
         .await
         .context("Failed to fetch bus infrastructure")
 }
 
-// TODO: fetch other data here as well
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, serde_json::Value>> {
     let client = crate::integrations::http::static_data();
-    let infrastructure = fetch_infrastructure(client).await?;
+    let (infrastructure, oba) =
+        tokio::try_join!(fetch_infrastructure(client), fetch_oba_static(client))?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert(
         "infrastructure.json".to_string(),
         serde_json::to_value(infrastructure)?,
     );
+    fixtures.insert("oba.json".to_string(), serde_json::to_value(oba)?);
 
     Ok(fixtures)
 }

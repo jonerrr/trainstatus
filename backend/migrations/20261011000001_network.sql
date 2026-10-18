@@ -63,13 +63,12 @@ CREATE TABLE IF NOT EXISTS static.stop (
 );
 
 
-CREATE TABLE IF NOT EXISTS static.stop_transfer (
+CREATE TABLE IF NOT EXISTS static.nearby_stop (
     from_stop_id VARCHAR NOT NULL,
     from_stop_source source_enum NOT NULL,
     to_stop_id VARCHAR NOT NULL,
     to_stop_source source_enum NOT NULL,
-    transfer_type SMALLINT NOT NULL,
-    min_transfer_time SMALLINT,
+    distance_m DOUBLE PRECISION NOT NULL CHECK (distance_m >= 0),
     PRIMARY KEY (from_stop_id, from_stop_source, to_stop_id, to_stop_source),
     FOREIGN KEY (from_stop_id, from_stop_source) REFERENCES static.stop(id, source) ON DELETE CASCADE,
     FOREIGN KEY (to_stop_id, to_stop_source) REFERENCES static.stop(id, source) ON DELETE CASCADE
@@ -90,12 +89,7 @@ CREATE TABLE IF NOT EXISTS static.route_stop (
 
 
 
--- The route_stop primary key is (route_id, source, stop_id), which cannot serve
--- lookups keyed on stop_id. Several hot queries filter route_stop by
--- (stop_id, source): the stops read-through query's `routes` aggregate, the
--- proximity-transfer `stop_direction` CTE, and its `opposite_stop_id` EXISTS
--- checks. Without this index those degrade to sequential scans, which made the
--- proximity computation time out once NJT bus added ~16k stops / ~29k route_stops.
+-- Membership and target-eligibility lookups are keyed on stop and source.
 CREATE INDEX IF NOT EXISTS idx_route_stop_stop ON static.route_stop (stop_id, source);
 CREATE INDEX idx_stop_projected_geom ON static.stop USING GIST (projected_geom) WHERE current;
 

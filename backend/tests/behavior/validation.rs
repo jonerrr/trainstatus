@@ -58,7 +58,7 @@ fn validation_catches_missing_route_stop_references() {
             id: "A01".into(),
             name: "Stop".into(),
             geom: Point::new(-73.9, 40.7).into(),
-            transfers: vec![],
+            nearby_stops: vec![],
             data: StopData::MtaSubway(MtaSubwayStopData {
                 gtfs_stop_id: "A01".into(),
                 station_group_id: "A01".into(),

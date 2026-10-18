@@ -423,7 +423,8 @@ fn static_dataset_expected(
         }
         Source::MtaBus => {
             let infrastructure = fixtures::read_json_payload(root, manifest, "infrastructure")?;
-            let dataset = mta_bus_static::build_static_dataset_from_fixture(infrastructure)?;
+            let oba = fixtures::read_json_payload(root, manifest, "oba")?;
+            let dataset = mta_bus_static::build_static_dataset_from_fixtures(infrastructure, oba)?;
             Ok(Some(fixtures::static_dataset_expected_value(&dataset)))
         }
         Source::NjtBus => Ok(None),

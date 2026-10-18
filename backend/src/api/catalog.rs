@@ -14,7 +14,7 @@ use http::{HeaderMap, StatusCode};
     path = "/catalog/{source}",
     tag = "STATIC",
     summary = "Get a source catalog",
-    description = "Returns every route and stop for the source, including route membership and order, directions, transfers and subway platform edges. Responses include an ETag; send it in `If-None-Match` to receive `304 Not Modified` while the catalog is unchanged.",
+    description = "Returns every route and stop for the source, including route membership and order, directions, nearby boarding stops with distances and subway platform edges. Responses include an ETag; send it in `If-None-Match` to receive `304 Not Modified` while the catalog is unchanged.",
     params(("source" = Source, Path, description = "Data source")),
     responses(
         (status = 200, description = "Source catalog", body = Catalog),

@@ -34,7 +34,7 @@ const EXIT_STRATEGY_URL: &str = concat!(
     "/v1/infrastructure/subway/exit-strategy?major=0"
 );
 
-// TODO: fix transfers not being included
+// Official station interchange metadata is not yet imported.
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -353,7 +353,7 @@ fn build_static_dataset(
                 id: s.station_id.to_string(),
                 name,
                 geom: Point::new(s.path_adjusted_longitude, s.path_adjusted_latitude).into(),
-                transfers: vec![],
+                nearby_stops: vec![],
                 data: StopData::MtaSubway(MtaSubwayStopData {
                     gtfs_stop_id,
                     bubble_id,

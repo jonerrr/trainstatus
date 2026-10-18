@@ -24,7 +24,7 @@ fn dataset(source: Source) -> NetworkDataset {
             text_color: "000000".into(),
             data: serde_json::from_value(serde_json::json!({"source": source.as_str(),
                 "sort_key": 1, "service_types": [], "borough": null, "name_prefix": "B",
-                "name_number": 1, "name_suffix": null}))
+                "name_number": 1, "name_suffix": null, "directions": []}))
             .unwrap(),
         });
     }
@@ -33,7 +33,7 @@ fn dataset(source: Source) -> NetworkDataset {
             id: id.into(),
             name: id.into(),
             geom: Geom::from(geo::Point::new(-74., 40.7)),
-            transfers: vec![],
+            nearby_stops: vec![],
             routes: vec![],
             data: serde_json::from_value(
                 serde_json::json!({"source": source.as_str(), "stop_code": id,

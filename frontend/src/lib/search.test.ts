@@ -12,7 +12,7 @@ function stop(id: string, name: string): CatalogStop {
 		lat: 0,
 		lon: 0,
 		routes: [],
-		transfers: [],
+		nearby_stops: [],
 		data: {
 			source: 'mta_subway',
 			bubble_id: id,

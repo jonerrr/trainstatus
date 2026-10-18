@@ -1,8 +1,8 @@
 import type { ComponentProps } from 'svelte';
 
 import { chartFixture, chartNow } from '#lib/charts/fixtures.js';
+import { page } from '#lib/test/page.svelte.js';
 import { fixtureTransitData } from '#lib/test/transit-fixture.js';
-import TransitDataHarness from '#lib/test/TransitDataHarness.svelte';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
 
 import { expect, test, vi } from 'vitest';
@@ -52,7 +52,8 @@ for (const empty of ['zero calls', 'all arrivals passed'] as const) {
 	});
 }
 
-test('repeated stop visits keep independent transfer times and disclosure state', async () => {
+test('repeated stop visits use their own arrival times while only one transfer panel stays open', async () => {
+	page.data.selected_sources = ['njt_bus'];
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const fixture = chartFixture('njt_bus', 0, [['a', 'b', 'a']]);
 	fixture.catalog.routes.push({ ...fixture.route, id: 'X', short_name: 'X' });
@@ -76,12 +77,6 @@ test('repeated stop visits keep independent transfer times and disclosure state'
 		services: { njt_bus: fixture.service }
 	});
 	try {
-		const preload = await render(TransitDataHarness, {
-			data,
-			source: 'njt_bus',
-			readers: [{ id: 'other', route: 'X' }]
-		});
-		await expect.poll(() => data.loadedTrip('njt_bus', 'X', 'early')?.trip.id).toBe('early');
 		const view = await render(TransitProvider<ComponentProps<typeof Modal>>, {
 			data,
 			component: Modal,
@@ -93,17 +88,24 @@ test('repeated stop visits keep independent transfer times and disclosure state'
 				time_format: 'countdown'
 			}
 		});
-		const toggles = view.getByRole('button', { name: 'Show transfers at stop' });
+		const toggles = view.getByRole('button', { name: /^Transfers at a:/ });
 		await expect.poll(() => toggles.all().length).toBe(2);
 		await toggles.nth(1).click();
-		await expect.element(view.getByText('Transfers:', { exact: true })).toBeVisible();
-		await expect.element(view.getByRole('button', { name: /X\s*2m/ })).toBeVisible();
-		expect(view.getByText('Transfers:', { exact: true }).all()).toHaveLength(1);
+		await expect
+			.element(view.getByRole('region', { name: 'Transfers after arrival' }))
+			.toBeVisible();
+		await expect.element(view.getByRole('button', { name: /^X to .*2m/ })).toBeVisible();
+		await expect
+			.poll(() => view.getByRole('region', { name: 'Transfers after arrival' }).all().length)
+			.toBe(1);
 		await toggles.nth(0).click();
-		await expect.element(view.getByRole('button', { name: /X\s*4m/ })).toBeVisible();
-		expect(view.getByText('Transfers:', { exact: true }).all()).toHaveLength(2);
+		await expect.element(view.getByRole('button', { name: /^X to .*4m/ })).toBeVisible();
+		await expect
+			.poll(() => view.getByRole('region', { name: 'Transfers after arrival' }).all().length)
+			.toBe(1);
+		await expect.element(toggles.nth(1)).toHaveAttribute('aria-expanded', 'false');
+		await expect.element(toggles.nth(0)).toHaveAttribute('aria-expanded', 'true');
 		await view.unmount();
-		await preload.unmount();
 	} finally {
 		data.destroy();
 		vi.restoreAllMocks();
