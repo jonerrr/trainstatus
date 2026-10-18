@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.0.0...frontend-v2.1.0) (2026-10-18)
+
+
+### Features
+
+* better nearby stop calculations and transfer ui ([82af9aa](https://github.com/jonerrr/trainstatus/commit/82af9aaba55eb229d31c0824e6fd594c6190a6d3))
+
+
+### Bug Fixes
+
+* stop button skeleton height mismatch and missing mta_bus headsigns ([62682a6](https://github.com/jonerrr/trainstatus/commit/62682a608644e7b10fbbf17699adbfe8d22db58a)), closes [#454](https://github.com/jonerrr/trainstatus/issues/454)
+
 ## [2.0.0](https://github.com/jonerrr/trainstatus/compare/frontend-v1.6.0...frontend-v2.0.0) (2026-10-15)
 
 
