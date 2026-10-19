@@ -547,8 +547,12 @@ export class TransitData {
 	}
 
 	#loadCatalog(entry: Entry<CatalogData>) {
-		return this.#load(entry, `/api/v1/catalog/${entry.source}`, {}, (body: Catalog) =>
-			decodeCatalog(body)
+		return this.#load(
+			entry,
+			`/api/v1/catalog/${entry.source}`,
+			{},
+			// { cache: 'no-cache' },
+			(body: Catalog) => decodeCatalog(body)
 		);
 	}
 

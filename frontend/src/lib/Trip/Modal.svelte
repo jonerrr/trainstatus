@@ -8,6 +8,8 @@
 	import Skeleton from '#lib/Skeleton.svelte';
 	import { boardingOptions } from '#lib/transit/nearby.js';
 	import { getTransitData, type TripRead } from '#lib/transit/store.svelte.js';
+	import { arrivalExits } from '#lib/Trip/platform-exits.js';
+	import PlatformExits from '#lib/Trip/PlatformExits.svelte';
 	import Transfers from '#lib/Trip/Transfers.svelte';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
@@ -36,6 +38,7 @@
 	const route = $derived(loaded_catalog?.routes_by_id.get(route_id));
 	const loaded_read = $derived(trip_resource.current.value);
 	let open_transfer = $state<string | null>(null);
+	let open_exits = $state<string | null>(null);
 	const transfer_catalogs_resource = transit.catalogs(() => page.data.selected_sources);
 	const transfer_catalogs = $derived(
 		transfer_catalogs_resource.current.flatMap((r) => (r.catalog ? [r.catalog] : []))
@@ -197,6 +200,7 @@
 					})}
 					{const nearby_options = $derived(boardingOptions(stop, transfer_catalogs, incoming))}
 					{const transfer_key = JSON.stringify([source, route_id, trip_id, st.sequence])}
+					{const exits = $derived(arrivalExits(stop, read.trip, st.platform_edges))}
 					<div class="relative text-base">
 						{#if nearby_options.length}
 							<button
@@ -243,6 +247,24 @@
 							</div>
 						</Button>
 					</div>
+
+					{#if exits}
+						<button
+							type="button"
+							class="mb-1 ml-12 flex min-h-9 items-center gap-1 rounded px-2 text-xs text-sky-300 hover:bg-neutral-800"
+							aria-label={`Where to sit for ${stop.name}`}
+							aria-expanded={open_exits === transfer_key}
+							onclick={() => {
+								open_exits = open_exits === transfer_key ? null : transfer_key;
+							}}
+						>
+							Where to sit
+							<ChevronDown size={14} class={open_exits === transfer_key ? 'rotate-180' : ''} />
+						</button>
+						{#if open_exits === transfer_key}
+							{#key transfer_key}<PlatformExits guidance={exits} />{/key}
+						{/if}
+					{/if}
 
 					{#if open_transfer === transfer_key}
 						{#key transfer_key}<Transfers {time_format} {stop} {incoming} />{/key}
