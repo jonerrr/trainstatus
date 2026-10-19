@@ -123,6 +123,22 @@ struct ExitStrategyDataset {
 struct ExitStrategyStation {
     mrn: i32,
     platform_edges: Vec<ExitStrategyPlatformEdge>,
+    #[serde(default)]
+    street_exits: Vec<ExitStrategyStreetExit>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct ExitStrategyStreetExit {
+    id: i32,
+    intersection: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExitStrategyStreetExitPath {
+    from_id: i32,
+    to_street_exit_id: i32,
+    accessible: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -131,6 +147,8 @@ struct ExitStrategyPlatformEdge {
     platform_edge_id: String,
     spec: Option<ExitStrategySpec>,
     egress_points: Vec<ExitStrategyEgressPoint>,
+    #[serde(default)]
+    street_exit_paths: Vec<ExitStrategyStreetExitPath>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -325,6 +343,23 @@ fn build_static_dataset(
                                     .iter()
                                     .map(|ep| EgressPoint {
                                         id: ep.id,
+                                        street_exits: pe
+                                            .street_exit_paths
+                                            .iter()
+                                            .filter(|path| path.from_id == ep.id)
+                                            .filter_map(|path| {
+                                                es.street_exits
+                                                    .iter()
+                                                    .find(|exit| exit.id == path.to_street_exit_id)
+                                                    .map(|exit| {
+                                                        crate::network::types::stop::StreetExit {
+                                                            id: exit.id,
+                                                            intersection: exit.intersection.clone(),
+                                                            accessible: path.accessible,
+                                                        }
+                                                    })
+                                            })
+                                            .collect(),
                                         egress_type: match ep.egress_type.as_str() {
                                             "STAIRCASE" => EgressType::Staircase,
                                             "ELEVATOR" => EgressType::Elevator,

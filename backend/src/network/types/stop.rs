@@ -88,6 +88,17 @@ pub struct EgressPoint {
     /// Position of the egress point on the platform in feet from a reference point
     pub position_ft: f32,
     pub vertical_direction: VerticalDirection,
+    /// Street exits reachable from this point on the platform.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub street_exits: Vec<StreetExit>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub struct StreetExit {
+    pub id: i32,
+    pub intersection: Vec<String>,
+    /// Whether the provider marks the path from this platform point as accessible.
+    pub accessible: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
