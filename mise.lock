@@ -50,12 +50,9 @@ url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/639313211"
 provenance = "github-attestations"
 
 [[tools."aqua:jdx/hk"]]
-version = "2.6.0"
+version = "2.8.0"
 backend = "aqua:jdx/hk"
-specifiers = [
-    "2.6.0",
-    "latest",
-]
+specifiers = ["latest"]
 
 [tools."aqua:jdx/hk"."platforms.linux-arm64"]
 checksum = "sha256:bcccd60f962a784bcf602b3a1ee6aac4dc53c76b298bffe38c4f9101725d2fb0"
