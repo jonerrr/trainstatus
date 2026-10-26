@@ -3,7 +3,7 @@ import type { EgressPoint, PlatformEdge } from '#lib/client/index.js';
 
 import { expect, test } from 'vitest';
 
-import { arrivalExits } from './platform-exits.js';
+import { arrivalExits, arrivalTransferExits } from './platform-exits.js';
 
 function point(position_ft: number): EgressPoint {
 	return {
@@ -177,4 +177,85 @@ test('Borough Hall combines equivalent destinations at one position and keeps se
 	expect(
 		exits.filter((exit) => exit.name === 'Joralemon St & Municipal Building Brooklyn')
 	).toHaveLength(1);
+});
+
+function transferFixture(direction: 1 | 3 = 1) {
+	const f = fixture(direction);
+	const target = { ...f.stop, id: 'connecting-stop', data: { ...f.stop.data } };
+	if (target.data.source !== 'mta_subway') throw new Error('Expected subway');
+	target.data.platform_edges = [{ ...f.edge, id: 'connecting-platform', egress_points: [] }];
+	f.edge.egress_points[0].street_exits = [];
+	f.edge.egress_points[0].transfer_paths = [
+		{ to_platform_edge: 'connecting-platform', accessible: true }
+	];
+	f.edge.egress_points[1].transfer_paths = [
+		{ to_platform_edge: 'other-platform', accessible: false }
+	];
+	const boarding = { stop: target, distance_m: 20, same_stop: false };
+	const departure: import('#lib/transit/nearby.js').DepartureOption = {
+		key: 'connecting',
+		route: { ...chartFixture('mta_subway').route, id: '7', short_name: '7' },
+		direction: 1,
+		destination: 'Flushing',
+		stops: [boarding],
+		unknown_stops: [],
+		boarding,
+		call: {
+			trip_id: 'connecting-trip',
+			route_id: '7',
+			stop_id: target.id,
+			sequence: 4,
+			arrival: 1,
+			departure: 2,
+			platform_edges: ['connecting-platform']
+		},
+		loading: false,
+		error: null
+	};
+	return { ...f, departure };
+}
+
+for (const direction of [1, 3] as const) {
+	test(`transfer guidance matches the departure platform across station records in direction ${direction}`, () => {
+		const { stop, trip, departure } = transferFixture(direction);
+		expect(arrivalTransferExits(stop, trip, ['edge'], departure)).toEqual({
+			car_count: 8,
+			exits: [
+				{
+					id: 'transfer:90',
+					name: 'Stairs',
+					accessible: true,
+					car: direction === 1 ? 1 : 8,
+					position: direction === 1 ? 0.9375 : 0.0625
+				}
+			]
+		});
+	});
+}
+
+test('transfer guidance does not infer platforms from route membership or an ambiguous assignment', () => {
+	const { stop, trip, edge, departure } = transferFixture();
+	for (const ids of [[], ['unknown'], ['connecting-platform', 'other-platform']]) {
+		departure.call!.platform_edges = ids;
+		expect(arrivalTransferExits(stop, trip, ['edge'], departure)).toBeNull();
+	}
+	departure.call!.platform_edges = ['connecting-platform', 'connecting-platform'];
+	expect(arrivalTransferExits(stop, trip, ['edge'], departure)?.exits).toHaveLength(1);
+	expect(arrivalTransferExits(stop, trip, ['edge', 'unknown'], departure)).toBeNull();
+	edge.egress_points[0].transfer_paths = [];
+	expect(arrivalTransferExits(stop, trip, ['edge'], departure)).toBeNull();
+});
+
+test('transfer guidance retains distinct stairs and elevator paths and their own accessibility', () => {
+	const { stop, trip, edge, departure } = transferFixture();
+	edge.egress_points[1].egress_type = 'ELEVATOR';
+	edge.egress_points[1].transfer_paths = [
+		{ to_platform_edge: 'connecting-platform', accessible: false }
+	];
+	expect(arrivalTransferExits(stop, trip, ['edge'], departure)?.exits).toEqual([
+		{ id: 'transfer:510', name: 'Elevator', accessible: false, car: 8, position: 0.0625 },
+		{ id: 'transfer:90', name: 'Stairs', accessible: true, car: 1, position: 0.9375 }
+	]);
+	edge.car_markers = [];
+	expect(arrivalTransferExits(stop, trip, ['edge'], departure)).toBeNull();
 });

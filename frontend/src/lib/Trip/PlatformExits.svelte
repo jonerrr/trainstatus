@@ -1,134 +1,212 @@
 <script lang="ts">
+	import type { ServiceTrip } from '#lib/client/index.js';
+	import Icon from '#lib/Route/Icon.svelte';
+	import type { DepartureOption } from '#lib/transit/nearby.js';
+
 	import { Accessibility } from '@lucide/svelte';
 
 	import type { ArrivalExits } from './platform-exits.js';
 
-	let { guidance }: { guidance: ArrivalExits } = $props();
-	let selected = $state<string | null>(null);
-	let width = $state(360);
+	let {
+		guidance,
+		trip,
+		transfer
+	}: {
+		guidance: ArrivalExits | null;
+		trip: ServiceTrip;
+		transfer?: DepartureOption;
+	} = $props();
+
+	// TODO: we are going to need a better way to separate UI between different sources
 	let label_heights = $state<Record<string, number>>({});
-	const selected_exit = $derived(guidance.exits.find((exit) => exit.id === selected));
-	const train_width = $derived(Math.max(0, Math.min(width - 16, guidance.car_count * 36)));
-	const train_left = $derived((width - train_width) / 2);
-	const car_width = $derived(train_width / guidance.car_count - 2);
-	const label_width = $derived(Math.min(112, width));
+	const cars = $derived(trip.data.source === 'mta_subway' ? trip.data.consist_cars : []);
+	const car_count = $derived(
+		trip.data.source === 'mta_subway' ? (trip.data.consist?.car_count ?? cars.length) : 0
+	);
+	const width = $derived(car_count * 54 + 12);
+	const train_width = $derived(car_count * 54 - 2);
+	const label_width = 112;
 	const labels = $derived.by(() => {
 		const lanes: number[] = [];
-		const positions = guidance.exits.map((exit) => {
-			const x = train_left + exit.position * train_width;
+		const positions = (guidance?.exits ?? []).map((exit) => {
+			const x = 6 + exit.position * train_width;
 			const left = Math.max(0, Math.min(width - label_width, x - label_width / 2));
 			let lane = lanes.findIndex((right) => right + 8 <= left);
 			if (lane < 0) lane = lanes.length;
 			lanes[lane] = left + label_width;
 			return { ...exit, x, left, lane };
 		});
-		const heights = lanes.map(() => 44);
+		const heights = lanes.map(() => 30);
 		for (const exit of positions)
-			heights[exit.lane] = Math.max(heights[exit.lane], label_heights[exit.id] ?? 44);
+			heights[exit.lane] = Math.max(heights[exit.lane], label_heights[exit.id] ?? 30);
 		const tops: number[] = [];
-		let top = 58;
+		let top = 38;
 		for (const height of heights) {
 			tops.push(top);
-			top += height + 8;
+			top += height + 4;
 		}
 		return positions.map((exit) => ({ ...exit, y: tops[exit.lane] }));
 	});
 	const height = $derived(
-		Math.max(...labels.map((label) => label.y + (label_heights[label.id] ?? 44))) + 8
+		labels.length
+			? Math.max(...labels.map((label) => label.y + (label_heights[label.id] ?? 30))) + 4
+			: 30
 	);
 </script>
 
-<section
-	aria-label="Platform exits at arrival"
-	class="mx-auto mb-3 w-[calc(100%-2rem)] max-w-md rounded-lg bg-sky-950/30 px-3 pt-2 pb-3"
->
-	<div bind:clientWidth={width}>
+{#if car_count > 0}
+	<section class="platform" aria-label="Platform exits at arrival">
+		<!-- Keyboard focus enables native horizontal scrolling. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
-			class="mb-1 flex justify-between text-[0.65rem] text-neutral-400"
-			style:margin-left={`${train_left}px`}
-			style:width={`${train_width}px`}
-			aria-hidden="true"
+			class="viewport"
+			tabindex="0"
+			role="region"
+			aria-label="Train and platform exits; scroll for more"
 		>
-			<span>Rear</span><span>Front →</span>
-		</div>
-		<div class="relative" style:height={`${height}px`}>
-			<svg
-				viewBox={`0 0 ${width} ${height}`}
-				class="absolute inset-0 h-full w-full overflow-visible text-sky-300"
-				aria-hidden="true"
-			>
-				{#each { length: guidance.car_count }, i (i)}
-					{const car = $derived(guidance.car_count - i)}
-					{const x = $derived(train_left + (i * train_width) / guidance.car_count + 1)}
-					{#if i === guidance.car_count - 1}
-						{const radius = $derived(Math.min(12, car_width / 2))}
-						<path
-							data-train-car={car}
-							d={`M${x} 4 H${x + car_width - radius} Q${x + car_width} 4 ${x + car_width} 16 Q${x + car_width} 28 ${x + car_width - radius} 28 H${x} Z`}
-							fill="currentColor"
-							opacity={selected_exit?.car === car ? 1 : 0.65}
-						/>
-					{:else}
-						<rect
-							data-train-car={car}
-							{x}
-							y="4"
-							width={car_width}
-							height="24"
-							rx="2"
-							fill="currentColor"
-							opacity={selected_exit?.car === car ? 1 : 0.65}
-						/>
-					{/if}
-				{/each}
-				{#each labels as exit (exit.id)}
-					<line
-						data-exit-shaft
-						x1={exit.x}
-						x2={exit.x}
-						y1="34"
-						y2="49"
-						stroke="currentColor"
-						stroke-width="2"
-					/>
-					<path
-						d={`M${exit.x - 4} 44 L${exit.x} 49 L${exit.x + 4} 44`}
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					/>
-				{/each}
-			</svg>
-			{#each labels as exit (exit.id)}
-				<button
-					bind:clientHeight={label_heights[exit.id]}
-					type="button"
-					aria-label={`${exit.name}${exit.accessible ? ', accessible exit' : ''}, around car ${exit.car} from the front`}
-					aria-pressed={selected === exit.id}
-					onclick={() => {
-						selected = exit.id;
-					}}
-					class={[
-						'absolute flex min-h-11 flex-col items-center justify-start rounded px-1 py-1 text-center text-xs leading-snug text-sky-100 hover:bg-sky-900/40 focus-visible:outline-2 focus-visible:outline-sky-300',
-						selected === exit.id && 'bg-sky-900/40'
-					]}
-					style:left={`${exit.left}px`}
-					style:width={`${label_width}px`}
-					style:top={`${exit.y}px`}
+			<div class="diagram" style:width={`${width}px`} style:height={`${height}px`}>
+				<svg
+					viewBox={`0 0 ${width} ${height}`}
+					aria-label="Train cars; front cab at the right"
+					role="img"
 				>
-					{#if exit.accessible}
-						<span aria-hidden="true" class="mb-0.5 rounded bg-sky-600 p-0.5 text-white">
-							<Accessibility size={16} />
-						</span>
-					{/if}
-					<span class="wrap-anywhere">{exit.name}</span>
-				</button>
-			{/each}
+					{#each Array.from({ length: car_count }, (_, i) => car_count - i) as number (number)}
+						{const i = car_count - number}
+						{const car = cars[number - 1]}
+						<g
+							transform={`translate(${6 + i * 54}, 0)`}
+							data-train-car={number}
+							data-highlighted={!!guidance?.exits.some((exit) => exit.car === number)}
+						>
+							<title
+								>{car
+									? `Car ${number} · #${car.number}${car.type ? ` · ${car.type}` : ''}`
+									: `Car ${number} from the front`}</title
+							>
+							<path
+								class="body"
+								d={number === 1
+									? 'M3 2H42L51 9V23Q51 25 49 25H3Q1 25 1 23V4Q1 2 3 2Z'
+									: 'M3 2H49Q51 2 51 4V23Q51 25 49 25H3Q1 25 1 23V4Q1 2 3 2Z'}
+							/>
+							{#if car?.number && car.number !== String(number)}
+								<text class="car-pos" x="25" y="12" text-anchor="middle">{number}</text>
+								<text class="car-id" x="25" y="23" text-anchor="middle">{car.number}</text>
+							{:else}
+								<text class="car-pos" x="25" y="16" text-anchor="middle">{number}</text>
+							{/if}
+						</g>
+					{/each}
+					{#each labels as exit (exit.id)}
+						<path
+							data-exit-shaft
+							d={`M${exit.x} 25V33H${exit.left + label_width / 2}V${exit.y - 2}`}
+							fill="none"
+							stroke={transfer ? '#7dd3fc' : 'currentColor'}
+						/>
+					{/each}
+				</svg>
+				<ul>
+					{#each labels as exit (exit.id)}
+						<li
+							bind:clientHeight={label_heights[exit.id]}
+							aria-label={`${exit.name}${transfer ? ` to ${transfer.route.short_name}` : ''}${exit.accessible ? ', accessible path' : ''}, around car ${exit.car} from the front`}
+							style:left={`${exit.left}px`}
+							style:top={`${exit.y}px`}
+							style:width={`${label_width}px`}
+						>
+							{#if exit.accessible}<Accessibility
+									size={13}
+									aria-label="Provider marks this path accessible"
+								/>{/if}
+							<span>{exit.name}</span>{#if transfer}<Icon
+									route={transfer.route}
+									width={16}
+									height={16}
+									link={false}
+								/>{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
 		</div>
-	</div>
-	{#if selected_exit}
-		<p class="mt-1 text-center text-xs text-sky-200" role="status">
-			{selected_exit.name} · car {selected_exit.car} from the front
-		</p>
-	{/if}
-</section>
+	</section>
+{/if}
+
+<style>
+	.platform {
+		display: flex;
+		flex-direction: column;
+		flex: 0 1 auto;
+		min-height: 30px;
+	}
+	.viewport {
+		flex: 0 1 auto;
+		min-height: 0;
+		max-height: min(140px, 20dvh);
+		overflow: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+		scrollbar-color: #525252 transparent;
+	}
+	.viewport:focus-visible {
+		outline: 2px solid #7dd3fc;
+		outline-offset: -2px;
+	}
+	.diagram {
+		position: relative;
+		margin-inline: auto;
+		color: #737373;
+	}
+	svg {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+	}
+	.body {
+		fill: #303030;
+		stroke: #737373;
+	}
+	.car-pos {
+		fill: #d4d4d4;
+		font-size: 9.5px;
+		font-weight: 700;
+		font-family: inherit;
+		font-variant-numeric: tabular-nums;
+	}
+	.car-id {
+		fill: #8a8a8a;
+		font-size: 7.5px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.02em;
+	}
+	[data-highlighted='true'] .body {
+		fill: #243b4a;
+		stroke: #7dd3fc;
+	}
+	[data-highlighted='true'] .car-pos {
+		fill: #ffffff;
+	}
+	[data-highlighted='true'] .car-id {
+		fill: #bae6fd;
+	}
+	ul {
+		list-style: none;
+	}
+	li {
+		position: absolute;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+		gap: 3px;
+		padding: 0 2px 2px;
+		color: #d4d4d4;
+		text-align: center;
+		font-size: 11px;
+		line-height: 1.3;
+		overflow-wrap: anywhere;
+	}
+</style>

@@ -8,6 +8,7 @@ import {
 	boardingDistance,
 	boardingOptions,
 	compareDepartures,
+	compareTransfers,
 	departureOptions,
 	optionStops,
 	serviceKey
@@ -99,6 +100,81 @@ describe('nearby boarding choices', () => {
 });
 
 describe('nearby departures', () => {
+	it('orders transfers by actual boarding stop distance, then arrival rather than departure', () => {
+		const f = setup();
+		f.origin.nearby_stops.find((s) => s.stop_id === f.third.id)!.distance_m = 30;
+		const options = boardingOptions(f.origin, f.catalogs, f.incoming);
+		const departures = departureOptions(options, f.reads, f.incoming, f.catalogs, chartNow);
+		const a = departures.find((o) => o.route.id === 'A')!;
+		const b = departures.find((o) => o.route.id === 'B')!;
+		// A departs before B, but B arrives first and dwells at the same boarding stop.
+		b.call = { ...b.call!, arrival: a.call!.arrival - 60_000 };
+		expect(a.stops[0].distance_m).toBe(20);
+		expect(a.boarding.distance_m).toBe(40);
+		expect([...departures].sort(compareTransfers).map((o) => o.route.id)).toEqual([
+			'C',
+			'B',
+			'A',
+			'D'
+		]);
+	});
+	it('keeps distinct equally distant boarding stops together with deterministic ordering', () => {
+		const f = setup();
+		f.origin.nearby_stops.find((s) => s.stop_id === f.third.id)!.distance_m = 40;
+		const options = boardingOptions(f.origin, f.catalogs, f.incoming);
+		const departures = departureOptions(options, f.reads, f.incoming, f.catalogs, chartNow);
+		const before = [...departures].sort(compareTransfers).map((o) => o.route.id);
+		expect(before).toEqual(['A', 'B', 'C', 'D']);
+		expect(
+			departures
+				.reverse()
+				.sort(compareTransfers)
+				.map((o) => o.route.id)
+		).toEqual(before);
+	});
+	it('hides opposite subway directions within the arrival station complex only', () => {
+		for (const direction of [1, 3]) {
+			const f = chartFixture('mta_subway');
+			const origin = f.stops[0];
+			const sibling = f.stops[1];
+			if (sibling.data.source !== 'mta_subway') throw new Error('Expected subway');
+			sibling.data.station_group_id = origin.id;
+			const connection = { ...f.route, id: 'X' };
+			f.catalog.routes.push(connection);
+			for (const stop of f.stops) stop.routes.push({ ...stop.routes[0], route_id: 'X' });
+			origin.nearby_stops = [
+				{ source: 'mta_subway', stop_id: sibling.id, distance_m: 10 },
+				{ source: 'mta_subway', stop_id: f.stops[2].id, distance_m: 30 }
+			];
+			const options = boardingOptions(origin, [decodeCatalog(f.catalog)], {
+				source: 'mta_subway',
+				route_id: f.route.id,
+				direction,
+				arrival: chartNow
+			});
+			expect(options.every((o) => o.route.id === 'X')).toBe(true);
+			expect(options.find((o) => o.direction === direction)?.stops.map((s) => s.stop.id)).toEqual([
+				origin.id,
+				sibling.id,
+				f.stops[2].id
+			]);
+			expect(options.find((o) => o.direction !== direction)?.stops.map((s) => s.stop.id)).toEqual([
+				f.stops[2].id
+			]);
+		}
+	});
+	it('keeps both directions of other bus routes when transferring at the same stop', () => {
+		const f = setup();
+		f.origin.routes.push({
+			...f.near.routes[0],
+			data: { source: 'mta_bus', direction_ids: [0, 1] }
+		});
+		expect(
+			boardingOptions(f.origin, f.catalogs, f.incoming)
+				.filter((o) => o.route.id === 'A')
+				.map((o) => o.direction)
+		).toEqual([0, 1]);
+	});
 	it('uses departure time across every boarding alternative, then ranks before truncating', () => {
 		const f = setup();
 		const options = boardingOptions(f.origin, f.catalogs, f.incoming);

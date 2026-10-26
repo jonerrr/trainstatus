@@ -195,6 +195,10 @@ export type EgressPoint = {
      * Street exits reachable from this point on the platform.
      */
     street_exits?: Array<StreetExit>;
+    /**
+     * Connections from this platform point to other platform edges.
+     */
+    transfer_paths?: Array<PlatformTransfer>;
     vertical_direction: VerticalDirection;
 };
 
@@ -308,6 +312,14 @@ export type PlatformEdge = {
     egress_points: Array<EgressPoint>;
     id: string;
     length_ft: number;
+};
+
+export type PlatformTransfer = {
+    /**
+     * Provider-declared path accessibility, not current elevator availability.
+     */
+    accessible: boolean;
+    to_platform_edge: string;
 };
 
 export type RouteService = {

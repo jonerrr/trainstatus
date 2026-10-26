@@ -1,16 +1,53 @@
 import '../../app.css';
 
+import { chartFixture } from '#lib/charts/fixtures.js';
+
 import { expect, test } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 
 import PlatformExits from './PlatformExits.svelte';
 
+function train(car_count: number) {
+	const trip = chartFixture('mta_subway').trips[0];
+	if (trip.data.source !== 'mta_subway') throw new Error('Expected subway');
+	trip.data.consist = { car_count, car_length_feet: 60 };
+	return trip;
+}
+
+test('keeps car positions visible alongside distinct fleet IDs and centers positions without IDs', async () => {
+	const trip = train(3);
+	if (trip.data.source !== 'mta_subway') throw new Error('Expected subway');
+	trip.data.consist_cars = [
+		{ number: '7244', type: 'R142' },
+		{ number: '2', type: 'R142' }
+	];
+	const view = await render(PlatformExits, { trip, guidance: null });
+	try {
+		const front = view.container.querySelector('[data-train-car="1"]')!;
+		expect(front.querySelectorAll('text')).toHaveLength(2);
+		expect(front.querySelector('.car-pos')?.textContent).toBe('1');
+		expect(front.querySelector('.car-id')?.textContent).toBe('7244');
+		const position = front.querySelector('.car-pos')!.getBoundingClientRect();
+		const fleet_id = front.querySelector('.car-id')!.getBoundingClientRect();
+		expect(position.bottom).toBeLessThan(fleet_id.top);
+		for (const number of [2, 3]) {
+			const car = view.container.querySelector(`[data-train-car="${number}"]`)!;
+			expect(car.querySelectorAll('text')).toHaveLength(1);
+			expect(car.querySelector('.car-pos')?.textContent).toBe(String(number));
+			expect(car.querySelector('text')?.getAttribute('y')).toBe('16');
+		}
+	} finally {
+		await view.unmount();
+	}
+});
+
 for (const width of [320, 390, 800])
 	for (const long_names of [false, true]) {
 		test(`${long_names ? 'long' : 'short'} named exit labels fit and stay separate at ${width}px`, async () => {
 			await page.viewport(width, 844);
 			const view = await render(PlatformExits, {
+				trip: train(10),
 				guidance: {
 					car_count: 10,
 					exits: [
@@ -46,12 +83,9 @@ for (const width of [320, 390, 800])
 			});
 			await expect
 				.poll(() => {
-					const section = view
-						.getByRole('region', { name: 'Platform exits at arrival' })
-						.element()
-						.getBoundingClientRect();
+					const section = view.container.querySelector('.diagram')!.getBoundingClientRect();
 					const boxes = view
-						.getByRole('button')
+						.getByRole('listitem')
 						.all()
 						.map((button) => button.element().getBoundingClientRect());
 					if (
@@ -81,59 +115,42 @@ for (const width of [320, 390, 800])
 	}
 
 for (const car_count of [4, 10]) {
-	test(`${car_count}-car trains keep compact cars and vertical exit arrows in wide modals`, async () => {
+	test(`${car_count}-car trains keep readable car widths and scroll on narrow screens`, async () => {
 		await page.viewport(1000, 844);
 		const view = await render(PlatformExits, {
+			trip: train(car_count),
 			guidance: {
 				car_count,
 				exits: [
-					{ id: 'end', name: 'Barclays Center', accessible: false, car: car_count, position: 0 },
-					{
-						id: 'stairs',
-						name: 'Pacific St & 4 Av',
-						accessible: false,
-						car: Math.ceil(car_count / 2),
-						position: 0.52
-					},
-					{
-						id: 'lift',
-						name: 'Pacific St & 4 Av',
-						accessible: true,
-						car: Math.ceil(car_count * 0.4),
-						position: 0.61
-					}
+					{ id: 'end', name: 'Barclays Center', accessible: false, car: car_count, position: 0 }
 				]
 			}
 		});
+		const scroller = view
+			.getByRole('region', { name: 'Train and platform exits; scroll for more' })
+			.element();
 		await expect
-			.poll(() => {
-				const cars = [...document.querySelectorAll('[data-train-car]')].map((car) =>
-					car.getBoundingClientRect()
-				);
-				return (
-					cars.length === car_count &&
-					cars.every((car) => car.width <= 36 && car.height >= 23 && car.height <= 25)
-				);
-			})
+			.poll(() =>
+				[...view.container.querySelectorAll('[data-train-car]')].every(
+					(car) => car.getBoundingClientRect().width >= 50
+				)
+			)
 			.toBe(true);
-		const arrows = [...document.querySelectorAll('[data-exit-shaft]')];
-		expect(arrows).toHaveLength(3);
-		for (const arrow of arrows) expect(arrow.getBoundingClientRect().width).toBe(0);
-		const rear = document.querySelector('[data-train-car]')!.getBoundingClientRect().left;
-		expect(Math.abs(arrows[0].getBoundingClientRect().left - rear)).toBeLessThanOrEqual(2);
-		await page.viewport(390, 844);
+		expect(scroller.scrollWidth).toBe(scroller.clientWidth);
+		await page.viewport(320, 844);
 		await expect
-			.poll(() => {
-				const cars = [...document.querySelectorAll('[data-train-car]')].map((car) =>
-					car.getBoundingClientRect()
-				);
-				const rear = cars[0].left;
-				return (
-					cars.every((car) => car.width <= 36 && car.height >= 23 && car.height <= 25) &&
-					Math.abs(arrows[0].getBoundingClientRect().left - rear) <= 2
-				);
-			})
+			.poll(() =>
+				[...view.container.querySelectorAll('[data-train-car]')].every(
+					(car) => car.getBoundingClientRect().width >= 50
+				)
+			)
 			.toBe(true);
+		await expect.poll(() => scroller.scrollWidth > scroller.clientWidth).toBe(car_count === 10);
+		if (car_count === 10) {
+			scroller.scrollLeft = 100;
+			expect(scroller.scrollLeft).toBe(100);
+		}
+		expect(view.container.querySelector('[data-exit-shaft]')?.getAttribute('d')).toMatch(/^M6 25/);
 		await view.unmount();
 	});
 }

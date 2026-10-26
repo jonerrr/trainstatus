@@ -14,7 +14,8 @@
 		show_stop = true,
 		time_format = 'countdown',
 		arrival,
-		show_source = false
+		show_source = false,
+		compact = false
 	}: {
 		option: BoardingOption;
 		departure?: DepartureOption;
@@ -22,6 +23,7 @@
 		time_format?: 'time' | 'countdown';
 		arrival?: number;
 		show_source?: boolean;
+		compact?: boolean;
 	} = $props();
 	const current_time = getCurrentTime();
 	const boarding = $derived(departure?.boarding ?? option.stops[0]);
@@ -53,7 +55,7 @@
 	}
 </script>
 
-<button type="button" class="option" aria-label={label} onclick={open}>
+<button type="button" class={['option', { compact }]} aria-label={label} onclick={open}>
 	<span class="badge"><Icon route={option.route} link={false} width={24} height={24} /></span>
 	<span class="copy"
 		><span class="destination"
@@ -68,7 +70,9 @@
 	</span>
 	{#if departure}
 		<span class="metric">
-			{#if time}<span class="time">{time}</span><span class="secondary">+{gap} min</span>
+			{#if time}<span class="time">{time}</span>{#if !compact}<span class="secondary"
+						>+{gap} min</span
+					>{/if}
 			{:else if departure.loading && !departure.error}<span
 					class="skeleton animate-pulse"
 					aria-label="Loading departures"
@@ -89,6 +93,10 @@
 		min-height: 48px;
 		padding: 6px;
 		text-align: left;
+	}
+	.option.compact {
+		min-height: 36px;
+		padding: 3px 8px 3px 0;
 	}
 	:global(.option) + .option {
 		border-top: 1px solid #262626;
@@ -132,6 +140,15 @@
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.compact .badge {
+		flex-basis: 24px;
+	}
+	.compact .destination {
+		font-size: 13px;
+	}
+	.compact .place {
+		font-size: 11px;
 	}
 	.separator,
 	.distance {

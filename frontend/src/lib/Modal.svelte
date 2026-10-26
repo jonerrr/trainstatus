@@ -221,7 +221,7 @@
 	source: Source,
 	pins: LocalStorage<Pins>
 )}
-	<div class="flex h-16 items-center justify-between gap-1 px-1">
+	<div class="flex h-16 shrink-0 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
 				close_modal(current_time.value);

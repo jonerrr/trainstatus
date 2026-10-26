@@ -65,4 +65,20 @@ fn named_platform_exits_keep_street_destinations_and_accessible_paths() {
         points[2]["street_exits"],
         serde_json::json!([{ "id": 0, "intersection": ["Utica Av"], "accessible": false }])
     );
+    let edge = stop["data"]["platform_edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|edge| edge["id"] == "181-PQ-A1")
+        .unwrap();
+    let points = edge["egress_points"].as_array().unwrap();
+    assert_eq!(
+        points[0]["transfer_paths"],
+        serde_json::json!([
+            { "to_platform_edge": "181-PM-A2", "accessible": false },
+            { "to_platform_edge": "181-PM-A4", "accessible": false }
+        ])
+    );
+    assert_eq!(points[0]["position_ft"], 615.0);
+    assert!(points[1].get("transfer_paths").is_none());
 }

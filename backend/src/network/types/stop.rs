@@ -91,6 +91,16 @@ pub struct EgressPoint {
     /// Street exits reachable from this point on the platform.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub street_exits: Vec<StreetExit>,
+    /// Connections from this platform point to other platform edges.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transfer_paths: Vec<PlatformTransfer>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub struct PlatformTransfer {
+    pub to_platform_edge: String,
+    /// Provider-declared path accessibility, not current elevator availability.
+    pub accessible: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]

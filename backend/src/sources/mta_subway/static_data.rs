@@ -143,12 +143,22 @@ struct ExitStrategyStreetExitPath {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
+struct ExitStrategyTransferPath {
+    from_id: i32,
+    to_platform_edge: String,
+    accessible: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct ExitStrategyPlatformEdge {
     platform_edge_id: String,
     spec: Option<ExitStrategySpec>,
     egress_points: Vec<ExitStrategyEgressPoint>,
     #[serde(default)]
     street_exit_paths: Vec<ExitStrategyStreetExitPath>,
+    #[serde(default)]
+    transfer_paths: Vec<ExitStrategyTransferPath>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -343,6 +353,17 @@ fn build_static_dataset(
                                     .iter()
                                     .map(|ep| EgressPoint {
                                         id: ep.id,
+                                        transfer_paths: pe
+                                            .transfer_paths
+                                            .iter()
+                                            .filter(|path| path.from_id == ep.id)
+                                            .map(|path| {
+                                                crate::network::types::stop::PlatformTransfer {
+                                                    to_platform_edge: path.to_platform_edge.clone(),
+                                                    accessible: path.accessible,
+                                                }
+                                            })
+                                            .collect(),
                                         street_exits: pe
                                             .street_exit_paths
                                             .iter()

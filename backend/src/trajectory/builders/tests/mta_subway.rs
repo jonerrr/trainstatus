@@ -352,6 +352,7 @@ fn platform_edge(id: &str, length_ft: f32, car_markers: Vec<CarMarker>) -> Platf
         car_markers,
         egress_points: vec![EgressPoint {
             street_exits: vec![],
+            transfer_paths: vec![],
             id: 1,
             egress_type: EgressType::Staircase,
             position_ft: 0.0,
