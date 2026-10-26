@@ -3,7 +3,7 @@
 lockfile_version = 3
 
 [[tools."aqua:astral-sh/uv"]]
-version = "0.13.1"
+version = "0.13.5"
 backend = "aqua:astral-sh/uv"
 specifiers = ["latest"]
 
@@ -88,7 +88,7 @@ url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-x86_64-pc-windows-m
 url_api = "https://api.github.com/repos/jdx/hk/releases/assets/633469628"
 
 [[tools."aqua:pnpm/pnpm"]]
-version = "12.14.0"
+version = "12.15.0"
 backend = "aqua:pnpm/pnpm"
 specifiers = ["latest"]
 
@@ -144,7 +144,7 @@ default-features = "false"
 features = "native-tls,postgres,sqlx-toml"
 
 [[tools.node]]
-version = "26.12.0"
+version = "26.12.1"
 backend = "core:node"
 specifiers = ["latest"]
 
