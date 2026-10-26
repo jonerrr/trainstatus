@@ -250,9 +250,9 @@
 
 <!-- TODO: back to top button in header -->
 <!-- TODO: fix scroll warnings in console -->
-<div class="relative z-30 flex w-full flex-col text-neutral-200 {container_class ?? ''}">
+<div class="relative z-30 flex w-full flex-col text-secondary {container_class ?? ''}">
 	<div
-		class="sticky top-0 z-30 flex w-full items-center justify-between bg-neutral-900/95 shadow-lg shadow-black/10 backdrop-blur-xs"
+		class="sticky top-0 z-30 flex w-full items-center justify-between bg-surface-1/95 shadow-lg shadow-black/10 backdrop-blur-xs"
 	>
 		<!-- TODO: remove either this header or the main website header -->
 		<!-- it should be possible to combine the logo, tab selection, and settings button in one "row" -->
@@ -268,7 +268,7 @@
 		</h1>
 
 		{#if available_sources.length > 1}
-			<div class="rounded-md border border-neutral-700/50 bg-neutral-800/50 p-1 shadow-inner">
+			<div class="rounded-none border border-border-default/50 bg-surface-2/50 p-1 shadow-inner">
 				<div class="flex gap-1">
 					{#each source_entries as { source, data: source_data } (source)}
 						{const info = $derived(source_config[source])}
@@ -276,10 +276,10 @@
 							<div transition:slide={{ axis: 'x', duration: 250 }}>
 								<button
 									class={[
-										'relative flex items-center gap-2 rounded-md px-4 py-1 transition-all duration-200',
+										'relative flex items-center gap-2 rounded-none px-4 py-1 transition-all duration-200',
 										{
-											'font-medium text-neutral-100': active_source === source,
-											'text-neutral-400': active_source !== source
+											'font-medium text-primary': active_source === source,
+											'text-muted': active_source !== source
 										}
 									]}
 									onclick={() => {
@@ -297,7 +297,7 @@
 										<div
 											in:send={{ key: 'tab' }}
 											out:receive={{ key: 'tab' }}
-											class="absolute inset-0 -z-10 rounded-md bg-neutral-700/50"
+											class="absolute inset-0 -z-10 rounded-none bg-border-default/50"
 										></div>
 									{/if}
 								</button>
@@ -309,7 +309,7 @@
 		{/if}
 	</div>
 
-	<div class="h-px bg-linear-to-r from-transparent via-neutral-700/50 to-transparent"></div>
+	<div class="h-px bg-linear-to-r from-transparent via-border-default/50 to-transparent"></div>
 
 	<div
 		bind:this={viewport_el}
@@ -317,7 +317,7 @@
 		onscroll={(e) => {
 			scroll_top = e.currentTarget.scrollTop;
 		}}
-		style="-webkit-overflow-scrolling: touch;"
+		style:-webkit-overflow-scrolling="touch"
 		style:height={preview_height}
 		class={[
 			'relative overflow-y-auto text-base',
@@ -332,10 +332,10 @@
 			>
 				{#each visible_items as { data, id } (id)}
 					<div
-						class="relative list-item w-full rounded-md border border-neutral-800/50 bg-neutral-950 will-change-transform"
+						class="relative list-item w-full rounded-none border border-border-subtle/50 bg-canvas will-change-transform"
 					>
 						<button
-							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50"
+							class="flex w-full items-center justify-between p-2 transition-colors duration-200 hover:bg-hover/50 active:bg-border-default/50"
 							onclick={() => open(data)}
 						>
 							{#if type === 'stop'}
@@ -354,7 +354,7 @@
 								{pins}
 								id={data.id}
 								source={active_source}
-								class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-md px-2 py-1 text-neutral-200 hover:text-neutral-400"
+								class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-none px-2 py-1 text-secondary hover:text-muted"
 							/>
 						{/if}
 					</div>

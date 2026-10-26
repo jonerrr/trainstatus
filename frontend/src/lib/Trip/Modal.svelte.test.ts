@@ -331,6 +331,7 @@ for (const missing of [false, true]) {
 }
 
 test('transfer car nodes preview matching access points while rows navigate, and refresh removes invalid guidance', async () => {
+	await browserPage.viewport(320, 844);
 	page.data.selected_sources = ['mta_subway'];
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = exitFixture();
@@ -379,6 +380,10 @@ test('transfer car nodes preview matching access points while rows navigate, and
 		const node = preview.element().querySelector('.car-box')!.getBoundingClientRect();
 		const rail = view.container.querySelector('.rail')!.getBoundingClientRect();
 		expect(Math.abs((node.left + node.right) / 2 - (rail.left + rail.right) / 2)).toBeLessThan(1);
+		const scroller = view
+			.getByRole('region', { name: 'Train and platform exits; scroll for more' })
+			.element();
+		expect(scroller.scrollLeft).toBe(0);
 		await preview.click();
 		await expect.element(preview).toHaveAttribute('aria-pressed', 'true');
 		await expect
@@ -390,6 +395,11 @@ test('transfer car nodes preview matching access points while rows navigate, and
 			)
 			.toBeVisible();
 		expect(view.container.querySelectorAll('[data-highlighted="true"]')).toHaveLength(1);
+		await expect.poll(() => scroller.scrollLeft).toBeGreaterThan(0);
+		const car = view.container.querySelector('[data-train-car="4"]')!.getBoundingClientRect();
+		const viewport = scroller.getBoundingClientRect();
+		expect(car.left).toBeGreaterThanOrEqual(viewport.left);
+		expect(car.right).toBeLessThanOrEqual(viewport.right);
 		expect(page.state.modal).toBeNull();
 		await view.getByRole('button', { name: /^X to/ }).click();
 		expect(page.state.modal).toMatchObject({

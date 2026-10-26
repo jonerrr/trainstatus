@@ -227,7 +227,7 @@
 	{/if}
 	{#if selectionError}<div
 			role="status"
-			class="absolute right-12 bottom-3 left-3 rounded-lg bg-neutral-950 p-3 text-sm text-amber-200"
+			class="absolute right-12 bottom-3 left-3 rounded-none bg-canvas p-3 text-sm text-amber-200"
 		>
 			{selectionError}
 		</div>{/if}

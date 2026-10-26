@@ -54,12 +54,12 @@
 
 <div class="pointer-events-none absolute top-1.5 left-1.5 z-30 max-w-[calc(100%-4.25rem)]">
 	<div
-		class="pointer-events-auto flex max-w-full items-center gap-1 rounded-lg border border-neutral-700/70 bg-neutral-950/88 p-1 text-white shadow-lg backdrop-blur-md"
+		class="pointer-events-auto flex max-w-full items-center gap-1 rounded-none border border-border-default/70 bg-canvas/88 p-1 text-white shadow-lg backdrop-blur-md"
 	>
 		<button
 			bind:this={trigger}
 			type="button"
-			class="relative flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-semibold hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-400"
+			class="relative flex h-9 shrink-0 items-center gap-1.5 rounded-none px-2 text-xs font-semibold hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
 			aria-label="Filters"
 			aria-expanded={filtersOpen}
 			aria-controls="map-filter-panel"
@@ -69,7 +69,7 @@
 			<span class="hidden sm:inline">Filters</span>
 			{#if filters.activeFilterCount > 0}
 				<span
-					class="flex min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] leading-4 font-bold text-white"
+					class="flex min-w-4 items-center justify-center rounded-none bg-accent px-1 text-[10px] leading-4 font-bold text-accent-fg"
 					aria-label={`${filters.activeFilterCount} active filters`}
 				>
 					{filters.activeFilterCount}
@@ -77,14 +77,14 @@
 			{/if}
 		</button>
 
-		<div class="h-5 w-px shrink-0 bg-neutral-700"></div>
+		<div class="h-5 w-px shrink-0 bg-border-default"></div>
 		<div class="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Data sources">
 			{#each page.data.selected_sources as source (source)}
 				{const info = $derived(source_config[source])}
 				{const enabled = $derived(filters.isSourceEnabled(source))}
 				<button
 					type="button"
-					class={`flex h-9 shrink-0 items-center gap-1 rounded-md border px-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-400 ${enabled ? 'border-blue-400 bg-blue-500/20' : 'border-neutral-700 text-neutral-400'}`}
+					class={`flex h-9 shrink-0 items-center gap-1 rounded-none border px-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${enabled ? 'border-accent-border bg-accent-bg' : 'border-border-default text-muted'}`}
 					aria-pressed={enabled}
 					aria-label={`${enabled ? 'Hide' : 'Show'} ${info.name}`}
 					onclick={() => filters.toggleSource(source)}
@@ -93,7 +93,7 @@
 						src={source_icons[source]}
 						sizes="20px"
 						alt=""
-						class="size-5 rounded object-contain"
+						class="size-5 rounded-none object-contain"
 					/>
 					<span class="hidden lg:inline">{info.name.replace('MTA ', '')}</span>
 				</button>
@@ -111,7 +111,7 @@
 		aria-label="Filters"
 	>
 		<header
-			class="flex min-h-11 shrink-0 items-center justify-between border-b border-neutral-800 px-3"
+			class="flex min-h-11 shrink-0 items-center justify-between border-b border-border-subtle px-3"
 		>
 			<div class="flex items-center gap-1.5">
 				<Layers size={18} aria-hidden="true" />
@@ -119,7 +119,7 @@
 			</div>
 			<button
 				type="button"
-				class="flex size-9 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400"
+				class="flex size-9 items-center justify-center rounded-none hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent"
 				aria-label="Close filters"
 				onclick={() => closeFilters()}
 			>
@@ -131,19 +131,19 @@
 			<section class="flex flex-col gap-1" aria-labelledby="map-layers-heading">
 				<h3
 					id="map-layers-heading"
-					class="mb-1 text-xs font-semibold tracking-wide text-neutral-400 uppercase"
+					class="mb-1 text-xs font-semibold tracking-wide text-muted uppercase"
 				>
 					Layers
 				</h3>
 				{#each layerEntries as [layer, { name }] (layer)}
 					<label
-						class="flex min-h-10 items-center justify-between gap-2 rounded-md px-1.5 hover:bg-neutral-800/70"
+						class="flex min-h-10 items-center justify-between gap-2 rounded-none px-1.5 hover:bg-hover/70"
 					>
 						<span class="text-sm">{name}</span>
 						<input
 							bind:checked={filters.layers[layer]}
 							type="checkbox"
-							class="size-5 accent-blue-500"
+							class="size-5 accent-accent"
 						/>
 					</label>
 				{/each}
@@ -151,8 +151,8 @@
 
 			{#each layerEntries as [layer] (layer)}
 				{#if filters.layers[layer] && filters.sources.length > 0}
-					<section class="flex flex-col gap-1.5 border-t border-neutral-800 pt-3">
-						<h3 class="text-xs font-semibold tracking-wide text-neutral-400 uppercase">
+					<section class="flex flex-col gap-1.5 border-t border-border-subtle pt-3">
+						<h3 class="text-xs font-semibold tracking-wide text-muted uppercase">
 							{layer} filters
 						</h3>
 						{#each filters.sources as source (source)}
@@ -182,11 +182,11 @@
 		</div>
 
 		<footer
-			class="shrink-0 border-t border-neutral-800 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
+			class="shrink-0 border-t border-border-subtle p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
 		>
 			<button
 				type="button"
-				class="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-neutral-700 text-sm font-semibold hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
+				class="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-none border border-border-default text-sm font-semibold hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
 				disabled={filters.activeFilterCount === 0}
 				onclick={() => filters.reset()}
 			>
@@ -207,10 +207,10 @@
 		display: flex;
 		max-height: min(48dvh, 30rem);
 		flex-direction: column;
-		border: 1px solid rgb(64 64 64);
-		border-bottom: 1px solid rgb(64 64 64);
-		border-radius: 0.75rem;
-		background: rgb(10 10 10 / 0.97);
+		border: 1px solid var(--border-default);
+		border-bottom: 1px solid var(--border-default);
+		border-radius: 0;
+		background: var(--bg-canvas);
 		color: white;
 		box-shadow: 0 -20px 50px rgb(0 0 0 / 0.42);
 		backdrop-filter: blur(16px);
@@ -224,8 +224,8 @@
 			left: 0.375rem;
 			width: 20rem;
 			max-height: calc(100% - 3.625rem);
-			border-bottom: 1px solid rgb(64 64 64);
-			border-radius: 0.65rem;
+			border-bottom: 1px solid var(--border-default);
+			border-radius: 0;
 			box-shadow: 0 20px 50px rgb(0 0 0 / 0.38);
 		}
 	}

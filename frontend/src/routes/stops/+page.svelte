@@ -98,7 +98,7 @@
 	<div class="w-full">
 		<div class="relative">
 			<Search
-				class="absolute top-1/2 left-3 z-20 h-5 w-5 -translate-y-1/2 text-neutral-400 transition-colors duration-200 group-focus-within:text-neutral-200"
+				class="absolute top-1/2 left-3 z-20 h-5 w-5 -translate-y-1/2 text-muted transition-colors duration-200 group-focus-within:text-secondary"
 			/>
 			<!-- TODO: maybe add autocomplete="off" -->
 			<input
@@ -106,17 +106,17 @@
 				bind:value={search_input.get, search_input.set}
 				type="search"
 				placeholder="Search stops by name, ID, or route..."
-				class="h-12 w-full rounded border
-			   border-neutral-800/50
-			   bg-neutral-900
+				class="h-12 w-full rounded-none border
+			   border-border-subtle/50
+			   bg-surface-1
 			   pr-10
 			   pl-10
-			   text-neutral-200 shadow-lg
+			   text-secondary shadow-lg
 			   ring-1 shadow-black/10
 			   ring-neutral-600/30 backdrop-blur-xs ring-inset
-			   placeholder:text-neutral-500
+			   placeholder:text-disabled
 			   focus:border-neutral-500/50
-			   focus:bg-neutral-900
+			   focus:bg-surface-1
 			   focus:ring-2
 			   focus:ring-neutral-500/50"
 			/>
@@ -125,10 +125,10 @@
 				aria-label="Clear search"
 				class="absolute top-1/2 right-3 h-6
 			   w-6 -translate-y-1/2
-			   text-neutral-400
+			   text-muted
 			   transition-all
 			   duration-200
-			   hover:text-neutral-200 active:scale-95"
+			   hover:text-secondary active:scale-95"
 				onclick={clear_search}
 			>
 				<CircleX />

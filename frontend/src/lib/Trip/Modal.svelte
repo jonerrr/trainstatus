@@ -80,7 +80,7 @@
 			? trip_data.deviation / 60
 			: undefined
 	)}
-	<div class="shrink-0 border-b border-neutral-700 p-3">
+	<div class="shrink-0 border-b border-border-default p-3">
 		<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
 			{#if route}
 				<Icon
@@ -102,18 +102,18 @@
 					<VehicleCapacity {status} />
 				</div>
 				<span
-					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-neutral-400"
+					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-muted"
 					>Bus #{read.trip.vehicle_id}</span
 				>
 			{/if}
 			{#if vehicle}
 				<span
-					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-neutral-400 tabular-nums"
+					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-muted tabular-nums"
 					>{vehicle}</span
 				>
 			{/if}
 			<div class="col-start-2 row-start-1 flex min-h-7 min-w-0 items-center self-center text-left">
-				<div class="text-sm leading-4 font-semibold wrap-anywhere text-neutral-100">
+				<div class="text-sm leading-4 font-semibold wrap-anywhere text-primary">
 					{#if read}
 						{trip_destination_title(
 							trip_headsign(read.trip, route, read.calls, loaded_catalog?.stops_by_id),
@@ -125,9 +125,7 @@
 				</div>
 			</div>
 			{#if deviation !== undefined}
-				<div
-					class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-neutral-300"
-				>
+				<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-secondary">
 					{Math.abs(deviation).toFixed(0)} min {deviation > 0 ? 'late' : 'early'}
 				</div>
 			{/if}
@@ -146,7 +144,7 @@
 		{#if catalog_state.loading || trip_state.loading}
 			<Skeleton lines={6} class="p-2" />
 		{:else if !read && !catalog_state.error && !trip_state.error}
-			<p class="p-2 text-center text-neutral-400">This trip is not currently running.</p>
+			<p class="p-2 text-center text-muted">This trip is not currently running.</p>
 		{:else if read}
 			{#if selected_call && selected_stop}
 				<div class="preview-panel" aria-label="Selected stop preview" role="region">
@@ -196,8 +194,7 @@
 								title={`Preview exits and transfers at ${stop.name}`}
 								onclick={() => (selected_key = visitKey(call))}
 								><span class="track" aria-hidden="true"
-									><span
-										class="dot relative size-3.5 rounded-none border-3 border-neutral-400 bg-neutral-950"
+									><span class="dot relative size-3.5 rounded-none border-3 border-muted bg-canvas"
 									></span></span
 								></button
 							>
@@ -211,7 +208,7 @@
 							>
 						</div>
 					{/if}
-				{:else}<p class="p-2 text-center text-neutral-400">No predictions to show</p>{/each}
+				{:else}<p class="p-2 text-center text-muted">No predictions to show</p>{/each}
 			</ModalList>
 		{/if}
 	</svelte:boundary>
@@ -241,8 +238,8 @@
 		flex: 0 1 auto;
 		min-height: 0;
 		overflow: auto;
-		background: #171717;
-		border-bottom: 1px solid #404040;
+		background: var(--bg-surface-1);
+		border-bottom: 1px solid var(--border-default);
 	}
 	.preview-title {
 		flex: none;
@@ -252,7 +249,7 @@
 		gap: 8px;
 		min-height: 28px;
 		padding: 0 8px;
-		color: #d4d4d4;
+		color: var(--text-secondary);
 		font-size: 12px;
 	}
 	.preview-actions {
@@ -272,7 +269,7 @@
 		display: flex;
 	}
 	.passed {
-		color: #a3a3a3;
+		color: var(--text-muted);
 	}
 	.select-stop {
 		flex: 0 0 44px;
@@ -292,20 +289,20 @@
 		position: absolute;
 		inset-block: 0;
 		width: 4px;
-		background: #737373;
+		background: var(--text-disabled);
 	}
 	.selected .track::before {
-		background: #7dd3fc;
+		background: var(--accent);
 	}
 	.selected .dot {
-		border-color: #7dd3fc;
-		background: #7dd3fc;
+		border-color: var(--accent);
+		background: var(--accent);
 	}
 	.select-stop:hover .track::before {
-		background: #bae6fd;
+		background: var(--accent-hover);
 	}
 	.select-stop:hover .dot {
-		border-color: #bae6fd;
+		border-color: var(--accent-hover);
 	}
 	.open-stop {
 		display: flex;
@@ -327,14 +324,14 @@
 	}
 	.open-stop:hover,
 	.select-stop:hover {
-		background: #262626;
+		background: var(--bg-hover);
 	}
 	.stop-row.selected .open-stop,
 	.stop-row.selected .select-stop {
-		background: rgba(125, 211, 252, 0.08);
+		background: var(--accent-bg);
 	}
 	button:focus-visible {
-		outline: 2px solid #7dd3fc;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 </style>

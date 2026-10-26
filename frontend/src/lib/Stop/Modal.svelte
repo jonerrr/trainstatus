@@ -77,7 +77,7 @@
 	}
 </script>
 
-<div class="flex flex-col items-start gap-3 border-b border-neutral-700 p-3">
+<div class="flex flex-col items-start gap-3 border-b border-border-default p-3">
 	<div class="flex w-full items-center gap-2">
 		{#if stop?.data.source === 'mta_bus'}
 			<BusArrow direction={stop.data.direction} />
@@ -98,7 +98,7 @@
 			{/if}
 		{/each}
 		{#if badges.length > 6}
-			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{badges.length - 5}</div>
+			<div class="rounded-none bg-border-default p-1 font-semibold">+{badges.length - 5}</div>
 		{/if}
 	</div>
 </div>
@@ -114,7 +114,7 @@
 		{#if read?.pending.length}
 			<Skeleton lines={5} class="p-2" />
 		{:else}
-			<div class="px-4 py-8 text-center text-base font-semibold text-neutral-400">
+			<div class="px-4 py-8 text-center text-base font-semibold text-muted">
 				No predictions to show
 			</div>
 		{/if}
@@ -143,7 +143,7 @@
 						<div
 							class={[
 								'col-start-2 row-start-1 text-left',
-								{ 'text-neutral-400': st.arrival < current_time.ms }
+								{ 'text-muted': st.arrival < current_time.ms }
 							]}
 						>
 							{trip_headsign(
@@ -160,7 +160,7 @@
 							'flex flex-col items-end',
 							{
 								italic: status?.data.source === 'mta_subway' && !status.data.assigned,
-								'text-neutral-400': st.arrival < current_time.ms
+								'text-muted': st.arrival < current_time.ms
 							}
 						]}
 					>
@@ -183,7 +183,7 @@
 
 {#if stop?.data.source === 'mta_subway'}
 	<div
-		class="grid grid-cols-2 border-neutral-700 bg-neutral-800 text-neutral-100"
+		class="grid grid-cols-2 border-border-default bg-surface-2 text-primary"
 		aria-label="Trip information"
 	>
 		{#each [{ direction: 1, name: stop.data.north_headsign }, { direction: 3, name: stop.data.south_headsign }] as tab (tab.direction)}
@@ -191,8 +191,8 @@
 				class={[
 					'p-2',
 					{
-						'bg-neutral-900': selected_direction.current[source] === tab.direction,
-						'text-neutral-400': selected_direction.current[source] !== tab.direction
+						'bg-surface-1': selected_direction.current[source] === tab.direction,
+						'text-muted': selected_direction.current[source] !== tab.direction
 					}
 				]}
 				onclick={() => {

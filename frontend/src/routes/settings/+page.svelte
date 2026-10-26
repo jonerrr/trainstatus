@@ -27,6 +27,7 @@
 		else url.searchParams.set('at', String(at));
 		applying_time = true;
 		try {
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- The current browser URL already includes the base path.
 			await goto(url.pathname + url.search + url.hash, { state: page.state });
 		} finally {
 			applying_time = false;
@@ -37,11 +38,11 @@
 	// TODO: add 'debug' mode that logs data in console and shows extra info about data sources
 </script>
 
-<div class="h-full overflow-y-auto bg-black text-white">
+<div class="h-full overflow-y-auto bg-canvas text-white">
 	<div class="mx-auto max-w-4xl px-6 py-6">
 		<!-- <h1 class="mb-12 text-4xl font-bold">Settings</h1> -->
 
-		<div class="flex flex-col divide-y divide-neutral-800 text-base">
+		<div class="flex flex-col divide-y divide-border-subtle text-base">
 			<div class="p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<div class="flex items-center gap-1">
@@ -49,7 +50,7 @@
 						<h2 class="text-xl font-semibold">Data Sources</h2>
 					</div>
 				</div>
-				<p class="mb-3 pl-6 text-sm text-neutral-400">
+				<p class="mb-3 pl-6 text-sm text-muted">
 					Select which transit agencies to load data from. Enabling more sources may increase data
 					usage and load times.
 				</p>
@@ -59,7 +60,7 @@
 						{const info = $derived(source_config[source])}
 						{const enabled = $derived(source_preferences.current.includes(source))}
 						<label
-							class="flex cursor-pointer items-center gap-3 rounded-md py-2 transition-colors hover:text-emerald-400"
+							class="flex cursor-pointer items-center gap-3 rounded-none py-2 transition-colors hover:text-accent"
 						>
 							<input
 								type="checkbox"
@@ -69,14 +70,14 @@
 									source_preferences.toggle(source);
 									refreshAll();
 								}}
-								class="size-5 rounded border-neutral-700 bg-neutral-800 text-emerald-500 focus:ring-emerald-500/30 disabled:opacity-50"
+								class="size-5 rounded-none border-border-default bg-surface-2 text-accent checked:border-accent checked:bg-accent focus:ring-accent/30 disabled:opacity-50"
 							/>
 							<div class="flex items-center gap-2">
 								<enhanced:img
 									src={source_icons[source]}
 									sizes="24px"
 									alt=""
-									class="size-6 rounded-sm object-contain"
+									class="size-6 rounded-none object-contain"
 								/>
 								<span class="font-medium">{info.name}</span>
 							</div>
@@ -92,7 +93,7 @@
 						<h2 class="text-xl font-semibold">Time Travel</h2>
 					</div>
 				</div>
-				<p class="mb-3 pl-6 text-sm text-neutral-400">
+				<p class="mb-3 pl-6 text-sm text-muted">
 					View train and bus information from a specific time in the past. This allows you to see
 					historical train movements and delays for research or analysis purposes.
 				</p>
@@ -106,18 +107,19 @@
 				>
 					<input
 						max={dayjs().format('YYYY-MM-DDTHH:mm')}
-						style="color-scheme: dark; font-size: 0.875rem"
+						style:color-scheme="dark"
+						style:font-size="0.875rem"
 						type="datetime-local"
 						aria-label="Historical time"
 						required
 						disabled={applying_time}
 						bind:value={selected_time}
-						class="min-w-50 rounded border border-neutral-700 bg-transparent p-2 leading-6 text-neutral-400"
+						class="min-w-50 rounded-none border border-border-default bg-transparent p-2 leading-6 text-muted"
 					/>
 					<button
 						type="submit"
 						disabled={!selected_time || !time_dirty || applying_time}
-						class="rounded bg-emerald-700 px-4 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 enabled:hover:bg-emerald-600 disabled:opacity-50"
+						class="rounded-none bg-accent px-4 py-2 text-accent-fg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent enabled:hover:bg-accent-hover disabled:opacity-50"
 						>{applying_time
 							? 'Applying…'
 							: applied_time && !time_dirty
@@ -129,7 +131,7 @@
 							type="button"
 							disabled={applying_time}
 							onclick={() => void applyTime(undefined)}
-							class="rounded border border-neutral-700 px-4 py-2 text-neutral-300 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 enabled:hover:border-neutral-500 enabled:hover:bg-neutral-800 enabled:hover:text-white disabled:opacity-50"
+							class="rounded-none border border-border-default px-4 py-2 text-secondary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent enabled:hover:border-neutral-500 enabled:hover:bg-hover enabled:hover:text-white disabled:opacity-50"
 						>
 							Return to live
 						</button>
@@ -149,8 +151,9 @@
 				<div class="flex flex-col gap-2">
 					<a
 						href="/api/docs"
+						rel="external"
 						target="_blank"
-						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-blue-400 focus:ring-2 focus:ring-blue-500/30 focus:outline-none active:scale-98"
+						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-accent focus:ring-2 focus:ring-accent/30 focus:outline-none active:scale-98"
 					>
 						<div>
 							<div class="flex items-center gap-1">
@@ -158,16 +161,14 @@
 								<span>Api Documentation</span>
 								<ExternalLink class="size-4" />
 							</div>
-							<div class="text-sm text-neutral-400">
-								Access Train Status data for your own projects
-							</div>
+							<div class="text-sm text-muted">Access Train Status data for your own projects</div>
 						</div>
 					</a>
 
 					<a
 						href="https://github.com/jonerrr/trainstatus"
 						target="_blank"
-						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-green-400 focus:ring-2 focus:ring-green-500/30 focus:outline-none active:scale-98"
+						class="flex items-center gap-3 px-4 py-3 transition-all duration-200 hover:text-accent focus:ring-2 focus:ring-accent/30 focus:outline-none active:scale-98"
 					>
 						<div>
 							<div class="flex items-center gap-1">
@@ -175,7 +176,7 @@
 								<span>Source Code</span>
 								<ExternalLink class="size-4" />
 							</div>
-							<div class="text-sm text-neutral-400">View and contribute on GitHub</div>
+							<div class="text-sm text-muted">View and contribute on GitHub</div>
 						</div>
 					</a>
 				</div>

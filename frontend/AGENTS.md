@@ -2,6 +2,15 @@
 
 These instructions apply to `frontend/` in addition to the repository's root `AGENTS.md`.
 
+## UI/UX & Design System Rules (`DESIGN.md`)
+
+Before creating or modifying any Svelte component, stylesheet, SVG diagram, or UI layout, read [../DESIGN.md](../DESIGN.md) and strictly enforce its rules:
+
+- **Strict Boxy Geometry (`border-radius: 0px`):** All containers, modals, buttons, inputs, checkboxes, sliders, bus route chips, transfer car boxes, and stop timeline nodes must use `0px` border radius.
+- **Reserved Circles (`border-radius: 9999px`):** True circles are strictly limited to official MTA Subway route bullets (`Icon.svelte`) and `TransferThread.svelte` `(+)` / `(-)` disclosure toggle icons.
+- **Single Interactive Accent (`--accent`):** Never introduce hard-coded sky blue (`#7dd3fc`), OS blue (`#2563eb`), or stray emerald (`#10b981`) for interactive UI states. Always use the CSS custom properties (`--accent`, `--accent-hover`, `--accent-fg`, `--accent-bg`, `--accent-border`, `--accent-car-fill`) defined in `app.css`.
+- **Tabular Numerals:** All arrival countdowns, clock times, walking distances, car numbers, and stop IDs must use `font-variant-numeric: tabular-nums`.
+
 ## Svelte MCP
 
 Use the Svelte MCP server for Svelte 5 and SvelteKit documentation and code analysis.

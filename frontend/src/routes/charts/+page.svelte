@@ -312,7 +312,7 @@
 
 <div class="flex h-full min-h-75 flex-col py-4">
 	<div
-		class="mx-auto flex w-fit flex-wrap gap-6 rounded-md border border-neutral-700/50 bg-neutral-800/70 p-4"
+		class="mx-auto flex w-fit flex-wrap gap-6 rounded-none border border-border-default/50 bg-surface-2/70 p-4"
 	>
 		<!-- Routes Option -->
 		<!-- TODO: improve ui for mobile -->
@@ -325,7 +325,7 @@
 					onclick={toggleCombobox}
 					aria-haspopup="listbox"
 					aria-expanded={isComboboxOpen}
-					class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-base hover:bg-neutral-800"
+					class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-none border border-border-default bg-surface-1 px-3 py-2 text-base hover:bg-hover"
 					aria-label="Add routes"
 				>
 					<div class="flex flex-1 flex-wrap items-center gap-2">
@@ -334,7 +334,7 @@
 						{:else}
 							{#each selected_routes_flat as selectedRoute (`${selectedRoute.data.source}:${selectedRoute.id}`)}
 								<div
-									class="flex items-center rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1"
+									class="flex items-center rounded-none border border-border-default bg-surface-2 px-2 py-1"
 								>
 									<Icon height={20} width={20} route={selectedRoute} link={false} />
 									{#if selected_routes_flat.length > 1}
@@ -352,7 +352,7 @@
 													removeRoute(selectedRoute);
 												}
 											}}
-											class="ml-1 cursor-pointer text-neutral-400 hover:text-white"
+											class="ml-1 cursor-pointer text-muted hover:text-white"
 											aria-label={`Remove ${getRouteDisplayName(selectedRoute)}`}
 										>
 											<X class="size-3" />
@@ -368,19 +368,19 @@
 				<!-- Dropdown with search and options -->
 				{#if isComboboxOpen}
 					<div
-						class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 shadow-lg"
+						class="absolute z-10 mt-1 w-64 max-w-64 overflow-hidden rounded-none border border-border-default bg-surface-1 shadow-lg"
 					>
-						<div class="border-b border-neutral-700 p-2">
+						<div class="border-b border-border-default p-2">
 							<div class="relative">
 								<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-									<Search class="h-4 w-4 text-neutral-400" />
+									<Search class="h-4 w-4 text-muted" />
 								</div>
 								<input
 									type="text"
 									bind:this={searchInputRef}
 									bind:value={searchQuery}
 									onkeydown={handleComboboxKeydown}
-									class="block w-full rounded-md border border-neutral-700 bg-neutral-800 py-2 pr-3 pl-10 text-sm placeholder-neutral-400"
+									class="block w-full rounded-none border border-border-default bg-surface-2 py-2 pr-3 pl-10 text-sm placeholder-muted"
 									placeholder="Search routes..."
 									autocomplete="off"
 								/>
@@ -390,17 +390,17 @@
 						<!-- Route options -->
 						<div id="route-listbox" role="listbox" class="max-h-60 overflow-auto py-1">
 							{#if filteredRoutes.length === 0}
-								<div class="px-4 py-2 text-neutral-400">No routes found</div>
+								<div class="px-4 py-2 text-muted">No routes found</div>
 							{:else}
 								{#each filteredRoutes as routeOption (`${routeOption.data.source}:${routeOption.id}`)}
 									<div
 										role="option"
 										tabindex="0"
 										aria-selected={isRouteSelected(routeOption)}
-										class="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none {isRouteSelected(
+										class="flex cursor-pointer items-center gap-2 px-4 py-2 hover:bg-hover focus:bg-hover focus:outline-none {isRouteSelected(
 											routeOption
 										)
-											? 'bg-neutral-700'
+											? 'bg-accent-bg text-accent'
 											: ''}"
 										onclick={() => selectRoute(routeOption)}
 										onkeydown={(e) => handleOptionKeydown(e, routeOption)}
@@ -415,11 +415,11 @@
 										<span class="grow">{routeOption.long_name}</span>
 										<!-- <div class="flex flex-col">
 											<span class="text-sm">{getRouteDisplayName(routeOption)}</span>
-											<span class="text-neutral-400 text-sm">{routeOption.long_name}</span>
+											<span class="text-muted text-sm">{routeOption.long_name}</span>
 										</div> -->
 										{#if isRouteSelected(routeOption)}
-											<Check class="mt-1 size-4 shrink-0 text-green-500" />
-											<!-- <span class="ml-auto text-green-500">✓</span> -->
+											<Check class="mt-1 size-4 shrink-0 text-accent" />
+											<!-- <span class="ml-auto text-accent">✓</span> -->
 										{/if}
 									</div>
 								{/each}
@@ -434,7 +434,7 @@
 		<!-- TODO: change direction text depending on source -->
 		<div class="flex min-w-24 flex-col gap-2">
 			<div class="font-bold">Direction</div>
-			<div class="flex flex-col gap-2 text-neutral-300">
+			<div class="flex flex-col gap-2 text-secondary">
 				<div class="flex items-center justify-between gap-2">
 					<label for="northbound" class="cursor-pointer">Northbound</label>
 					<input
@@ -463,7 +463,7 @@
 		<!-- Stop Points Option -->
 		<div class="flex min-w-24 flex-col justify-end gap-2">
 			<div class="font-bold">Style</div>
-			<div class="flex flex-col gap-2 text-neutral-300">
+			<div class="flex flex-col gap-2 text-secondary">
 				<div class="flex w-full items-center justify-between gap-2">
 					<label for="stop_points" class="cursor-pointer">Stop Points</label>
 					<input
@@ -527,7 +527,7 @@
 		<div class="flex min-w-30 flex-col justify-center">
 			<button
 				onclick={export_as_svg}
-				class="flex h-fit items-center justify-center gap-2 rounded bg-neutral-900 px-4 py-2 transition-colors hover:bg-neutral-800"
+				class="flex h-fit items-center justify-center gap-2 rounded-none bg-surface-1 px-4 py-2 transition-colors hover:bg-hover"
 				aria-label="Export chart as SVG"
 			>
 				<Download class="size-5" />
@@ -567,11 +567,9 @@
 				</div>
 			</div>
 		{:else if catalogs.some((c) => c.error) || reads.some((r) => r.error)}
-			<div class="flex h-full items-center justify-center text-neutral-400">
-				Couldn't load chart data
-			</div>
+			<div class="flex h-full items-center justify-center text-muted">Couldn't load chart data</div>
 		{:else}
-			<div class="flex h-full items-center justify-center text-neutral-400">No data available</div>
+			<div class="flex h-full items-center justify-center text-muted">No data available</div>
 		{/if}
 	</div>
 </div>
@@ -580,6 +578,6 @@
 	@reference "../../app.css";
 
 	:global(.layercake-layout-svg) {
-		@apply bg-neutral-950;
+		@apply bg-canvas;
 	}
 </style>

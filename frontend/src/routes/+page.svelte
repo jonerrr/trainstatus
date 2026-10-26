@@ -133,11 +133,11 @@
 	<button
 		onclick={() => resume()}
 		class={[
-			'relative flex items-center justify-center rounded-lg p-1 shadow-lg transition-all duration-200 hover:bg-neutral-600 active:bg-neutral-600',
+			'relative flex items-center justify-center rounded-none p-1 shadow-lg transition-all duration-200 hover:bg-border-strong active:bg-border-strong',
 			{
-				'bg-blue-600 text-white': position,
+				'bg-accent text-accent-fg': position,
 				'bg-red-600 text-white hover:bg-red-500 active:bg-red-700': position_denied
-				// 'bg-neutral-700 text-white hover:bg-neutral-600 active:bg-neutral-800':
+				// 'bg-border-default text-white hover:bg-border-strong active:bg-surface-2':
 				// 	location_status.current === 'unknown'
 			}
 		]}
@@ -211,7 +211,7 @@
 			loading={catalogs_loading || (position === undefined && !position_denied)}
 		/>
 		<!-- {:else}
-			<p class="p-4 text-sm text-neutral-400">
+			<p class="p-4 text-sm text-muted">
 				Unable to get nearby stops. Please allow location access and refresh the page.
 			</p>
 		{/if} -->

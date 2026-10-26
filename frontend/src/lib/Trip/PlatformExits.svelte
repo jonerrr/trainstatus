@@ -52,6 +52,16 @@
 			? Math.max(...labels.map((label) => label.y + (label_heights[label.id] ?? 30))) + 4
 			: 30
 	);
+
+	function center_transfer(viewport: HTMLDivElement) {
+		if (!transfer || !guidance?.exits.length) return;
+		const positions = guidance.exits.map((exit) => 6 + exit.position * train_width);
+		const center = (Math.min(...positions) + Math.max(...positions)) / 2;
+		viewport.scrollTo({
+			left: Math.max(0, center - viewport.clientWidth / 2),
+			behavior: 'instant'
+		});
+	}
 </script>
 
 {#if car_count > 0}
@@ -60,6 +70,7 @@
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
 			class="viewport"
+			{@attach center_transfer}
 			tabindex="0"
 			role="region"
 			aria-label="Train and platform exits; scroll for more"
@@ -91,7 +102,7 @@
 							/>
 							{#if car?.number && car.number !== String(number)}
 								<text class="car-pos" x="25" y="12" text-anchor="middle">{number}</text>
-								<text class="car-id" x="25" y="23" text-anchor="middle">{car.number}</text>
+								<text class="car-id" x="25" y="22.5" text-anchor="middle">{car.number}</text>
 							{:else}
 								<text class="car-pos" x="25" y="16" text-anchor="middle">{number}</text>
 							{/if}
@@ -102,7 +113,7 @@
 							data-exit-shaft
 							d={`M${exit.x} 25V33H${exit.left + label_width / 2}V${exit.y - 2}`}
 							fill="none"
-							stroke={transfer ? '#7dd3fc' : 'currentColor'}
+							stroke={transfer ? 'var(--accent)' : 'currentColor'}
 						/>
 					{/each}
 				</svg>
@@ -147,16 +158,16 @@
 		overflow: auto;
 		overscroll-behavior: contain;
 		scrollbar-width: thin;
-		scrollbar-color: #525252 transparent;
+		scrollbar-color: var(--border-strong) transparent;
 	}
 	.viewport:focus-visible {
-		outline: 2px solid #7dd3fc;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 	.diagram {
 		position: relative;
 		margin-inline: auto;
-		color: #737373;
+		color: var(--text-disabled);
 	}
 	svg {
 		position: absolute;
@@ -165,11 +176,11 @@
 		height: 100%;
 	}
 	.body {
-		fill: #303030;
-		stroke: #737373;
+		fill: var(--bg-surface-2);
+		stroke: var(--text-disabled);
 	}
 	.car-pos {
-		fill: #d4d4d4;
+		fill: var(--text-secondary);
 		font-size: 9.5px;
 		font-weight: 700;
 		font-family: inherit;
@@ -183,14 +194,15 @@
 		letter-spacing: -0.02em;
 	}
 	[data-highlighted='true'] .body {
-		fill: #243b4a;
-		stroke: #7dd3fc;
+		fill: var(--accent-car-fill);
+		stroke: var(--accent);
+		stroke-width: 1.5px;
 	}
 	[data-highlighted='true'] .car-pos {
 		fill: #ffffff;
 	}
 	[data-highlighted='true'] .car-id {
-		fill: #bae6fd;
+		fill: var(--accent-hover);
 	}
 	ul {
 		list-style: none;
@@ -203,7 +215,7 @@
 		align-items: center;
 		gap: 3px;
 		padding: 0 2px 2px;
-		color: #d4d4d4;
+		color: var(--text-secondary);
 		text-align: center;
 		font-size: 11px;
 		line-height: 1.3;

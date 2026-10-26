@@ -48,7 +48,7 @@
 		list-style: none;
 		cursor: pointer;
 		font-size: 12px;
-		color: #d4d4d4;
+		color: var(--text-secondary);
 	}
 	summary::-webkit-details-marker {
 		display: none;
@@ -59,7 +59,7 @@
 	.toggle {
 		display: grid;
 		place-items: center;
-		background: #171717;
+		background: var(--bg-surface-1);
 	}
 	.rail {
 		position: absolute;
@@ -76,16 +76,16 @@
 		left: 11px;
 		inset-block: 0;
 		width: 2px;
-		background: #525252;
+		background: var(--border-strong);
 	}
 	summary:focus-visible,
 	.rail:focus-visible {
-		outline: 2px solid #7dd3fc;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 	.rail:hover::before,
 	.rail:focus-visible::before {
-		background: #d4d4d4;
+		background: var(--text-secondary);
 	}
 	.nested::before {
 		content: '';
@@ -94,13 +94,13 @@
 		top: -1px;
 		width: 15px;
 		height: 18px;
-		border-left: 2px solid #525252;
-		border-bottom: 2px solid #525252;
-		border-bottom-left-radius: 16px;
+		border-left: 2px solid var(--border-strong);
+		border-bottom: 2px solid var(--border-strong);
+		border-bottom-left-radius: 0;
 		pointer-events: none;
 	}
 	.nested summary {
-		color: #a3a3a3;
+		color: var(--text-muted);
 		font-size: 11px;
 	}
 </style>

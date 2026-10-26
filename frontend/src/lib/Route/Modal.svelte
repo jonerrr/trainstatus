@@ -76,10 +76,10 @@
 	{:else if catalog.loading}
 		<Skeleton lines={1} class="w-40" />
 	{:else}
-		<div class="text-sm font-semibold text-neutral-100">Route {route_id}</div>
+		<div class="text-sm font-semibold text-primary">Route {route_id}</div>
 	{/if}
 
-	<div class="flex items-center gap-1 text-lg font-semibold text-neutral-100">
+	<div class="flex items-center gap-1 text-lg font-semibold text-primary">
 		{#if alerts_state.loading}
 			<Skeleton lines={1} class="w-24" />
 		{:else if route_alerts.length && idx < route_alerts.length}
@@ -108,7 +108,7 @@
 />
 
 <div
-	class="scrollbar-hidden flex snap-x snap-mandatory gap-2 overflow-x-scroll bg-neutral-950"
+	class="scrollbar-hidden flex snap-x snap-mandatory gap-2 overflow-x-scroll bg-canvas"
 	{@attach (node) => {
 		scroll_area = node;
 		return () => {
@@ -123,10 +123,10 @@
 			{@attach observe_alert(alert)}
 			class="alert flex max-h-[65dvh] w-full shrink-0 snap-start snap-always flex-col items-center justify-between gap-1"
 		>
-			<div class="max-h-[65dvh] overflow-auto bg-neutral-950 px-3 py-2">
+			<div class="max-h-[65dvh] overflow-auto bg-canvas px-3 py-2">
 				{#if header}
 					<div
-						class="mb-3 text-base leading-snug font-semibold text-neutral-100"
+						class="mb-3 text-base leading-snug font-semibold text-primary"
 						role="heading"
 						aria-level="2"
 					>
@@ -135,7 +135,7 @@
 					</div>
 				{/if}
 				{#if description}
-					<div class="text-sm leading-relaxed text-neutral-300">
+					<div class="text-sm leading-relaxed text-secondary">
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- Alert feed markup is intentionally rendered with our static subway icons. -->
 						{@html description.text}
 					</div>
@@ -153,7 +153,7 @@
 				{/if}
 			{/snippet}
 
-			<div class="flex w-full justify-between px-1 text-sm text-neutral-400">
+			<div class="flex w-full justify-between px-1 text-sm text-muted">
 				<div class="text-left">
 					Updated:
 					{@render alert_time(alert.updated_at)}
@@ -172,7 +172,7 @@
 		<div class="absolute bottom-0 flex w-full -translate-y-16 items-center justify-center gap-2">
 			<button
 				disabled={idx === 0}
-				class={{ 'text-neutral-500': idx === 0 }}
+				class={{ 'text-disabled': idx === 0 }}
 				aria-label="Previous alert"
 				onclick={() => scroll_to_alert(idx - 1)}
 			>
@@ -180,7 +180,7 @@
 			</button>
 			{#each route_alerts as alert, i (alert.id)}
 				<button
-					class={['size-3 rounded-full', i === idx ? 'bg-white' : 'bg-neutral-500']}
+					class={['size-3 rounded-none', i === idx ? 'bg-white' : 'bg-neutral-500']}
 					aria-label="Scroll to alert"
 					onclick={() => scroll_to_alert(i)}
 				>
@@ -188,7 +188,7 @@
 			{/each}
 			<button
 				disabled={idx === route_alerts.length - 1}
-				class={{ 'text-neutral-500': idx === route_alerts.length - 1 }}
+				class={{ 'text-disabled': idx === route_alerts.length - 1 }}
 				aria-label="Next alert"
 				onclick={() => scroll_to_alert(idx + 1)}
 			>

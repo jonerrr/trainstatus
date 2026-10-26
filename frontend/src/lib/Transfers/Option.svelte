@@ -99,13 +99,13 @@
 		padding: 3px 8px 3px 0;
 	}
 	:global(.option) + .option {
-		border-top: 1px solid #262626;
+		border-top: 1px solid var(--bg-hover);
 	}
 	.option:hover {
-		background: #262626;
+		background: var(--bg-hover);
 	}
 	.option:focus-visible {
-		outline: 2px solid #60a5fa;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 	.badge {
@@ -134,7 +134,7 @@
 		gap: 6px;
 		margin-top: 2px;
 		font-size: 12px;
-		color: #a3a3a3;
+		color: var(--text-muted);
 	}
 	.stop-name {
 		min-width: 0;
@@ -171,13 +171,13 @@
 	}
 	.secondary {
 		display: block;
-		color: #a3a3a3;
+		color: var(--text-muted);
 		font-size: 11px;
 	}
 	.skeleton {
 		width: 48px;
 		height: 16px;
-		background: #404040;
-		border-radius: 3px;
+		background: var(--border-default);
+		border-radius: 0;
 	}
 </style>

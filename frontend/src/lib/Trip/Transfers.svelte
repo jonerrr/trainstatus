@@ -115,7 +115,7 @@
 		transfer_exits ? [...new Set(transfer_exits.exits.map((exit) => exit.car))] : []
 	)}
 	{const active = $derived(key(departure) === selected_key)}
-	<div class={['transfer-row relative pl-[22px]', { 'bg-[#7dd3fc]/[0.08]': active }]}>
+	<div class={['transfer-row relative pl-[22px]', { 'active bg-accent-bg': active }]}>
 		{#if can_preview}<button
 				type="button"
 				class={[
@@ -127,7 +127,7 @@
 				title="Preview platform guidance"
 				onclick={() => (selected_key = active ? null : key(departure))}
 				><span
-					class="car-box relative z-1 inline-flex h-[17px] max-w-[38px] min-w-5 items-center justify-center rounded-none border-[1.5px] border-neutral-400 bg-neutral-900 px-[3px] text-[10px] leading-none font-bold tracking-[-0.03em] whitespace-nowrap text-neutral-300 tabular-nums"
+					class="car-box relative z-1 inline-flex h-[17px] max-w-[38px] min-w-5 items-center justify-center rounded-none border-[1.5px] border-muted bg-surface-1 px-[3px] text-[10px] leading-none font-bold tracking-[-0.03em] whitespace-nowrap text-secondary tabular-nums"
 					>{exit_cars.slice(0, 3).join('·')}</span
 				></button
 			>{/if}
@@ -155,7 +155,7 @@
 		overflow: auto;
 		overscroll-behavior-y: contain;
 		scrollbar-width: thin;
-		border-top: 1px solid #525252;
+		border-top: 1px solid var(--border-strong);
 		padding-block: 4px 0;
 	}
 	.preview::before {
@@ -169,27 +169,27 @@
 	.preview.active::before {
 		left: 20px;
 		width: 4px;
-		background: #7dd3fc;
+		background: var(--accent);
 	}
 	.preview:hover::before {
-		background: #bae6fd;
+		background: var(--accent-hover);
 	}
 	.preview:focus-visible {
-		outline: 2px solid #7dd3fc;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 	.preview:hover .car-box {
-		border-color: #bae6fd;
+		border-color: var(--accent-hover);
 		color: #ffffff;
 	}
 	.preview.active .car-box {
-		border-color: #7dd3fc;
-		background: #7dd3fc;
-		color: #0a0a0a;
+		border-color: var(--accent);
+		background: var(--accent);
+		color: var(--accent-fg);
 	}
 	.status {
 		padding: 6px 8px 6px 22px;
 		font-size: 11px;
-		color: #a3a3a3;
+		color: var(--text-muted);
 	}
 </style>

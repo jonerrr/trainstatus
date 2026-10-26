@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import type { RouteId } from '$app/types';
 
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
@@ -18,7 +20,7 @@
 				| typeof ChartLine
 				| typeof Settings
 				| typeof Map,
-			href: string
+			href: RouteId
 		];
 	}
 
@@ -35,17 +37,17 @@
 {#snippet nav_button(label: string)}
 	{const [Icon, href] = $derived(routes[label])}
 	<!-- use state.eager to ensure visual feedback is instant -->
-	{const is_active = $derived(href === $state.eager(page.url.pathname))}
+	{const is_active = $derived(resolve(href) === $state.eager(page.url.pathname))}
 	<a
 		aria-label={label}
 		aria-current={is_active ? 'page' : undefined}
 		title={label}
-		href="{href}{current_time.value !== undefined ? `?at=${current_time.value}` : ''}"
+		href="{resolve(href)}{current_time.value !== undefined ? `?at=${current_time.value}` : ''}"
 		class={[
 			'nav-button',
 			{
-				'bg-neutral-800 font-medium text-neutral-100': is_active,
-				'text-neutral-400': !is_active
+				'bg-accent-bg font-medium text-accent': is_active,
+				'text-muted': !is_active
 			}
 		]}
 	>
@@ -56,7 +58,7 @@
 
 <!-- Mobile: fixed bottom bar (scrollable row). (larger screens) md+  fixed left sidebar (column). -->
 <nav
-	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-neutral-900/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
+	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-surface-1/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
 >
 	{#if !page.state.modal}<div class="shrink-0 md:hidden"><UpdateIndicator /></div>{/if}
 	<div
@@ -79,7 +81,17 @@
 
 	.nav-button {
 		/* Mobile: fixed-width cells so the bar scrolls rather than squishing */
-		@apply flex min-w-20 flex-none flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-neutral-800/50 active:bg-neutral-700/50;
+		@apply flex min-w-20 flex-none flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-hover/50 active:bg-border-default/50;
+	}
+
+	.nav-button[aria-current='page'] {
+		box-shadow: inset 0 2px var(--accent);
+	}
+
+	@media (min-width: 768px) {
+		.nav-button[aria-current='page'] {
+			box-shadow: inset 2px 0 var(--accent);
+		}
 	}
 
 	@media (max-width: 767px) {
@@ -105,6 +117,6 @@
 	/* Gradient separator — top edge on mobile, right edge on desktop */
 	nav::before {
 		content: '';
-		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-neutral-700 to-transparent md:top-0 md:right-0 md:bottom-0 md:left-auto md:h-full md:w-px md:bg-linear-to-b;
+		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-border-default to-transparent md:top-0 md:right-0 md:bottom-0 md:left-auto md:h-full md:w-px md:bg-linear-to-b;
 	}
 </style>
