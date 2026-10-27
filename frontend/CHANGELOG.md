@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/jonerrr/trainstatus/compare/frontend-v2.1.0...frontend-v2.1.1) (2026-10-27)
+
+
+### Miscellaneous Chores
+
+* **frontend:** Synchronize trainstatus versions
+
 ## [2.1.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.0.0...frontend-v2.1.0) (2026-10-18)
 
 
