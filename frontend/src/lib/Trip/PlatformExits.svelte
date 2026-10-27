@@ -53,12 +53,21 @@
 			: 30
 	);
 
-	function center_transfer(viewport: HTMLDivElement) {
+	const transfer_key = $derived(
+		transfer
+			? JSON.stringify([transfer.key, transfer.call?.trip_id, transfer.call?.sequence])
+			: null
+	);
+	const transfer_center = $derived.by(() => {
 		if (!transfer || !guidance?.exits.length) return;
 		const positions = guidance.exits.map((exit) => 6 + exit.position * train_width);
-		const center = (Math.min(...positions) + Math.max(...positions)) / 2;
+		return (Math.min(...positions) + Math.max(...positions)) / 2;
+	});
+
+	function center_transfer(viewport: HTMLDivElement) {
+		if (transfer_key === null || transfer_center === undefined) return;
 		viewport.scrollTo({
-			left: Math.max(0, center - viewport.clientWidth / 2),
+			left: Math.max(0, transfer_center - viewport.clientWidth / 2),
 			behavior: 'instant'
 		});
 	}

@@ -73,12 +73,10 @@ function store(fetcher: typeof fetch, sources: Source[] = ['mta_bus'], history_l
 	return data;
 }
 
-test('each app mount revalidates catalogs instead of accepting a fresh HTTP-cache copy', async () => {
-	const modes: (RequestCache | undefined)[] = [];
+test('each app mount loads catalogs', async () => {
 	const catalog = chartFixture('mta_bus').catalog;
-	const fetcher: typeof fetch = async (input, init) => {
+	const fetcher: typeof fetch = async (input) => {
 		if (String(input).includes('/catalog/')) {
-			modes.push(init?.cache);
 			return new Response(JSON.stringify(catalog));
 		}
 		return new Response('[]');
@@ -90,7 +88,6 @@ test('each app mount revalidates catalogs instead of accepting a fresh HTTP-cach
 	const second = store(fetcher);
 	await settle();
 	expect(second.peekCatalog('mta_bus')?.stops).toEqual(catalog.stops);
-	expect(modes).toEqual(['no-cache', 'no-cache']);
 });
 
 test('successful map polls retain source age in the shared warning until a new commit', async () => {

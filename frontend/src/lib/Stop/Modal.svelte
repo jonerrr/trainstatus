@@ -191,7 +191,7 @@
 				class={[
 					'p-2',
 					{
-						'bg-surface-1': selected_direction.current[source] === tab.direction,
+						'bg-accent-bg text-accent': selected_direction.current[source] === tab.direction,
 						'text-muted': selected_direction.current[source] !== tab.direction
 					}
 				]}

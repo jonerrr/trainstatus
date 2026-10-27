@@ -333,6 +333,7 @@ for (const missing of [false, true]) {
 test('transfer car nodes preview matching access points while rows navigate, and refresh removes invalid guidance', async () => {
 	await browserPage.viewport(320, 844);
 	page.data.selected_sources = ['mta_subway'];
+	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = exitFixture();
 	const stop = f.stops[0];
@@ -401,6 +402,17 @@ test('transfer car nodes preview matching access points while rows navigate, and
 		expect(car.left).toBeGreaterThanOrEqual(viewport.left);
 		expect(car.right).toBeLessThanOrEqual(viewport.right);
 		expect(page.state.modal).toBeNull();
+		scroller.scrollLeft = 0;
+		vi.mocked(Date.now).mockReturnValue(chartNow + 15_000);
+		await vi.advanceTimersByTimeAsync(15_000);
+		await expect
+			.element(view.getByRole('button', { name: /^X to .*5m, 4 minutes after arrival/ }))
+			.toBeVisible();
+		expect(scroller.scrollLeft).toBe(0);
+		await preview.click();
+		await expect.element(preview).toHaveAttribute('aria-pressed', 'false');
+		await preview.click();
+		await expect.poll(() => scroller.scrollLeft).toBeGreaterThan(0);
 		await view.getByRole('button', { name: /^X to/ }).click();
 		expect(page.state.modal).toMatchObject({
 			type: 'trip',
@@ -417,6 +429,7 @@ test('transfer car nodes preview matching access points while rows navigate, and
 		await view.unmount();
 	} finally {
 		data.destroy();
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 	}
 });

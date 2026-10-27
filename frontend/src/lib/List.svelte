@@ -278,7 +278,7 @@
 									class={[
 										'relative flex items-center gap-2 rounded-none px-4 py-1 transition-all duration-200',
 										{
-											'font-medium text-primary': active_source === source,
+											'font-medium text-accent': active_source === source,
 											'text-muted': active_source !== source
 										}
 									]}
@@ -297,7 +297,7 @@
 										<div
 											in:send={{ key: 'tab' }}
 											out:receive={{ key: 'tab' }}
-											class="absolute inset-0 -z-10 rounded-none bg-border-default/50"
+											class="absolute inset-0 -z-10 rounded-none bg-accent-bg"
 										></div>
 									{/if}
 								</button>
