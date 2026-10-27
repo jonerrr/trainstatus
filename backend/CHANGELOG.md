@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/jonerrr/trainstatus/compare/backend-v2.1.0...backend-v2.1.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** update backend ([#474](https://github.com/jonerrr/trainstatus/issues/474)) ([b242b01](https://github.com/jonerrr/trainstatus/commit/b242b019187263bc980c0440e1ae80f0703f843d))
+
 ## [2.1.0](https://github.com/jonerrr/trainstatus/compare/backend-v2.0.0...backend-v2.1.0) (2026-10-18)
 
 
