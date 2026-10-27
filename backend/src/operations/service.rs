@@ -99,6 +99,7 @@ struct RouteEntry {
 /// Immutable indexes over one input generation. Route blocks are encoded on first use
 /// and shared by later requests against the same generation.
 pub struct RouteInputs<'a> {
+    pub source: Source,
     pub trips: &'a [TripRun],
     pub visits: &'a [StopVisit],
     pub positions: &'a [VehicleObservation],
@@ -221,6 +222,7 @@ impl ServiceSnapshot {
             return Ok(block.clone());
         }
         let block = (self.encoder.route)(RouteInputs {
+            source: self.source,
             trips: self.inputs.trips(),
             visits: self.inputs.stop_times(),
             positions: self.inputs.positions(),

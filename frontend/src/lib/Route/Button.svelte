@@ -27,7 +27,7 @@
 <section class="flex items-center gap-1">
 	<Icon height={36} width={36} link={false} route={data} />
 	{#if alerts_state.error}
-		<span class="text-neutral-400">—</span>
+		<span class="text-muted">—</span>
 	{:else if !alerts}
 		<Skeleton lines={1} class="w-24" />
 	{:else if alerts.length}
@@ -40,7 +40,7 @@
 			{/if}
 		</div>
 		{#if alerts.length > 1}
-			<div class="rounded-sm bg-neutral-700 p-1 text-neutral-50">
+			<div class="rounded-none bg-border-default p-1 text-primary">
 				+{alerts.length - 1}
 			</div>
 		{/if}

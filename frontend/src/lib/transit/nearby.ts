@@ -22,6 +22,7 @@ export interface BoardingOption {
 export interface IncomingTrip {
 	source: Source;
 	route_id: string;
+	direction: number;
 	arrival: number;
 }
 
@@ -113,9 +114,18 @@ export function boardingOptions(
 		const catalog = bySource.get(source)!;
 		for (const m of memberships(candidate.stop, catalog)) {
 			const key = serviceKey(source, m.route.id, m.direction);
+			const same_station =
+				candidate.same_stop ||
+				(origin.data.source === 'mta_subway' &&
+					candidate.stop.data.source === 'mta_subway' &&
+					origin.data.station_group_id === candidate.stop.data.station_group_id);
 			if (
 				here.has(key) ||
-				(incoming && source === incoming.source && m.route.id === incoming.route_id)
+				(incoming && source === incoming.source && m.route.id === incoming.route_id) ||
+				(incoming?.source === 'mta_subway' &&
+					source === 'mta_subway' &&
+					same_station &&
+					m.direction !== incoming.direction)
 			)
 				continue;
 			let option = grouped.get(key);
@@ -227,6 +237,15 @@ export function compareDepartures(a: DepartureOption, b: DepartureOption) {
 		a.key.localeCompare(b.key) ||
 		(a.call?.trip_id ?? '').localeCompare(b.call?.trip_id ?? '') ||
 		(a.call?.sequence ?? 0) - (b.call?.sequence ?? 0)
+	);
+}
+
+/** Keep each boarding stop together, nearest first, then show its earliest arrivals. */
+export function compareTransfers(a: DepartureOption, b: DepartureOption) {
+	return (
+		compareStop(a.boarding, b.boarding) ||
+		(a.call?.arrival ?? Infinity) - (b.call?.arrival ?? Infinity) ||
+		compareDepartures(a, b)
 	);
 }
 

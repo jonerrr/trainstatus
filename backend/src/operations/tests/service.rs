@@ -249,3 +249,47 @@ fn historical_snapshot_echoes_at_and_has_no_status() {
     assert_eq!(body["routes"]["A"]["trips"][0]["status"], Value::Null);
     assert_eq!(body["routes"]["A"]["calls"]["sequence"], json!([0, 1]));
 }
+
+#[test]
+fn subway_platform_assignments_follow_each_ordered_visit_including_repeated_stops() {
+    use crate::operations::types::trip::{MtaSubwayStopTimeData, MtaSubwayTripData};
+    let mut train = trip("A", "train-1");
+    train.data = TripData::MtaSubway(MtaSubwayTripData {
+        consist: None,
+        consist_cars: vec![],
+    });
+    let visit = |sequence, edges: Vec<&str>| {
+        let mut visit = call(&train, sequence, "X", i64::from(sequence) * 60);
+        visit.data = StopTimeData::MtaSubway(MtaSubwayStopTimeData {
+            scheduled_track: None,
+            actual_track: None,
+            platform_edges: edges.into_iter().map(String::from).collect(),
+        });
+        visit
+    };
+    let visits = vec![
+        visit(2, vec!["south"]),
+        visit(0, vec!["north", "other"]),
+        visit(1, vec![]),
+    ];
+    let snapshot = ServiceSnapshot::new(
+        Source::MtaSubway,
+        Some(1_780_000_000),
+        Inputs::Historical {
+            trips: vec![train],
+            stop_times: visits,
+        },
+        ["A".to_owned(), "empty".to_owned()],
+        crate::api::dto::service::ENCODER,
+    );
+    let body = decode(&snapshot.encode(&RouteSelection::All).unwrap());
+    assert_eq!(body["routes"]["A"]["calls"]["sequence"], json!([0, 1, 2]));
+    assert_eq!(
+        body["routes"]["A"]["calls"]["platform_edges"],
+        json!([["north", "other"], [], ["south"]])
+    );
+    assert_eq!(
+        body["routes"]["empty"]["calls"]["platform_edges"],
+        json!([])
+    );
+}

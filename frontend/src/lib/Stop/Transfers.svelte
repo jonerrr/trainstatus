@@ -19,13 +19,13 @@
 </script>
 
 {#if options.length}
-	<section class="shrink-0 border-b border-neutral-700 px-3 pb-2" aria-label="Nearby routes">
+	<section class="shrink-0 border-b border-border-default px-3 pb-2" aria-label="Nearby routes">
 		<div class="flex min-h-11 items-center justify-between gap-2">
-			<h3 class="text-xs font-medium text-neutral-400">Nearby routes</h3>
+			<h3 class="text-xs font-medium text-muted">Nearby routes</h3>
 			{#if options.length > 3}
 				<button
 					type="button"
-					class="min-h-11 px-2 text-xs font-medium text-neutral-300 hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400"
+					class="min-h-11 px-2 text-xs font-medium text-secondary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent"
 					aria-expanded={expanded}
 					aria-controls={options_id}
 					onclick={() => (expanded = !expanded)}

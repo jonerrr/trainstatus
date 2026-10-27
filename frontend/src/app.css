@@ -7,18 +7,193 @@
 	--font-sans: Inter, sans-serif;
 }
 
+:root {
+	--bg-canvas: #0a0a0a;
+	--bg-surface-1: #141414;
+	--bg-surface-2: #1f1f1f;
+	--bg-hover: #262626;
+	--bg-backdrop: rgba(0, 0, 0, 0.72);
+	--border-subtle: #262626;
+	--border-default: #404040;
+	--border-strong: #525252;
+	--text-primary: #f5f5f5;
+	--text-secondary: #d4d4d4;
+	--text-muted: #a3a3a3;
+	--text-disabled: #737373;
+
+	/* Phosphor Amber: change these six tokens together to re-theme interactions. */
+	--accent: #f59e0b;
+	--accent-hover: #fbbf24;
+	--accent-fg: #0a0a0a;
+	--accent-bg: rgba(245, 158, 11, 0.11);
+	--accent-border: rgba(245, 158, 11, 0.45);
+	--accent-car-fill: #2e210b;
+
+	--status-live: #10b981;
+	--status-warning: #f97316;
+	--status-danger: #ef4444;
+}
+
+@theme inline {
+	--color-canvas: var(--bg-canvas);
+	--color-surface-1: var(--bg-surface-1);
+	--color-surface-2: var(--bg-surface-2);
+	--color-hover: var(--bg-hover);
+	--color-backdrop: var(--bg-backdrop);
+	--color-border-subtle: var(--border-subtle);
+	--color-border-default: var(--border-default);
+	--color-border-strong: var(--border-strong);
+	--color-primary: var(--text-primary);
+	--color-secondary: var(--text-secondary);
+	--color-muted: var(--text-muted);
+	--color-disabled: var(--text-disabled);
+	--color-accent: var(--accent);
+	--color-accent-hover: var(--accent-hover);
+	--color-accent-fg: var(--accent-fg);
+	--color-accent-bg: var(--accent-bg);
+	--color-accent-border: var(--accent-border);
+	--color-status-live: var(--status-live);
+	--color-status-warning: var(--status-warning);
+	--color-status-danger: var(--status-danger);
+}
+
+@layer base {
+	html {
+		color-scheme: dark;
+		background: var(--bg-canvas);
+		color: var(--text-primary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	button,
+	input,
+	select,
+	textarea,
+	::file-selector-button {
+		border-radius: 0;
+		accent-color: var(--accent);
+	}
+
+	[type='checkbox'],
+	[type='radio'] {
+		border-radius: 0;
+		color: var(--accent);
+		background-color: var(--bg-surface-2);
+		border-color: var(--border-strong);
+	}
+
+	[type='checkbox']:checked,
+	[type='checkbox']:indeterminate,
+	[type='radio']:checked {
+		background-color: var(--accent);
+		border-color: var(--accent);
+		/* The mask follows --accent-fg when the accent palette changes. */
+		background-image: none;
+		position: relative;
+	}
+
+	[type='checkbox']:checked::after,
+	[type='checkbox']:indeterminate::after,
+	[type='radio']:checked::after {
+		content: '';
+		position: absolute;
+		inset: 3px;
+		background: var(--accent-fg);
+	}
+
+	[type='checkbox']:checked::after {
+		clip-path: polygon(0 45%, 20% 25%, 40% 45%, 80% 5%, 100% 25%, 40% 85%);
+	}
+
+	[type='checkbox']:indeterminate::after {
+		inset-block: 40%;
+	}
+
+	[type='range'] {
+		appearance: none;
+		min-height: 24px;
+		background: transparent;
+	}
+
+	[type='range']::-webkit-slider-runnable-track {
+		height: 4px;
+		border-radius: 0;
+		background: var(--border-strong);
+	}
+
+	[type='range']::-moz-range-track {
+		height: 4px;
+		border-radius: 0;
+		background: var(--border-strong);
+	}
+
+	[type='range']::-webkit-slider-thumb {
+		appearance: none;
+		width: 16px;
+		height: 16px;
+		margin-top: -6px;
+		border: 1px solid var(--accent);
+		border-radius: 0;
+		background: var(--accent);
+	}
+
+	[type='range']::-moz-range-thumb {
+		width: 16px;
+		height: 16px;
+		border: 1px solid var(--accent);
+		border-radius: 0;
+		background: var(--accent);
+	}
+}
+
+/* Override the forms plugin's blue focus ring, including typed inputs. */
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--accent);
+	--tw-ring-color: var(--accent);
+}
+
+@media (forced-colors: active) {
+	:focus-visible {
+		outline-color: Highlight;
+	}
+
+	input:focus,
+	select:focus,
+	textarea:focus {
+		border-color: Highlight;
+		--tw-ring-color: Highlight;
+	}
+
+	[type='checkbox'],
+	[type='radio'] {
+		appearance: auto;
+	}
+
+	[type='checkbox']::after,
+	[type='radio']::after {
+		display: none;
+	}
+}
+
 @media (forced-colors: none) {
 	::selection {
-		background-color: #23d5ab;
-		color: #0a0a0a;
+		background-color: var(--accent);
+		color: var(--accent-fg);
 	}
 
 	:root {
-		scrollbar-color: #408579 #171717;
+		scrollbar-color: var(--border-strong) var(--bg-surface-1);
 	}
 
 	/* Fallback for browsers without the standard scrollbar properties. */
-	@supports not (scrollbar-color: #408579 #171717) {
+	@supports not (scrollbar-color: auto) {
 		::-webkit-scrollbar {
 			width: 12px;
 			height: 12px;
@@ -26,13 +201,13 @@
 
 		::-webkit-scrollbar-track,
 		::-webkit-scrollbar-corner {
-			background-color: #171717;
+			background-color: var(--bg-surface-1);
 		}
 
 		::-webkit-scrollbar-thumb {
-			border: 2px solid #171717;
-			border-radius: 999px;
-			background-color: #408579;
+			border: 2px solid var(--bg-surface-1);
+			border-radius: 0;
+			background-color: var(--border-strong);
 		}
 	}
 }

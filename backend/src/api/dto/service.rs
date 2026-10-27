@@ -51,6 +51,10 @@ pub struct ServiceCalls {
     pub arrival: Vec<i64>,
     /// Predicted or retained departure, Unix seconds. Never null.
     pub departure: Vec<i64>,
+    /// Subway platform-edge IDs per visit, aligned with the other call columns.
+    /// Absent for sources without platform assignments; an empty entry means unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform_edges: Option<Vec<Vec<String>>>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -130,6 +134,9 @@ pub fn encode_route(
     let mut stops = vec![];
     let mut stop_indexes: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
     let mut calls = ServiceCalls::default();
+    if input.source == Source::MtaSubway {
+        calls.platform_edges = Some(Vec::new());
+    }
     let mut service_trips = Vec::with_capacity(input.trip_indexes.len());
     for (trip_index, &index) in input.trip_indexes.iter().enumerate() {
         let trip = &trips[index];
@@ -157,6 +164,14 @@ pub fn encode_route(
             calls.sequence.push(call.stop_sequence);
             calls.arrival.push(call.arrival.timestamp());
             calls.departure.push(call.departure.timestamp());
+            if let Some(edges) = &mut calls.platform_edges {
+                edges.push(match &call.data {
+                    crate::operations::types::trip::StopTimeData::MtaSubway(data) => {
+                        data.platform_edges.clone()
+                    }
+                    _ => vec![],
+                });
+            }
         }
     }
     let route = RouteService {

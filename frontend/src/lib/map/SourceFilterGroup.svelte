@@ -25,13 +25,13 @@
 
 {#if entries.length > 0}
 	<div
-		class="flex flex-col gap-1.5 rounded border border-neutral-800 bg-neutral-900 p-1.5 text-neutral-100"
+		class="flex flex-col gap-1.5 rounded-none border border-border-subtle bg-surface-1 p-1.5 text-primary"
 	>
 		<div class="flex min-h-10 items-center justify-between gap-2">
 			<div class="text-sm font-semibold capitalize">{sourceLabel}</div>
 			<button
 				type="button"
-				class="min-h-10 rounded px-1.5 text-xs text-blue-400 underline hover:text-blue-300"
+				class="min-h-10 rounded-none px-1.5 text-xs text-accent underline hover:text-accent"
 				onclick={() => {
 					groupOpen = !groupOpen;
 				}}

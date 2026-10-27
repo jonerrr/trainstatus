@@ -16,6 +16,7 @@ export interface Call {
 	sequence: number;
 	arrival: number;
 	departure: number;
+	platform_edges: readonly string[];
 }
 
 /** Live data older than this since its fetch or successful source commit is stale. */
@@ -66,7 +67,13 @@ export function decodeRoute(
 ): RouteData {
 	const { trips, stops, calls } = route;
 	const length = calls.trip.length;
-	for (const column of [calls.stop, calls.sequence, calls.arrival, calls.departure]) {
+	for (const column of [
+		calls.stop,
+		calls.sequence,
+		calls.arrival,
+		calls.departure,
+		...(calls.platform_edges ? [calls.platform_edges] : [])
+	]) {
 		if (column.length !== length)
 			throw new Error(`Service columns for ${route_id} differ in length`);
 	}
@@ -81,7 +88,8 @@ export function decodeRoute(
 			stop_id: stops[calls.stop[i]],
 			sequence: calls.sequence[i],
 			arrival: calls.arrival[i] * 1000,
-			departure: calls.departure[i] * 1000
+			departure: calls.departure[i] * 1000,
+			platform_edges: calls.platform_edges?.[i] ?? []
 		};
 		calls_by_trip.get(call.trip_id)!.push(call);
 		let at_stop = calls_by_stop.get(call.stop_id);

@@ -67,7 +67,7 @@
 	<!-- TODO: better colors -->
 	<div
 		class={[
-			'flex items-center gap-1 self-start text-neutral-200',
+			'flex items-center gap-1 self-start text-secondary',
 			{
 				'pt-1': occupancy.kind === 'meter',
 				'text-yellow-400': occupancy.tone === 'busy',

@@ -4,8 +4,9 @@ import { SvelteURL } from 'svelte/reactivity';
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { page as browserPage } from 'vitest/browser';
 
-import { chartFixture } from '../lib/charts/fixtures';
+import { chartFixture, chartNow } from '../lib/charts/fixtures';
 import { page } from '../lib/test/page.svelte';
 import { fixtureFetcher } from '../lib/test/transit-fixture';
 import Layout from './+layout.svelte';
@@ -65,6 +66,143 @@ test('a direct trip URL opens at once and recovers through the shared Retry', as
 	await expect.element(view.getByRole('dialog')).toBeVisible();
 	await view.unmount();
 });
+
+for (const [width, height] of [
+	[320, 480],
+	[390, 600],
+	[390, 844],
+	[1000, 700]
+]) {
+	test(`dense trip sections preserve the warning and three visible stops at ${width}×${height}`, async () => {
+		await browserPage.viewport(width, height);
+		vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+		const fixture = chartFixture('mta_subway', 0);
+		const trip = fixture.trips[0];
+		fixture.stops[0].name = 'Atlantic Av–Barclays Ctr';
+		fixture.stops[1].name = 'Lexington Av/59 St–Lexington Avenue';
+		fixture.stops[2].name = 'Jamaica Center–Parsons/Archer';
+
+		const stop = fixture.stops[0];
+		if (trip.data.source !== 'mta_subway' || stop.data.source !== 'mta_subway')
+			throw new Error('Expected subway');
+		trip.data.consist = { car_count: 10, car_length_feet: 51 };
+		stop.data.platform_edges = [
+			{
+				id: 'platform',
+				length_ft: 600,
+				car_markers: [
+					{
+						marked_as: '10',
+						is_opto: false,
+						consist_length_ft: 510,
+						position_ft: 0,
+						direction: 'NORTH'
+					}
+				],
+				egress_points: Array.from({ length: 24 }, (_, id) => ({
+					id,
+					position_ft: 100,
+					egress_type: 'STAIRCASE',
+					vertical_direction: 'UP',
+					street_exits: [
+						{ id, intersection: [`Exit ${id}`, 'Long platform passage'], accessible: false }
+					]
+				}))
+			}
+		];
+		fixture.service.routes['4'].calls.platform_edges = fixture.service.routes['4'].calls.stop.map(
+			() => ['platform']
+		);
+		for (let i = 0; i < 6; i++) {
+			const id = `X${i}`;
+			fixture.catalog.routes.push({ ...fixture.route, id, short_name: id });
+			stop.routes.push({ ...stop.routes[0], route_id: id });
+			fixture.service.routes[id] = {
+				trips: [
+					{ ...trip, id: `${id}-early` },
+					{ ...trip, id: `${id}-later` }
+				],
+				stops: [stop.id],
+				calls: {
+					trip: [0, 1],
+					stop: [0, 0],
+					sequence: [0, 0],
+					arrival: [chartNow / 1000 + 600, chartNow / 1000 + 1200],
+					departure: [chartNow / 1000 + 600, chartNow / 1000 + 1200]
+				}
+			};
+		}
+		const respond = fixtureFetcher({
+			catalogs: { mta_subway: fixture.catalog },
+			services: { mta_subway: fixture.service }
+		});
+		vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) =>
+			String(input).includes('/alerts/')
+				? Promise.reject(new TypeError('Connection failed'))
+				: respond(input, init)) as typeof fetch);
+		page.data.selected_sources = ['mta_subway'];
+		page.url = new SvelteURL('http://localhost/?t=trip-0&r=4&src=mta_subway');
+		const view = await render(Layout, {
+			children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
+		});
+		try {
+			await expect
+				.element(view.getByRole('region', { name: 'Platform exits at arrival', exact: true }))
+				.toBeVisible();
+			const retry = view.getByRole('dialog').getByRole('button', { name: /Retry updates/ });
+			await expect.element(retry).toBeInTheDocument();
+			await expect
+				.poll(() => {
+					const control = retry.element().getBoundingClientRect();
+					const wrapper = retry.element().parentElement!.getBoundingClientRect();
+					const dialog = view.getByRole('dialog').element().getBoundingClientRect();
+					return (
+						control.height >= 36 &&
+						wrapper.height >= control.height &&
+						control.top >= dialog.top &&
+						control.bottom <= wrapper.bottom + 0.5
+					);
+				})
+				.toBe(true);
+			await view.getByText('Show more', { exact: true }).click();
+			await view.getByText('Later departures', { exact: true }).click();
+			await expect
+				.element(view.getByRole('button', { name: /^X5 to/ }).first())
+				.toBeInTheDocument();
+
+			await expect
+				.poll(() => {
+					const dialog = view.getByRole('dialog').element();
+					dialog.scrollTop = 0;
+					const bounds = dialog.getBoundingClientRect();
+					return fixture.stops.slice(0, 3).every(({ name }) => {
+						const button = view
+							.getByRole('button', { name: `Open ${name} stop modal`, exact: true })
+							.element();
+						const row = button.getBoundingClientRect();
+						const list = button.parentElement!.parentElement!.getBoundingClientRect();
+						return (
+							row.top >= Math.max(bounds.top, list.top) &&
+							row.bottom <= Math.min(bounds.bottom, list.bottom) + 0.5
+						);
+					});
+				})
+				.toBe(true);
+			const platforms = view
+				.getByRole('region', { name: 'Train and platform exits; scroll for more' })
+				.element();
+			expect(platforms.scrollHeight).toBeGreaterThan(platforms.clientHeight);
+			const transfers = view.getByRole('region', { name: 'Transfers after arrival' }).element();
+			expect(transfers.scrollHeight).toBeGreaterThan(transfers.clientHeight);
+			platforms.scrollTop = platforms.scrollHeight;
+			transfers.scrollTop = transfers.scrollHeight;
+			expect(platforms.scrollTop).toBeGreaterThan(0);
+			expect(transfers.scrollTop).toBeGreaterThan(0);
+		} finally {
+			await view.unmount();
+		}
+	});
+}
 
 test('a catalog revalidated by the service worker updates the open app', async () => {
 	fail = false;

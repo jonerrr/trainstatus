@@ -40,7 +40,7 @@
 </script>
 
 {#if error}
-	<span class="text-neutral-400">—</span>
+	<span class="text-muted">—</span>
 {:else if !catalog || !route_data}
 	<Skeleton lines={2} class="w-full" />
 {:else}

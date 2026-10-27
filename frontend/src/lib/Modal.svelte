@@ -221,7 +221,7 @@
 	source: Source,
 	pins: LocalStorage<Pins>
 )}
-	<div class="flex h-16 items-center justify-between gap-1 px-1">
+	<div class="flex h-16 shrink-0 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
 				close_modal(current_time.value);
@@ -235,7 +235,7 @@
 		<div class="flex items-center gap-1 text-xs">
 			{#if history}
 				<button
-					class={{ 'text-neutral-400': !show_previous, 'text-neutral-50': show_previous }}
+					class={{ 'text-muted': !show_previous, 'text-primary': show_previous }}
 					aria-label="Show previous"
 					onclick={() => {
 						show_previous = !show_previous;
@@ -315,7 +315,7 @@
 					<Share size="2rem" />
 				</button>
 			{:else}
-				<button class="flex appearance-none text-green-600" aria-label="Link copied to clipboard">
+				<button class="flex appearance-none text-accent" aria-label="Link copied to clipboard">
 					<ClipboardCheck size="2rem" />
 				</button>
 			{/if}
@@ -325,7 +325,7 @@
 	</div>
 {/snippet}
 <!-- fixed bottom-0 left-0 right-0 -->
-<div class="modal-backdrop fixed inset-0 z-100 bg-black/50" data-open={has_modal}>
+<div class="modal-backdrop fixed inset-0 z-100 bg-backdrop" data-open={has_modal}>
 	<div
 		role="dialog"
 		aria-modal="true"
@@ -333,7 +333,7 @@
 		tabindex="-1"
 		{@attach has_modal && contain_modal_focus}
 		{@attach modal}
-		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-t-sm bg-neutral-900 text-white focus:ring-2 focus:ring-neutral-700 focus:outline-hidden"
+		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-none bg-surface-1 text-white focus:ring-2 focus:ring-border-default focus:outline-hidden"
 	>
 		{#if has_modal}<UpdateIndicator compact />{/if}
 		{#if selected_modal?.type === 'stop'}

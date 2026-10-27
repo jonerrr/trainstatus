@@ -73,6 +73,23 @@ function store(fetcher: typeof fetch, sources: Source[] = ['mta_bus'], history_l
 	return data;
 }
 
+test('each app mount loads catalogs', async () => {
+	const catalog = chartFixture('mta_bus').catalog;
+	const fetcher: typeof fetch = async (input) => {
+		if (String(input).includes('/catalog/')) {
+			return new Response(JSON.stringify(catalog));
+		}
+		return new Response('[]');
+	};
+	const first = store(fetcher);
+	await settle();
+	expect(first.peekCatalog('mta_bus')?.stops).toEqual(catalog.stops);
+	first.destroy();
+	const second = store(fetcher);
+	await settle();
+	expect(second.peekCatalog('mta_bus')?.stops).toEqual(catalog.stops);
+});
+
 test('successful map polls retain source age in the shared warning until a new commit', async () => {
 	const http = transport();
 	const data = store(http.fetcher);
