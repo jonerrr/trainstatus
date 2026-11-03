@@ -55,7 +55,13 @@ export function watchTrajectories(
 			fatal: false,
 			fetched_at: null as number | null,
 			source_updated_at: null as number | null,
-			retry: () => void load()
+			retry: () => {
+				if (update.fatal) {
+					update.error = null;
+					update.fatal = false;
+				}
+				void load();
+			}
 		};
 
 		async function request() {

@@ -37,7 +37,9 @@
 {#snippet nav_button(label: string)}
 	{const [Icon, href] = $derived(routes[label])}
 	<!-- use state.eager to ensure visual feedback is instant -->
-	{const is_active = $derived(resolve(href) === $state.eager(page.url.pathname))}
+	{const is_active = $derived(
+		new URL(resolve(href), page.url.href).pathname === $state.eager(page.url.pathname)
+	)}
 	<a
 		aria-label={label}
 		aria-current={is_active ? 'page' : undefined}

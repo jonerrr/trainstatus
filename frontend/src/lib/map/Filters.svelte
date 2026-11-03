@@ -54,7 +54,7 @@
 
 <div class="pointer-events-none absolute top-1.5 left-1.5 z-30 max-w-[calc(100%-4.25rem)]">
 	<div
-		class="pointer-events-auto flex max-w-full items-center gap-1 rounded-none border border-border-default/70 bg-canvas/88 p-1 text-white shadow-lg backdrop-blur-md"
+		class="pointer-events-auto flex max-w-full items-center gap-1 rounded-none border border-border-default/70 bg-canvas/88 p-1 text-primary shadow-lg backdrop-blur-md"
 	>
 		<button
 			bind:this={trigger}

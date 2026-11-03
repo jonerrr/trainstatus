@@ -47,15 +47,17 @@
 	const ordered = $derived(transfers.state === 'ready' ? transfers.value : []);
 	const later = $derived(ordered.flatMap((o) => (o.next ? [o.next] : [])).sort(compareTransfers));
 	const has_details = $derived(expanded || ordered.length > 3 || ordered.some((o) => o.next));
-	const selected = $derived(
-		ordered.flatMap((o) => (o.next ? [o, o.next] : [o])).find((o) => key(o) === selected_key)
-	);
+	const selection = $derived.by(() => {
+		if (!trip) return undefined;
+		const departure = ordered
+			.flatMap((o) => (o.next ? [o, o.next] : [o]))
+			.find((o) => key(o) === selected_key);
+		const exits = departure && arrivalTransferExits(stop, trip, platform_edges, departure);
+		return departure && exits ? { departure, exits } : undefined;
+	});
+	const selected = $derived(selection?.departure);
 	const guidance = $derived(
-		trip
-			? selected
-				? arrivalTransferExits(stop, trip, platform_edges, selected)
-				: arrivalExits(stop, trip, platform_edges)
-			: null
+		trip ? (selection?.exits ?? arrivalExits(stop, trip, platform_edges)) : null
 	);
 	function key(departure: DepartureOption) {
 		return JSON.stringify([departure.key, departure.call.trip_id, departure.call.sequence]);
@@ -102,7 +104,7 @@
 	{const exit_cars = $derived(
 		transfer_exits ? [...new Set(transfer_exits.exits.map((exit) => exit.car))] : []
 	)}
-	{const active = $derived(key(departure) === selected_key)}
+	{const active = $derived(selected !== undefined && key(departure) === key(selected))}
 	<div class={['transfer-row relative pl-[22px]', { 'active bg-accent-bg': active }]}>
 		{#if can_preview}<button
 				type="button"

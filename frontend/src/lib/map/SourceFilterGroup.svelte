@@ -31,7 +31,7 @@
 			<div class="text-sm font-semibold capitalize">{sourceLabel}</div>
 			<button
 				type="button"
-				class="min-h-10 rounded-none px-1.5 text-xs text-accent underline hover:text-accent"
+				class="min-h-10 rounded-none px-1.5 text-xs text-accent underline hover:text-accent-hover"
 				onclick={() => {
 					groupOpen = !groupOpen;
 				}}

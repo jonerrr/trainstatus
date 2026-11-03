@@ -423,9 +423,15 @@ test('transfer car nodes preview matching access points while rows navigate, and
 		f.service.routes.X.calls.platform_edges = [['missing-edge']];
 		data.retry();
 		await expect.element(preview).not.toBeInTheDocument();
+		await expect.poll(() => view.container.querySelectorAll('.transfer-row.active').length).toBe(0);
 		await expect
-			.poll(() => view.container.querySelectorAll('[data-highlighted="true"]').length)
-			.toBe(0);
+			.element(
+				view.getByRole('listitem', {
+					name: 'Stuyvesant Av, around car 4 from the front',
+					exact: true
+				})
+			)
+			.toBeVisible();
 		await view.unmount();
 	} finally {
 		data.destroy();

@@ -78,7 +78,7 @@ test('a failed historical Arrow update retries until network recovery', async ()
 	stop();
 });
 
-test('invalid Arrow reports an fatal error and a valid refresh clears it', async () => {
+test('Retry clears fatal Arrow errors synchronously and subsequent failures restore them', async () => {
 	const { trajectoryFixture } = await import('./trajectoryFixture');
 	let malformed = true;
 	let tracked: TrackedUpdate | undefined;
@@ -95,7 +95,16 @@ test('invalid Arrow reports an fatal error and a valid refresh clears it', async
 		await stop.refresh();
 		expect(tracked?.error).toBeInstanceOf(Error);
 		expect(tracked?.fatal).toBe(true);
+		tracked!.retry();
+		expect(tracked?.error).toBeNull();
+		expect(tracked?.fatal).toBe(false);
+		await stop.refresh();
+		expect(tracked?.error).toBeInstanceOf(Error);
+		expect(tracked?.fatal).toBe(true);
 		malformed = false;
+		tracked!.retry();
+		expect(tracked?.error).toBeNull();
+		expect(tracked?.fatal).toBe(false);
 		await stop.refresh();
 		expect(tracked?.error).toBeNull();
 		expect(tracked?.fatal).toBe(false);
