@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.1.0...frontend-v2.2.0) (2026-11-03)
+
+
+### Features
+
+* platform edge ui ([#478](https://github.com/jonerrr/trainstatus/issues/478)) ([2ea8609](https://github.com/jonerrr/trainstatus/commit/2ea860912fdafb00bf996df4e6311a1b3dcae49f))
+
+
+### Bug Fixes
+
+* **deps:** update frontend and svelte patch ([903c4d3](https://github.com/jonerrr/trainstatus/commit/903c4d3bf0875ba6fe3ae3f115d32fadc6150d59))
+
 ## [2.1.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.0.0...frontend-v2.1.0) (2026-10-18)
 
 

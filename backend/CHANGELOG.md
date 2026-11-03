@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/jonerrr/trainstatus/compare/backend-v2.1.0...backend-v2.2.0) (2026-11-03)
+
+
+### Features
+
+* platform edge ui ([#478](https://github.com/jonerrr/trainstatus/issues/478)) ([2ea8609](https://github.com/jonerrr/trainstatus/commit/2ea860912fdafb00bf996df4e6311a1b3dcae49f))
+
+
+### Bug Fixes
+
+* **deps:** update backend ([#474](https://github.com/jonerrr/trainstatus/issues/474)) ([b242b01](https://github.com/jonerrr/trainstatus/commit/b242b019187263bc980c0440e1ae80f0703f843d))
+* **deps:** update backend ([#483](https://github.com/jonerrr/trainstatus/issues/483)) ([0b93f28](https://github.com/jonerrr/trainstatus/commit/0b93f28e67aebf016097957ec9fdbca0bc7c0119))
+
 ## [2.1.0](https://github.com/jonerrr/trainstatus/compare/backend-v2.0.0...backend-v2.1.0) (2026-10-18)
 
 
