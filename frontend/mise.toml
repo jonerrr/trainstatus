@@ -10,11 +10,6 @@ sources = [
 ]
 outputs = ["node_modules/.pnpm/lock.yaml"]
 
-[tasks.check]
-description = "Check Svelte, TypeScript and service worker types"
-depends = ["pnpm-install"]
-run = "pnpm check"
-
 [tasks.dev]
 run = "pnpm dev"
 depends = ["pnpm-install"]

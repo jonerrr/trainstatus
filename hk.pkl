@@ -19,14 +19,14 @@ steps {
     fix = "mise lock && git diff --exit-code -- mise.lock .mise/locks"
     exclusive = true
   }
-  ["prettier-dependencies"] {
-    glob = Builtins.prettier.glob
-    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml", "backend/tests/fixtures/**")
+  ["frontend-dependencies"] {
+    glob = Builtins.prettier.glob + List("frontend/patches/*.patch", "frontend/mise.toml")
+    exclude = List("backend/tests/fixtures/**")
     check = "mise run //frontend:pnpm-install"
   }
-  ["shared-prettier"] = (Builtins.prettier) {
-    exclude = List("frontend/**", "**/CHANGELOG.md", "**/pnpm-lock.yaml", "backend/tests/fixtures/**")
-    depends = "prettier-dependencies"
+  ["prettier"] = (Builtins.prettier) {
+    exclude = List("**/pnpm-lock.yaml", "backend/tests/fixtures/**")
+    depends = "frontend-dependencies"
   }
 }
 

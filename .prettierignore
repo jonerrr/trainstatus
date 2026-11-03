@@ -5,3 +5,13 @@
 **/src/lib/client/
 **/CHANGELOG.md
 backend/tests/fixtures/
+frontend/**/package-lock.json
+frontend/**/yarn.lock
+frontend/**/bun.lock
+frontend/**/bun.lockb
+frontend/**/build/
+frontend/**/.svelte-kit/
+frontend/**/static/
+frontend/**/test-results/
+frontend/**/playwright-report/
+frontend/**/renovate.json
