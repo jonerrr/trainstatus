@@ -90,6 +90,17 @@ export interface RouteKey {
 	at?: number;
 }
 
+export interface TripKey extends RouteKey {
+	trip_id: string;
+}
+
+interface TripSelection {
+	requested: TripKey;
+	entry: ServiceEntry;
+	revision: number;
+	confirm: boolean;
+}
+
 export type CatalogRead = { source: Source } & Read<CatalogData>;
 export type RouteRead = RouteKey & Read<RouteData>;
 
@@ -303,57 +314,92 @@ export class TransitData {
 		});
 	}
 
-	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<Read<TripRead>> {
+	trip(key: () => TripKey | null): Resource<Read<TripRead>> {
+		const trips = this.trips(() => {
+			const requested = key();
+			return requested ? [requested] : [];
+		});
+		return {
+			get current() {
+				return trips.current[0] ?? { state: 'idle' };
+			}
+		};
+	}
+
+	trips(keys: () => readonly TripKey[]): Resource<(TripKey & Read<TripRead>)[]> {
+		let acquired = new Map<string, TripSelection>();
 		const selected = $derived.by(() => {
 			void this.#generation;
-			const requested = key();
-			if (!requested) return null;
-			const entry = this.#service(
-				requested.source,
-				this.#key_route(requested.source, requested.route_id),
-				requested.at
-			);
-			// Capture publication identity once per acquisition, never on snapshot updates.
+			const requested = keys();
 			return untrack(() => {
-				const cached = entry.data?.get(requested.route_id);
-				return {
-					requested,
-					entry,
-					revision: entry.revision,
-					confirm:
-						requested.at === undefined &&
-						entry.snapshot.state !== 'loading' &&
-						!cached?.trips.has(requested.trip_id)
-				};
+				const next = new Map<string, TripSelection>();
+				const selections = requested.map((requested) => {
+					const key = JSON.stringify([
+						requested.source,
+						requested.route_id,
+						requested.trip_id,
+						requested.at
+					]);
+					const entry = this.#service(
+						requested.source,
+						this.#key_route(requested.source, requested.route_id),
+						requested.at
+					);
+					const previous = acquired.get(key);
+					// Preserve confirmation identity when sibling keys are added or removed.
+					const selection =
+						previous?.entry === entry
+							? previous
+							: {
+									requested,
+									entry,
+									revision: entry.revision,
+									confirm:
+										requested.at === undefined &&
+										entry.snapshot.state !== 'loading' &&
+										!entry.data?.get(requested.route_id)?.trips.has(requested.trip_id)
+								};
+					next.set(key, selection);
+					return selection;
+				});
+				acquired = next;
+				return selections;
 			});
 		});
-		const resource = this.#bind<Read<TripRead>>(() => {
-			const selection = selected;
+		const resource = this.#bind(() => {
+			const selections = selected;
 			return {
-				entries: selection ? [selection.entry] : [],
-				read: () => {
-					if (!selection) return { state: 'idle' };
-					const { requested, entry, revision, confirm } = selection;
-					const current = this.#routeSnapshot(entry, requested.route_id);
-					const route = current.state === 'ready' ? current.value : undefined;
-					const trip = route?.trips.get(requested.trip_id);
-					if (route && trip)
-						return {
-							state: 'ready',
-							value: { trip, calls: route.calls_by_trip.get(trip.id) ?? [], route }
-						};
-					if (current.state === 'failed' || current.state === 'loading') return current;
-					if (confirm && entry.revision === revision)
-						return entry.error ? { state: 'failed', error: entry.error } : { state: 'loading' };
-					return { state: 'missing' };
-				}
+				entries: [...new Set(selections.map(({ entry }) => entry))],
+				read: () =>
+					selections.map((selection) => ({
+						...selection.requested,
+						...this.#tripSnapshot(selection)
+					}))
 			};
 		});
 		$effect(() => {
-			const selection = selected;
-			if (selection?.confirm) untrack(() => this.#start(selection.entry));
+			const selections = selected;
+			untrack(() => {
+				for (const { entry, revision, confirm } of selections)
+					if (confirm && entry.revision === revision) this.#start(entry);
+			});
 		});
 		return resource;
+	}
+
+	#tripSnapshot({ requested, entry, revision, confirm }: TripSelection): Read<TripRead> {
+		const current = this.#routeSnapshot(entry, requested.route_id);
+		const route = current.state === 'ready' ? current.value : undefined;
+		const trip = route?.trips.get(requested.trip_id);
+		if (route && trip)
+			return {
+				state: 'ready',
+				value: { trip, calls: route.calls_by_trip.get(trip.id) ?? [], route }
+			};
+		if (current.state === 'failed' || current.state === 'loading') return current;
+		if (confirm && entry.revision === revision)
+			return entry.error ? { state: 'failed', error: entry.error } : { state: 'loading' };
+		return { state: 'missing' };
 	}
 
 	stopArrivals(

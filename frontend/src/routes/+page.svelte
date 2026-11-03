@@ -37,26 +37,17 @@
 			})
 		)
 	);
-	// Check every pinned route, including trips outside the virtualized list or selected tab.
-	const pinned_service = transit.routes(() =>
-		current_time.value === undefined
-			? Object.values(pinned_trips.sources)
-					.flat()
-					.map(({ source, route_id }) => ({ source, route_id }))
-			: []
+	const pinned_service = transit.trips(() =>
+		current_time.value === undefined ? Object.values(pinned_trips.sources).flat() : []
 	);
 	$effect(() => {
 		const pins = trip_pins.current;
 		let next = pins;
 		for (const read of pinned_service.current) {
-			if (read.state !== 'ready' && read.state !== 'missing') continue;
+			if (read.state !== 'missing') continue;
 			const kept = next[read.source].filter((key) => {
 				const pin = parse_trip_pin(key);
-				return (
-					!pin ||
-					pin.route_id !== read.route_id ||
-					(read.state === 'ready' && read.value.trips.has(pin.trip_id))
-				);
+				return pin?.route_id !== read.route_id || pin.trip_id !== read.trip_id;
 			});
 			if (kept.length !== next[read.source].length) next = { ...next, [read.source]: kept };
 		}

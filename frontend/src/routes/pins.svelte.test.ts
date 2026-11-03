@@ -131,3 +131,69 @@ test('historical service never removes trip pins; returning to live checks them'
 		await view.unmount();
 	}
 });
+
+test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
+	'%s confirms a cross-tab pin against fresh service, retaining it through a failed refresh',
+	async (source) => {
+		const fixture = chartFixture(source);
+		page.data.selected_sources = [source];
+		const respond = fixtureFetcher({
+			catalogs: { [source]: fixture.catalog },
+			services: { [source]: fixture.service }
+		});
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		let service_requests = 0;
+		let fail = true;
+		const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+			if (String(input).includes('/service/') && ++service_requests > 1) {
+				await gate;
+				if (fail) return new Response(null, { status: 503 });
+			}
+			return respond(input, init);
+		});
+		vi.stubGlobal('fetch', fetcher);
+		const view = await render(HomeLayoutHarness);
+		try {
+			await expect.element(view.getByRole('button', { name: /^4 / }).first()).toBeVisible();
+			const key = trip_pin_key('4', 'new-trip');
+			const saved = { ...trip_pins.current, [source]: [...trip_pins.current[source], key] };
+			localStorage.setItem('tripRoutePins', JSON.stringify(saved));
+			window.dispatchEvent(
+				new StorageEvent('storage', {
+					key: 'tripRoutePins',
+					storageArea: localStorage
+				})
+			);
+			await expect.poll(() => service_requests).toBe(2);
+			expect(trip_pins.current).toEqual(saved);
+			release();
+			const retry = view.getByRole('button', { name: /Retry updates/ });
+			await expect.element(retry).toBeVisible();
+			expect(trip_pins.current).toEqual(saved);
+			expect(JSON.parse(localStorage.getItem('tripRoutePins')!)).toEqual(saved);
+
+			fixture.service.routes['4'].trips.push({
+				...fixture.service.routes['4'].trips[0],
+				id: 'new-trip'
+			});
+			fail = false;
+			await retry.click();
+			await expect.poll(() => service_requests).toBe(3);
+			await expect.element(retry).not.toBeInTheDocument();
+			expect(trip_pins.current).toEqual(saved);
+
+			fixture.service.routes['4'].trips.pop();
+			vi.mocked(Date.now).mockReturnValue(chartNow + 31_000);
+			document.dispatchEvent(new Event('visibilitychange'));
+			const expected = { ...saved, [source]: saved[source].filter((pin) => pin !== key) };
+			await expect.poll(() => trip_pins.current).toEqual(expected);
+			expect(JSON.parse(localStorage.getItem('tripRoutePins')!)).toEqual(expected);
+		} finally {
+			release();
+			await view.unmount();
+		}
+	}
+);
