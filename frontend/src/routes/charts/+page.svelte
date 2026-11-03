@@ -23,7 +23,7 @@
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current);
+	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
 
 	type RouteKey = { source: Source; id: string };
 	let selected = $state<RouteKey[]>(
@@ -41,7 +41,7 @@
 	// Selected routes present in their source catalogs (for Lines, export filename, etc.)
 	const selected_routes_flat = $derived(
 		selected.flatMap(({ source, id }) => {
-			const route = catalogs.find((c) => c.source === source)?.catalog?.routes_by_id.get(id);
+			const route = catalogs.find((c) => c.source === source)?.value?.routes_by_id.get(id);
 			return route ? [route] : [];
 		})
 	);
@@ -55,7 +55,8 @@
 	);
 	const reads = $derived(route_resources.current);
 	const trips_loading = $derived(
-		catalogs.some((c) => !c.catalog && !c.error) || reads.some((r) => !r.route && !r.error)
+		catalog_resources.current.some((c) => c.state === 'loading') ||
+			reads.some((r) => r.state === 'loading')
 	);
 
 	let stop_points = $state<boolean>(false);
@@ -66,8 +67,10 @@
 
 	const data = $derived.by(() => {
 		const inputs: ChartInput[] = [];
-		for (const { source, route_id: id, route } of reads) {
-			const stops = catalogs.find((c) => c.source === source)?.catalog?.stops_by_id;
+		for (const read of reads) {
+			if (read.state !== 'ready') continue;
+			const { source, route_id: id, value: route } = read;
+			const stops = catalogs.find((c) => c.source === source)?.value?.stops_by_id;
 			if (!route || !stops) continue;
 			for (const trip of route.trips.values()) {
 				if (trip.direction !== direction_of(source)) continue;
@@ -154,7 +157,7 @@
 	// Sorted flat list of all routes from all sources (subway first, then bus)
 	const sortedRoutes = $derived(
 		catalogs
-			.flatMap((c) => c.catalog?.routes ?? [])
+			.flatMap((c) => c.value.routes)
 			.sort((a, b) => {
 				// Subway routes come first
 				if (a.data.source === 'mta_subway' && b.data.source !== 'mta_subway') return -1;
@@ -538,11 +541,7 @@
 
 	<!-- Chart container with proper overflow handling -->
 	<div class="relative flex-1 overflow-hidden">
-		{#if trips_loading}
-			<div class="flex h-full items-center justify-center">
-				<Skeleton lines={8} class="w-3/4" />
-			</div>
-		{:else if data.route_trips.length && data.yDomain.length}
+		{#if data.route_trips.length && data.yDomain.length}
 			<div class="absolute inset-0 overflow-auto">
 				<div bind:this={svgContainer} class="h-full min-h-125 w-full min-w-325">
 					<LayerCake
@@ -566,9 +565,11 @@
 					</LayerCake>
 				</div>
 			</div>
-		{:else if catalogs.some((c) => c.error) || reads.some((r) => r.error)}
-			<div class="flex h-full items-center justify-center text-muted">Couldn't load chart data</div>
-		{:else}
+		{:else if trips_loading}
+			<div class="flex h-full items-center justify-center">
+				<Skeleton lines={8} class="w-3/4" />
+			</div>
+		{:else if !reads.some((r) => r.state === 'failed') && !catalog_resources.current.some((r) => r.state === 'failed')}
 			<div class="flex h-full items-center justify-center text-muted">No data available</div>
 		{/if}
 	</div>

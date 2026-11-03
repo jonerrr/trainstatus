@@ -2,7 +2,7 @@
 	import type { CatalogStop } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { stop_arrivals } from '#lib/transit/arrivals.js';
+	import { stop_arrivals, type StopArrival } from '#lib/transit/arrivals.js';
 	import { upcomingCalls } from '#lib/transit/decode.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
@@ -26,7 +26,7 @@
 	}));
 	const arrivals = $derived(arrivals_resource.current);
 	const predictions = $derived.by(() => {
-		const read = arrivals.value;
+		const read = arrivals.state === 'ready' ? arrivals.value : undefined;
 		const now = current_time.ms;
 		return stop_arrivals(upcomingCalls(read?.calls ?? [], now), read?.routes ?? [], now);
 	});
@@ -55,8 +55,8 @@
 	);
 </script>
 
-{#snippet etas(times: import('#lib/transit/arrivals.js').StopArrival[], route_id: string)}
-	{#if !arrivals.error && (arrivals.loading || arrivals.value?.pending.includes(route_id))}
+{#snippet etas(times: StopArrival[], route_id: string)}
+	{#if arrivals.state === 'loading' || (arrivals.state === 'ready' && arrivals.value.pending.includes(route_id))}
 		<span
 			class="inline-block w-8 animate-pulse rounded-none bg-surface-2 px-1.5 py-0.5 text-sm leading-5"
 			>&nbsp;</span
@@ -152,7 +152,9 @@
 								{trip_headsign(
 									next.trip,
 									route,
-									arrivals.value?.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id),
+									arrivals.state === 'ready'
+										? arrivals.value.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id)
+										: undefined,
 									catalog?.stops_by_id
 								)}
 							{:else if route_stop.data.source === 'mta_bus'}

@@ -23,6 +23,7 @@ function fixtureData(
 	customize(f);
 	page.data.selected_sources = ['mta_bus'];
 	const requests: string[] = [];
+	const service_state = { fail: false };
 	const respond = fixtureFetcher({
 		catalogs: { mta_bus: f.catalog },
 		services: { mta_bus: f.service }
@@ -32,7 +33,10 @@ function fixtureData(
 		batch_ms: 0,
 		fetcher: async (input, init) => {
 			requests.push(String(input));
-			if (String(input).includes('/service/')) await service_gate;
+			if (String(input).includes('/service/')) {
+				await service_gate;
+				if (service_state.fail) throw new Error('Predictions unavailable');
+			}
 			return respond(input, init);
 		}
 	});
@@ -47,7 +51,7 @@ function fixtureData(
 					)
 			)
 		].sort();
-	return { ...f, data, requestedRoutes };
+	return { ...f, data, requestedRoutes, service_state };
 }
 
 test('orders by actual boarding stop then arrival through expansion and collapse', async () => {
@@ -200,6 +204,34 @@ test('does not flash route rows while bus predictions load and resolve empty', a
 		expect(view.container.querySelector('button[aria-label*=" to "]')).toBeNull();
 	} finally {
 		release();
+		await view.unmount();
+		f.data.destroy();
+		vi.restoreAllMocks();
+	}
+});
+
+test('hides failed transfers with known options and restores departures on Retry', async () => {
+	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+	const f = fixtureData();
+	f.service_state.fail = true;
+	const view = await render(TransitProvider<ComponentProps<typeof Transfers>>, {
+		data: f.data,
+		component: Transfers,
+		child_props: { stop: f.origin, incoming: f.incoming, time_format: 'countdown' }
+	});
+	try {
+		await expect.poll(() => f.data.status.warning).toBe(true);
+		await expect
+			.element(view.getByRole('region', { name: 'Transfers after arrival' }))
+			.not.toBeInTheDocument();
+		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
+		f.service_state.fail = false;
+		f.data.retry();
+		await expect.element(view.getByRole('button', { name: /^A to/ }).first()).toBeVisible();
+		await expect
+			.element(view.getByRole('region', { name: 'Transfers after arrival' }))
+			.toBeVisible();
+	} finally {
 		await view.unmount();
 		f.data.destroy();
 		vi.restoreAllMocks();

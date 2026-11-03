@@ -14,12 +14,15 @@
 </script>
 
 <svelte:boundary>
-	{const state = $derived(resource.current)}
-	{#if state.loading}
+	{const read = $derived(resource.current)}
+	{#if read.state === 'loading'}
 		<p data-pending={route_id}>loading</p>
-	{:else if state.error}
-		<p data-failed={route_id}>{state.error.message}</p>
-	{:else if state.value}
-		<p data-route={route_id}>{[...state.value.trips.keys()].join(',')}</p>
+	{:else if read.state === 'ready'}
+		<p data-route={route_id}>{[...read.value.trips.keys()].join(',')}</p>
+	{:else if read.state === 'missing'}
+		<p data-missing={route_id}>Not found</p>
+	{/if}
+	{#if read.state === 'failed'}
+		<p data-failed={route_id}>{read.error.message}</p>
 	{/if}
 </svelte:boundary>

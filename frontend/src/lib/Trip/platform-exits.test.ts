@@ -208,9 +208,7 @@ function transferFixture(direction: 1 | 3 = 1) {
 			arrival: 1,
 			departure: 2,
 			platform_edges: ['connecting-platform']
-		},
-		loading: false,
-		error: null
+		}
 	};
 	return { ...f, departure };
 }

@@ -51,21 +51,132 @@ test('a direct trip URL opens at once and recovers through the shared Retry', as
 			route_id: '4',
 			id: 'trip-0'
 		});
-	const retry = view.getByRole('button', { name: /Retry updates/ });
-	await expect.element(retry).toBeVisible();
-	await expect
-		.element(view.getByRole('dialog').getByRole('button', { name: /Retry updates/ }))
-		.toBeVisible();
+	const retry = view.getByRole('button', { name: 'Try again' });
+	await expect.element(view.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
 	fail = false;
-	await view
-		.getByRole('dialog')
-		.getByRole('button', { name: /Retry updates/ })
-		.click();
+	await retry.click();
 	await expect.element(retry).not.toBeInTheDocument();
-	await expect.element(view.getByText(/Arrivals unavailable/)).not.toBeInTheDocument();
 	await expect.element(view.getByRole('dialog')).toBeVisible();
+	expect(page.state.modal?.id).toBe('trip-0');
 	await view.unmount();
 });
+
+test('a failed trip refresh retains the itinerary and recovers through the single shared Retry', async () => {
+	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+	fail = false;
+	const fixture = chartFixture('njt_bus', 0);
+	const view = await coldLoad();
+	const preview = view.getByRole('button', {
+		name: `Preview ${fixture.stops[0].name}`,
+		exact: true
+	});
+	try {
+		await expect.element(preview).toBeVisible();
+		fail = true;
+		window.dispatchEvent(new Event('online'));
+		const retry = view.getByRole('button', { name: /Retry updates/ });
+		await expect.element(retry).toBeVisible();
+		await expect.element(preview).toBeVisible();
+		expect(page.state.modal?.id).toBe('trip-0');
+		await expect.element(view.getByText('Trip data unavailable')).not.toBeInTheDocument();
+		fail = false;
+		await retry.click();
+		await expect.element(retry).not.toBeInTheDocument();
+		await expect.element(preview).toBeVisible();
+	} finally {
+		await view.unmount();
+	}
+});
+
+for (const kind of ['service', 'alerts'] as const) {
+	test(`malformed ${kind} JSON retains the trip and recovers through the shared Retry`, async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+		const fixture = chartFixture('njt_bus', 0);
+		const respond = fixtureFetcher({
+			catalogs: { njt_bus: fixture.catalog },
+			services: { njt_bus: fixture.service }
+		});
+		let malformed = false;
+		vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) =>
+			malformed && String(input).includes(`/${kind}/`)
+				? Promise.resolve(new Response('{broken json'))
+				: respond(input, init)) as typeof fetch);
+		const view = await coldLoad();
+		const preview = view.getByRole('button', {
+			name: `Preview ${fixture.stops[0].name}`,
+			exact: true
+		});
+		try {
+			await expect.element(preview).toBeVisible();
+			malformed = true;
+			window.dispatchEvent(new Event('online'));
+			const retry = view.getByRole('dialog').getByRole('button', { name: /Retry updates/ });
+			await expect.element(retry).toBeVisible();
+			await expect.element(preview).toBeVisible();
+			await expect
+				.element(view.getByRole('heading', { name: 'Something went wrong' }))
+				.not.toBeInTheDocument();
+			malformed = false;
+			await retry.click();
+			await expect.element(retry).not.toBeInTheDocument();
+			await expect.element(preview).toBeVisible();
+			expect(page.state.modal?.id).toBe('trip-0');
+			expect(page.url.searchParams.get('t')).toBe('trip-0');
+		} finally {
+			await view.unmount();
+		}
+	});
+}
+
+for (const kind of ['service', 'catalog'] as const) {
+	test(`an invalid ${kind} payload uses the shared error screen and Retry restores the trip`, async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+		const fixture = chartFixture('njt_bus', 0);
+		const respond = fixtureFetcher({
+			catalogs: { njt_bus: fixture.catalog },
+			services: { njt_bus: fixture.service }
+		});
+		let malformed = false;
+		vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) =>
+			malformed && String(input).includes('/service/')
+				? Promise.resolve(new Response(JSON.stringify({ ...fixture.service, routes: null })))
+				: respond(input, init)) as typeof fetch);
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const view = await coldLoad();
+		const preview = view.getByRole('button', {
+			name: `Preview ${fixture.stops[0].name}`,
+			exact: true
+		});
+		try {
+			await expect.element(preview).toBeVisible();
+			if (kind === 'service') {
+				malformed = true;
+				window.dispatchEvent(new Event('online'));
+			} else {
+				navigator.serviceWorker.dispatchEvent(
+					new MessageEvent('message', {
+						data: { type: 'catalog', body: { ...fixture.catalog, routes: null } }
+					})
+				);
+			}
+			await expect
+				.element(view.getByRole('heading', { name: 'Something went wrong' }))
+				.toBeVisible();
+			await expect.element(view.getByRole('dialog')).not.toBeInTheDocument();
+			expect(logged).toHaveBeenCalled();
+			expect(page.state.modal?.id).toBe('trip-0');
+			malformed = false;
+			await view.getByRole('button', { name: 'Try again' }).click();
+			await expect.element(preview).toBeVisible();
+			await expect
+				.element(view.getByRole('heading', { name: 'Something went wrong' }))
+				.not.toBeInTheDocument();
+			expect(page.url.searchParams.get('t')).toBe('trip-0');
+		} finally {
+			await view.unmount();
+		}
+	});
+}
 
 for (const [width, height] of [
 	[320, 480],
@@ -251,10 +362,11 @@ test('service-worker catalog replacement wins over an older pending fetch', asyn
 
 test('reconnecting retries failed reads without a click', async () => {
 	const view = await coldLoad();
-	await expect.element(view.getByRole('button', { name: /Retry updates/ })).toBeVisible();
+	await expect.element(view.getByRole('button', { name: 'Try again' })).toBeVisible();
 	fail = false;
 	window.dispatchEvent(new Event('online'));
-	await expect.element(view.getByRole('button', { name: /Retry updates/ })).not.toBeInTheDocument();
+	await expect.element(view.getByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+	await expect.element(view.getByRole('dialog')).toBeVisible();
 	await view.unmount();
 });
 
@@ -281,7 +393,8 @@ for (const source of ['njt_bus', 'mta_subway'] as const) {
 				data: { type: 'catalog', body: { ...fixture.catalog, routes: [] } }
 			})
 		);
-		await expect.poll(() => page.state.modal ?? null).toBeNull();
+		await expect.element(view.getByRole('dialog').getByText('Route not found')).toBeVisible();
+		expect(page.state.modal).toEqual({ type: 'route', source, id: '4' });
 		expect(requests.some((url) => url.includes('/service/'))).toBe(false);
 		await view.unmount();
 	});
@@ -339,13 +452,30 @@ test('historical layouts load background data at the URL time and follow URL cha
 	await view.unmount();
 });
 
-for (const query of [
-	'?s=missing&src=njt_bus',
-	'?r=missing&src=njt_bus',
-	'?t=missing&r=4&src=njt_bus',
-	'?t=trip-0&src=njt_bus',
-	'?r=4&src=invalid'
+for (const [query, message] of [
+	['?s=missing&src=njt_bus', 'Stop not found'],
+	['?r=missing&src=njt_bus', 'Route not found'],
+	['?t=missing&r=4&src=njt_bus', 'This trip is not currently running.'],
+	['?t=missing&r=unknown&src=njt_bus', 'Route not found']
 ]) {
+	test(`keeps a missing entity URL open with an explanation ${query}`, async () => {
+		fail = false;
+		page.data.selected_sources = ['njt_bus'];
+		page.data.at = '0';
+		const url = `http://localhost/${query}&at=0&keep=value`;
+		page.url = new SvelteURL(url);
+		const view = await render(Layout, {
+			children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
+		});
+		await expect.element(view.getByText(message)).toBeVisible();
+		await expect.element(view.getByRole('dialog')).toBeVisible();
+		expect(page.url.href).toBe(url);
+		expect(page.state.modal).toBeTruthy();
+		await view.unmount();
+	});
+}
+
+for (const query of ['?t=trip-0&src=njt_bus', '?r=4&src=invalid']) {
 	test(`silently dismisses invalid modal URL ${query}`, async () => {
 		fail = false;
 		page.data.selected_sources = ['njt_bus'];

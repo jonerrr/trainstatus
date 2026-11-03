@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 
 	import type { Catalog } from '#lib/client/index.js';
+	import DataBoundary from '#lib/DataBoundary.svelte';
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
 	import SEO from '#lib/SEO.svelte';
@@ -50,7 +51,11 @@
 	// Open the modal a direct link identifies; the modal loads its own data.
 	onMount(() => {
 		const modal = modal_from_url(page.url);
-		if (modal) void tick().then(() => goto('', { shallow: true, replace: true, state: { modal } }));
+		if (modal)
+			void tick().then(() => {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Preserve the current shared URL while initializing its shallow modal state.
+				return goto(page.url.href, { shallow: true, replace: true, state: { modal } });
+			});
 		else if (['s', 'r', 't'].some((key) => page.url.searchParams.has(key)))
 			close_modal(current_time.value, true);
 	});
@@ -70,21 +75,17 @@
 
 <SEO />
 
-<svelte:window
-	ononline={() => {
-		transit.retry();
-	}}
-/>
-
 <!-- Navbar is fixed-position; this wrapper reserves space for it.
      Mobile: pb-16 (bottom bar). Larger screens, md+: pl-20 (left sidebar). -->
-<div class="app-shell flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
-	<main class="relative min-h-0 flex-1 overflow-hidden text-white">
-		<Modal />
-		{@render children()}
-	</main>
-</div>
-<Navbar />
+<DataBoundary>
+	<div class="app-shell flex h-dvh flex-col pb-16 md:pb-0 md:pl-20">
+		<main class="relative min-h-0 flex-1 overflow-hidden text-white">
+			<Modal />
+			{@render children()}
+		</main>
+	</div>
+	<Navbar />
+</DataBoundary>
 
 <style>
 	:global(body) {

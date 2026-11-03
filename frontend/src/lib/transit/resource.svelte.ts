@@ -1,11 +1,13 @@
 import type { Source } from '#lib/client/index.js';
 
-export interface ResourceSnapshot<T> {
-	value: T | undefined;
-	loading: boolean;
-	/** Initial-load failure. Refresh failures retain a loaded value. */
-	error: Error | null;
-}
+export type Read<T> =
+	| { state: 'idle' }
+	| { state: 'loading' }
+	| { state: 'missing' }
+	| { state: 'ready'; value: T }
+	| { state: 'failed'; error: Error };
+
+type Snapshot<T> = Extract<Read<T>, { state: 'loading' | 'missing' | 'ready' }>;
 
 /** Bind once during initialization; reading current only observes native state. */
 export interface Resource<T> {
@@ -14,10 +16,15 @@ export interface Resource<T> {
 
 export type Kind = 'catalog' | 'alerts' | 'service';
 
+export function toError(error: unknown): Error {
+	return error instanceof Error ? error : new Error(String(error));
+}
+
 export class Entry<T> {
-	state = $state.raw<{ data: T | undefined; error: Error | null }>({
-		data: undefined,
-		error: null
+	state = $state.raw<{ snapshot: Snapshot<T>; error: Error | null; fatal: boolean }>({
+		snapshot: { state: 'loading' },
+		error: null,
+		fatal: false
 	});
 	readers = 0;
 	eager = false;
@@ -37,38 +44,47 @@ export class Entry<T> {
 		readonly kind: Kind = 'service'
 	) {}
 
+	get snapshot() {
+		return this.state.snapshot;
+	}
 	get data() {
-		return this.state.data;
+		return this.snapshot.state === 'ready' ? this.snapshot.value : undefined;
 	}
 	get error() {
 		return this.state.error;
 	}
+	get fatal() {
+		return this.state.fatal;
+	}
 	get active() {
 		return this.readers > 0;
 	}
-	get current(): ResourceSnapshot<T> {
-		const { data, error } = this.state;
-		return {
-			value: data,
-			loading: data === undefined && !error,
-			error: data === undefined ? error : null
-		};
+	get current(): Read<T> {
+		const { snapshot, error, fatal } = this.state;
+		if (error && (fatal || snapshot.state !== 'ready')) return { state: 'failed', error };
+		return snapshot;
 	}
 
-	install(data: T, now: number) {
+	install(value: T, now: number) {
+		this.#publish({ state: 'ready', value }, now);
+	}
+	markMissing(now: number) {
+		this.#publish({ state: 'missing' }, now);
+	}
+	#publish(snapshot: Snapshot<T>, now: number) {
 		this.revision++;
 		this.fetched_at = now;
 		this.failures = 0;
-		this.state = { data, error: null };
+		this.state = { snapshot, error: null, fatal: false };
 	}
 
-	fail(error: Error) {
+	fail(error: Error, fatal = false) {
 		this.failures++;
-		this.state = { data: this.data, error };
+		this.state = { snapshot: this.snapshot, error, fatal };
 	}
 
 	reset() {
-		if (this.data !== undefined || !this.error) return;
-		this.state = { data: undefined, error: null };
+		if (!this.error || (this.snapshot.state === 'ready' && !this.fatal)) return;
+		this.state = { snapshot: { state: 'loading' }, error: null, fatal: false };
 	}
 }

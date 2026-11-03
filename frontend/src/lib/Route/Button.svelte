@@ -20,13 +20,15 @@
 		source: data.data.source,
 		at: current_time.value
 	}));
-	const alerts_state = $derived(alerts_resource.current);
-	const alerts = $derived(alerts_state.value && route_alerts(alerts_state.value, data.id));
+	const alerts_read = $derived(alerts_resource.current);
+	const alerts = $derived(
+		alerts_read.state === 'ready' ? route_alerts(alerts_read.value, data.id) : undefined
+	);
 </script>
 
 <section class="flex items-center gap-1">
 	<Icon height={36} width={36} link={false} route={data} />
-	{#if alerts_state.error}
+	{#if alerts_read.state === 'failed'}
 		<span class="text-muted">—</span>
 	{:else if !alerts}
 		<Skeleton lines={1} class="w-24" />

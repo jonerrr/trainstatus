@@ -89,8 +89,7 @@ export function arrivalTransferExits(
 ): ArrivalExits | null {
 	if (
 		departure.route.data.source !== 'mta_subway' ||
-		departure.boarding.stop.data.source !== 'mta_subway' ||
-		!departure.call
+		departure.boarding.stop.data.source !== 'mta_subway'
 	)
 		return null;
 	const targets = [...new Set(departure.call.platform_edges)];

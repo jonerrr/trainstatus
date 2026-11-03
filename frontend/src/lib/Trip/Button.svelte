@@ -22,11 +22,10 @@
 	// Rows render as their route arrives; a suspending read per row would batch them.
 	const catalog_resource = transit.catalog(() => source);
 	const route_resource = transit.route(() => ({ source, route_id, at }));
-	const catalog_state = $derived(catalog_resource.current);
-	const route_state = $derived(route_resource.current);
-	const catalog = $derived(catalog_state.value);
-	const route_data = $derived(route_state.value);
-	const error = $derived(catalog_state.error ?? route_state.error);
+	const catalog_read = $derived(catalog_resource.current);
+	const route_read = $derived(route_resource.current);
+	const catalog = $derived(catalog_read.state === 'ready' ? catalog_read.value : undefined);
+	const route_data = $derived(route_read.state === 'ready' ? route_read.value : undefined);
 	// A pin outlives the realtime run it refers to.
 	const read = $derived(
 		route_data?.trips.has(trip_id)
@@ -39,10 +38,10 @@
 	const route = $derived(catalog?.routes_by_id.get(route_id));
 </script>
 
-{#if error}
-	<span class="text-muted">—</span>
-{:else if !catalog || !route_data}
+{#if (!catalog || !route_data) && (catalog_read.state === 'loading' || route_read.state === 'loading')}
 	<Skeleton lines={2} class="w-full" />
+{:else if !catalog || !route_data}
+	<span class="text-muted">—</span>
 {:else}
 	<div class="flex flex-col items-center gap-1 text-left">
 		<div class="flex max-w-[95%] items-center gap-1 self-start">

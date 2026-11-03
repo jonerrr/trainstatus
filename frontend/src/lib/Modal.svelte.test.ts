@@ -199,12 +199,44 @@ test('includes trip disclosure summaries when wrapping keyboard focus', async ()
 	expect(document.activeElement).toBe(button);
 });
 
-for (const { age, present } of [
+for (const type of ['route', 'stop'] as const) {
+	test(`a ${type} absent from the loaded catalog stays open with a missing message`, async () => {
+		const fixture = chartFixture('njt_bus', 0);
+		const data = new TransitData({
+			sources: ['njt_bus'],
+			fetcher: fixtureFetcher({
+				catalogs: { njt_bus: fixture.catalog },
+				services: { njt_bus: fixture.service }
+			}),
+			batch_ms: 0
+		});
+		try {
+			page.state = { modal: { type, source: 'njt_bus', id: 'unknown' } };
+			const view = await render(TransitProvider<Record<string, never>>, { data, component: Modal });
+			await expect
+				.element(view.getByText(type === 'route' ? 'Route not found' : 'Stop not found'))
+				.toBeVisible();
+			expect(page.state.modal).toEqual({ type, source: 'njt_bus', id: 'unknown' });
+			await view.getByRole('button', { name: 'Close modal' }).click();
+			await expect.poll(() => page.state.modal ?? null).toBeNull();
+			await settle();
+			await view.unmount();
+		} finally {
+			data.destroy();
+		}
+	});
+}
+
+for (const { age, present, fail_first = false, missing_route = false } of [
 	{ age: 10_000, present: true },
 	{ age: 31_000, present: true },
-	{ age: 31_000, present: false }
+	{ age: 31_000, present: false },
+	{ age: 10_000, present: true, fail_first: true },
+	{ age: 10_000, present: false, fail_first: true },
+	{ age: 10_000, present: true, fail_first: true, missing_route: true },
+	{ age: 10_000, present: false, missing_route: true }
 ]) {
-	test(`a trip missing from ${age}ms cached service waits for refreshed membership (${present})`, async () => {
+	test(`a trip missing from ${age}ms cached service waits for refreshed membership (${present}, failed refresh ${fail_first}, missing route ${missing_route})`, async () => {
 		const fixture = chartFixture('njt_bus', 0);
 		const empty = {
 			...fixture.service,
@@ -231,8 +263,12 @@ for (const { age, present } of [
 		const gate = new Promise<void>((resolve) => (release = resolve));
 		const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
 			if (String(input).includes('/service/')) {
-				if (++requests > 1) {
+				requests++;
+				if (requests === 1 && missing_route)
+					return new Response(JSON.stringify({ unknown_route_ids: ['4'] }), { status: 404 });
+				if (requests > 1) {
 					await gate;
+					if (fail_first && requests === 2) return new Response('', { status: 503 });
 					return refreshed(input, init);
 				}
 			}
@@ -245,9 +281,13 @@ for (const { age, present } of [
 				source: 'njt_bus',
 				readers: [{ id: 'old', route: '4' }]
 			});
-			await expect
-				.poll(() => data.loadedStopArrivals('njt_bus', fixture.catalog.stops[0].id).routes.has('4'))
-				.toBe(true);
+			if (missing_route) await expect.element(reader.getByText('Not found')).toBeVisible();
+			else
+				await expect
+					.poll(() =>
+						data.loadedStopArrivals('njt_bus', fixture.catalog.stops[0].id).routes.has('4')
+					)
+					.toBe(true);
 			await reader.unmount();
 			clock += age;
 			page.data.selected_sources = ['njt_bus'];
@@ -256,15 +296,22 @@ for (const { age, present } of [
 			await expect.poll(() => requests).toBe(2);
 			expect(page.state.modal?.id).toBe('trip-0');
 			release();
+			if (fail_first) {
+				await expect.element(view.getByRole('button', { name: /Retry updates/ })).toBeVisible();
+				expect(view.getByRole('dialog').element().querySelector('.animate-pulse')).toBeNull();
+				expect(page.state.modal?.id).toBe('trip-0');
+				data.retry();
+			}
 			if (present) {
 				await expect.poll(() => data.loadedTrip('njt_bus', '4', 'trip-0')?.trip.id).toBe('trip-0');
 				await expect.element(view.getByRole('dialog')).toBeVisible();
 				expect(page.state.modal?.id).toBe('trip-0');
 			} else {
-				await expect.poll(() => page.state.modal ?? null).toBeNull();
+				await expect.element(view.getByText('This trip is not currently running.')).toBeVisible();
+				expect(page.state.modal?.id).toBe('trip-0');
 			}
 			await settle();
-			expect(requests).toBe(2);
+			expect(requests).toBe(fail_first ? 3 : 2);
 			await view.unmount();
 		} finally {
 			release();

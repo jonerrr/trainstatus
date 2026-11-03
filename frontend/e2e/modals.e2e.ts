@@ -5,9 +5,10 @@ const dialog = (page: import('@playwright/test').Page) =>
 	page.getByRole('dialog', { name: 'Transit details' });
 
 test('opening a stop from the list can be restored with Back', async ({ page }) => {
-	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
-		.stops;
-	const stop = stops[0];
+	const catalog = (await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog;
+	// Route IDs take precedence when a stop shares the same ID.
+	const stop = catalog.stops.find((stop) => !catalog.routes.some((route) => route.id === stop.id));
+	if (!stop) throw new Error('expected a stop ID distinct from every route ID');
 	await page.goto('/stops');
 	await page.getByRole('searchbox').fill(stop.id);
 	const row = page.locator('main .list-item').filter({ hasText: stop.name });
@@ -43,8 +44,13 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	expect(stop).toBeTruthy();
 	expect(route).toBeTruthy();
 	const trip = Object.entries(service.routes)
-		.map(([route_id, { trips }]) => ({ route_id, trip: trips[0] }))
-		.find(({ trip }) => trip);
+		.flatMap(([route_id, { trips, calls }]) => {
+			const trip = trips.find((_, index) =>
+				calls.trip.some((trip, call) => trip === index && calls.arrival[call] > Date.now() / 1000)
+			);
+			return trip ? [{ route_id, trip }] : [];
+		})
+		.at(0);
 	await page.addInitScript(
 		({ stop_id, trip }) => {
 			localStorage.setItem(
@@ -82,7 +88,11 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 		await expect.poll(() => new URL(page.url()).searchParams.get('r')).toBe(trip.route_id);
 		await expect.poll(() => new URL(page.url()).searchParams.get('src')).toBe('mta_subway');
 		await expect(dialog(page)).toBeVisible();
-		await expect(dialog(page).locator('summary')).toContainText('Consist');
+		await expect(
+			dialog(page)
+				.getByRole('button', { name: /^Preview / })
+				.first()
+		).toBeVisible();
 	}
 
 	await page.goto(`/?s=${encodeURIComponent(stop.id)}`);

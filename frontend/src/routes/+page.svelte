@@ -5,6 +5,7 @@
 	import List, { type TripItem } from '#lib/List.svelte';
 	import { parse_trip_pin, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { getCurrentTime } from '#lib/url_params.svelte.js';
 	import {
 		calculate_route_height,
 		calculate_stop_height,
@@ -15,10 +16,11 @@
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 
 	const transit = getTransitData();
+	const current_time = getCurrentTime();
 
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current);
-	const catalogs_loading = $derived(catalogs.some((c) => !c.catalog && !c.error));
+	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
+	const catalogs_loading = $derived(catalog_resources.current.some((c) => c.state === 'loading'));
 
 	function by_source<T>(pick: (source: Source) => T[]) {
 		const sources = Object.fromEntries(
@@ -27,7 +29,6 @@
 		return { sources, exists: Object.values(sources).some((items) => items.length > 0) };
 	}
 
-	// Pins persist until unpinned; a trip that is not running shows that in its row.
 	const pinned_trips = $derived(
 		by_source((source) =>
 			(trip_pins.current[source] ?? []).flatMap((id): TripItem[] => {
@@ -36,8 +37,33 @@
 			})
 		)
 	);
+	// Check every pinned route, including trips outside the virtualized list or selected tab.
+	const pinned_service = transit.routes(() =>
+		current_time.value === undefined
+			? Object.values(pinned_trips.sources)
+					.flat()
+					.map(({ source, route_id }) => ({ source, route_id }))
+			: []
+	);
+	$effect(() => {
+		const pins = trip_pins.current;
+		let next = pins;
+		for (const read of pinned_service.current) {
+			if (read.state !== 'ready' && read.state !== 'missing') continue;
+			const kept = next[read.source].filter((key) => {
+				const pin = parse_trip_pin(key);
+				return (
+					!pin ||
+					pin.route_id !== read.route_id ||
+					(read.state === 'ready' && read.value.trips.has(pin.trip_id))
+				);
+			});
+			if (kept.length !== next[read.source].length) next = { ...next, [read.source]: kept };
+		}
+		if (next !== pins) trip_pins.current = next;
+	});
 
-	const catalog_of = (source: Source) => catalogs.find((c) => c.source === source)?.catalog;
+	const catalog_of = (source: Source) => catalogs.find((c) => c.source === source)?.value;
 
 	const pinned_stops = $derived(
 		by_source((source) =>
@@ -111,7 +137,7 @@
 		// reassign to local var to prevent undefined error in map callback.
 		const current_coords = position.coords;
 
-		for (const { source, catalog } of catalogs) {
+		for (const { source, value: catalog } of catalogs) {
 			result[source] = (catalog?.stops ?? [])
 				.map((stop) => {
 					const distance = haversine(

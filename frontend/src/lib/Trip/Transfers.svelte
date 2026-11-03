@@ -4,13 +4,11 @@
 	import type { CatalogStop, ServiceTrip } from '#lib/client/index.js';
 	import Option from '#lib/Transfers/Option.svelte';
 	import {
-		boardingOptions,
 		compareTransfers,
-		departureOptions,
 		type DepartureOption,
 		type IncomingTrip
 	} from '#lib/transit/nearby.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { createTransfers } from '#lib/transit/transfers.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
 	import { arrivalExits, arrivalTransferExits } from './platform-exits.js';
@@ -32,34 +30,23 @@
 		platform_edges?: readonly string[];
 		open?: boolean;
 	} = $props();
-	const transit = getTransitData();
 	const current_time = getCurrentTime();
 	let expanded = $state(false);
 	let later_open = $state(false);
 	let selected_key = $state<string | null>(null);
-	const catalogs_resource = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(
-		catalogs_resource.current.flatMap((read) => (read.catalog ? [read.catalog] : []))
-	);
-	const options = $derived(boardingOptions(stop, catalogs, incoming));
-	const requested = $derived(open ? options : []);
-	const routes_resource = transit.routes(() => [
-		...new Map(
-			requested.map((o) => [
-				JSON.stringify([o.route.data.source, o.route.id]),
-				{ source: o.route.data.source, route_id: o.route.id, at: current_time.value }
-			])
-		).values()
-	]);
-	const reads = $derived(routes_resource.current);
-	const departures = $derived(
-		departureOptions(requested, reads, incoming, catalogs, current_time.ms)
-	);
-	const ordered = $derived(departures.filter((o) => o.call).sort(compareTransfers));
+	const transfers_resource = createTransfers(() => ({
+		stop,
+		incoming,
+		sources: page.data.selected_sources,
+		at: current_time.value,
+		now: current_time.ms,
+		open
+	}));
+	const transfers = $derived(transfers_resource.current);
+	const options = $derived(transfers.options);
+	const ordered = $derived(transfers.state === 'ready' ? transfers.value : []);
 	const later = $derived(ordered.flatMap((o) => (o.next ? [o.next] : [])).sort(compareTransfers));
-	const pending = $derived(reads.some((r) => !r.route && r.loading && !r.error));
 	const has_details = $derived(expanded || ordered.length > 3 || ordered.some((o) => o.next));
-	const partial_error = $derived(reads.some((r) => r.error));
 	const selected = $derived(
 		ordered.flatMap((o) => (o.next ? [o, o.next] : [o])).find((o) => key(o) === selected_key)
 	);
@@ -71,21 +58,22 @@
 			: null
 	);
 	function key(departure: DepartureOption) {
-		return JSON.stringify([departure.key, departure.call?.trip_id, departure.call?.sequence]);
+		return JSON.stringify([departure.key, departure.call.trip_id, departure.call.sequence]);
 	}
 </script>
 
 {#if trip?.data.source === 'mta_subway'}
 	<PlatformExits {guidance} {trip} transfer={selected} />
 {/if}
-{#if options.length}
+{#if transfers.state !== 'failed' && (options.length || transfers.state === 'loading')}
 	<section class="transfers" aria-label="Transfers after arrival">
 		<TransferThread label="Transfers" bind:open>
 			{#each ordered.slice(0, 3) as departure (key(departure))}{@render row(departure)}
-			{:else}<p class="status" role="status">
-					{pending ? 'Loading predictions…' : 'No transfer predictions to show'}
-				</p>{/each}
-			{#if partial_error}<p class="status" role="status">Some predictions unavailable</p>{/if}
+			{:else}{#if transfers.state === 'loading'}<p class="status" role="status">
+						Loading predictions…
+					</p>{:else if transfers.state === 'ready'}<p class="status" role="status">
+						No transfer predictions to show
+					</p>{/if}{/each}
 			{#if has_details}
 				<TransferThread label={expanded ? 'Show less' : 'Show more'} nested bind:open={expanded}>
 					{#if expanded}
@@ -132,12 +120,10 @@
 				></button
 			>{/if}
 		<Option
-			option={departure}
 			{departure}
 			{time_format}
 			arrival={incoming.arrival}
 			show_stop={!departure.boarding.same_stop}
-			compact
 			show_source={options.some(
 				(o) =>
 					o.route.short_name === departure.route.short_name &&

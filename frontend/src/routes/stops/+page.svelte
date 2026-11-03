@@ -24,17 +24,17 @@
 
 	const transit = getTransitData();
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current);
+	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
 	const all_stops = $derived(
-		Object.fromEntries(
-			catalogs.map(({ source, catalog }) => [source, catalog?.stops ?? []])
-		) as Partial<Record<Source, readonly CatalogStop[]>>
+		Object.fromEntries(catalogs.map(({ source, value }) => [source, value.stops])) as Partial<
+			Record<Source, readonly CatalogStop[]>
+		>
 	);
 
 	const search_input = createThrottled('', 150);
 
 	function matching_stops(term: string): readonly CatalogStop[] | undefined {
-		const catalog = catalogs.find((c) => c.source === selected_source.current)?.catalog;
+		const catalog = catalogs.find((c) => c.source === selected_source.current)?.value;
 		if (!catalog || term === '') return undefined;
 
 		// Route IDs take precedence when a stop shares the same ID.

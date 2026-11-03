@@ -25,7 +25,10 @@
 		show_alerts && route ? { source: route.data.source, at: current_time.value } : null
 	);
 	const hasAlert = $derived(
-		show_alerts && !!route && alerts_resource.current.value?.by_route.has(route.id)
+		show_alerts &&
+			!!route &&
+			alerts_resource.current.state === 'ready' &&
+			alerts_resource.current.value.by_route.has(route.id)
 	);
 	const size = $derived(Math.max(width, height));
 	const icon = $derived(
@@ -91,12 +94,12 @@
 	}
 	.bus-badge {
 		display: inline-flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: center;
 		gap: 1px;
 		min-width: var(--badge-size);
-		min-height: var(--badge-size);
-		padding: 0.2em 0.45em;
+		height: var(--badge-size);
+		padding: 0 0.45em;
 		border-radius: 0;
 		font-size: calc(var(--badge-size) * 0.52);
 		line-height: 1.4;

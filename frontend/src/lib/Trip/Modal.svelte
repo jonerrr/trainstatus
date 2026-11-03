@@ -15,7 +15,6 @@
 	import { RotateCcw } from '@lucide/svelte';
 
 	const current_time = getCurrentTime();
-	const transit = getTransitData();
 
 	interface Props {
 		show_previous: boolean;
@@ -26,14 +25,21 @@
 	}
 
 	const { source, route_id, trip_id, show_previous, time_format }: Props = $props();
-
-	const at = $derived(current_time.value);
+	const transit = getTransitData();
 	const catalog_resource = transit.catalog(() => source);
-	const trip_resource = transit.trip(() => ({ source, route_id, trip_id, at }));
+	const trip_resource = transit.trip(() => ({
+		source,
+		route_id,
+		trip_id,
+		at: current_time.value
+	}));
+	const catalog_read = $derived(catalog_resource.current);
+	const trip_read = $derived(trip_resource.current);
+
 	// The header stays mounted across loading states and shows whatever has loaded.
-	const loaded_catalog = $derived(transit.peekCatalog(source));
+	const loaded_catalog = $derived(catalog_read.state === 'ready' ? catalog_read.value : undefined);
 	const route = $derived(loaded_catalog?.routes_by_id.get(route_id));
-	const loaded_read = $derived(trip_resource.current.value);
+	const loaded_read = $derived(trip_read.state === 'ready' ? trip_read.value : undefined);
 	let selected_key = $state<string | null>(null);
 	let transfers_open = $state(true);
 	let stop_heights = $state<Record<number, number>>({});
@@ -136,16 +142,12 @@
 <div class="trip-content" style:--trip-stops-min-height={`${stops_min_height}px`}>
 	{@render title_row(loaded_read)}
 	<svelte:boundary>
-		{const catalog_state = $derived(catalog_resource.current)}
-		{const trip_state = $derived(trip_resource.current)}
-		{const catalog = $derived(catalog_state.value)}
-		{const read = $derived(trip_state.value)}
+		{const catalog = $derived(catalog_read.state === 'ready' ? catalog_read.value : undefined)}
+		{const read = $derived(trip_read.state === 'ready' ? trip_read.value : undefined)}
 
-		{#if catalog_state.loading || trip_state.loading}
-			<Skeleton lines={6} class="p-2" />
-		{:else if !read && !catalog_state.error && !trip_state.error}
-			<p class="p-2 text-center text-muted">This trip is not currently running.</p>
-		{:else if read}
+		{#if catalog && !route}
+			<p class="p-2 text-center text-muted">Route not found</p>
+		{:else if catalog && read}
 			{#if selected_call && selected_stop}
 				<div class="preview-panel" aria-label="Selected stop preview" role="region">
 					<div class="preview-title">
@@ -210,6 +212,10 @@
 					{/if}
 				{:else}<p class="p-2 text-center text-muted">No predictions to show</p>{/each}
 			</ModalList>
+		{:else if catalog_read.state === 'loading' || trip_read.state === 'loading'}
+			<Skeleton lines={6} class="p-2" />
+		{:else if catalog && trip_read.state === 'missing'}
+			<p class="p-2 text-center text-muted">This trip is not currently running.</p>
 		{/if}
 	</svelte:boundary>
 </div>

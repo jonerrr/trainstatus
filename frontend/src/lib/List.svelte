@@ -86,7 +86,9 @@
 	}: Props = $props();
 
 	const catalogs = getTransitData().catalogs(() => page.data.selected_sources);
-	const pending = $derived(loading ?? catalogs.current.some((catalog) => catalog.loading));
+	const pending = $derived(
+		loading ?? catalogs.current.some((catalog) => catalog.state === 'loading')
+	);
 
 	const source_entries = $derived(
 		page.data.selected_sources.map((source) => ({

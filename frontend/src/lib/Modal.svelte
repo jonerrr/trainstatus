@@ -13,7 +13,7 @@
 	import RouteModal from '#lib/Route/Modal.svelte';
 	import StopModal from '#lib/Stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { getTransitData, UnknownRouteError } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import TripModal from '#lib/Trip/Modal.svelte';
 	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
 	import { close_modal, getCurrentTime } from '#lib/url_params.svelte.js';
@@ -84,48 +84,6 @@
 			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
 			slide_to(forward);
 		}
-	});
-
-	const selected_catalog = transit.catalog(() => page.state.modal?.source ?? null);
-	const selected_service = transit.route(() => {
-		const selected = page.state.modal;
-		const catalog = selected_catalog.current.value;
-		const route_id = selected?.type === 'trip' ? selected.route_id : null;
-		return selected && route_id && catalog?.routes_by_id.has(route_id)
-			? { source: selected.source, route_id, at: current_time.value }
-			: null;
-	});
-	const initial_service = $derived.by(() => {
-		void page.state.modal;
-		return untrack(() => selected_service.current.value);
-	});
-	$effect(() => {
-		const selected = page.state.modal;
-		if (!selected) return;
-		// Capture cached membership before a cold catalog or service request completes.
-		const cached = initial_service;
-		const catalog = selected_catalog.current.value;
-		// Keep the requested modal and its shared Retry available during catalog failures.
-		if (!catalog) return;
-		const service = selected_service.current;
-		let invalid: boolean;
-		switch (selected.type) {
-			case 'stop':
-				invalid = !catalog.stops_by_id.has(selected.id);
-				break;
-			case 'route':
-				invalid = !catalog.routes_by_id.has(selected.id);
-				break;
-			case 'trip':
-				invalid =
-					!catalog.routes_by_id.has(selected.route_id) ||
-					service.error instanceof UnknownRouteError ||
-					(!!service.value &&
-						(current_time.value !== undefined || service.value !== cached) &&
-						!service.value.trips.has(selected.id));
-				break;
-		}
-		if (invalid) untrack(() => close_modal(current_time.value, true));
 	});
 
 	const modal: Attachment<HTMLDivElement> = (node) => {

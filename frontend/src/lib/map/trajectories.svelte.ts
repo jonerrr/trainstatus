@@ -4,6 +4,7 @@ import { untrack } from 'svelte';
 
 import type { Source } from '#lib/client/index.js';
 import { source_config } from '#lib/sources.js';
+import { toError } from '#lib/transit/resource.svelte.js';
 import { getTransitData, type TrackedUpdate } from '#lib/transit/store.svelte.js';
 
 import { renderUnitTableFromIPC, type RenderUnitTable } from './trajectoryArrow';
@@ -15,13 +16,8 @@ export interface TrajectoryQuery {
 	at: number | undefined;
 	refreshInterval?: number;
 }
-export interface TrajectoryStatus {
-	available: boolean;
-	error: Error | null;
-}
 export interface TrajectorySnapshot {
 	tables: ReadonlyMap<Source, RenderUnitTable>;
-	statuses: ReadonlyMap<Source, TrajectoryStatus>;
 }
 export interface TrajectoryWatcher {
 	(): void;
@@ -40,10 +36,8 @@ export function watchTrajectories(
 ): TrajectoryWatcher {
 	const controller = new AbortController();
 	const tables = new Map<Source, RenderUnitTable>();
-	const statuses = new Map<Source, TrajectoryStatus>();
 	const publish = () => {
-		if (!controller.signal.aborted)
-			onchange({ tables: new Map(tables), statuses: new Map(statuses) });
+		if (!controller.signal.aborted) onchange({ tables: new Map(tables) });
 	};
 
 	const pollers = query.sources.map((source) => {
@@ -58,35 +52,38 @@ export function watchTrajectories(
 			active: true as boolean,
 			at: query.at,
 			error: null as Error | null,
+			fatal: false,
 			fetched_at: null as number | null,
 			source_updated_at: null as number | null,
 			retry: () => void load()
 		};
-		statuses.set(source, { available: false, error: null });
 
 		async function request() {
+			let decoding = false;
 			try {
 				const response = await fetcher(url, {
 					signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
 					cache: 'no-store'
 				});
 				if (!response.ok) throw new Error(`Trajectory service returned ${response.status}`);
-				const table = renderUnitTableFromIPC(await response.arrayBuffer());
+				const bytes = await response.arrayBuffer();
+				decoding = true;
+				const table = renderUnitTableFromIPC(bytes);
 				if (controller.signal.aborted) return;
 				tables.set(source, table);
 				failures = 0;
 				update.error = null;
+				update.fatal = false;
 				update.fetched_at = Date.now();
 				const committed_at = response.headers.get('x-source-updated-at');
 				update.source_updated_at =
 					query.at === undefined && committed_at !== null ? Number(committed_at) * 1000 : null;
-				statuses.set(source, { available: true, error: null });
 				if (query.at === undefined) schedule(refresh_ms);
 			} catch (error) {
 				if (controller.signal.aborted) return;
 				failures++;
-				update.error = error as Error;
-				statuses.set(source, { available: tables.has(source), error: error as Error });
+				update.error = toError(error);
+				update.fatal = decoding;
 				schedule(Math.min(refresh_ms, FIRST_RETRY_MS * 2 ** (failures - 1)));
 			}
 			publish();
@@ -139,7 +136,7 @@ export function watchTrajectories(
 /** A layout-owned trajectory binding with the same initialization/read pattern as passenger data. */
 export function createTrajectories(query: () => TrajectoryQuery) {
 	const transit = getTransitData();
-	let snapshot = $state.raw<TrajectorySnapshot>({ tables: new Map(), statuses: new Map() });
+	let snapshot = $state.raw<TrajectorySnapshot>({ tables: new Map() });
 	$effect(() => {
 		const selected = query();
 		const sources = [...selected.sources];
