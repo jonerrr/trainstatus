@@ -6,7 +6,8 @@ exclude = List("**/CHANGELOG.md", "frontend/src/lib/client/**")
 
 steps {
   ["trailing-whitespace"] = (Builtins.trailing_whitespace) {
-    exclude = List("backend/tests/fixtures/**")
+    // Unified diff context lines can consist of a single significant space.
+    exclude = List("backend/tests/fixtures/**", "frontend/patches/**")
   }
   ["newlines"] = (Builtins.newlines) {
     exclude = List("backend/tests/fixtures/**")

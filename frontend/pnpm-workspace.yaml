@@ -4,5 +4,6 @@ allowBuilds:
   sharp: true
   esbuild: true
 # Temporary async batch fix: https://github.com/sveltejs/svelte/pull/18896
+# Keep applying across Svelte 5 updates; revisit when upstream includes the fix.
 patchedDependencies:
-  svelte@5.57.2: patches/svelte@5.57.2.patch
+  svelte@^5.57.3: patches/svelte-async-batch.patch

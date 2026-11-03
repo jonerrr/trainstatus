@@ -1,11 +1,11 @@
 amends "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Builtins.pkl"
 
-local code = List("**/*.{js,mjs,ts,svelte,css,json}", "pnpm-lock.yaml", "pnpm-workspace.yaml", "mise.toml", ".npmrc")
+local code = List("**/*.{js,mjs,ts,svelte,css,json}", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/*.patch", "mise.toml", ".npmrc")
 
 steps {
   ["dependencies"] {
-    glob = Builtins.prettier.glob
+    glob = Builtins.prettier.glob + List("patches/*.patch")
     check = "mise run pnpm-install"
   }
   ["prettier"] = (Builtins.prettier) {

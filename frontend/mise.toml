@@ -1,7 +1,13 @@
 [tasks.pnpm-install]
 description = "Installs dependencies with pnpm"
 run = "pnpm install --frozen-lockfile"
-sources = ["mise.toml", "package.json", "pnpm-lock.yaml"]
+sources = [
+  "patches/*.patch",
+  "mise.toml",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
 outputs = ["node_modules/.pnpm/lock.yaml"]
 
 [tasks.check]
