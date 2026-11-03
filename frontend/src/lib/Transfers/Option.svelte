@@ -1,83 +1,73 @@
 <script lang="ts">
 	import Icon from '#lib/Route/Icon.svelte';
 	import { source_config } from '#lib/sources.js';
-	import {
-		boardingDistance,
-		type BoardingOption,
-		type DepartureOption
-	} from '#lib/transit/nearby.js';
+	import { boardingDistance, type DepartureOption } from '#lib/transit/nearby.js';
 	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
 
 	let {
-		option,
 		departure,
 		show_stop = true,
 		time_format = 'countdown',
 		arrival,
-		show_source = false
+		show_source = false,
+		target = 'trip'
 	}: {
-		option: BoardingOption;
-		departure?: DepartureOption;
+		departure: DepartureOption;
 		show_stop?: boolean;
 		time_format?: 'time' | 'countdown';
 		arrival?: number;
 		show_source?: boolean;
+		target?: 'stop' | 'trip';
 	} = $props();
 	const current_time = getCurrentTime();
-	const boarding = $derived(departure?.boarding ?? option.stops[0]);
+	const boarding = $derived(departure.boarding);
 	const distance = $derived(boardingDistance(boarding.distance_m, boarding.same_stop));
-	const destination = $derived(departure?.destination ?? option.destination);
+	const show_distance = $derived(!boarding.same_stop);
+	const destination = $derived(departure.destination);
 	const gap = $derived(
-		departure?.call && arrival !== undefined
-			? Math.floor((departure.call.departure - arrival) / 60_000)
-			: undefined
+		arrival !== undefined ? Math.floor((departure.call.departure - arrival) / 60_000) : undefined
 	);
 	const time = $derived(
-		departure?.call
-			? time_format === 'time'
-				? new Date(departure.call.departure).toLocaleTimeString([], {
-						hour: 'numeric',
-						minute: '2-digit'
-					})
-				: `${Math.max(0, Math.ceil((departure.call.departure - current_time.ms) / 60_000))}m`
-			: undefined
+		time_format === 'time'
+			? new Date(departure.call.departure).toLocaleTimeString([], {
+					hour: 'numeric',
+					minute: '2-digit'
+				})
+			: `${Math.max(0, Math.ceil((departure.call.departure - current_time.ms) / 60_000))}m`
 	);
 	const label = $derived(
-		`${option.route.short_name} to ${destination}, ${source_config[option.route.data.source].name}, ${boarding.stop.name}, ${distance}${time ? `, departs ${time}, ${gap} minutes after arrival` : ''}`
+		`${departure.route.short_name} to ${destination}, ${source_config[departure.route.data.source].name}, ${boarding.stop.name}, ${distance}, departs ${time}${gap !== undefined ? `, ${gap} minutes after arrival` : ''}`
 	);
 	function open() {
-		const source = option.route.data.source;
-		if (departure?.call)
-			open_modal({ type: 'trip', source, route_id: option.route.id, id: departure.call.trip_id });
+		const source = departure.route.data.source;
+		if (target === 'trip')
+			open_modal({
+				type: 'trip',
+				source,
+				route_id: departure.route.id,
+				id: departure.call.trip_id
+			});
 		else open_modal({ type: 'stop', source, id: boarding.stop.id });
 	}
 </script>
 
 <button type="button" class="option" aria-label={label} onclick={open}>
-	<span class="badge"><Icon route={option.route} link={false} width={24} height={24} /></span>
+	<span class="badge"><Icon route={departure.route} link={false} width={24} height={24} /></span>
 	<span class="copy"
 		><span class="destination"
-			>{#if show_source}{source_config[option.route.data.source].name} ·
+			>{#if show_source}{source_config[departure.route.data.source].name} ·
 			{/if}{destination}</span
 		>
-		{#if show_stop}<span class="place"
-				><span class="stop-name">{boarding.stop.name}</span>{#if departure && !boarding.same_stop}
-					<span class="separator" aria-hidden="true">·</span><span class="distance">{distance}</span
+		{#if show_stop || show_distance}<span class="place"
+				>{#if show_stop}<span class="stop-name">{boarding.stop.name}</span>{/if}{#if show_distance}
+					{#if show_stop}<span class="separator" aria-hidden="true">·</span>{/if}<span
+						class="distance">{distance}</span
 					>{/if}</span
 			>{/if}
 	</span>
-	{#if departure}
-		<span class="metric">
-			{#if time}<span class="time">{time}</span><span class="secondary">+{gap} min</span>
-			{:else if departure.loading && !departure.error}<span
-					class="skeleton animate-pulse"
-					aria-label="Loading departures"
-				></span>
-			{:else}<span class="secondary"
-					>{departure.error ? 'Unavailable' : 'No later predictions'}</span
-				>{/if}
-		</span>
-	{:else}<span class="metric">{distance}</span>{/if}
+	<span class="metric">
+		<span class="time">{time}</span>
+	</span>
 </button>
 
 <style>
@@ -86,24 +76,24 @@
 		align-items: center;
 		gap: 8px;
 		width: 100%;
-		min-height: 48px;
-		padding: 6px;
+		min-height: 36px;
+		padding: 3px 8px 3px 0;
 		text-align: left;
 	}
 	:global(.option) + .option {
-		border-top: 1px solid #262626;
+		border-top: 1px solid var(--bg-hover);
 	}
 	.option:hover {
-		background: #262626;
+		background: var(--bg-hover);
 	}
 	.option:focus-visible {
-		outline: 2px solid #60a5fa;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 	.badge {
 		display: flex;
 		justify-content: center;
-		flex: 0 0 42px;
+		flex: 0 0 24px;
 	}
 	.copy {
 		min-width: 0;
@@ -117,7 +107,7 @@
 		white-space: nowrap;
 	}
 	.destination {
-		font-size: 14px;
+		font-size: 13px;
 		font-weight: 500;
 	}
 	.place {
@@ -125,8 +115,8 @@
 		align-items: baseline;
 		gap: 6px;
 		margin-top: 2px;
-		font-size: 12px;
-		color: #a3a3a3;
+		font-size: 11px;
+		color: var(--text-muted);
 	}
 	.stop-name {
 		min-width: 0;
@@ -151,16 +141,5 @@
 	.time {
 		font-size: 14px;
 		white-space: nowrap;
-	}
-	.secondary {
-		display: block;
-		color: #a3a3a3;
-		font-size: 11px;
-	}
-	.skeleton {
-		width: 48px;
-		height: 16px;
-		background: #404040;
-		border-radius: 3px;
 	}
 </style>

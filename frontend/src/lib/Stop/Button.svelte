@@ -2,7 +2,7 @@
 	import type { CatalogStop } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
-	import { stop_arrivals } from '#lib/transit/arrivals.js';
+	import { stop_arrivals, type StopArrival } from '#lib/transit/arrivals.js';
 	import { upcomingCalls } from '#lib/transit/decode.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import { getCurrentTime } from '#lib/url_params.svelte.js';
@@ -26,7 +26,7 @@
 	}));
 	const arrivals = $derived(arrivals_resource.current);
 	const predictions = $derived.by(() => {
-		const read = arrivals.value;
+		const read = arrivals.state === 'ready' ? arrivals.value : undefined;
 		const now = current_time.ms;
 		return stop_arrivals(upcomingCalls(read?.calls ?? [], now), read?.routes ?? [], now);
 	});
@@ -55,23 +55,23 @@
 	);
 </script>
 
-{#snippet etas(times: import('#lib/transit/arrivals.js').StopArrival[], route_id: string)}
-	{#if !arrivals.error && (arrivals.loading || arrivals.value?.pending.includes(route_id))}
+{#snippet etas(times: StopArrival[], route_id: string)}
+	{#if arrivals.state === 'loading' || (arrivals.state === 'ready' && arrivals.value.pending.includes(route_id))}
 		<span
-			class="inline-block w-8 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
+			class="inline-block w-8 animate-pulse rounded-none bg-surface-2 px-1.5 py-0.5 text-sm leading-5"
 			>&nbsp;</span
 		>
 		<span
-			class="inline-block w-10 animate-pulse rounded-sm bg-neutral-800 px-1.5 py-0.5 text-sm leading-5"
+			class="inline-block w-10 animate-pulse rounded-none bg-surface-2 px-1.5 py-0.5 text-sm leading-5"
 			>&nbsp;</span
 		>
 	{:else}
 		{#each times.slice(0, 2) as call (`${call.trip_id}:${call.sequence}`)}
-			<span class="rounded-sm bg-neutral-800/70 px-1.5 py-0.5 text-sm font-medium"
+			<span class="rounded-none bg-surface-2/70 px-1.5 py-0.5 text-sm font-medium"
 				>{call.eta.toFixed(0)}m</span
 			>
 		{:else}
-			<span class="text-neutral-400">—</span>
+			<span class="text-muted">—</span>
 		{/each}
 	{/if}
 {/snippet}
@@ -142,7 +142,7 @@
 				{const times = $derived(
 					calls.filter((call) => call.trip.direction === next?.trip.direction)
 				)}
-				<div class="flex items-center gap-2 rounded-sm p-1 text-left text-wrap">
+				<div class="flex items-center gap-2 rounded-none p-1 text-left text-wrap">
 					{#if route}
 						<Icon {route} link={false} width={32} height={32} />
 					{/if}
@@ -152,7 +152,9 @@
 								{trip_headsign(
 									next.trip,
 									route,
-									arrivals.value?.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id),
+									arrivals.state === 'ready'
+										? arrivals.value.routes.get(next.route_id)?.calls_by_trip.get(next.trip_id)
+										: undefined,
 									catalog?.stops_by_id
 								)}
 							{:else if route_stop.data.source === 'mta_bus'}
@@ -174,7 +176,7 @@
 		</div>
 	</div>
 
-	<div class="self-start text-neutral-300">
+	<div class="self-start text-secondary">
 		#{stop.id}
 	</div>
 {/if}

@@ -22,14 +22,13 @@ export interface BoardingOption {
 export interface IncomingTrip {
 	source: Source;
 	route_id: string;
+	direction: number;
 	arrival: number;
 }
 
 export interface DepartureOption extends BoardingOption {
 	boarding: BoardingStop;
-	call?: Call;
-	loading: boolean;
-	error: Error | null;
+	call: Call;
 	next?: DepartureOption;
 }
 
@@ -113,9 +112,18 @@ export function boardingOptions(
 		const catalog = bySource.get(source)!;
 		for (const m of memberships(candidate.stop, catalog)) {
 			const key = serviceKey(source, m.route.id, m.direction);
+			const same_station =
+				candidate.same_stop ||
+				(origin.data.source === 'mta_subway' &&
+					candidate.stop.data.source === 'mta_subway' &&
+					origin.data.station_group_id === candidate.stop.data.station_group_id);
 			if (
 				here.has(key) ||
-				(incoming && source === incoming.source && m.route.id === incoming.route_id)
+				(incoming && source === incoming.source && m.route.id === incoming.route_id) ||
+				(incoming?.source === 'mta_subway' &&
+					source === 'mta_subway' &&
+					same_station &&
+					m.direction !== incoming.direction)
 			)
 				continue;
 			let option = grouped.get(key);
@@ -155,21 +163,23 @@ export function optionStops(option: BoardingOption): BoardingStop[] {
 export function departureOptions(
 	options: readonly BoardingOption[],
 	reads: readonly RouteRead[],
-	incoming: IncomingTrip,
+	incoming: IncomingTrip | undefined,
 	catalogs: readonly CatalogData[],
 	reference_ms: number
 ): DepartureOption[] {
 	const results = new Map<string, DepartureOption[]>();
 	for (const option of options) {
 		const source = option.route.data.source;
-		if (source === incoming.source && option.route.id === incoming.route_id) continue;
+		if (source === incoming?.source && option.route.id === incoming.route_id) continue;
 		const read = reads.find((r) => r.source === source && r.route_id === option.route.id);
+		const route = read?.state === 'ready' ? read.value : undefined;
 		const catalog = catalogs.find((c) => c.source === source);
 		const matches: DepartureOption[] = [];
 		for (const boarding of optionStops(option)) {
-			for (const call of read?.route?.calls_by_stop.get(boarding.stop.id) ?? []) {
-				const trip = read?.route?.trips.get(call.trip_id);
-				if (!trip || call.departure < Math.max(incoming.arrival, reference_ms)) continue;
+			for (const call of route?.calls_by_stop.get(boarding.stop.id) ?? []) {
+				const trip = route?.trips.get(call.trip_id);
+				if (!trip || call.departure < Math.max(incoming?.arrival ?? reference_ms, reference_ms))
+					continue;
 				const unknown = option.unknown_stops.some(
 					(s) => stopKey(s.stop) === stopKey(boarding.stop)
 				);
@@ -177,7 +187,7 @@ export function departureOptions(
 				const destination = trip_headsign(
 					trip,
 					option.route,
-					read?.route?.calls_by_trip.get(trip.id),
+					route?.calls_by_trip.get(trip.id),
 					catalog?.stops_by_id
 				);
 				matches.push({
@@ -186,26 +196,11 @@ export function departureOptions(
 					direction: trip.direction,
 					destination: destination === 'Unknown' ? option.destination : destination,
 					boarding,
-					call,
-					loading: read?.loading ?? true,
-					error: read?.error ?? null
+					call
 				});
 			}
 		}
-		const choices: DepartureOption[] =
-			matches.length &&
-			(option.direction === null || matches.some((m) => m.direction === option.direction))
-				? matches
-				: [
-						...matches,
-						{
-							...option,
-							boarding: option.stops[0],
-							loading: read?.loading ?? true,
-							error: read?.error ?? null
-						}
-					];
-		for (const choice of choices) {
+		for (const choice of matches) {
 			const group = results.get(choice.key);
 			if (group) group.push(choice);
 			else results.set(choice.key, [choice]);
@@ -214,19 +209,28 @@ export function departureOptions(
 	return [...results.values()].map((group) => {
 		const sorted = group.sort(compareDepartures);
 		const best = sorted[0];
-		const next = sorted.find((d) => d.call && d.call.trip_id !== best.call?.trip_id);
+		const next = sorted.find((d) => d.call.trip_id !== best.call.trip_id);
 		return next ? { ...best, next } : best;
 	});
 }
 
 export function compareDepartures(a: DepartureOption, b: DepartureOption) {
-	const time = (a.call?.departure ?? Infinity) - (b.call?.departure ?? Infinity);
+	const time = a.call.departure - b.call.departure;
 	return (
-		(Number.isNaN(time) ? 0 : time) ||
+		time ||
 		compareStop(a.boarding, b.boarding) ||
 		a.key.localeCompare(b.key) ||
-		(a.call?.trip_id ?? '').localeCompare(b.call?.trip_id ?? '') ||
-		(a.call?.sequence ?? 0) - (b.call?.sequence ?? 0)
+		a.call.trip_id.localeCompare(b.call.trip_id) ||
+		a.call.sequence - b.call.sequence
+	);
+}
+
+/** Keep each boarding stop together, nearest first, then show its earliest arrivals. */
+export function compareTransfers(a: DepartureOption, b: DepartureOption) {
+	return (
+		compareStop(a.boarding, b.boarding) ||
+		a.call.arrival - b.call.arrival ||
+		compareDepartures(a, b)
 	);
 }
 

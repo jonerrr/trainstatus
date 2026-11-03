@@ -47,7 +47,7 @@
 <div class="flex flex-col gap-1.5">
 	<!-- TODO: add "undefined" option in checkbox -->
 	{#if fieldDef.type === 'boolean'}
-		<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded px-1">
+		<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded-none px-1">
 			<span class="text-sm">{label}</span>
 			<input
 				type="checkbox"
@@ -70,7 +70,7 @@
 					)}
 					{#each fieldDef.options ?? [] as option (option)}
 						{const isChecked = $derived(stringValues.includes(option))}
-						<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded px-1">
+						<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded-none px-1">
 							<span class="text-xs">{option}</span>
 							<input
 								type="checkbox"
@@ -86,7 +86,7 @@
 				<select
 					value={typeof value === 'string' ? value : ''}
 					onchange={(e) => handleEnumChange(e.currentTarget.value, false)}
-					class="min-h-10 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
+					class="min-h-10 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
 				>
 					<option value="">All</option>
 					{#each fieldDef.options ?? [] as option (option)}
@@ -103,7 +103,7 @@
 				value={typeof value === 'string' ? value : ''}
 				onchange={(e) => handleStringChange(e.currentTarget.value)}
 				placeholder="Search..."
-				class="min-h-10 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
+				class="min-h-10 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
 			/>
 		</label>
 	{:else if fieldDef.type === 'number'}
@@ -127,7 +127,7 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="min-h-10 w-20 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
+					class="min-h-10 w-20 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
 				/>
 				<span class="self-center text-sm">to</span>
 				<input
@@ -141,7 +141,7 @@
 							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
 						onChange?.(newValue);
 					}}
-					class="min-h-10 w-20 rounded border border-neutral-600 bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
+					class="min-h-10 w-20 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
 				/>
 			</div>
 		</div>

@@ -35,7 +35,7 @@
 	bind:clientWidth={width}
 	bind:clientHeight={height}
 	data-map-tooltip-kind={target.kind}
-	class="pointer-events-none absolute z-20 w-70 max-w-[calc(100%-1rem)] rounded-xl border border-neutral-700 bg-neutral-950/95 p-3 shadow-lg"
+	class="pointer-events-none absolute z-20 w-70 max-w-[calc(100%-1rem)] rounded-none border border-border-default bg-canvas/95 p-3 shadow-lg"
 	style:left={`${left}px`}
 	style:top={`${top}px`}
 >

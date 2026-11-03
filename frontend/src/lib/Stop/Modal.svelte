@@ -39,17 +39,17 @@
 		njt_bus: 0
 	});
 
+	const alerts_read = $derived(alerts_resource.current);
 	const show_alert_icon = $derived(
-		alerts_resource.current.value?.alerts.some((alert) =>
-			alert.entities.some((e) => e.stop_id === stop_id)
-		)
+		alerts_read.state === 'ready' &&
+			alerts_read.value.alerts.some((alert) => alert.entities.some((e) => e.stop_id === stop_id))
 	);
 
-	const catalog_state = $derived(catalog_resource.current);
-	const catalog = $derived(catalog_state.value);
+	const catalog_read = $derived(catalog_resource.current);
+	const catalog = $derived(catalog_read.state === 'ready' ? catalog_read.value : undefined);
 	const stop = $derived(catalog?.stops_by_id.get(stop_id));
-	const arrivals_state = $derived(arrivals_resource.current);
-	const read = $derived(arrivals_state.value);
+	const arrivals_read = $derived(arrivals_resource.current);
+	const read = $derived(arrivals_read.state === 'ready' ? arrivals_read.value : undefined);
 	const predictions = $derived.by(() => {
 		const now = current_time.ms;
 		const calls = show_previous ? (read?.calls ?? []) : upcomingCalls(read?.calls ?? [], now);
@@ -77,7 +77,7 @@
 	}
 </script>
 
-<div class="flex flex-col items-start gap-3 border-b border-neutral-700 p-3">
+<div class="flex flex-col items-start gap-3 border-b border-border-default p-3">
 	<div class="flex w-full items-center gap-2">
 		{#if stop?.data.source === 'mta_bus'}
 			<BusArrow direction={stop.data.direction} />
@@ -90,7 +90,7 @@
 			<CircleAlert size="1.5rem" class="text-red-800" />
 		{/if}
 	</div>
-	<div class="flex flex-wrap items-center gap-1">
+	<div class="flex flex-wrap items-center gap-2">
 		{#each badges.length > 6 ? badges.slice(0, 5) : badges as route_stop (route_stop.route_id)}
 			{const route = $derived(catalog?.routes_by_id.get(route_stop.route_id))}
 			{#if route}
@@ -98,23 +98,23 @@
 			{/if}
 		{/each}
 		{#if badges.length > 6}
-			<div class="rounded-sm bg-neutral-700 p-1 font-semibold">+{badges.length - 5}</div>
+			<div class="rounded-none bg-border-default p-1 font-semibold">+{badges.length - 5}</div>
 		{/if}
 	</div>
 </div>
 {#if stop}
-	{#key `${source}:${stop.id}`}<Transfers {stop} />{/key}
+	{#key `${source}:${stop.id}`}<Transfers {stop} {time_format} />{/key}
 {/if}
-{#if catalog_state.loading}
+{#if catalog_read.state === 'loading'}
 	<Skeleton lines={5} class="p-2" />
+{:else if catalog && !stop}
+	<p class="p-2 text-center text-muted">Stop not found</p>
 {:else if stop}
-	{#if arrivals_state.loading}
+	{#if !visible_arrivals.length && arrivals_read.state === 'loading'}
 		<Skeleton lines={5} class="p-2" />
 	{:else if !visible_arrivals.length}
-		{#if read?.pending.length}
-			<Skeleton lines={5} class="p-2" />
-		{:else}
-			<div class="px-4 py-8 text-center text-base font-semibold text-neutral-400">
+		{#if arrivals_read.state === 'ready'}
+			<div class="px-4 py-8 text-center text-base font-semibold text-muted">
 				No predictions to show
 			</div>
 		{/if}
@@ -143,7 +143,7 @@
 						<div
 							class={[
 								'col-start-2 row-start-1 text-left',
-								{ 'text-neutral-400': st.arrival < current_time.ms }
+								{ 'text-muted': st.arrival < current_time.ms }
 							]}
 						>
 							{trip_headsign(
@@ -160,7 +160,7 @@
 							'flex flex-col items-end',
 							{
 								italic: status?.data.source === 'mta_subway' && !status.data.assigned,
-								'text-neutral-400': st.arrival < current_time.ms
+								'text-muted': st.arrival < current_time.ms
 							}
 						]}
 					>
@@ -183,7 +183,7 @@
 
 {#if stop?.data.source === 'mta_subway'}
 	<div
-		class="grid grid-cols-2 border-neutral-700 bg-neutral-800 text-neutral-100"
+		class="grid grid-cols-2 border-border-default bg-surface-2 text-primary"
 		aria-label="Trip information"
 	>
 		{#each [{ direction: 1, name: stop.data.north_headsign }, { direction: 3, name: stop.data.south_headsign }] as tab (tab.direction)}
@@ -191,8 +191,8 @@
 				class={[
 					'p-2',
 					{
-						'bg-neutral-900': selected_direction.current[source] === tab.direction,
-						'text-neutral-400': selected_direction.current[source] !== tab.direction
+						'bg-accent-bg text-accent': selected_direction.current[source] === tab.direction,
+						'text-muted': selected_direction.current[source] !== tab.direction
 					}
 				]}
 				onclick={() => {

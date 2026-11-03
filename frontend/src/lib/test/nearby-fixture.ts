@@ -56,6 +56,7 @@ export function nearbyFixture() {
 	const incoming: IncomingTrip = {
 		source: 'mta_bus',
 		route_id: 'IN',
+		direction: 0,
 		arrival: chartNow + 60_000
 	};
 	function serviceFor(route_id: string, visits: [string, number, number][]): RouteService {

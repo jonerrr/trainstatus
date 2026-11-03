@@ -64,14 +64,14 @@
 </script>
 
 {#if occupancy}
-	<!-- TODO: better colors -->
 	<div
 		class={[
-			'flex items-center gap-1 self-start text-neutral-200',
+			'flex items-center gap-1 self-start',
 			{
 				'pt-1': occupancy.kind === 'meter',
-				'text-yellow-400': occupancy.tone === 'busy',
-				'text-red-400': occupancy.tone === 'full'
+				'text-secondary': occupancy.tone === 'open',
+				'text-status-warning': occupancy.tone === 'busy',
+				'text-status-danger': occupancy.tone === 'full'
 			}
 		]}
 	>

@@ -14,7 +14,7 @@
 <span class="sr-only" role="status">{status.warning ? 'Can’t update data' : ''}</span>
 {#if status.warning}
 	<div
-		class="overflow-hidden"
+		class="shrink-0 overflow-hidden"
 		transition:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
 	>
 		<button

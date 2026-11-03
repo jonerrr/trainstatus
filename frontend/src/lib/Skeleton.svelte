@@ -10,7 +10,7 @@
 <div class="flex flex-col gap-2 {className}">
 	{#each Array.from({ length: lines }, (_, i) => i) as i (i)}
 		<div
-			class="h-4 animate-pulse rounded bg-neutral-800"
+			class="h-4 animate-pulse rounded-none bg-surface-2"
 			style:width="{75 + ((i * 17) % 25)}%"
 		></div>
 	{/each}

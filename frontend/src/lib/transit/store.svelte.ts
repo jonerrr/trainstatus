@@ -26,9 +26,9 @@ import {
 	type CatalogData,
 	type RouteData
 } from './decode.js';
-import { Entry, type Resource, type ResourceSnapshot } from './resource.svelte.js';
+import { Entry, toError, type Read, type Resource } from './resource.svelte.js';
 
-export type { Resource, ResourceSnapshot } from './resource.svelte.js';
+export type { Resource, Read } from './resource.svelte.js';
 
 const MAX_BATCH_ROUTES = 40;
 const FIRST_RETRY_MS = 5_000;
@@ -69,12 +69,12 @@ export interface TrackedUpdate {
 	readonly at?: number;
 	readonly active: boolean;
 	readonly error: Error | null;
+	/** Decoding/programming failures use the shared error screen instead of the Retry warning. */
+	readonly fatal?: boolean;
 	readonly fetched_at: number | null;
 	readonly source_updated_at?: number | null;
 	retry(): void;
 }
-
-export class UnknownRouteError extends Error {}
 
 type ServiceEntry = Entry<ReadonlyMap<string, RouteData>>;
 
@@ -90,18 +90,19 @@ export interface RouteKey {
 	at?: number;
 }
 
-export interface CatalogRead {
-	source: Source;
-	catalog: CatalogData | undefined;
-	loading: boolean;
-	error: Error | null;
+export interface TripKey extends RouteKey {
+	trip_id: string;
 }
 
-export interface RouteRead extends RouteKey {
-	route: RouteData | undefined;
-	loading: boolean;
-	error: Error | null;
+interface TripSelection {
+	requested: TripKey;
+	entry: ServiceEntry;
+	revision: number;
+	confirm: boolean;
 }
+
+export type CatalogRead = { source: Source } & Read<CatalogData>;
+export type RouteRead = RouteKey & Read<RouteData>;
 
 function serviceUrl(source: Source, routes: readonly string[] | null, at: number | undefined) {
 	const params = new URLSearchParams();
@@ -115,7 +116,7 @@ function serviceUrl(source: Source, routes: readonly string[] | null, at: number
  * native snapshots through bindings whose explicit effects own reader interest and first loads.
  */
 export class TransitData {
-	readonly status = $state({ warning: false });
+	readonly status = $state({ warning: false, error: null as Error | null });
 	#fetcher: typeof fetch;
 	#refresh_ms: number | undefined;
 	#history_limit: number;
@@ -236,13 +237,13 @@ export class TransitData {
 	}
 
 	/** Getters keep reused component props reactive without recreating a binding. */
-	catalog(source: () => Source | null): Resource<ResourceSnapshot<CatalogData>> {
+	catalog(source: () => Source | null): Resource<Read<CatalogData>> {
 		return this.#bind(() => {
 			const key = source();
 			const entry = key === null ? undefined : this.#catalogEntry(key);
 			return {
 				entries: entry ? [entry] : [],
-				read: () => entry?.current ?? { value: undefined, loading: false, error: null }
+				read: () => entry?.current ?? { state: 'idle' }
 			};
 		});
 	}
@@ -255,41 +256,31 @@ export class TransitData {
 				read: () =>
 					entries.map((entry) => ({
 						source: entry.source,
-						catalog: entry.data,
-						loading: entry.current.loading,
-						error: entry.current.error
+						...entry.current
 					}))
 			};
 		});
 	}
 
-	alerts(
-		key: () => { source: Source; at?: number } | null
-	): Resource<ResourceSnapshot<AlertsData>> {
+	alerts(key: () => { source: Source; at?: number } | null): Resource<Read<AlertsData>> {
 		return this.#bind(() => {
 			const selected = key();
 			const entry = selected && this.#alertEntry(selected.source, selected.at);
 			return {
 				entries: entry ? [entry] : [],
-				read: () => entry?.current ?? { value: undefined, loading: false, error: null }
+				read: () => entry?.current ?? { state: 'idle' }
 			};
 		});
 	}
 
-	#routeSnapshot(entry: ServiceEntry, route_id: string): ResourceSnapshot<RouteData> {
+	#routeSnapshot(entry: ServiceEntry, route_id: string): Read<RouteData> {
 		const current = entry.current;
-		const value = current.value?.get(route_id);
-		return {
-			...current,
-			value,
-			error:
-				current.value && !value
-					? new UnknownRouteError(`Unknown ${entry.source} route ${route_id}`)
-					: current.error
-		};
+		if (current.state !== 'ready') return current;
+		const route = current.value.get(route_id);
+		return route ? { state: 'ready', value: route } : { state: 'missing' };
 	}
 
-	route(key: () => RouteKey | null): Resource<ResourceSnapshot<RouteData>> {
+	route(key: () => RouteKey | null): Resource<Read<RouteData>> {
 		return this.#bind(() => {
 			const selected = key();
 			const entry =
@@ -302,9 +293,7 @@ export class TransitData {
 			return {
 				entries: entry ? [entry] : [],
 				read: () =>
-					selected && entry
-						? this.#routeSnapshot(entry, selected.route_id)
-						: { value: undefined, loading: false, error: null }
+					selected && entry ? this.#routeSnapshot(entry, selected.route_id) : { state: 'idle' }
 			};
 		});
 	}
@@ -319,53 +308,103 @@ export class TransitData {
 				entries: [...new Set(selected.map(({ entry }) => entry))],
 				read: () =>
 					selected.map(({ key, entry }) => {
-						const { value, loading, error } = this.#routeSnapshot(entry, key.route_id);
-						return { ...key, route: value, loading, error };
+						return { ...key, ...this.#routeSnapshot(entry, key.route_id) };
 					})
 			};
 		});
 	}
 
-	trip(key: () => (RouteKey & { trip_id: string }) | null): Resource<ResourceSnapshot<TripRead>> {
-		const selected = $derived(key());
-		const route = this.route(() => selected);
-		$effect(() => {
-			const requested = selected;
-			if (!requested || requested.at !== undefined) return;
-			// A map generation can name a trip absent from cached passenger service.
-			// Check once on acquisition, so an absent trip does not create a refresh loop.
-			untrack(() => {
-				const entry = this.#service(
-					requested.source,
-					this.#key_route(requested.source, requested.route_id),
-					requested.at
-				);
-				const cached = entry.data?.get(requested.route_id);
-				if (cached && !cached.trips.has(requested.trip_id)) this.#start(entry);
-			});
+	trip(key: () => TripKey | null): Resource<Read<TripRead>> {
+		const trips = this.trips(() => {
+			const requested = key();
+			return requested ? [requested] : [];
 		});
-		const project = (current: ResourceSnapshot<RouteData>): ResourceSnapshot<TripRead> => {
-			const requested = selected;
-			const data = current.value;
-			const trip = requested && data?.trips.get(requested.trip_id);
-			return {
-				...current,
-				value:
-					requested && data && trip
-						? { trip, calls: data.calls_by_trip.get(requested.trip_id) ?? [], route: data }
-						: undefined
-			};
-		};
 		return {
 			get current() {
-				return project(route.current);
+				return trips.current[0] ?? { state: 'idle' };
 			}
 		};
 	}
 
+	trips(keys: () => readonly TripKey[]): Resource<(TripKey & Read<TripRead>)[]> {
+		let acquired = new Map<string, TripSelection>();
+		const selected = $derived.by(() => {
+			void this.#generation;
+			const requested = keys();
+			return untrack(() => {
+				const next = new Map<string, TripSelection>();
+				const selections = requested.map((requested) => {
+					const key = JSON.stringify([
+						requested.source,
+						requested.route_id,
+						requested.trip_id,
+						requested.at
+					]);
+					const entry = this.#service(
+						requested.source,
+						this.#key_route(requested.source, requested.route_id),
+						requested.at
+					);
+					const previous = acquired.get(key);
+					// Preserve confirmation identity when sibling keys are added or removed.
+					const selection =
+						previous?.entry === entry
+							? previous
+							: {
+									requested,
+									entry,
+									revision: entry.revision,
+									confirm:
+										requested.at === undefined &&
+										entry.snapshot.state !== 'loading' &&
+										!entry.data?.get(requested.route_id)?.trips.has(requested.trip_id)
+								};
+					next.set(key, selection);
+					return selection;
+				});
+				acquired = next;
+				return selections;
+			});
+		});
+		const resource = this.#bind(() => {
+			const selections = selected;
+			return {
+				entries: [...new Set(selections.map(({ entry }) => entry))],
+				read: () =>
+					selections.map((selection) => ({
+						...selection.requested,
+						...this.#tripSnapshot(selection)
+					}))
+			};
+		});
+		$effect(() => {
+			const selections = selected;
+			untrack(() => {
+				for (const { entry, revision, confirm } of selections)
+					if (confirm && entry.revision === revision) this.#start(entry);
+			});
+		});
+		return resource;
+	}
+
+	#tripSnapshot({ requested, entry, revision, confirm }: TripSelection): Read<TripRead> {
+		const current = this.#routeSnapshot(entry, requested.route_id);
+		const route = current.state === 'ready' ? current.value : undefined;
+		const trip = route?.trips.get(requested.trip_id);
+		if (route && trip)
+			return {
+				state: 'ready',
+				value: { trip, calls: route.calls_by_trip.get(trip.id) ?? [], route }
+			};
+		if (current.state === 'failed' || current.state === 'loading') return current;
+		if (confirm && entry.revision === revision)
+			return entry.error ? { state: 'failed', error: entry.error } : { state: 'loading' };
+		return { state: 'missing' };
+	}
+
 	stopArrivals(
 		key: () => { source: Source; stop_id: string; at?: number }
-	): Resource<ResourceSnapshot<StopArrivals>> {
+	): Resource<Read<StopArrivals>> {
 		return this.#bind(() => {
 			const { source, stop_id, at } = key();
 			const catalog = this.#catalogEntry(source);
@@ -379,20 +418,23 @@ export class TransitData {
 			return {
 				entries: [catalog, ...new Set(selected.map(({ entry }) => entry))],
 				read: () => {
-					if (!catalog.data) return { ...catalog.current, value: undefined };
+					const catalog_read = catalog.current;
+					if (catalog_read.state !== 'ready') return catalog_read;
+					if (!catalog_read.value.stops_by_id.has(stop_id)) return { state: 'missing' };
 					const routes = new Map<string, RouteData>();
 					const pending: string[] = [];
-					let error: Error | null = null;
+					let error: Error | undefined;
 					for (const { id, entry } of selected) {
 						const current = this.#routeSnapshot(entry, id);
-						if (current.value) routes.set(id, current.value);
-						else if (current.loading) pending.push(id);
-						else error ??= current.error;
+						if (current.state === 'ready') routes.set(id, current.value);
+						else if (current.state === 'loading') pending.push(id);
+						else if (current.state === 'failed') error ??= current.error;
 					}
+					if (!routes.size && pending.length) return { state: 'loading' };
+					if (!routes.size && error) return { state: 'failed', error };
 					return {
-						value: { calls: callsAtStop(routes.values(), stop_id), routes, pending },
-						loading: !routes.size && pending.length > 0,
-						error: !routes.size && !pending.length ? error : null
+						state: 'ready',
+						value: { calls: callsAtStop(routes.values(), stop_id), routes, pending }
 					};
 				}
 			};
@@ -441,13 +483,21 @@ export class TransitData {
 
 	replaceCatalog(body: Catalog) {
 		if (!this.#sources.has(body.source)) return;
-		const catalog = decodeCatalog(body);
-		this.#catalogEntry(body.source).install(catalog, Date.now());
+		const entry = this.#catalogEntry(body.source);
+		let catalog: CatalogData;
+		try {
+			catalog = decodeCatalog(body);
+		} catch (error) {
+			entry.fail(toError(error), true);
+			this.#updateStatus();
+			return;
+		}
+		entry.install(catalog, Date.now());
 		for (const entry of this.#services.values())
 			if (
 				entry.source === body.source &&
 				entry.active &&
-				entry.error instanceof UnknownRouteError &&
+				entry.snapshot.state === 'missing' &&
 				entry.route_id !== null &&
 				catalog.routes_by_id.has(entry.route_id)
 			)
@@ -457,9 +507,10 @@ export class TransitData {
 
 	#ensure(entry: Entry<unknown>) {
 		if (this.#destroyed || entry.in_flight) return;
-		if (entry.data !== undefined && (entry.kind === 'catalog' || entry.at !== undefined)) return;
+		if (entry.snapshot.state !== 'loading' && (entry.kind === 'catalog' || entry.at !== undefined))
+			return;
 		if (
-			(entry.data !== undefined || entry.error) &&
+			(entry.snapshot.state !== 'loading' || entry.error) &&
 			(this.#due(entry) > Date.now() || !this.#may_poll())
 		)
 			return;
@@ -481,12 +532,16 @@ export class TransitData {
 			...this.#alerts.values(),
 			...this.#services.values()
 		]) {
-			if (!entry.active && !entry.eager) continue;
+			if (!entry.active && !entry.eager) {
+				if (entry.fatal) entry.reset();
+				continue;
+			}
 			if (entry.kind === 'catalog' ? !entry.error : entry.at !== undefined && !entry.error)
 				continue;
 			this.#start(entry);
 		}
 		for (const update of this.#tracked) if (update.active) update.retry();
+		this.#updateStatus();
 	}
 
 	/** Stops timers and requests without touching reactive state that unmounting views may read. */
@@ -569,6 +624,7 @@ export class TransitData {
 		entry.attempted_at = Date.now();
 		entry.in_flight = true;
 		const revision = entry.revision;
+		let decoding = false;
 		try {
 			const response = await this.#fetcher(url, {
 				...init,
@@ -576,11 +632,12 @@ export class TransitData {
 			});
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
 			const body = (await response.json()) as B;
+			decoding = true;
 			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
 				entry.install(decode(body), Date.now());
 		} catch (error) {
 			if (!signal.aborted && this.#owns(entry) && entry.revision === revision)
-				entry.fail(error as Error);
+				entry.fail(toError(error), decoding);
 		} finally {
 			entry.in_flight = false;
 			this.#evictHistory();
@@ -640,6 +697,7 @@ export class TransitData {
 			entry.in_flight = true;
 			entry.attempted_at = attempted;
 		}
+		let decoding = false;
 		try {
 			const response = await this.#fetcher(serviceUrl(source, routes, at), {
 				signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
@@ -648,20 +706,22 @@ export class TransitData {
 			if (signal.aborted || this.#destroyed) return;
 			// A saved catalog can name a retired route; isolate it so valid batch peers still load.
 			if (response.status === 404 && routes) {
-				const unknown = new Set(((await response.json()) as UnknownRoutes).unknown_route_ids);
+				const body = (await response.json()) as UnknownRoutes;
+				decoding = true;
+				const unknown = new Set(body.unknown_route_ids);
+				if (!unknown.size) throw new Error('Service 404 omitted unknown route IDs');
 				if (signal.aborted || this.#destroyed) return;
 				for (const entry of entries) {
 					if (!this.#owns(entry)) continue;
 					entry.in_flight = false;
 					if (!unknown.has(entry.route_id!)) this.#enqueue(entry);
-					else {
-						entry.fail(new UnknownRouteError(`Unknown ${source} route ${entry.route_id}`));
-					}
+					else entry.markMissing(Date.now());
 				}
 				return;
 			}
 			if (!response.ok) throw new Error(`Service returned ${response.status}`);
 			const service = (await response.json()) as Service;
+			decoding = true;
 			const now = Date.now();
 			const decoded = decodeService(service, now);
 			for (const entry of entries) {
@@ -673,7 +733,7 @@ export class TransitData {
 				else {
 					const route = decoded.get(entry.route_id!);
 					if (route) entry.install(new Map([[entry.route_id!, route]]), now);
-					else entry.fail(new Error(`Service omitted route ${entry.route_id}`));
+					else entry.fail(new Error(`Service omitted route ${entry.route_id}`), true);
 				}
 			}
 		} catch (error) {
@@ -681,7 +741,7 @@ export class TransitData {
 			for (const entry of entries) {
 				if (signal.aborted || !this.#owns(entry)) continue;
 				entry.in_flight = false;
-				entry.fail(error as Error);
+				entry.fail(toError(error), decoding);
 			}
 		} finally {
 			this.#evictHistory();
@@ -723,14 +783,30 @@ export class TransitData {
 		if (this.#destroyed) return;
 		let warning = browser && !navigator.onLine;
 		const now = Date.now();
+		let error: Error | null = null;
+		let catalog_available = false;
+		let catalog_pending = false;
+		let catalog_error: Error | null = null;
 		for (const entry of [
 			...this.#catalogs.values(),
 			...this.#services.values(),
 			...this.#alerts.values()
 		]) {
-			if (entry.error instanceof UnknownRouteError || (!entry.active && !entry.eager)) continue;
+			if (!entry.active && !entry.eager) continue;
 			if (entry.error) warning = true;
-			if (entry.kind === 'catalog' || entry.at !== undefined || entry.fetched_at === null) continue;
+			if (entry.fatal) error ??= entry.error;
+			if (entry.kind === 'catalog') {
+				catalog_available ||= entry.current.state === 'ready';
+				catalog_pending ||= entry.current.state === 'loading';
+				catalog_error ??= entry.error;
+			}
+			if (
+				entry.snapshot.state === 'missing' ||
+				entry.kind === 'catalog' ||
+				entry.at !== undefined ||
+				entry.fetched_at === null
+			)
+				continue;
 			const refreshed = Math.min(entry.fetched_at, entry.source_updated_at ?? entry.fetched_at);
 			// TODO: If revisiting stale rows causes distracting warning flashes, consider
 			// waiting for their refresh result before showing the freshness warning.
@@ -738,6 +814,7 @@ export class TransitData {
 		}
 		for (const update of this.#tracked) {
 			if (!update.active) continue;
+			if (update.fatal) error ??= update.error;
 			if (
 				update.error ||
 				(update.at == null &&
@@ -748,6 +825,7 @@ export class TransitData {
 				warning = true;
 		}
 		this.status.warning = warning;
+		this.status.error = error ?? (!catalog_available && !catalog_pending ? catalog_error : null);
 	}
 
 	#owns(entry: Entry<unknown>) {

@@ -73,6 +73,23 @@ function store(fetcher: typeof fetch, sources: Source[] = ['mta_bus'], history_l
 	return data;
 }
 
+test('each app mount loads catalogs', async () => {
+	const catalog = chartFixture('mta_bus').catalog;
+	const fetcher: typeof fetch = async (input) => {
+		if (String(input).includes('/catalog/')) {
+			return new Response(JSON.stringify(catalog));
+		}
+		return new Response('[]');
+	};
+	const first = store(fetcher);
+	await settle();
+	expect(first.peekCatalog('mta_bus')?.stops).toEqual(catalog.stops);
+	first.destroy();
+	const second = store(fetcher);
+	await settle();
+	expect(second.peekCatalog('mta_bus')?.stops).toEqual(catalog.stops);
+});
+
 test('successful map polls retain source age in the shared warning until a new commit', async () => {
 	const http = transport();
 	const data = store(http.fetcher);
@@ -356,6 +373,7 @@ test('failed refreshes retain data and empty replacements remove stale trips', a
 	http.calls[1].respond(new Response('down', { status: 500 }));
 	await settle();
 	expect(text('A')).toEqual(['a1']);
+	expect(document.querySelector('[data-failed="A"]')).toBeNull();
 	expect(data.status.warning).toBe(true);
 
 	clock += 60_000;
@@ -366,6 +384,7 @@ test('failed refreshes retain data and empty replacements remove stale trips', a
 	http.calls[2].respond(http.json(http.service('mta_bus', { A: [] })));
 	await settle();
 	expect(text('A')).toEqual(['']);
+	expect(document.querySelector('[data-failed="A"]')).toBeNull();
 	expect(data.status.warning).toBe(false);
 });
 
@@ -441,7 +460,7 @@ test('historical failures warn while mounted and successful history never ages',
 	await view.unmount();
 });
 
-test('unknown routes fail alone and the rest of the batch is requested again', async () => {
+test('missing routes resolve without an error and the rest of the batch is requested again', async () => {
 	const http = transport();
 	const data = store(http.fetcher);
 	await render(TransitDataHarness, {
@@ -455,11 +474,43 @@ test('unknown routes fail alone and the rest of the batch is requested again', a
 	await settle();
 	http.calls[0].respond(http.json({ unknown_route_ids: ['Z'] }, 404));
 	await settle();
-	expect(document.querySelector('[data-failed="Z"]')).not.toBeNull();
+	expect(document.querySelector('[data-missing="Z"]')).not.toBeNull();
+	expect(document.querySelector('[data-failed="Z"]')).toBeNull();
+	expect(data.status.warning).toBe(false);
 	expect(http.routes(http.calls[1])).toEqual(['A']);
 	http.calls[1].respond(http.json(http.service('mta_bus', { A: ['a1'] })));
 	await settle();
 	expect(text('A')).toEqual(['a1']);
+});
+
+test('confirmed route absence does not age into a warning, but a failed recheck does', async () => {
+	const http = transport();
+	const data = store(http.fetcher);
+	await render(TransitDataHarness, {
+		data,
+		source: 'mta_bus',
+		readers: [{ id: 'missing', route: 'Z' }]
+	});
+	await settle();
+	http.calls[0].respond(http.json({ unknown_route_ids: ['Z'] }, 404));
+	await settle();
+	expect(document.querySelector('[data-missing="Z"]')).not.toBeNull();
+	expect(data.status.warning).toBe(false);
+	clock += 91_000;
+	document.dispatchEvent(new Event('visibilitychange'));
+	await settle();
+	expect(data.status.warning).toBe(false);
+	http.calls[1].respond(new Response('', { status: 503 }));
+	await settle();
+	expect(document.querySelector('[data-failed="Z"]')?.textContent).toBe('Service returned 503');
+	expect(data.status.warning).toBe(true);
+	data.retry();
+	await settle();
+	http.calls[2].respond(http.json({ unknown_route_ids: ['Z'] }, 404));
+	await settle();
+	expect(document.querySelector('[data-failed="Z"]')).toBeNull();
+	expect(document.querySelector('[data-missing="Z"]')).not.toBeNull();
+	expect(data.status.warning).toBe(false);
 });
 
 test('historical entries are separate, bounded, and protected while read', async () => {
@@ -659,12 +710,13 @@ test('a replacement catalog retries an active route previously reported unknown'
 	await settle();
 	http.calls[0].respond(http.json({ unknown_route_ids: ['4'] }, 404));
 	await settle();
-	expect(document.querySelector('[data-failed="4"]')).not.toBeNull();
+	expect(document.querySelector('[data-missing="4"]')).not.toBeNull();
+	expect(document.querySelector('[data-failed="4"]')).toBeNull();
 	data.replaceCatalog(chartFixture('mta_bus').catalog);
 	await settle();
 	expect(http.calls).toHaveLength(2);
 	http.calls[1].respond(http.json(http.service('mta_bus', { '4': ['recovered'] })));
 	await settle();
 	expect(text('4')).toEqual(['recovered']);
-	expect(document.querySelector('[data-failed="4"]')).toBeNull();
+	expect(document.querySelector('[data-missing="4"]')).toBeNull();
 });

@@ -22,7 +22,7 @@
 <!-- currently only used in modals, not main list -->
 <div class="relative list-item w-full">
 	<button
-		class="flex w-full items-center justify-between border-b border-neutral-800 p-1 text-white transition-colors duration-200 last:border-b-0 hover:bg-neutral-900 active:bg-neutral-900"
+		class="flex w-full items-center justify-between border-b border-border-subtle p-1 text-white transition-colors duration-200 last:border-b-0 hover:bg-surface-1 active:bg-surface-1"
 		onclick={() => {
 			open_modal(pState);
 		}}
@@ -35,7 +35,7 @@
 			bind:pins
 			id={pin_id}
 			source={pState.source}
-			class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-md px-2 py-1 text-neutral-200 hover:text-neutral-400"
+			class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-none px-2 py-1 text-secondary hover:text-muted"
 		/>
 	{/if}
 </div>

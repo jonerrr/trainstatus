@@ -10,11 +10,11 @@
 
 	const transit = getTransitData();
 	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current);
+	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
 
 	const sources = $derived(
 		Object.fromEntries(
-			catalogs.map(({ source, catalog }) => [source, catalog ? alert_routes(catalog) : []])
+			catalogs.map(({ source, value }) => [source, alert_routes(value)])
 		) as Partial<Record<Source, CatalogRoute[]>>
 	);
 </script>

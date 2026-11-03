@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'svelte';
 
+import { chartFixture } from '#lib/charts/fixtures.js';
 import type { ApiAlert } from '#lib/client/index.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
 import { TransitData } from '#lib/transit/store.svelte.js';
@@ -37,12 +38,18 @@ test('asynchronously loaded and replaced alert cards are observed and update nav
 		}
 	);
 	const responses: ((response: Response) => void)[] = [];
+	const catalog = chartFixture('mta_bus', 0).catalog;
 	const data = new TransitData({
 		sources: ['mta_bus'],
 		fetcher: (async (input) => {
 			if (String(input).includes('/alerts/'))
 				return new Promise<Response>((resolve) => responses.push(resolve));
-			return new Response(JSON.stringify({ source: 'mta_bus', routes: [], stops: [] }));
+			return new Response(
+				JSON.stringify({
+					...catalog,
+					routes: [{ ...catalog.routes[0], id: 'A' }]
+				})
+			);
 		}) as typeof fetch
 	});
 	const alert = (id: string): ApiAlert => ({
@@ -93,6 +100,17 @@ test('asynchronously loaded and replaced alert cards are observed and update nav
 	responses[2](new Response(JSON.stringify([refreshed])));
 	await expect.element(view.getByText('refreshed text', { exact: true })).toBeVisible();
 	expect(view.container.querySelector('a')?.hasAttribute('href')).toBe(false);
+	data.retry();
+	await expect.poll(() => responses.length).toBe(4);
+	responses[3](new Response('', { status: 503 }));
+	await expect.poll(() => data.status.warning).toBe(true);
+	await expect.element(view.getByText('refreshed text', { exact: true })).toBeVisible();
+	await expect.element(view.getByText('Alerts unavailable')).not.toBeInTheDocument();
+	data.retry();
+	await expect.poll(() => responses.length).toBe(5);
+	responses[4](new Response('[]'));
+	await expect.element(view.getByText('No alerts', { exact: true })).toBeVisible();
+	expect(view.container.querySelectorAll('.alert')).toHaveLength(0);
 	await view.unmount();
 	expect(observers.every((observer) => observer.disconnect.mock.calls.length > 0)).toBe(true);
 	data.destroy();

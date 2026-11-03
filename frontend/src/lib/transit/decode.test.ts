@@ -70,3 +70,24 @@ test('fetching an old committed snapshot does not renew source freshness', () =>
 	const historical = decodeService({ ...service, at: 50 }, 92_000).get('A')!;
 	expect(historical.source_updated_at).toBeNull();
 });
+
+test('platform assignments stay attached to individual visits and validate column length', () => {
+	const subway: RouteService = {
+		...route,
+		trips: route.trips.map((trip) => ({
+			...trip,
+			data: { source: 'mta_subway', consist_cars: [] }
+		})),
+		calls: { ...route.calls, platform_edges: [['north'], [], ['south'], ['island', 'express']] }
+	};
+	const decoded = decodeRoute('mta_subway', 'A', subway);
+	expect(decoded.calls_by_trip.get('t1')?.map((call) => call.platform_edges)).toEqual([
+		['north'],
+		[],
+		['south']
+	]);
+	expect(decoded.calls_by_stop.get('loop')?.[0].platform_edges).toEqual(['island', 'express']);
+	expect(() =>
+		decodeRoute('mta_subway', 'A', { ...subway, calls: { ...subway.calls, platform_edges: [[]] } })
+	).toThrow(/differ in length/);
+});

@@ -1,3 +1,5 @@
+import type { TrackedUpdate } from '#lib/transit/store.svelte.js';
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { watchTrajectories } from './trajectories.svelte.js';
@@ -14,6 +16,7 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 	const { trajectoryFixture } = await import('./trajectoryFixture');
 	let requests = 0;
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
+	let tracked: TrackedUpdate | undefined;
 	const stop = watchTrajectories(
 		{ sources: ['mta_bus'], at: undefined, refreshInterval: 30_000 },
 		(snapshot) => (latest = snapshot),
@@ -23,17 +26,21 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 			return new Promise<Response>((_resolve, reject) => {
 				signal.addEventListener('abort', () => reject(signal.reason));
 			});
+		},
+		(update) => {
+			tracked = update;
+			return () => {};
 		}
 	);
 	try {
 		expect(timeout).toHaveBeenCalledWith(15_000);
 		deadline.abort(new DOMException('Request timed out', 'TimeoutError'));
 		await vi.advanceTimersByTimeAsync(0);
-		expect(latest?.statuses.get('mta_bus')?.error?.name).toBe('TimeoutError');
+		expect(tracked?.error?.name).toBe('TimeoutError');
 		await stop.refresh();
 		expect(requests).toBe(2);
 		expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
-		expect(latest?.statuses.get('mta_bus')?.error).toBeNull();
+		expect(tracked?.error).toBeNull();
 	} finally {
 		stop();
 	}
@@ -44,6 +51,7 @@ test('a failed historical Arrow update retries until network recovery', async ()
 	const { trajectoryFixture } = await import('./trajectoryFixture');
 	let calls = 0;
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
+	let tracked: TrackedUpdate | undefined;
 	const stop = watchTrajectories(
 		{ sources: ['mta_bus'], at: 0, refreshInterval: 100 },
 		(snapshot) => {
@@ -52,19 +60,57 @@ test('a failed historical Arrow update retries until network recovery', async ()
 		async () => {
 			calls++;
 			return new Response(trajectoryFixture(), calls === 1 ? { status: 503 } : {});
+		},
+		(update) => {
+			tracked = update;
+			return () => {};
 		}
 	);
 	await vi.advanceTimersByTimeAsync(0);
 	expect(latest?.tables.size).toBe(0);
-	expect(latest?.statuses.get('mta_bus')?.available).toBe(false);
-	expect(latest?.statuses.get('mta_bus')?.error).toBeInstanceOf(Error);
+	expect(tracked?.error).toBeInstanceOf(Error);
 	await vi.advanceTimersByTimeAsync(1000);
 	expect(calls).toBe(2);
 	expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
-	expect(latest?.statuses.get('mta_bus')?.error).toBeNull();
+	expect(tracked?.error).toBeNull();
 	await stop.refresh();
 	expect(calls).toBe(3);
 	stop();
+});
+
+test('Retry clears fatal Arrow errors synchronously and subsequent failures restore them', async () => {
+	const { trajectoryFixture } = await import('./trajectoryFixture');
+	let malformed = true;
+	let tracked: TrackedUpdate | undefined;
+	const stop = watchTrajectories(
+		{ sources: ['mta_bus'], at: 0 },
+		() => {},
+		async () => new Response(malformed ? 'invalid Arrow' : trajectoryFixture()),
+		(update) => {
+			tracked = update;
+			return () => {};
+		}
+	);
+	try {
+		await stop.refresh();
+		expect(tracked?.error).toBeInstanceOf(Error);
+		expect(tracked?.fatal).toBe(true);
+		tracked!.retry();
+		expect(tracked?.error).toBeNull();
+		expect(tracked?.fatal).toBe(false);
+		await stop.refresh();
+		expect(tracked?.error).toBeInstanceOf(Error);
+		expect(tracked?.fatal).toBe(true);
+		malformed = false;
+		tracked!.retry();
+		expect(tracked?.error).toBeNull();
+		expect(tracked?.fatal).toBe(false);
+		await stop.refresh();
+		expect(tracked?.error).toBeNull();
+		expect(tracked?.fatal).toBe(false);
+	} finally {
+		stop();
+	}
 });
 
 test('historical failures retry at the selected time', async () => {
@@ -137,22 +183,22 @@ test('disposing a query aborts its requests and rejects late completions', async
 test('live polling reports a source failure and stops after disposal', async () => {
 	vi.useFakeTimers();
 	let requests = 0;
-	const errors: string[] = [];
+	let tracked: TrackedUpdate | undefined;
 	const stop = watchTrajectories(
 		{ sources: ['njt_bus'], at: undefined, refreshInterval: 100 },
-		(update) => {
-			for (const state of update.statuses.values()) {
-				if (state.error) errors.push(state.error.message);
-			}
-		},
+		() => {},
 		async () => {
 			requests++;
 			return new Response('', { status: 503 });
+		},
+		(update) => {
+			tracked = update;
+			return () => {};
 		}
 	);
 	await vi.advanceTimersByTimeAsync(200);
 	expect(requests).toBe(3);
-	expect(errors.some((error) => error.includes('503'))).toBe(true);
+	expect(tracked?.error?.message).toContain('503');
 	stop();
 	await vi.advanceTimersByTimeAsync(200);
 	expect(requests).toBe(3);

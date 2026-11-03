@@ -1,6 +1,7 @@
 <script lang="ts" generics="P extends object">
 	import type { Component } from 'svelte';
 
+	import DataBoundary from '#lib/DataBoundary.svelte';
 	import { setTransitData, type TransitData } from '#lib/transit/store.svelte.js';
 	import { createCurrentTime, setCurrentTime } from '#lib/url_params.svelte.js';
 
@@ -15,4 +16,4 @@
 	setCurrentTime(createCurrentTime());
 </script>
 
-<Child {...child_props as P} />
+<DataBoundary><Child {...child_props as P} /></DataBoundary>

@@ -23,6 +23,7 @@ function fixtureData(
 	customize(f);
 	page.data.selected_sources = ['mta_bus'];
 	const requests: string[] = [];
+	const service_state = { fail: false };
 	const respond = fixtureFetcher({
 		catalogs: { mta_bus: f.catalog },
 		services: { mta_bus: f.service }
@@ -32,7 +33,10 @@ function fixtureData(
 		batch_ms: 0,
 		fetcher: async (input, init) => {
 			requests.push(String(input));
-			if (String(input).includes('/service/')) await service_gate;
+			if (String(input).includes('/service/')) {
+				await service_gate;
+				if (service_state.fail) throw new Error('Predictions unavailable');
+			}
 			return respond(input, init);
 		}
 	});
@@ -47,12 +51,15 @@ function fixtureData(
 					)
 			)
 		].sort();
-	return { ...f, data, requestedRoutes };
+	return { ...f, data, requestedRoutes, service_state };
 }
 
-test('loads visible choices first and preserves proximity order through expansion and collapse', async () => {
+test('orders by actual boarding stop then arrival through expansion and collapse', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
-	const f = fixtureData();
+	const f = fixtureData((f) => {
+		f.origin.nearby_stops.find((s) => s.stop_id === f.third.id)!.distance_m = 30;
+		f.service.routes.B = f.serviceFor('B', [['far', 3, 0]]);
+	});
 	const view = await render(TransitProvider<ComponentProps<typeof Transfers>>, {
 		data: f.data,
 		component: Transfers,
@@ -60,38 +67,55 @@ test('loads visible choices first and preserves proximity order through expansio
 	});
 	try {
 		await expect.element(view.getByRole('button', { name: /^A to A North.*5m/ })).toBeVisible();
-		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C']);
+		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
 		expect(view.container.querySelectorAll('button[aria-label*=" to "]')).toHaveLength(3);
 		expect(
 			view.container.querySelector('button[aria-label^="A to"]')?.getAttribute('aria-label')
 		).toContain('Board at far');
-		await view.getByRole('button', { name: 'Show more' }).click();
+		await view.getByText('Show more', { exact: true }).click();
 		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
+		await expect
+			.element(view.getByRole('button', { name: /^A to A North.*20m/ }))
+			.not.toBeInTheDocument();
+		await view.getByText('Later departures', { exact: true }).click();
+		await expect.element(view.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
+		await view.getByRole('button', { name: 'Collapse later departures', exact: true }).click();
+		await expect
+			.element(view.getByRole('button', { name: /^A to A North.*20m/ }))
+			.not.toBeInTheDocument();
+		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
+		await view.getByText('Later departures', { exact: true }).click();
 		await expect.element(view.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
 		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
 		await expect
 			.poll(() =>
 				[
 					...view.container.querySelectorAll(
-						'section[aria-label="Transfers after arrival"] > button[aria-label*=" to "]'
+						'section[aria-label="Transfers after arrival"] .transfer-row > button[aria-label*=" to "]'
 					)
 				]
-					.filter((b) => b.getBoundingClientRect().height > 0)
+					.filter(
+						(b) =>
+							b.getBoundingClientRect().height > 0 && !b.closest('[aria-label="Later departures"]')
+					)
 					.map((b) => b.getAttribute('aria-label')?.split(' ')[0])
 			)
-			.toEqual(['A', 'B', 'C', 'D']);
-		await view.getByRole('button', { name: 'Show less' }).click();
+			.toEqual(['C', 'B', 'A', 'D']);
+		await view.getByText('Show less', { exact: true }).click();
 		expect(
 			[
 				...view.container.querySelectorAll(
-					'section[aria-label="Transfers after arrival"] > button[aria-label*=" to "]'
+					'section[aria-label="Transfers after arrival"] .transfer-row > button[aria-label*=" to "]'
 				)
 			]
-				.filter((b) => b.getBoundingClientRect().height > 0)
+				.filter(
+					(b) =>
+						b.getBoundingClientRect().height > 0 && !b.closest('[aria-label="Later departures"]')
+				)
 				.map((b) => b.getAttribute('aria-label')?.split(' ')[0])
-		).toEqual(['A', 'B', 'C']);
+		).toEqual(['C', 'B', 'A']);
 		expect(view.container.textContent).not.toContain('Later departures');
-		await view.getByRole('button', { name: 'Show more' }).click();
+		await view.getByText('Show more', { exact: true }).click();
 		await view.getByRole('button', { name: /^D to/ }).click();
 		expect(page.state.modal).toMatchObject({
 			type: 'trip',
@@ -106,7 +130,7 @@ test('loads visible choices first and preserves proximity order through expansio
 	}
 });
 
-test('omits empty routes and same-stop distances while keeping expanded choices collapsible', async () => {
+test('fills three rows from available departures beyond empty choices and omits same-stop distances', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = fixtureData((f) => {
 		f.origin.routes.push(...f.third.routes);
@@ -114,7 +138,7 @@ test('omits empty routes and same-stop distances while keeping expanded choices 
 		f.service.routes.C = f.serviceFor('C', [['origin', 8, 0]]);
 		f.service.routes.A = f.serviceFor('A', [['far', 5, 0]]);
 		f.service.routes.B = f.serviceFor('B', [['far', 0, 0]]);
-		f.service.routes.D = f.serviceFor('D', []);
+		f.service.routes.D = f.serviceFor('D', [['fourth', 3, 0]]);
 	});
 	const view = await render(TransitProvider<ComponentProps<typeof Transfers>>, {
 		data: f.data,
@@ -126,7 +150,7 @@ test('omits empty routes and same-stop distances while keeping expanded choices 
 		await expect.element(same_stop).toBeVisible();
 		await expect.element(same_stop).not.toHaveTextContent('Here');
 		await expect.element(view.getByRole('button', { name: /^A to A North.*5m/ })).toBeVisible();
-		await view.getByRole('button', { name: 'Show more' }).click();
+		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
 		await expect.poll(() => f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
 		await expect
 			.poll(() => view.container.querySelectorAll('[aria-label="Loading departures"]').length)
@@ -134,16 +158,17 @@ test('omits empty routes and same-stop distances while keeping expanded choices 
 		expect(
 			[
 				...view.container.querySelectorAll(
-					'section[aria-label="Transfers after arrival"] > button[aria-label*=" to "]'
+					'section[aria-label="Transfers after arrival"] .transfer-row > button[aria-label*=" to "]'
 				)
 			].map((button) => button.getAttribute('aria-label'))
-		).toEqual([expect.stringMatching(/^C to/), expect.stringMatching(/^A to/)]);
+		).toEqual([
+			expect.stringMatching(/^C to/),
+			expect.stringMatching(/^A to/),
+			expect.stringMatching(/^D to/)
+		]);
 		expect(view.container.querySelector('button[aria-label^="B to"]')).toBeNull();
-		expect(view.container.querySelector('button[aria-label^="D to"]')).toBeNull();
 		expect(view.container.textContent).not.toContain('No later predictions');
-		await expect.element(view.getByRole('button', { name: 'Show less' })).toBeVisible();
-		await view.getByRole('button', { name: 'Show less' }).click();
-		await expect.element(view.getByRole('button', { name: 'Show less' })).not.toBeInTheDocument();
+		await expect.element(view.getByText('Show more', { exact: true })).not.toBeInTheDocument();
 	} finally {
 		await view.unmount();
 		f.data.destroy();
@@ -185,26 +210,48 @@ test('does not flash route rows while bus predictions load and resolve empty', a
 	}
 });
 
-test('closed trip panels advertise static choices without acquiring their service', async () => {
+test('hides failed transfers with known options and restores departures on Retry', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = fixtureData();
-	const view = await render(TransitProvider<ComponentProps<typeof Modal>>, {
+	f.service_state.fail = true;
+	const view = await render(TransitProvider<ComponentProps<typeof Transfers>>, {
 		data: f.data,
-		component: Modal,
-		child_props: {
-			source: 'mta_bus' as const,
-			route_id: 'IN',
-			trip_id: 'IN-0',
-			show_previous: false,
-			time_format: 'countdown' as const
-		}
+		component: Transfers,
+		child_props: { stop: f.origin, incoming: f.incoming, time_format: 'countdown' }
 	});
 	try {
+		await expect.poll(() => f.data.status.warning).toBe(true);
 		await expect
-			.element(view.getByRole('button', { name: /Transfers at Board at origin/ }))
+			.element(view.getByRole('region', { name: 'Transfers after arrival' }))
+			.not.toBeInTheDocument();
+		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
+		f.service_state.fail = false;
+		f.data.retry();
+		await expect.element(view.getByRole('button', { name: /^A to/ }).first()).toBeVisible();
+		await expect
+			.element(view.getByRole('region', { name: 'Transfers after arrival' }))
 			.toBeVisible();
-		expect(f.requestedRoutes()).toEqual(['IN']);
-		expect(view.container.textContent).not.toContain('Transfers after arrival');
+	} finally {
+		await view.unmount();
+		f.data.destroy();
+		vi.restoreAllMocks();
+	}
+});
+
+test('a collapsed transfer section advertises choices without acquiring route service', async () => {
+	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+	const f = fixtureData();
+	const view = await render(TransitProvider<ComponentProps<typeof Transfers>>, {
+		data: f.data,
+		component: Transfers,
+		child_props: { stop: f.origin, incoming: f.incoming, time_format: 'countdown', open: false }
+	});
+	try {
+		await expect.element(view.getByText('Transfers', { exact: true })).toBeVisible();
+		expect(f.requestedRoutes()).toEqual([]);
+		await view.getByText('Transfers', { exact: true }).click();
+		await expect.element(view.getByRole('button', { name: /^A to/ })).toBeVisible();
+		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
 	} finally {
 		await view.unmount();
 		f.data.destroy();
@@ -227,9 +274,8 @@ test('an open transfer panel follows refreshed incoming arrival predictions', as
 		}
 	});
 	try {
-		const toggle = view.getByRole('button', { name: /Transfers at Board at origin/ });
+		const toggle = view.getByRole('button', { name: 'Preview Board at origin', exact: true });
 		await expect.element(toggle).toBeVisible();
-		await toggle.click();
 		await expect.element(view.getByRole('button', { name: /^A to A North.*5m/ })).toBeVisible();
 		f.service.routes.IN.calls.arrival[0] = chartNow / 1000 + 6 * 60;
 		f.service.routes.IN.calls.departure[0] = chartNow / 1000 + 6 * 60;
@@ -240,7 +286,7 @@ test('an open transfer panel follows refreshed incoming arrival predictions', as
 		await expect
 			.element(view.getByRole('button', { name: /^A to A North.*5m/ }))
 			.not.toBeInTheDocument();
-		await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
 	} finally {
 		await view.unmount();
 		f.data.destroy();

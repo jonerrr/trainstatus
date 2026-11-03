@@ -191,6 +191,14 @@ export type EgressPoint = {
      * Position of the egress point on the platform in feet from a reference point
      */
     position_ft: number;
+    /**
+     * Street exits reachable from this point on the platform.
+     */
+    street_exits?: Array<StreetExit>;
+    /**
+     * Connections from this platform point to other platform edges.
+     */
+    transfer_paths?: Array<PlatformTransfer>;
     vertical_direction: VerticalDirection;
 };
 
@@ -306,6 +314,14 @@ export type PlatformEdge = {
     length_ft: number;
 };
 
+export type PlatformTransfer = {
+    /**
+     * Provider-declared path accessibility, not current elevator availability.
+     */
+    accessible: boolean;
+    to_platform_edge: string;
+};
+
 export type RouteService = {
     calls: ServiceCalls;
     /**
@@ -356,6 +372,11 @@ export type ServiceCalls = {
      */
     departure: Array<number>;
     /**
+     * Subway platform-edge IDs per visit, aligned with the other call columns.
+     * Absent for sources without platform assignments; an empty entry means unknown.
+     */
+    platform_edges?: Array<Array<string>> | null;
+    /**
      * Visit order within the trip. Distinct per trip; a repeated stop is a separate visit.
      */
     sequence: Array<number>;
@@ -395,6 +416,15 @@ export type StopData = (MtaSubwayStopData & {
 });
 
 export type StopType = 'full_time' | 'part_time' | 'late_night' | 'rush_hour_one_direction' | 'rush_hour' | 'weekday_only' | 'nights_weekends_only' | 'unknown';
+
+export type StreetExit = {
+    /**
+     * Whether the provider marks the path from this platform point as accessible.
+     */
+    accessible: boolean;
+    id: number;
+    intersection: Array<string>;
+};
 
 /**
  * TripRun data changes based on the `Source`

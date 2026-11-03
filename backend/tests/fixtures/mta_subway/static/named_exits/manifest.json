@@ -1,0 +1,13 @@
+{
+  "source": "mta_subway",
+  "kind": "static",
+  "scenario": "named_exits",
+  "payloads": [
+    {
+      "name": "exit_strategy",
+      "path": "raw/exit_strategy.json",
+      "format": "json"
+    }
+  ],
+  "notes": "Raw exit strategy captured 2026-10-19, filtered to Utica Av (181) to retain street exits and path associations."
+}

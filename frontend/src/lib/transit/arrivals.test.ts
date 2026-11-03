@@ -32,6 +32,7 @@ function route(route_id: string, trips: [string, number][]): RouteData {
 
 function call(route_id: string, trip_id: string, minutes: number): Call {
 	return {
+		platform_edges: [],
 		trip_id,
 		route_id,
 		stop_id: 'test-stop',

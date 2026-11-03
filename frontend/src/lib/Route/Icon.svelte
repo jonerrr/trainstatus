@@ -25,17 +25,21 @@
 		show_alerts && route ? { source: route.data.source, at: current_time.value } : null
 	);
 	const hasAlert = $derived(
-		show_alerts && !!route && alerts_resource.current.value?.by_route.has(route.id)
+		show_alerts &&
+			!!route &&
+			alerts_resource.current.state === 'ready' &&
+			alerts_resource.current.value.by_route.has(route.id)
 	);
-	const classes = $derived([
-		'inline-flex shrink-0 items-center rounded-md',
-		hasAlert && 'ring-2 ring-orange-400',
-		className
-	]);
 	const size = $derived(Math.max(width, height));
 	const icon = $derived(
 		route?.data.source === 'mta_subway' ? icons.find((item) => item.name === route.id) : undefined
 	);
+	const classes = $derived([
+		'inline-flex shrink-0 items-center',
+		icon ? 'rounded-full' : 'rounded-none',
+		hasAlert && 'ring-2 ring-orange-400',
+		className
+	]);
 	const label = $derived(route?.short_name ?? '');
 	const parts = $derived(
 		route?.data.source === 'mta_bus' ? label.match(/^([A-Za-z]+)(.*)$/) : null
@@ -71,7 +75,7 @@
 {#if link}
 	<button
 		type="button"
-		class={[classes, 'focus-visible:outline-2 focus-visible:outline-blue-400']}
+		class={[classes, 'focus-visible:outline-2 focus-visible:outline-accent']}
 		aria-label={`Open route ${label}`}
 		onclick={() => open_modal({ type: 'route', source: route.data.source, id: route.id })}
 	>
@@ -90,13 +94,13 @@
 	}
 	.bus-badge {
 		display: inline-flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: center;
 		gap: 1px;
 		min-width: var(--badge-size);
-		min-height: var(--badge-size);
-		padding: 0.2em 0.45em;
-		border-radius: 0.4rem;
+		height: var(--badge-size);
+		padding: 0 0.45em;
+		border-radius: 0;
 		font-size: calc(var(--badge-size) * 0.52);
 		line-height: 1.4;
 		font-weight: 750;

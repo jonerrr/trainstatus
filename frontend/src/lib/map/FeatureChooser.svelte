@@ -71,20 +71,20 @@
 	aria-label="Choose a map feature"
 	data-map-control
 >
-	<header class="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
-		<h2 class="text-xs font-medium text-neutral-400">Choose a feature</h2>
+	<header class="flex items-center justify-between border-b border-border-subtle px-3 py-2">
+		<h2 class="text-xs font-medium text-muted">Choose a feature</h2>
 		<button
 			type="button"
 			aria-label="Close feature chooser"
 			onclick={dismiss}
-			class="rounded-md p-1 text-neutral-300 hover:bg-neutral-800"><X size={16} /></button
+			class="rounded-none p-1 text-secondary hover:bg-hover"><X size={16} /></button
 		>
 	</header>
 	<div class="flex flex-col gap-1 p-1.5">
 		{#each targets as target (`${target.kind}:${target.source}:${target.id}`)}
 			<button
 				type="button"
-				class="min-h-11 rounded-lg p-2.5 hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-blue-400"
+				class="min-h-11 rounded-none p-2.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent"
 				data-map-target
 				onclick={() => onselect(target)}
 			>
@@ -103,9 +103,9 @@
 		width: min(20rem, calc(100% - 1rem));
 		max-height: calc(100% - 1rem);
 		overflow: auto;
-		border: 1px solid #404040;
-		border-radius: 0.75rem;
-		background: #0a0a0af5;
+		border: 1px solid var(--border-default);
+		border-radius: 0;
+		background: var(--bg-canvas);
 		box-shadow: 0 8px 24px #0005;
 	}
 	@media (max-width: 639px) {

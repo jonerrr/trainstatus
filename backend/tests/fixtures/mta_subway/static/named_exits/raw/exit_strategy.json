@@ -1,0 +1,328 @@
+{
+  "release": {
+    "tag": "v0.0.18",
+    "dataset": {
+      "exitStrategy": [
+        {
+          "mrn": 181,
+          "platformEdges": [
+            {
+              "platformEdgeId": "181-PQ-A1",
+              "spec": {
+                "lengthFt": 660,
+                "carMarkers": [
+                  {
+                    "markedAs": "5",
+                    "positionFt": 501,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 300
+                  },
+                  {
+                    "markedAs": "8",
+                    "positionFt": 566,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 480
+                  },
+                  {
+                    "markedAs": "10",
+                    "positionFt": 628,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 600
+                  }
+                ]
+              },
+              "egressPoints": [
+                {
+                  "id": 0,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 615,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "id": 1,
+                  "egressType": "ELEVATOR",
+                  "positionFt": 478,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "id": 2,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 45,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "streetExitPaths": [
+                {
+                  "fromId": 0,
+                  "toStreetExitId": 0,
+                  "accessible": false
+                },
+                {
+                  "fromId": 1,
+                  "toStreetExitId": 0,
+                  "accessible": true
+                },
+                {
+                  "fromId": 2,
+                  "toStreetExitId": 1,
+                  "accessible": false
+                }
+              ],
+              "transferPaths": [
+                {
+                  "fromId": 0,
+                  "toPlatformEdge": "181-PM-A2",
+                  "accessible": false
+                },
+                {
+                  "fromId": 0,
+                  "toPlatformEdge": "181-PM-A4",
+                  "accessible": false
+                }
+              ]
+            },
+            {
+              "platformEdgeId": "181-PM-A2",
+              "spec": {
+                "lengthFt": 660,
+                "carMarkers": [
+                  {
+                    "markedAs": "5",
+                    "positionFt": 150,
+                    "direction": "NORTH",
+                    "consistLengthFt": 300
+                  },
+                  {
+                    "markedAs": "8",
+                    "positionFt": 91,
+                    "direction": "NORTH",
+                    "consistLengthFt": 480
+                  },
+                  {
+                    "markedAs": "10",
+                    "positionFt": 32,
+                    "direction": "NORTH",
+                    "consistLengthFt": 600
+                  }
+                ]
+              },
+              "egressPoints": [
+                {
+                  "id": 3,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 45,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "id": 4,
+                  "egressType": "ELEVATOR",
+                  "positionFt": 478,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "id": 5,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 615,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "streetExitPaths": [
+                {
+                  "fromId": 3,
+                  "toStreetExitId": 1,
+                  "accessible": false
+                },
+                {
+                  "fromId": 4,
+                  "toStreetExitId": 0,
+                  "accessible": true
+                },
+                {
+                  "fromId": 5,
+                  "toStreetExitId": 0,
+                  "accessible": false
+                }
+              ],
+              "transferPaths": [
+                {
+                  "fromId": 3,
+                  "toPlatformEdge": "181-PQ-A1",
+                  "accessible": false
+                },
+                {
+                  "fromId": 3,
+                  "toPlatformEdge": "181-PQ-A3",
+                  "accessible": false
+                }
+              ]
+            },
+            {
+              "platformEdgeId": "181-PQ-A3",
+              "spec": {
+                "lengthFt": 660,
+                "carMarkers": [
+                  {
+                    "markedAs": "5",
+                    "positionFt": 516,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 300
+                  },
+                  {
+                    "markedAs": "8",
+                    "positionFt": 566,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 480
+                  },
+                  {
+                    "markedAs": "10",
+                    "positionFt": 628,
+                    "direction": "SOUTH",
+                    "consistLengthFt": 600
+                  }
+                ]
+              },
+              "egressPoints": [
+                {
+                  "id": 6,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 615,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "id": 7,
+                  "egressType": "ELEVATOR",
+                  "positionFt": 478,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "id": 8,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 45,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "streetExitPaths": [
+                {
+                  "fromId": 6,
+                  "toStreetExitId": 0,
+                  "accessible": false
+                },
+                {
+                  "fromId": 7,
+                  "toStreetExitId": 0,
+                  "accessible": true
+                },
+                {
+                  "fromId": 8,
+                  "toStreetExitId": 1,
+                  "accessible": false
+                }
+              ],
+              "transferPaths": [
+                {
+                  "fromId": 6,
+                  "toPlatformEdge": "181-PM-A2",
+                  "accessible": false
+                },
+                {
+                  "fromId": 6,
+                  "toPlatformEdge": "181-PM-A4",
+                  "accessible": false
+                }
+              ]
+            },
+            {
+              "platformEdgeId": "181-PM-A4",
+              "spec": {
+                "lengthFt": 660,
+                "carMarkers": [
+                  {
+                    "markedAs": "5",
+                    "positionFt": 150,
+                    "direction": "NORTH",
+                    "consistLengthFt": 300
+                  },
+                  {
+                    "markedAs": "8",
+                    "positionFt": 91,
+                    "direction": "NORTH",
+                    "consistLengthFt": 480
+                  },
+                  {
+                    "markedAs": "10",
+                    "positionFt": 32,
+                    "direction": "NORTH",
+                    "consistLengthFt": 600
+                  }
+                ]
+              },
+              "egressPoints": [
+                {
+                  "id": 9,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 45,
+                  "verticalDirection": "UP"
+                },
+                {
+                  "id": 10,
+                  "egressType": "ELEVATOR",
+                  "positionFt": 478,
+                  "verticalDirection": "NONE"
+                },
+                {
+                  "id": 11,
+                  "egressType": "STAIRCASE",
+                  "positionFt": 615,
+                  "verticalDirection": "UP"
+                }
+              ],
+              "streetExitPaths": [
+                {
+                  "fromId": 9,
+                  "toStreetExitId": 1,
+                  "accessible": false
+                },
+                {
+                  "fromId": 10,
+                  "toStreetExitId": 0,
+                  "accessible": true
+                },
+                {
+                  "fromId": 11,
+                  "toStreetExitId": 0,
+                  "accessible": false
+                }
+              ],
+              "transferPaths": [
+                {
+                  "fromId": 9,
+                  "toPlatformEdge": "181-PQ-A1",
+                  "accessible": false
+                },
+                {
+                  "fromId": 9,
+                  "toPlatformEdge": "181-PQ-A3",
+                  "accessible": false
+                }
+              ]
+            }
+          ],
+          "streetExits": [
+            {
+              "id": 0,
+              "intersection": [
+                "Utica Av"
+              ]
+            },
+            {
+              "id": 1,
+              "intersection": [
+                "Stuyvesant Av"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
