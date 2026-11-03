@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/jonerrr/trainstatus/compare/frontend-v2.2.0...frontend-v2.2.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **map:** override headers for martin basemap to prevent mlt conversion bug ([b3a4584](https://github.com/jonerrr/trainstatus/commit/b3a458480313c9bb89f05960236510f6bdb3be8b))
+
 ## [2.2.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.1.0...frontend-v2.2.0) (2026-11-03)
 
 
