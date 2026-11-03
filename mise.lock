@@ -183,7 +183,7 @@ url = "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip"
 version = "3.9.1"
 backend = "pipx:pyvalhalla"
 specifiers = ["latest"]
-uv = { path = ".mise/locks/pipx-pyvalhalla/3.9.1~eb79bc5f", digest = "sha256:75888482dc3118a97810d326bdf5273d70ccda8d9adbee2c1f2b301c22a91466" }
+uv = { path = ".mise/locks/pipx-pyvalhalla/3.9.1~eb79bc5f", digest = "sha256:ae574d8cea8e15df3c6c6cc4c62065f750836801e30d361b513a1c2bc776ae09" }
 
 [tools."pipx:pyvalhalla".options]
 uvx = "true"
