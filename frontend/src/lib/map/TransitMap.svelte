@@ -159,6 +159,13 @@
 		autoloadGlobalCss={false}
 		attributionControl={false}
 		style={`${page.url.origin}/martin/style/dark-matter.json?v=transit-v3`}
+		transformRequest={(url, resourceType) => {
+			// TODO: Remove once Martin 2.0 is released and deployed (MLT detection fix: maplibre/martin#3486).
+			if (resourceType === 'Tile' && new URL(url).pathname.startsWith('/martin/basemap/')) {
+				return { url, headers: { Accept: '*/*' } };
+			}
+			return { url };
+		}}
 		minZoom={7}
 		maxZoom={20}
 		maxPitch={0}
