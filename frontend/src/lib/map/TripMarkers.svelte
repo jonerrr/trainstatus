@@ -10,6 +10,7 @@
 	import type { MapFeatureKey, VehiclePicker } from './interactions';
 	import { createTrajectories } from './trajectories.svelte.js';
 	import { buildActiveVehiclesAtTime, type ActiveVehicle } from './trajectoryArrow';
+	import { MotionControllers } from './trajectoryMotion';
 	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
 
 	const current_time = getCurrentTime();
@@ -32,6 +33,8 @@
 	const snapshot = $derived(trajectories.current);
 	const identities = new WeakMap<ActiveVehicle[], string[]>();
 	const pools = new SvelteMap<Source, ActiveVehicle[]>();
+	const controllers = new SvelteMap<Source, MotionControllers>();
+	let browsingTime: number | undefined;
 	let frame = $state(0);
 	let membership = $state(0);
 
@@ -40,6 +43,7 @@
 		for (const source of pools.keys()) {
 			if (!snapshot.tables.has(source)) {
 				pools.delete(source);
+				controllers.delete(source);
 				changed = true;
 			}
 		}
@@ -47,7 +51,17 @@
 			const pool = pools.get(source) ?? [];
 			const previousIds = identities.get(pool) ?? [];
 			identities.set(pool, previousIds);
-			buildActiveVehiclesAtTime(table, time, pool);
+			let controller = controllers.get(source);
+			if (!controller) {
+				controller = new MotionControllers();
+				controllers.set(source, controller);
+			}
+			buildActiveVehiclesAtTime(
+				table,
+				time,
+				pool,
+				current_time.value === undefined ? controller : undefined
+			);
 			// Reuse the identity buffer rather than allocating arrays/strings every frame.
 			if (previousIds.length !== pool.length) changed = true;
 			for (let i = 0; i < pool.length; i++) {
@@ -64,6 +78,10 @@
 	$effect(() => {
 		void snapshot;
 		const at = current_time.value;
+		if (at !== browsingTime) {
+			controllers.clear();
+			browsingTime = at;
+		}
 		untrack(() => {
 			update(at ?? Date.now() / 1000);
 			membership++;

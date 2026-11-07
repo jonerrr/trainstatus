@@ -39,7 +39,7 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 		expect(tracked?.error?.name).toBe('TimeoutError');
 		await stop.refresh();
 		expect(requests).toBe(2);
-		expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
+		expect(latest?.tables.get('mta_bus')?.units.length).toBe(1);
 		expect(tracked?.error).toBeNull();
 	} finally {
 		stop();
@@ -71,7 +71,7 @@ test('a failed historical Arrow update retries until network recovery', async ()
 	expect(tracked?.error).toBeInstanceOf(Error);
 	await vi.advanceTimersByTimeAsync(1000);
 	expect(calls).toBe(2);
-	expect(latest?.tables.get('mta_bus')?.table.numRows).toBe(1);
+	expect(latest?.tables.get('mta_bus')?.units.length).toBe(1);
 	expect(tracked?.error).toBeNull();
 	await stop.refresh();
 	expect(calls).toBe(3);
@@ -212,7 +212,7 @@ test('a successful empty snapshot clears vehicles but a failed refresh preserves
 	const stop = watchTrajectories(
 		{ sources: ['mta_subway'], at: undefined, refreshInterval: 100 },
 		(snapshot) => {
-			counts.push(snapshot.tables.get('mta_subway')?.table.numRows ?? -1);
+			counts.push(snapshot.tables.get('mta_subway')?.units.length ?? -1);
 		},
 		async () => {
 			requests++;

@@ -1,5 +1,4 @@
 use crate::source::Source;
-use geo::{Distance, Euclidean, Point};
 
 use super::geometry::ShapeGeometry;
 use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
@@ -45,23 +44,12 @@ pub(super) fn recorded_anchor_knot(
         &sample.point,
         super::types::source_projected_epsg_code(source),
     )?;
-    let distance = super::geometry::project_point_onto_line(
-        &projected,
-        &geometry.projected_line,
-        &geometry.cum_dist,
+    let candidates = super::geometry::projection_candidates(&projected, geometry);
+    let distance = super::gps::resolve_candidates(
+        trip,
+        candidates,
+        sample.observed_at.timestamp_micros() as f64 / 1e6,
     )?;
-    if source == Source::NjtBus {
-        let snapped = super::geometry::distance_to_coord(
-            distance,
-            &geometry.projected_line,
-            &geometry.cum_dist,
-        )?;
-        if Euclidean.distance(&projected, &Point::from(snapped))
-            > super::builders::njt_bus::NJT_MAX_GPS_OFFSET_METERS
-        {
-            return None;
-        }
-    }
     Some(TrajectoryKnot::new(
         sample.observed_at.timestamp_micros() as f64 / 1_000_000.0,
         distance.clamp(0.0, trip.shape_length_m),
@@ -70,6 +58,7 @@ pub(super) fn recorded_anchor_knot(
 
 /// Source-specific knot synthesis from trip snapshots.
 pub trait TrajectoryBuilder: Send + Sync {
+    fn source(&self) -> Source;
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

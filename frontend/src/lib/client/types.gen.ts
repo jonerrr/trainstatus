@@ -204,6 +204,28 @@ export type EgressPoint = {
 
 export type EgressType = 'STAIRCASE' | 'ELEVATOR' | 'ESCALATOR' | 'FARE_CONTROL' | 'DOOR' | 'EXIT' | 'RAMP' | 'UNKNOWN';
 
+export type GpsEvidence = {
+    /**
+     * Absolute Unix seconds, retained across re-derivation of the same fix.
+     */
+    correction_deadline: number;
+    distance_m: number;
+    observed_at: number;
+    vehicle_id: string;
+};
+
+/**
+ * Normalized cubic: s = a + b*u + c*u² + d*u³, u = (t-t0)/(t1-t0).
+ */
+export type MotionInterval = {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    t0: number;
+    t1: number;
+};
+
 export type MtaAlertData = {
     alert_type: string;
     /**
@@ -424,6 +446,15 @@ export type StreetExit = {
     accessible: boolean;
     id: number;
     intersection: Array<string>;
+};
+
+export type TrajectoryShape = {
+    distances_m: Array<number>;
+    key: string;
+    /**
+     * WGS84 vertices; distances use EPSG:6538 projected meters.
+     */
+    positions: Array<Array<number>>;
 };
 
 /**

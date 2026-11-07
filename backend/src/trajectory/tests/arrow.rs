@@ -1,86 +1,128 @@
 use crate::source::Source;
-use crate::trajectory::arrow::encode_render_units;
-use crate::trajectory::types::RenderUnit;
-use arrow::array::{Array, Float64Array, Int16Array, ListArray, StringArray};
-use arrow::datatypes::DataType;
+use crate::trajectory::{
+    arrow::encode_render_units,
+    geometry::build_shape_geometry,
+    interpolation::hermite,
+    types::{GpsEvidence, RenderUnit, Trajectory},
+};
+use arrow::array::{Array, FixedSizeListArray, Float64Array, ListArray, StringArray};
 use arrow::ipc::reader::StreamReader;
-use std::io::Cursor;
+use std::{io::Cursor, sync::Arc};
 
 #[test]
-fn encode_empty_round_trip_schema() {
-    let bytes = encode_render_units(&[]).expect("encode");
-    let reader = StreamReader::try_new(Cursor::new(bytes), None).expect("read IPC stream");
-    let schema = reader.schema();
-    assert_eq!(schema.fields().len(), 14);
-    assert_eq!(
-        schema.field_with_name("trip_id").unwrap().data_type(),
-        &DataType::Utf8
-    );
-    assert!(schema.field_with_name("unit_count").unwrap().is_nullable());
-    assert_eq!(
-        reader.map(|batch| batch.unwrap().num_rows()).sum::<usize>(),
-        0
-    );
+fn empty_response_retains_distance_contract() {
+    let bytes = encode_render_units(&[]).unwrap();
+    let reader = StreamReader::try_new(Cursor::new(bytes), None).unwrap();
+    for name in [
+        "shape_key",
+        "shape_positions",
+        "shape_distances",
+        "motion",
+        "offset_m",
+        "correction_deadline",
+    ] {
+        assert!(reader.schema().field_with_name(name).is_ok());
+    }
+    assert_eq!(reader.map(|b| b.unwrap().num_rows()).sum::<usize>(), 0);
 }
-
 #[test]
-fn encode_single_render_unit() {
+fn arrow_shares_geometry_and_motion_and_preserves_float64_coefficients() {
+    let shape = build_shape_geometry(
+        &geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7), (-73.99, 40.71)]),
+        6538,
+    )
+    .unwrap()
+    .path;
+    let plan = Arc::new(Trajectory {
+        generated_at: 100.0,
+        trip_id: "trip".into(),
+        route_id: "A".into(),
+        color: [255, 0, 0],
+        shape: shape.clone(),
+        motion: vec![hermite(
+            100.125,
+            200.125,
+            50.123456789,
+            500.987654321,
+            0.0,
+            0.0,
+        )],
+        evidence: Some(GpsEvidence {
+            vehicle_id: "bus".into(),
+            observed_at: 100.125,
+            distance_m: 50.123456789,
+            correction_deadline: 115.125,
+        }),
+    });
     let unit = RenderUnit {
-        render_unit_id: "mta_subway:t1:0".into(),
+        render_unit_id: "one".into(),
         source: Source::MtaSubway,
-        trip_id: "t1".into(),
+        trip_id: "trip".into(),
         route_id: "A".into(),
         icon_key: "rail_head".into(),
         unit_index: Some(0),
-        unit_count: Some(1),
+        unit_count: Some(2),
         is_head: true,
         length_m: 18.288,
         passengers: None,
         color: [255, 0, 0],
-        positions: vec![[-74.0, 40.7], [-73.9, 40.8]],
-        timestamps: vec![1000.0, 1010.0],
-        bearings: vec![350.0, 10.0],
+        offset_m: 9.144,
+        trajectory: plan,
     };
-    let bytes = encode_render_units(&[unit]).expect("encode");
-    let mut reader = StreamReader::try_new(Cursor::new(bytes), None).expect("read IPC stream");
-    let batch = reader.next().unwrap().unwrap();
-    assert_eq!(batch.num_rows(), 1);
-    let text = |name| {
+    let mut second = unit.clone();
+    second.render_unit_id = "two".into();
+    second.offset_m += 18.288;
+    let bytes = encode_render_units(&[unit, second]).unwrap();
+    let batch = StreamReader::try_new(Cursor::new(bytes), None)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap();
+    let lists = |name| {
         batch
             .column_by_name(name)
             .unwrap()
             .as_any()
-            .downcast_ref::<StringArray>()
+            .downcast_ref::<ListArray>()
             .unwrap()
-            .value(0)
     };
-    assert_eq!(text("render_unit_id"), "mta_subway:t1:0");
-    assert_eq!(text("source"), "mta_subway");
-    assert_eq!(text("route_id"), "A");
-    assert_eq!(text("icon_key"), "rail_head");
-    let count = batch
-        .column_by_name("unit_count")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int16Array>()
-        .unwrap();
-    assert_eq!(count.value(0), 1);
-    assert!(batch.column_by_name("passengers").unwrap().is_null(0));
-    let times = batch
-        .column_by_name("timestamps")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<ListArray>()
-        .unwrap()
-        .value(0);
     assert_eq!(
-        times
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .unwrap()
-            .values()
-            .as_ref(),
-        &[1000.0, 1010.0]
+        lists("shape_positions").value_length(0),
+        shape.positions.len() as i32
     );
-    assert!(reader.next().is_none());
+    assert_eq!(lists("shape_positions").value_length(1), 0);
+    assert_eq!(lists("motion").value_length(1), 0);
+    let motion = lists("motion").value(0);
+    let pairs = motion
+        .as_any()
+        .downcast_ref::<FixedSizeListArray>()
+        .unwrap();
+    let values = pairs
+        .values()
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .unwrap();
+    assert_eq!(values.value(0), 100.125);
+    assert_eq!(values.value(2), 50.123456789);
+    let deadlines = batch
+        .column_by_name("correction_deadline")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .unwrap();
+    assert_eq!(deadlines.value(1), 115.125);
+    let keys = batch
+        .column_by_name("shape_key")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!(keys.value(0), keys.value(1));
+    let offsets = batch
+        .column_by_name("offset_m")
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .unwrap();
+    assert!((offsets.value(1) - offsets.value(0) - 18.288).abs() < 1e-7);
 }

@@ -10,6 +10,7 @@ pub struct ShapeGeometry {
     pub projected_line: LineString<f64>,
     pub cum_dist: Vec<f64>,
     pub length_m: f64,
+    pub path: std::sync::Arc<super::types::TrajectoryShape>,
 }
 
 pub fn shape_key_from_line(line: &LineString<f64>) -> String {
@@ -38,6 +39,11 @@ pub fn build_shape_geometry(line: &LineString<f64>, epsg_code: u16) -> Option<Sh
     Some(ShapeGeometry {
         wgs84_line: line.clone(),
         projected_line,
+        path: std::sync::Arc::new(super::types::TrajectoryShape {
+            key: shape_key_from_line(line),
+            positions: line.0.iter().map(|c| [c.x, c.y]).collect(),
+            distances_m: cum_dist.clone(),
+        }),
         cum_dist,
         length_m,
     })
@@ -56,6 +62,7 @@ pub fn cumulative_distances(line: &LineString) -> Vec<f64> {
     cum
 }
 
+#[cfg(test)]
 pub fn distance_to_coord(
     distance_m: f64,
     line: &LineString,
@@ -89,24 +96,6 @@ pub fn distance_to_coord(
         x: c0.x + frac * (c1.x - c0.x),
         y: c0.y + frac * (c1.y - c0.y),
     })
-}
-
-pub fn bearing_at_distance(distance_m: f64, line: &LineString, cum_dist: &[f64]) -> Option<f32> {
-    let total = *cum_dist.last()?;
-    if total <= 0.0 {
-        return None;
-    }
-
-    let delta = 2.0_f64.min(total / 4.0).max(0.25);
-    let start = (distance_m - delta).clamp(0.0, total);
-    let end = (distance_m + delta).clamp(0.0, total);
-    if (end - start).abs() < 1e-9 {
-        return None;
-    }
-
-    let from = distance_to_coord(start, line, cum_dist)?;
-    let to = distance_to_coord(end, line, cum_dist)?;
-    compass_bearing_deg(from, to).map(|bearing| bearing as f32)
 }
 
 pub fn project_point_onto_line(
@@ -164,21 +153,6 @@ pub fn parse_color(hex: &str) -> [u8; 3] {
     }
 }
 
-fn compass_bearing_deg(from: Coord<f64>, to: Coord<f64>) -> Option<f64> {
-    let lat1 = from.y.to_radians();
-    let lat2 = to.y.to_radians();
-    let dlon = (to.x - from.x).to_radians();
-
-    let y = dlon.sin() * lat2.cos();
-    let x = lat1.cos() * lat2.sin() - lat1.sin() * lat2.cos() * dlon.cos();
-    if x.abs() < 1e-12 && y.abs() < 1e-12 {
-        return None;
-    }
-
-    let theta = y.atan2(x).to_degrees();
-    Some(theta.rem_euclid(360.0))
-}
-
 pub fn project_wgs84_point_to_epsg(point: &Point<f64>, epsg_code: u16) -> Option<Point<f64>> {
     let proj_wgs84 = Proj::from_epsg_code(4326).ok()?;
     let proj_target = Proj::from_epsg_code(epsg_code).ok()?;
@@ -217,4 +191,108 @@ pub fn geom_to_linestring(geom: &Geom) -> Option<LineString<f64>> {
         geo::Geometry::LineString(ls) => Some(ls.clone()),
         _ => None,
     }
+}
+
+/// All nearby directed projections, deduplicated at shared vertices. Retaining
+/// alternatives is essential at loops and parallel legs.
+pub fn projection_candidates(point: &Point<f64>, geometry: &ShapeGeometry) -> Vec<(f64, f64)> {
+    let mut candidates = Vec::new();
+    for (i, pair) in geometry.projected_line.0.windows(2).enumerate() {
+        let dx = pair[1].x - pair[0].x;
+        let dy = pair[1].y - pair[0].y;
+        let len2 = dx * dx + dy * dy;
+        if len2 <= 1e-12 {
+            continue;
+        }
+        let u =
+            (((point.x() - pair[0].x) * dx + (point.y() - pair[0].y) * dy) / len2).clamp(0.0, 1.0);
+        let error = (point.x() - pair[0].x - u * dx).hypot(point.y() - pair[0].y - u * dy);
+        if error <= 100.0 {
+            candidates.push((
+                geometry.cum_dist[i] + u * (geometry.cum_dist[i + 1] - geometry.cum_dist[i]),
+                error,
+                i,
+            ));
+        }
+    }
+    let best = candidates.iter().map(|c| c.1).fold(f64::INFINITY, f64::min);
+    candidates.retain(|c| c.1 <= best + 5.0);
+    candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut branches: Vec<((f64, f64), usize, f64)> = Vec::new();
+    for (distance, error, segment) in candidates {
+        if let Some((best, last_segment, last_distance)) = branches.last_mut()
+            && segment == *last_segment + 1
+            && distance - *last_distance <= 5.0
+        {
+            if error < best.1 {
+                *best = (distance, error);
+            }
+            *last_segment = segment;
+            *last_distance = distance;
+        } else {
+            branches.push(((distance, error), segment, distance));
+        }
+    }
+    branches.into_iter().map(|(best, _, _)| best).collect()
+}
+
+/// Resolve the entire visit chain, allowing equal distances for colocated stops.
+/// A projection is published only if all feasible directed traversals agree.
+pub fn ordered_stop_distances(candidates: &[Vec<(f64, f64)>], ids: &[String]) -> Vec<Option<f64>> {
+    let active: Vec<_> = candidates
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| !c.is_empty())
+        .map(|(i, _)| i)
+        .collect();
+    if active.is_empty() {
+        return vec![None; candidates.len()];
+    }
+    let compatible =
+        |i: usize, a: f64, j: usize, b: f64| b >= a && (ids[i] != ids[j] || b > a + 1.0);
+    let mut forward: Vec<Vec<bool>> = active
+        .iter()
+        .map(|i| vec![false; candidates[*i].len()])
+        .collect();
+    forward[0].fill(true);
+    for row in 1..active.len() {
+        let i = active[row - 1];
+        let j = active[row];
+        for (b, cb) in candidates[j].iter().enumerate() {
+            forward[row][b] = candidates[i]
+                .iter()
+                .enumerate()
+                .any(|(a, ca)| forward[row - 1][a] && compatible(i, ca.0, j, cb.0));
+        }
+    }
+    let mut backward: Vec<Vec<bool>> = active
+        .iter()
+        .map(|i| vec![false; candidates[*i].len()])
+        .collect();
+    backward.last_mut().unwrap().fill(true);
+    for row in (0..active.len() - 1).rev() {
+        let i = active[row];
+        let j = active[row + 1];
+        for (a, ca) in candidates[i].iter().enumerate() {
+            backward[row][a] = candidates[j]
+                .iter()
+                .enumerate()
+                .any(|(b, cb)| backward[row + 1][b] && compatible(i, ca.0, j, cb.0));
+        }
+    }
+    let mut out = vec![None; candidates.len()];
+    for (row, &index) in active.iter().enumerate() {
+        let viable: Vec<_> = candidates[index]
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| forward[row][*i] && backward[row][*i])
+            .map(|(_, c)| c.0)
+            .collect();
+        if let (Some(first), Some(last)) = (viable.first(), viable.last())
+            && last - first < 1.0
+        {
+            out[index] = Some(*first);
+        }
+    }
+    out
 }

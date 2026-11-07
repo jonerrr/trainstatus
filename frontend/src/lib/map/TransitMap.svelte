@@ -29,6 +29,12 @@
 
 	const current_time = getCurrentTime();
 
+	type MapOverlay =
+		| { kind: 'hover'; target: MapTarget; point: ScreenPoint }
+		| { kind: 'choose'; targets: MapTarget[]; point: ScreenPoint }
+		| { kind: 'error'; message: string }
+		| null;
+
 	let map = $state.raw<MapInstance>();
 	let center = $state<[number, number]>([-74.006, 40.7128]);
 	let zoom = $state(12);
@@ -38,37 +44,31 @@
 	let ready = $state(false);
 	let width = $state(0);
 	let height = $state(0);
-	let hover = $state<{ target: MapTarget; point: ScreenPoint } | null>(null);
-	let chooser = $state<{ targets: MapTarget[]; point: ScreenPoint } | null>(null);
-	let selectionError = $state('');
 	let filters = $state(new MapFilters());
 	const interactions = new MapInteractionController();
 	const transit = getTransitData();
+	// Reset any active overlay whenever the visible network or the selected time changes.
+	let overlay = $derived.by<MapOverlay>(() => {
+		void filters.route;
+		void filters.stop;
+		void filters.trip;
+		void filters.layers.route;
+		void filters.layers.stop;
+		void filters.layers.trip;
+		void current_time.value;
+		return null;
+	});
+	const hoveredTarget = $derived(overlay?.kind === 'hover' ? overlay.target : null);
 	const activeRoute = $derived<MapFeatureKey | null>(
-		hover?.target.kind === 'route'
-			? { id: hover.target.id, source: hover.target.source }
-			: hover?.target.routeId
-				? { id: hover.target.routeId, source: hover.target.source }
+		hoveredTarget?.kind === 'route'
+			? { id: hoveredTarget.id, source: hoveredTarget.source }
+			: hoveredTarget?.routeId
+				? { id: hoveredTarget.routeId, source: hoveredTarget.source }
 				: null
 	);
 	const selectedTrip = $derived<MapFeatureKey | null>(
-		hover?.target.kind === 'trip' ? { id: hover.target.id, source: hover.target.source } : null
+		hoveredTarget?.kind === 'trip' ? { id: hoveredTarget.id, source: hoveredTarget.source } : null
 	);
-	// New object whenever the visible network or the selected time changes.
-	const interactionScope = $derived({
-		route: filters.route,
-		stop: filters.stop,
-		trip: filters.trip,
-		routeLayer: filters.layers.route,
-		stopLayer: filters.layers.stop,
-		tripLayer: filters.layers.trip,
-		at: current_time.value
-	});
-	$effect(() => {
-		void interactionScope;
-		hover = null;
-		chooser = null;
-	});
 	$effect(() => {
 		if (!map) return;
 		map.touchZoomRotate.disableRotation();
@@ -77,7 +77,7 @@
 	$effect(() => {
 		if (!map) return;
 		const canvas = map.getCanvas();
-		canvas.style.cursor = hover && !moving ? 'pointer' : '';
+		canvas.style.cursor = overlay?.kind === 'hover' && !moving ? 'pointer' : '';
 		return () => {
 			canvas.style.cursor = '';
 		};
@@ -109,14 +109,13 @@
 				: [];
 	}
 	function mousemove(event: MapMouseEvent) {
-		if (moving || chooser || event.originalEvent.buttons) return;
+		if (moving || overlay?.kind === 'choose' || event.originalEvent.buttons) return;
 		const target = targetsAt(event.point)[0];
-		hover = target ? { target, point: event.point } : null;
+		if (target) overlay = { kind: 'hover', target, point: event.point };
+		else if (overlay?.kind === 'hover') overlay = null;
 	}
 	function openTarget(target: MapTarget) {
-		hover = null;
-		chooser = null;
-		selectionError = '';
+		overlay = null;
 		if (target.kind !== 'trip') {
 			open_modal({ type: target.kind, source: target.source, id: target.id });
 		} else if (target.routeId) {
@@ -128,15 +127,16 @@
 				id: target.id
 			});
 		} else {
-			selectionError = 'This vehicle has no route. Select another vehicle.';
+			overlay = {
+				kind: 'error',
+				message: 'This vehicle has no route. Select another vehicle.'
+			};
 		}
 	}
 	function click(event: MapMouseEvent) {
 		const targets = targetsAt(event.point);
-		selectionError = '';
-		hover = null;
 		if (targets.length === 1) openTarget(targets[0]);
-		else chooser = targets.length ? { targets, point: event.point } : null;
+		else overlay = targets.length ? { kind: 'choose', targets, point: event.point } : null;
 	}
 </script>
 
@@ -179,12 +179,11 @@
 		onclick={click}
 		onmousemove={mousemove}
 		onmouseout={() => {
-			hover = null;
+			if (overlay?.kind === 'hover') overlay = null;
 		}}
 		onmovestart={() => {
 			moving = true;
-			hover = null;
-			chooser = null;
+			if (overlay?.kind !== 'error') overlay = null;
 		}}
 		onmoveend={() => {
 			moving = false;
@@ -211,31 +210,32 @@
 			/>
 		{/if}
 	</MapLibre>
-	{#if chooser}
+	{#if overlay?.kind === 'choose'}
 		<FeatureChooser
-			targets={chooser.targets}
-			point={chooser.point}
+			targets={overlay.targets}
+			point={overlay.point}
 			viewportWidth={width}
 			viewportHeight={height}
 			onselect={openTarget}
 			ondismiss={() => {
-				chooser = null;
+				if (overlay?.kind === 'choose') overlay = null;
 			}}
 		>
 			{#snippet children(target)}<MapFeatureSummary {target} />{/snippet}
 		</FeatureChooser>
-	{:else if hover && !page.state.modal}
+	{:else if overlay?.kind === 'hover' && !page.state.modal}
 		<FeaturePreview
-			target={hover.target}
-			point={hover.point}
+			target={overlay.target}
+			point={overlay.point}
 			viewportWidth={width}
 			viewportHeight={height}
 		/>
-	{/if}
-	{#if selectionError}<div
+	{:else if overlay?.kind === 'error'}
+		<div
 			role="status"
 			class="absolute right-12 bottom-3 left-3 rounded-none bg-canvas p-3 text-sm text-status-warning"
 		>
-			{selectionError}
-		</div>{/if}
+			{overlay.message}
+		</div>
+	{/if}
 </div>

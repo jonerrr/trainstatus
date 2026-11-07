@@ -1,4 +1,4 @@
-use super::types::{TrajectoryConfig, TrajectoryKnot, TrajectoryState};
+use super::types::TrajectoryConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContinuityDiscardReason {
@@ -114,113 +114,86 @@ impl ContinuityStatsBatch {
     }
 }
 
-/// Apply realtime continuity: anchor to prev_state, hold on schedule regression, teleport on large gap.
-pub fn apply(
-    mut knots: Vec<TrajectoryKnot>,
-    prev_state: Option<TrajectoryState>,
+/// Preserve the old plan at the *new* derivation time. Geometry compatibility is
+/// checked by the caller. GPS estimates never enter this prediction-only path.
+pub fn reconcile(
+    motion: Vec<super::types::MotionInterval>,
+    previous: &super::types::Trajectory,
     config: &TrajectoryConfig,
-    t_now: f64,
-) -> (Vec<TrajectoryKnot>, ContinuityStats) {
-    let knots_in = knots.len() as u32;
-
-    let Some(prev) = prev_state else {
-        let out = enforce_monotonic_distance(knots);
-        let knots_out = out.len() as u32;
-        return (
-            out,
-            ContinuityStats {
-                knots_in,
-                knots_out,
-                prev_state_discarded: false,
-                ..Default::default()
-            },
-        );
+    now: f64,
+) -> (Vec<super::types::MotionInterval>, ContinuityStats) {
+    use super::interpolation::{evaluate_motion, hermite, validate_motion};
+    let mut stats = ContinuityStats::default();
+    let old = evaluate_motion(&previous.motion, now);
+    let new = evaluate_motion(&motion, now);
+    let reason = if now - previous.generated_at > config.max_prev_state_age_s {
+        Some(ContinuityDiscardReason::StalePrevState)
+    } else if new.s_m - old.s_m > config.max_forward_jump_m {
+        Some(ContinuityDiscardReason::ForwardJump)
+    } else if old.s_m - new.s_m > config.max_backward_gap_m {
+        Some(ContinuityDiscardReason::BackwardGap)
+    } else {
+        None
     };
-
-    if t_now - prev.t_unix > config.max_prev_state_age_s {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::StalePrevState);
+    if let Some(reason) = reason {
+        stats.prev_state_discarded = true;
+        stats.discard_reason = Some(reason);
+        return (motion, stats);
     }
-
-    let first_new_s = knots.first().map(|k| k.s_m).unwrap_or(prev.s_m);
-    if first_new_s + config.max_backward_gap_m < prev.s_m {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::BackwardGap);
-    }
-    if first_new_s > prev.s_m + config.max_forward_jump_m {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::ForwardJump);
-    }
-
-    knots.retain(|k| k.t_event >= t_now - 1.0 || k.s_m >= prev.s_m - 1.0);
-
-    let bridge = TrajectoryKnot::new(t_now, prev.s_m);
-    let mut out = vec![bridge];
-    out.extend(knots);
-    out = enforce_monotonic_distance(out);
-    let out = apply_hold_strategy(out, prev.s_m);
-    let knots_out = out.len() as u32;
-    (
-        out,
-        ContinuityStats {
-            knots_in,
-            knots_out,
-            prev_state_discarded: false,
-            ..Default::default()
-        },
-    )
-}
-
-fn discard_prev_state(
-    knots: Vec<TrajectoryKnot>,
-    knots_in: u32,
-    reason: ContinuityDiscardReason,
-) -> (Vec<TrajectoryKnot>, ContinuityStats) {
-    let out = enforce_monotonic_distance(knots);
-    let knots_out = out.len() as u32;
-    (
-        out,
-        ContinuityStats {
-            knots_in,
-            knots_out,
-            prev_state_discarded: true,
-            discard_reason: Some(reason),
-            ..Default::default()
-        },
-    )
-}
-
-fn enforce_monotonic_distance(mut knots: Vec<TrajectoryKnot>) -> Vec<TrajectoryKnot> {
-    if knots.is_empty() {
-        return knots;
-    }
-    knots.sort_by(|a, b| {
-        a.t_event
-            .partial_cmp(&b.t_event)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    let mut cleaned: Vec<TrajectoryKnot> = Vec::with_capacity(knots.len());
-    for knot in knots {
-        if let Some(last) = cleaned.last() {
-            if (knot.t_event - last.t_event).abs() < 1e-6 {
-                continue;
-            }
-            if knot.s_m + 1e-6 < last.s_m {
-                continue;
-            }
+    // A short synthetic prefix supplies the required zero-speed first boundary
+    // without accumulating an unbounded history of previous motion intervals.
+    let duration = if old.v_mps > 1e-9 {
+        (2.0 * old.s_m / old.v_mps).clamp(1e-3, 1.0)
+    } else {
+        1.0
+    };
+    let mut out = vec![hermite(
+        now - duration,
+        now,
+        (old.s_m - old.v_mps * duration / 2.0).max(0.0),
+        old.s_m,
+        0.0,
+        old.v_mps,
+    )];
+    for (index, interval) in motion.iter().enumerate() {
+        if interval.t1 <= now {
+            continue;
         }
-        cleaned.push(knot);
-    }
-    cleaned
-}
-
-fn apply_hold_strategy(knots: Vec<TrajectoryKnot>, s_floor: f64) -> Vec<TrajectoryKnot> {
-    let mut out = Vec::with_capacity(knots.len() + 4);
-    let mut current_s = s_floor;
-    for knot in knots {
-        if knot.s_m < current_s - 1e-6 {
-            out.push(TrajectoryKnot::new(knot.t_event, current_s));
-        } else {
-            current_s = knot.s_m;
-            out.push(knot);
+        let target = interval.evaluate(interval.t1);
+        let bridge = hermite(
+            now,
+            interval.t1,
+            old.s_m,
+            target.s_m,
+            old.v_mps,
+            target.v_mps,
+        );
+        if bridge.is_monotonic() && bridge.max_speed_mps() <= config.max_speed_mps + 1e-7 {
+            out.push(bridge);
+            out.extend_from_slice(&motion[index + 1..]);
+            if validate_motion(&out).is_ok() {
+                return (out, stats);
+            }
+            break;
         }
     }
-    out
+    // Delayed predictions cannot pull a moving train backwards. Brake to a hold
+    // along the compatible path, and try the predictions again next revision.
+    let duration = old.v_mps.max(1.0);
+    let stop =
+        (old.s_m + old.v_mps * duration / 2.0).min(*previous.shape.distances_m.last().unwrap());
+    let braking = hermite(now, now + duration, old.s_m, stop, old.v_mps, 0.0);
+    if braking.is_monotonic() {
+        out.push(braking);
+        out.push(hermite(
+            now + duration,
+            now + duration + 300.0,
+            stop,
+            stop,
+            0.0,
+            0.0,
+        ));
+        return (out, stats);
+    }
+    (motion, stats)
 }

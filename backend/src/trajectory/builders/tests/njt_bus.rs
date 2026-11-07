@@ -27,6 +27,7 @@ fn trip() -> (TripSnapshot, ShapeGeometry) {
         .collect();
     (
         TripSnapshot {
+            started_at: chrono::DateTime::from_timestamp(900, 0).unwrap(),
             trip_id: uuid::Uuid::nil(),
             route_id: "87".into(),
             route_color: "1A2B57".into(),
@@ -76,20 +77,9 @@ fn schedule_fallback_preserves_reported_dwell_and_motion() {
         &TrajectoryConfig::for_source(Source::NjtBus),
     )
     .unwrap();
-    assert!(
-        result
-            .trajectory
-            .distances_m
-            .windows(2)
-            .all(|w| w[1] >= w[0])
-    );
-    assert!(
-        result
-            .trajectory
-            .distances_m
-            .windows(2)
-            .any(|w| w[1] > w[0])
-    );
+    let motion = &result.trajectory.motion;
+    assert!(motion.iter().all(|p| p.is_monotonic()));
+    assert!(motion.iter().any(|p| p.evaluate(p.t1).s_m > p.a));
 }
 #[test]
 fn gps_uses_observation_time_and_next_stop_ceiling() {
@@ -123,7 +113,7 @@ fn stale_future_offroute_and_invalid_gps_fall_back_to_schedule() {
 #[test]
 fn newest_usable_fix_wins_and_behind_stop_does_not_truncate() {
     let (mut t, g) = trip();
-    t.positions = vec![position(&t, 1040, -73.9975), position(&t, 1050, -73.993)];
+    t.positions = vec![position(&t, 1020, -73.9975), position(&t, 1050, -73.993)];
     let k = knots(&t, &g);
     assert!(k.knots.iter().any(|k| k.t_event == 1050.0));
     assert!(k.knots.iter().any(|k| k.s_m == t.shape_length_m));
@@ -137,13 +127,13 @@ fn continuity_is_monotonic_and_bad_trip_does_not_poison_builder() {
     let next = compute_trajectory(
         &NjtBusBuilder,
         &t,
-        Some(first.end_state),
+        Some(&first.trajectory),
         &g,
         &PchipMethod,
         &config,
     )
     .unwrap();
-    assert!(next.trajectory.distances_m.windows(2).all(|w| w[1] >= w[0]));
+    assert!(next.trajectory.motion.iter().all(|p| p.is_monotonic()));
     t.stops[0].arrival_unix = f64::NAN;
     assert!(NjtBusBuilder.generate_knots(&t, &g).is_err());
     let (valid, _) = trip();

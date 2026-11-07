@@ -19,14 +19,13 @@ use crate::operations::types::trip::StopTimeData;
 use crate::source::Source;
 use crate::trajectory::builder::TrajectoryBuilder;
 use crate::trajectory::builders::mta_subway::MtaSubwayBuilder;
-use crate::trajectory::continuity::apply;
+
 use crate::trajectory::expand_render_units;
 use crate::trajectory::geometry::build_shape_geometry;
 use crate::trajectory::geometry::distance_to_coord;
 use crate::trajectory::source_render_config;
 use crate::trajectory::types::Trajectory;
-use crate::trajectory::types::TrajectoryConfig;
-use crate::trajectory::types::TrajectoryState;
+
 use crate::trajectory::types::TrajectoryStop;
 use crate::trajectory::types::TripSnapshot;
 use crate::trajectory::types::source_projected_epsg_code;
@@ -52,66 +51,18 @@ fn match_platform_edge_picks_best_candidate() {
 }
 
 #[test]
-fn live_anchor_prevents_prev_state_discard_when_next_stop_is_far() {
-    let (trip, shape_geom) = trip_with_anchor(
-        "EN_ROUTE",
-        vec![stop(
-            "STOP1",
-            200.0,
-            650.0,
-            vec!["platform-a"],
-            vec![
-                platform_edge(
-                    "platform-a",
-                    328.084,
-                    vec![car_marker(480.0, 164.042, PlatformDirection::North)],
-                ),
-                platform_edge(
-                    "platform-b",
-                    328.084,
-                    vec![car_marker(300.0, 164.042, PlatformDirection::North)],
-                ),
-            ],
-        )],
-        300.0,
-    );
-
-    let builder = MtaSubwayBuilder;
-    let generated = builder.generate_knots(&trip, &shape_geom).expect("knots");
-    let prev = TrajectoryState {
-        t_unix: 95.0,
-        s_m: 305.0,
-        v_mps: 4.0,
-    };
-    let config = TrajectoryConfig {
-        max_forward_jump_m: 100.0,
-        ..Default::default()
-    };
-
-    let (_, stats) = apply(generated.knots, Some(prev), &config, 100.0);
-    assert!(!stats.prev_state_discarded);
-    assert!(generated.stats.live_anchor_gap_m.unwrap_or_default() > 200.0);
-}
-
-#[test]
 fn expand_render_units_emits_one_row_per_subway_car() {
     let (trip, shape_geom) = trip_with_anchor("EN_ROUTE", vec![], 220.0);
-    let distances_m = vec![220.0, 240.0, 260.0];
-    let path: Vec<[f64; 2]> = distances_m
-        .iter()
-        .filter_map(|distance| {
-            distance_to_coord(*distance, &shape_geom.wgs84_line, &shape_geom.cum_dist)
-                .map(|coord| [coord.x, coord.y])
-        })
-        .collect();
     let trajectory = Trajectory {
+        generated_at: 100.0,
         trip_id: trip.trip_id.to_string(),
         route_id: trip.route_id.clone(),
         color: [0, 57, 166],
-        path: path.clone(),
-        timestamps: vec![100.0, 110.0, 120.0],
-        distances_m: distances_m.clone(),
-        bearings: vec![0.0, 5.0, 10.0],
+        shape: shape_geom.path.clone(),
+        motion: vec![crate::trajectory::interpolation::hermite(
+            100.0, 120.0, 220.0, 260.0, 0.0, 0.0,
+        )],
+        evidence: None,
     };
 
     let units = expand_render_units(Source::MtaSubway, &trip, &trajectory, &shape_geom);
@@ -123,17 +74,11 @@ fn expand_render_units_emits_one_row_per_subway_car() {
     assert_eq!(units[0].unit_index, Some(0));
     assert_eq!(units[0].unit_count, Some(8));
     assert_eq!(units[0].length_m, 18.288);
-    assert!(units[0].positions.len() >= units[1].positions.len());
-    assert!(
-        units
-            .iter()
-            .all(|unit| unit.bearings.len() == unit.timestamps.len())
-    );
-    assert!(
-        units
-            .iter()
-            .all(|unit| unit.positions.len() == unit.timestamps.len())
-    );
+    assert!((units[1].offset_m - units[0].offset_m - 18.288).abs() < 1e-5);
+    assert!(std::sync::Arc::ptr_eq(
+        &units[0].trajectory,
+        &units[1].trajectory
+    ));
 }
 
 #[test]
@@ -204,21 +149,7 @@ fn overlapping_station_profiles_stay_monotone_with_anchor() {
     let generated = builder.generate_knots(&trip, &shape_geom).expect("knots");
     assert!(generated.stats.backtracking_knots_removed > 0);
 
-    let prev = TrajectoryState {
-        t_unix: 95.0,
-        s_m: 298.0,
-        v_mps: 3.0,
-    };
-    let (out, stats) = apply(
-        generated.knots,
-        Some(prev),
-        &TrajectoryConfig::default(),
-        100.0,
-    );
-    assert!(!stats.prev_state_discarded);
-    for i in 1..out.len() {
-        assert!(out[i].s_m + 1e-6 >= out[i - 1].s_m);
-    }
+    assert!(generated.knots.windows(2).all(|w| w[1].s_m >= w[0].s_m));
 }
 
 #[test]
@@ -293,6 +224,7 @@ fn trip_with_anchor(
     };
 
     let trip = TripSnapshot {
+        started_at: ts(0),
         trip_id: Uuid::nil(),
         route_id: "A".into(),
         route_color: "#0039A6".into(),

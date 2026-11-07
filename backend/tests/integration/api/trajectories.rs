@@ -60,13 +60,13 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
             .downcast_ref::<Int16Array>()
             .unwrap();
         let times = batch
-            .column_by_name("timestamps")
+            .column_by_name("motion")
             .unwrap()
             .as_any()
             .downcast_ref::<ListArray>()
             .unwrap();
         let paths = batch
-            .column_by_name("positions")
+            .column_by_name("shape_positions")
             .unwrap()
             .as_any()
             .downcast_ref::<ListArray>()
@@ -81,31 +81,48 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
                 assert!(counts.is_null(row));
                 assert_eq!(icons.value(row), "bus");
             }
-            let time_values = times.value(row);
-            let time_values = time_values.as_any().downcast_ref::<Float64Array>().unwrap();
-            assert!(time_values.len() > 1);
-            assert!(time_values.values().iter().all(|t| t.is_finite()));
-            assert!(time_values.values().windows(2).all(|w| w[0] <= w[1]));
-            let path = paths.value(row);
-            let pairs = path.as_any().downcast_ref::<FixedSizeListArray>().unwrap();
-            assert_eq!(pairs.len(), time_values.len());
-            let coords = pairs
-                .values()
-                .as_any()
-                .downcast_ref::<Float64Array>()
-                .unwrap();
-            assert!(coords.values().iter().all(|v| v.is_finite()));
-            assert!(
-                coords
+            // Shared shape and trip motion occur once, on their first unit row.
+            if row == 0 {
+                let motion = times.value(row);
+                let intervals = motion
+                    .as_any()
+                    .downcast_ref::<FixedSizeListArray>()
+                    .unwrap();
+                let values = intervals
                     .values()
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
-                    .collect::<Vec<_>>()
-                    .windows(2)
-                    .any(|w| w[0] != w[1]),
-                "{source} moving trajectory"
-            );
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .unwrap();
+                assert!(values.values().iter().all(|v| v.is_finite()));
+                assert!(
+                    values
+                        .values()
+                        .as_chunks::<6>()
+                        .0
+                        .iter()
+                        .all(|v| v[1] > v[0])
+                );
+                let path = paths.value(row);
+                let pairs = path.as_any().downcast_ref::<FixedSizeListArray>().unwrap();
+                assert!(pairs.len() >= 2);
+                let coords = pairs
+                    .values()
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .unwrap();
+                assert!(coords.values().iter().all(|v| v.is_finite()));
+                assert!(
+                    values
+                        .values()
+                        .as_chunks::<6>()
+                        .0
+                        .iter()
+                        .any(|v| v[3] + v[4] + v[5] > 0.0)
+                );
+            } else {
+                assert_eq!(times.value_length(row), 0);
+                assert_eq!(paths.value_length(row), 0);
+            }
         }
     }
     // Exercise the live transport path using the computed render generation.

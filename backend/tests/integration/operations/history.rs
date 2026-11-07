@@ -16,9 +16,9 @@ use support::{mta_bus_dataset, test_owners};
 use uuid::Uuid;
 
 /// Real B94 stops (from the checked-in Helium fixture) all served by shape
-/// `B940017`. Used to build a synthetic realtime trip whose stop sequence
+/// `B940017`, in directed traversal order. Used to build a synthetic realtime trip whose stop sequence
 /// unambiguously belongs to that shape.
-const B94_STOP_IDS: [&str; 5] = ["504409", "901701", "904218", "904219", "904979"];
+const B94_STOP_IDS: [&str; 5] = ["904218", "904979", "504409", "901701", "904219"];
 
 #[sqlx::test]
 async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
@@ -67,25 +67,20 @@ async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(p
         .unwrap();
     assert!(!first.render_units.is_empty());
     assert!(!second.render_units.is_empty());
-    let expected_first = serde_json::to_value(&first.render_units).unwrap();
-    let expected_second = serde_json::to_value(&second.render_units).unwrap();
     assert_ne!(
-        expected_first, expected_second,
-        "sampling windows depend on the requested second"
+        first.render_units, second.render_units,
+        "generations retain their requested second even when the motion polynomials agree"
     );
     for order in [[at, later], [later, at]] {
         let service = backend::trajectory::TrajectoryService::new(pool.clone());
         for time in order {
             let snapshot = service.snapshot(Source::MtaBus, Some(time)).await.unwrap();
             let expected = if time == at {
-                &expected_first
+                &first.render_units
             } else {
-                &expected_second
+                &second.render_units
             };
-            assert_eq!(
-                &serde_json::to_value(&snapshot.render_units).unwrap(),
-                expected
-            );
+            assert_eq!(&snapshot.render_units, expected);
         }
     }
 }
@@ -241,12 +236,24 @@ async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
         .values()
         .find(|unit| unit.trip_id == committed.trips[0].id.to_string())
         .expect("historical bus renders");
-    let sample = unit
-        .timestamps
+    let event = observed_at.timestamp_micros() as f64 / 1e6;
+    let interval = unit
+        .trajectory
+        .motion
         .iter()
-        .position(|t| (*t - observed_at.timestamp() as f64).abs() < 0.001)
-        .expect("rendered path samples the historical GPS observation time");
-    let [lon, lat] = unit.positions[sample];
+        .find(|p| p.t0 == event || p.t1 == event)
+        .expect("motion retains the historical observation boundary");
+    let u = (event - interval.t0) / (interval.t1 - interval.t0);
+    let distance = interval.a + u * (interval.b + u * (interval.c + u * interval.d));
+    assert!(
+        distance.abs() < 1e-5,
+        "historical anchor must remain at the first shape vertex"
+    );
+    assert!(
+        unit.trajectory.evidence.is_none(),
+        "history must not carry live correction state"
+    );
+    let [lon, lat] = unit.trajectory.shape.positions[0];
     assert!(
         (lon - old_point.x()).abs() < 0.00001 && (lat - old_point.y()).abs() < 0.00001,
         "rendered position must use the past GPS fix, not schedule-only interpolation or the future fix: {lon}, {lat}"

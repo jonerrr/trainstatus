@@ -4,10 +4,9 @@ use crate::source::Source;
 use super::super::builder::{
     TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
 };
-use super::super::geometry::{ShapeGeometry, project_point_onto_line, project_wgs84_point_to_epsg};
+use super::super::geometry::ShapeGeometry;
 use super::super::types::{
     GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TrajectoryStop, TripSnapshot,
-    source_projected_epsg_code,
 };
 
 /// Slack allowed above the reported next-stop distance when truncating the
@@ -21,8 +20,6 @@ struct BusKinematicsConfig {
     accel_mps2: f64,
     /// Deceleration into a stop (m/s²).
     decel_mps2: f64,
-    /// Fixed dwell time at every stop (seconds).
-    dwell_seconds: f64,
     /// Distance budget for the decel/accel ramp either side of a stop (meters).
     approach_distance_m: f64,
 }
@@ -32,7 +29,6 @@ impl Default for BusKinematicsConfig {
         Self {
             accel_mps2: 1.0,
             decel_mps2: 1.0,
-            dwell_seconds: 30.0,
             approach_distance_m: 50.0,
         }
     }
@@ -79,8 +75,7 @@ impl MtaBusBuilder {
         let dt_accel_s = (2.0 * d_accel / kinematics.accel_mps2).sqrt();
 
         let t_arrive = stop.arrival_unix;
-        // arrival == departure in the current GTFS feed; hardcode 30 s dwell.
-        let t_depart = t_arrive + kinematics.dwell_seconds;
+        let t_depart = stop.departure_unix.max(t_arrive);
         let t_approach = t_arrive - dt_decel_s;
         let t_clear = t_depart + dt_accel_s;
 
@@ -92,58 +87,18 @@ impl MtaBusBuilder {
         ]
     }
 
-    /// Project the live GPS position onto the bus route shape and return a
-    /// "live anchor" knot at the current time.
     fn vehicle_anchor_knot(
         trip: &TripSnapshot,
-        shape_geom: &ShapeGeometry,
+        geometry: &ShapeGeometry,
     ) -> Option<TrajectoryKnot> {
-        if trip.recorded_anchor.is_some() {
-            return super::super::builder::recorded_anchor_knot(trip, shape_geom, Source::MtaBus);
-        }
-        let position = trip.positions.iter().find(|p| p.geom.is_some())?;
-        let geom = position.geom.as_ref()?;
-        let point = match &geom.0 {
-            geo::Geometry::Point(pt) => pt,
-            _ => return None,
-        };
-
-        let projected_point =
-            project_wgs84_point_to_epsg(point, source_projected_epsg_code(Source::MtaBus))?;
-        let projected_s = project_point_onto_line(
-            &projected_point,
-            &shape_geom.projected_line,
-            &shape_geom.cum_dist,
-        )?;
-
-        Some(TrajectoryKnot::new(
-            trip.as_of.timestamp() as f64,
-            projected_s.clamp(0.0, trip.shape_length_m),
-        ))
-    }
-
-    /// Along-shape distance of the stop the live feed says the bus is still
-    /// heading toward (GTFS-RT `VehicleObservation.stop_id`, remapped to a canonical
-    /// static stop id during import).
-    ///
-    /// The bus has not passed this stop yet, so the animated marker must not be
-    /// rendered beyond it — regardless of how optimistic the realtime *schedule*
-    /// predictions for downstream stops are. Those predictions are noisy (MTA
-    /// keeps pushing them later), and letting the interpolation race ahead to an
-    /// early-predicted arrival is what makes buses overshoot the stop they are
-    /// actually approaching. Uses the same position the live anchor is taken from
-    /// so the ceiling and anchor stay consistent.
-    fn reported_next_stop_distance(trip: &TripSnapshot) -> Option<f64> {
-        let position = trip.positions.iter().find(|p| p.geom.is_some())?;
-        let stop_id = position.stop_id.as_deref()?;
-        trip.stops
-            .iter()
-            .find(|s| s.stop_id == stop_id)
-            .map(|s| s.stop_distance_m)
+        super::super::gps::anchor(trip, geometry, Source::MtaBus)
     }
 }
 
 impl TrajectoryBuilder for MtaBusBuilder {
+    fn source(&self) -> Source {
+        Source::MtaBus
+    }
     fn generate_knots(
         &self,
         trip: &TripSnapshot,
@@ -193,7 +148,7 @@ impl TrajectoryBuilder for MtaBusBuilder {
             // (`> anchor_s`); if the GPS already projects past its own reported
             // stop the feed is inconsistent, so we trust the fix and skip the
             // clamp rather than risk trimming away every forward knot.
-            if let Some(ceiling) = Self::reported_next_stop_distance(trip)
+            if let Some(ceiling) = super::super::gps::next_stop_ceiling(trip, anchor)
                 && ceiling > anchor.s_m
             {
                 all_knots.retain(|k| k.s_m <= ceiling + NEXT_STOP_CEILING_TOLERANCE_M);

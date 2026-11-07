@@ -160,15 +160,38 @@ pub(crate) async fn snapshot_from_geometry(
         geometry.length_m.is_finite() && geometry.length_m > 0.0,
         "Invalid projected shape length"
     );
-    // TODO: shouldn't stop times already be sorted?
-    stop_times.sort_by(|a, b| {
-        a.arrival
-            .cmp(&b.arrival)
-            .then_with(|| a.departure.cmp(&b.departure))
-            .then_with(|| a.stop_id.cmp(&b.stop_id))
-    });
+    stop_times.sort_by_key(|s| s.stop_sequence);
+    let mut candidates = Vec::with_capacity(stop_times.len());
+    for visit in &stop_times {
+        let stop = revision
+            .stops
+            .get(&visit.stop_id)
+            .context("Missing static stop")?;
+        let geo::Geometry::Point(point) = stop.geom.0 else {
+            anyhow::bail!("Stop geometry is not a point");
+        };
+        let projected = super::geometry::project_wgs84_point_to_epsg(
+            &point,
+            super::types::source_projected_epsg_code(revision.source),
+        )
+        .context("Stop projection failed")?;
+        if revision.historical {
+            ensure!(
+                Euclidean.distance(&projected, &geometry.projected_line) <= 500.0,
+                "Retained stop location is incompatible with the run shape"
+            );
+        }
+        candidates.push(super::geometry::projection_candidates(
+            &projected, &geometry,
+        ));
+    }
+    let ids: Vec<_> = stop_times.iter().map(|s| s.stop_id.clone()).collect();
+    let distances = super::geometry::ordered_stop_distances(&candidates, &ids);
     let mut stops = Vec::with_capacity(stop_times.len());
-    for stop_time in stop_times {
+    for (stop_time, distance) in stop_times.into_iter().zip(distances) {
+        let Some(distance) = distance else {
+            continue;
+        };
         ensure!(stop_time.trip_id == trip.id, "Stop belongs to another trip");
         let stop = revision
             .stops
@@ -181,30 +204,6 @@ pub(crate) async fn snapshot_from_geometry(
             point.x().is_finite() && point.y().is_finite(),
             "Non-finite stop point"
         );
-        if revision.historical {
-            let projected = super::geometry::project_wgs84_point_to_epsg(
-                &point,
-                super::types::source_projected_epsg_code(revision.source),
-            )
-            .context("Stop projection failed")?;
-            // History uses today's descriptions, not an archived network. Avoid
-            // projecting a relocated stop onto a retained path kilometres away.
-            ensure!(
-                Euclidean.distance(&projected, &geometry.projected_line) <= 500.0,
-                "Retained stop location is incompatible with the run shape"
-            );
-        }
-        let distance = cache
-            .get_stop_projection(
-                revision.source,
-                &shape_key,
-                &stop_time.stop_id,
-                point,
-                &geometry,
-            )
-            .await
-            .context("Stop projection failed")?;
-        ensure!(distance.is_finite(), "Non-finite stop distance");
         stops.push(TrajectoryStop {
             stop_id: stop_time.stop_id,
             arrival_unix: stop_time.arrival.timestamp() as f64,
@@ -230,6 +229,7 @@ pub(crate) async fn snapshot_from_geometry(
         _ => None,
     };
     Ok(TripSnapshot {
+        started_at: trip.created_at,
         trip_id: trip.id,
         route_id: trip.route_id.clone(),
         route_color: revision.route_color.into(),

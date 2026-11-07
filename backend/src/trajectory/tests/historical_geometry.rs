@@ -78,3 +78,96 @@ async fn relocated_stop_cannot_anchor_a_retained_shape() {
     assert!(usable.stops[0].stop_distance_m > 0.0);
     assert!(usable.stops[0].stop_distance_m < usable.shape_length_m);
 }
+
+#[tokio::test]
+async fn live_and_history_resolve_loop_visits_by_sequence_instead_of_arrival_order() {
+    let at = chrono::DateTime::from_timestamp(1_780_000_000, 0).unwrap();
+    let trip = TripRun {
+        id: uuid::Uuid::nil(),
+        original_id: "loop".into(),
+        vehicle_id: "bus".into(),
+        route_id: "route".into(),
+        shape_ids: vec!["loop".into()],
+        direction: 0,
+        created_at: at,
+        updated_at: at,
+        data: TripData::MtaBus(MtaBusData { deviation: None }),
+    };
+    let stop_data = StopData::MtaBus(MtaBusStopData {
+        bearing: None,
+        is_boardable: true,
+        direction: CompassDirection::Unknown,
+    });
+    let stops = HashMap::from([
+        (
+            "A".into(),
+            IndexedStop {
+                geom: geo::Point::new(-74.0, 40.7).into(),
+                data: stop_data.clone(),
+            },
+        ),
+        (
+            "B".into(),
+            IndexedStop {
+                geom: geo::Point::new(-73.999, 40.7).into(),
+                data: stop_data.clone(),
+            },
+        ),
+        (
+            "C".into(),
+            IndexedStop {
+                geom: geo::Point::new(-74.001, 40.7).into(),
+                data: stop_data,
+            },
+        ),
+    ]);
+    let shapes = HashMap::from([(
+        "loop".into(),
+        geo::LineString::from(vec![
+            (-74.0, 40.7),
+            (-73.999, 40.7),
+            (-74.0, 40.7),
+            (-74.001, 40.7),
+        ])
+        .into(),
+    )]);
+    let calls: Vec<_> = [("A", 0, 0), ("B", 1, 120), ("A", 2, 60), ("C", 3, 180)]
+        .into_iter()
+        .map(|(id, seq, seconds)| StopVisit {
+            trip_id: trip.id,
+            stop_id: id.into(),
+            stop_sequence: seq,
+            arrival: at + chrono::Duration::seconds(seconds),
+            departure: at + chrono::Duration::seconds(seconds),
+            data: StopTimeData::MtaBus,
+        })
+        .collect();
+    let cache = TrajectoryCache::new();
+    for historical in [false, true] {
+        let inputs = GeometryInputs {
+            source: Source::MtaBus,
+            historical,
+            route_color: "000000",
+            stops: &stops,
+            shapes: &shapes,
+        };
+        let snapshot = snapshot_from_geometry(&trip, calls.clone(), vec![], &inputs, &cache, at)
+            .await
+            .unwrap();
+        assert_eq!(
+            snapshot
+                .stops
+                .iter()
+                .map(|s| s.stop_id.as_str())
+                .collect::<Vec<_>>(),
+            ["A", "B", "A", "C"]
+        );
+        assert!(
+            snapshot
+                .stops
+                .windows(2)
+                .all(|w| w[1].stop_distance_m > w[0].stop_distance_m)
+        );
+        assert!(snapshot.stops[2].stop_distance_m > 150.0);
+    }
+}

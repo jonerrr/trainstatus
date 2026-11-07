@@ -10,11 +10,9 @@ use super::builders::{
 use super::cache::TrajectoryCache;
 use super::continuity;
 use super::geometry::ShapeGeometry;
-use super::geometry::{bearing_at_distance, distance_to_coord, parse_color};
+use super::geometry::parse_color;
 use super::interpolation::{InterpolationMethod, PchipMethod};
-use super::types::{
-    ComputedTrajectory, Trajectory, TrajectoryConfig, TrajectoryState, TripSnapshot,
-};
+use super::types::{ComputedTrajectory, Trajectory, TrajectoryConfig, TripSnapshot};
 
 pub struct TrajectoryCalculator {
     builders: HashMap<Source, Arc<dyn TrajectoryBuilder>>,
@@ -60,107 +58,58 @@ impl Default for TrajectoryCalculator {
 pub fn compute_trajectory(
     builder: &dyn TrajectoryBuilder,
     trip: &TripSnapshot,
-    prev_state: Option<TrajectoryState>,
+    previous: Option<&Trajectory>,
     shape_geom: &ShapeGeometry,
     method: &dyn InterpolationMethod,
     config: &TrajectoryConfig,
 ) -> anyhow::Result<ComputedTrajectory> {
     let generated = builder.generate_knots(trip, shape_geom)?;
     let raw_knots = generated.knots;
-    let t_now = trip.as_of.timestamp() as f64;
-    let (knots, mut continuity_stats) = continuity::apply(raw_knots, prev_state, config, t_now);
+    let t_now = trip.as_of.timestamp_micros() as f64 / 1e6;
+    let mut knots = raw_knots;
+    let source = builder.source();
+    let evidence = if source != Source::MtaSubway {
+        super::gps::compensate(trip, shape_geom, source, &mut knots, previous)
+    } else {
+        None
+    };
+    knots.sort_by(|a, b| {
+        a.t_event
+            .total_cmp(&b.t_event)
+            .then(a.s_m.total_cmp(&b.s_m))
+    });
+    knots.dedup_by(|a, b| a.t_event == b.t_event);
+    validate_knots(&knots)?;
+    let mut motion = super::interpolation::bounded_prediction_motion(
+        method,
+        &knots,
+        config.max_speed_mps,
+        evidence.as_ref().map(|_| t_now),
+    )?;
+    let mut continuity_stats = continuity::ContinuityStats::default();
+    if evidence.is_none()
+        && trip.recorded_anchor.is_none()
+        && let Some(previous) =
+            previous.filter(|p| p.evidence.is_none() && p.shape.key == shape_geom.path.key)
+    {
+        (motion, continuity_stats) = continuity::reconcile(motion, previous, config, t_now);
+    }
     continuity_stats.live_anchor_gap_m = generated.stats.live_anchor_gap_m;
     continuity_stats.pre_anchor_knots_dropped = generated.stats.pre_anchor_knots_dropped;
     continuity_stats.backtracking_knots_removed = generated.stats.backtracking_knots_removed;
-    // TODO: make this debug only maybe
-    validate_knots(&knots)?;
-
-    if knots.len() < 2 {
-        return Err(anyhow::anyhow!("Not enough knots after continuity"));
-    }
-
-    let t0 = knots[0].t_event;
-    let t_max = knots.last().map(|k| k.t_event).unwrap_or(t0);
-
-    // TODO: make this configurable or only pass in data within the window to begin with
-    // Limit the sampling window around t_now (realtime anchor) to reduce payload size.
-    // We keep a buffer of 120s in the past and 300s in the future.
-    let window_start = t_now - 120.0;
-    let window_end = t_now + 300.0;
-
-    let sample_min = t0.max(window_start);
-    let sample_max = t_max.min(window_end);
-
-    if sample_min >= sample_max {
-        return Err(anyhow::anyhow!("TripRun is outside the active time window"));
-    }
-
-    let n_samples = ((sample_max - sample_min) / config.dt_s).ceil() as usize;
-    let n_samples = n_samples.max(2);
-
-    let mut sampled_t = Vec::with_capacity(n_samples + 2);
-    let mut t = sample_min;
-    while t <= sample_max + 1e-9 {
-        sampled_t.push(t);
-        t += config.dt_s;
-    }
-    if let Some(&last) = sampled_t.last()
-        && (last - sample_max).abs() > 1e-6
-    {
-        sampled_t.push(sample_max);
-    }
-
-    let state_t = t_now.clamp(t0, t_max);
-    let sampled = method.sample_motion(&knots, &sampled_t, state_t)?;
-    let sampled_s = sampled.distances;
-
-    let line = &shape_geom.wgs84_line;
-    let cum_dist = &shape_geom.cum_dist;
-    let total = shape_geom.length_m;
-
-    let mut path = Vec::with_capacity(sampled_t.len());
-    let mut timestamps = Vec::with_capacity(sampled_t.len());
-    let mut distances_m = Vec::with_capacity(sampled_t.len());
-    let mut bearings = Vec::with_capacity(sampled_t.len());
-
-    for (i, &s) in sampled_s.iter().enumerate() {
-        if s.is_nan() {
-            continue;
-        }
-        let s_clamped = s.clamp(0.0, total);
-        if let Some(coord) = distance_to_coord(s_clamped, line, cum_dist) {
-            path.push([coord.x, coord.y]);
-            timestamps.push(sampled_t[i]);
-            distances_m.push(s_clamped);
-            bearings.push(bearing_at_distance(s_clamped, line, cum_dist).unwrap_or(0.0));
-        }
-    }
-
-    if path.len() < 2 || timestamps.len() < 2 || distances_m.len() < 2 || bearings.len() < 2 {
-        return Err(anyhow::anyhow!("Not enough sampled points"));
-    }
-
-    let end_t = state_t;
-    let v_mps = sampled.state_speed_mps;
-    let end_s = sampled.state_distance_m;
-
+    super::interpolation::validate_motion(&motion)?;
     let trajectory = Trajectory {
+        generated_at: t_now,
         trip_id: trip.trip_id.to_string(),
         route_id: trip.route_id.clone(),
         color: parse_color(&trip.route_color),
-        path,
-        timestamps,
-        distances_m,
-        bearings,
+        shape: shape_geom.path.clone(),
+        motion,
+        evidence,
     };
 
     Ok(ComputedTrajectory {
         trajectory,
-        end_state: TrajectoryState {
-            t_unix: end_t,
-            s_m: end_s,
-            v_mps,
-        },
         continuity_stats,
     })
 }
@@ -169,7 +118,7 @@ pub async fn compute_trajectory_async(
     engine: &TrajectoryCalculator,
     source: Source,
     trip: &TripSnapshot,
-    prev_state: Option<TrajectoryState>,
+    previous: Option<&Trajectory>,
     caches: &TrajectoryCache,
     config: &TrajectoryConfig,
 ) -> anyhow::Result<ComputedTrajectory> {
@@ -183,7 +132,7 @@ pub async fn compute_trajectory_async(
     compute_trajectory(
         builder.as_ref(),
         trip,
-        prev_state,
+        previous,
         shape_geom.as_ref(),
         engine.method.as_ref(),
         config,

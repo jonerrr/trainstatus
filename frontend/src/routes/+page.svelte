@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 
 	import type { CatalogRoute, CatalogStop, Source } from '#lib/client/index.js';
+	import { geolocation } from '#lib/geolocation.svelte.js';
 	import List, { type TripItem } from '#lib/List.svelte';
 	import { parse_trip_pin, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
 	import { getTransitData } from '#lib/transit/store.svelte.js';
@@ -72,50 +73,6 @@
 		)
 	);
 
-	let watch_id: number;
-	// TODO: types
-	let position = $state<GeolocationPosition>();
-	let position_denied = $state(false);
-
-	function update_position(_position: GeolocationPosition) {
-		position = _position;
-		// location_status.current = 'granted';
-	}
-
-	// || location_status.current === 'denied'
-	function resume() {
-		// TODO: maybe add a check to delete the existing watch before starting a new one
-		if (!navigator) return;
-		watch_id = navigator.geolocation.watchPosition(
-			update_position,
-			(err) => {
-				console.error('Error watching position:', err);
-				// location_status.current = 'denied';
-				position_denied = true;
-			},
-			{
-				// enableHighAccuracy: true,
-				maximumAge: 30000 // 30 seconds
-				// timeout: 27000 // 27 seconds to allow for some delay in getting a position
-			}
-		);
-	}
-
-	$effect(() => {
-		// if (location_status.current !== 'denied') {
-		resume();
-		// }
-
-		// Stop watching position on unmount
-		return () => {
-			if (watch_id !== undefined) {
-				navigator.geolocation.clearWatch(watch_id);
-			}
-		};
-	});
-
-	const position_loading = $derived(position === undefined && !position_denied);
-
 	// Interface for stops with distance
 	interface StopWithDistance extends CatalogStop {
 		distance: number;
@@ -124,9 +81,8 @@
 	const nearby_stops = $derived.by(() => {
 		const result = {} as Record<Source, StopWithDistance[]>;
 
-		if (!position) return result;
-		// reassign to local var to prevent undefined error in map callback.
-		const current_coords = position.coords;
+		if (!geolocation.position) return result;
+		const current_coords = geolocation.position.coords;
 
 		for (const { source, value: catalog } of catalogs) {
 			result[source] = (catalog?.stops ?? [])
@@ -146,24 +102,24 @@
 </script>
 
 {#snippet locate_button()}
-	<!-- TODO: double check the location states are all working and onclick is working -->
 	<button
-		onclick={() => resume()}
+		onclick={() => geolocation.resume()}
 		class={[
-			'relative flex items-center justify-center rounded-none p-1 shadow-lg transition-all duration-200 hover:bg-border-strong active:bg-border-strong',
+			'relative flex items-center justify-center rounded-none p-1 shadow-lg transition-colors duration-200',
 			{
-				'bg-accent text-accent-fg': position,
-				'bg-red-600 text-white hover:bg-red-500 active:bg-red-700': position_denied
-				// 'bg-border-default text-white hover:bg-border-strong active:bg-surface-2':
-				// 	location_status.current === 'unknown'
+				'bg-border-default text-primary hover:bg-border-strong active:bg-surface-2':
+					geolocation.status === 'loading',
+				'bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent':
+					geolocation.status === 'active',
+				'bg-red-600 text-white hover:bg-red-500 active:bg-red-700': geolocation.status === 'denied'
 			}
 		]}
 		aria-label="Nearby stops"
 		title="Nearby stops"
 	>
-		{#if position_loading}
+		{#if geolocation.status === 'loading'}
 			<Locate class="animate-spin" />
-		{:else if position_denied}
+		{:else if geolocation.status === 'denied'}
 			<LocateOff />
 		{:else}
 			<LocateFixed />
@@ -225,7 +181,7 @@
 			pins={stop_pins}
 			header_slot={locate_button}
 			height_calc={calculate_stop_height}
-			loading={catalogs_loading || (position === undefined && !position_denied)}
+			loading={catalogs_loading || (geolocation.status === 'loading' && !geolocation.position)}
 		/>
 		<!-- {:else}
 			<p class="p-4 text-sm text-muted">
