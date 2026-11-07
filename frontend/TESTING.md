@@ -19,7 +19,8 @@ For map E2E on a machine with a GPU, run `pnpm test:e2e --headed --workers=1`. H
 - Test observable behavior, not implementation: no Tailwind class assertions, no accessor internals. Badge tests assert measured text bounds; navigation asserts `aria-current` and the URL.
 - Use the real app with synthetic fixtures. Do not intercept HTTP; components get data through `TransitData` with an injected fetcher.
 - Do not extract page logic just to unit-test it. Leave unfinished behavior untested rather than freezing a placeholder.
-- Add a regression test for every bug fix at the lowest layer that catches it.
+- Add regression coverage when it protects a meaningful behavior or a subtle, recurring, or high-impact failure. A bug fix does not automatically require a new test.
+- Prefer extending an existing behavior test at the lowest layer that catches the failure. Avoid dedicated harnesses or extensive mocks for trivial guards, and tests that merely repeat the implementation. For small, low-risk fixes, existing tests, type checks, or a focused manual check can be sufficient; report what was verified.
 - Control time with Vitest (`Date.now`) or by mocking `getCurrentTime`, never real timers or the 15-second native timeouts.
 
 ## Layers

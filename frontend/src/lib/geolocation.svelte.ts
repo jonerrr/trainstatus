@@ -26,7 +26,11 @@ export class Geolocation {
 	});
 
 	#watch(): void {
-		if (!browser || !navigator.geolocation) return;
+		if (!browser) return;
+		if (!navigator.geolocation) {
+			this.#status = 'denied';
+			return;
+		}
 		this.#stop();
 		this.#status = 'loading';
 		this.#watch_id = navigator.geolocation.watchPosition(
@@ -62,7 +66,11 @@ export class Geolocation {
 	}
 
 	resume(): void {
-		if (!browser || !navigator.geolocation) return;
+		if (!browser) return;
+		if (!navigator.geolocation) {
+			this.#status = 'denied';
+			return;
+		}
 		this.#status = 'loading';
 		if (this.#active) {
 			this.#watch();

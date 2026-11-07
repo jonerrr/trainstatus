@@ -40,3 +40,6 @@ demo.configmap.yml
 data/
 pgadmin.yaml
 .venv/
+
+# agent scratch plans
+plans/
