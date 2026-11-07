@@ -4,11 +4,12 @@
 	import {
 		getFilterDefsForLayer,
 		type FilterFieldDef,
-		type FilterValue
+		type FilterValue,
+		type PropertyLayerKey
 	} from '#lib/map/filters.svelte.js';
 
 	interface Props {
-		layer: 'route' | 'stop' | 'trip';
+		layer: PropertyLayerKey;
 		source: Source;
 		filters: Record<string, FilterValue>;
 	}
@@ -44,9 +45,8 @@
 			<div class="flex flex-col gap-1.5">
 				{#each entries as [property, fieldDef] (property)}
 					<FilterField
-						label={fieldDef.label}
 						{fieldDef}
-						value={filters[property] as FilterValue}
+						value={filters[property]}
 						onChange={(newValue) => {
 							if (newValue === undefined) {
 								delete filters[property];

@@ -49,31 +49,39 @@ fn make_trip(stops: Vec<TrajectoryStop>, shape_length_m: f64) -> TripSnapshot {
 }
 
 #[test]
-fn generates_four_knots_per_stop() {
-    let stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1120.0, 300.0)];
+fn generates_single_knot_without_reported_dwell_and_two_with_dwell() {
+    let mut stops = vec![make_stop("A", 1000.0, 100.0), make_stop("B", 1120.0, 300.0)];
+    stops[1].departure_unix = 1135.0;
     let trip = make_trip(stops, 500.0);
-    let kinematics = BusKinematicsConfig::default();
 
-    let knots_a = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
-    let knots_b = MtaBusBuilder::build_stop_knots(&trip.stops[1], &trip, kinematics);
+    let knots_a = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip).unwrap();
+    let knots_b = MtaBusBuilder::build_stop_knots(&trip.stops[1], &trip).unwrap();
 
-    assert_eq!(knots_a.len(), 4, "stop A: expected 4 knots");
-    assert_eq!(knots_b.len(), 4, "stop B: expected 4 knots");
+    assert_eq!(
+        knots_a.len(),
+        1,
+        "stop A without reported dwell: expected 1 knot"
+    );
+    assert_eq!(
+        knots_b.len(),
+        2,
+        "stop B with reported dwell: expected 2 knots"
+    );
 }
 
 #[test]
 fn dwell_knots_preserve_stationary_plateau() {
-    let stops = vec![make_stop("A", 1000.0, 200.0)];
+    let stops = vec![make_stop("A", 1000.0, 200.0), make_stop("B", 1120.0, 400.0)];
     let mut trip = make_trip(stops, 500.0);
     trip.stops[0].departure_unix += 15.0;
-    let kinematics = BusKinematicsConfig::default();
-    let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
+    let mut knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip).unwrap();
+    knots.extend(MtaBusBuilder::build_stop_knots(&trip.stops[1], &trip).unwrap());
 
-    assert_eq!(knots[1].s_m, knots[2].s_m, "dwell knots should share s_m");
-    let midpoint = (knots[1].t_event + knots[2].t_event) / 2.0;
+    assert_eq!(knots[0].s_m, knots[1].s_m, "dwell knots should share s_m");
+    let midpoint = (knots[0].t_event + knots[1].t_event) / 2.0;
     let motion = PchipMethod.motion(&knots).unwrap();
     let state = crate::trajectory::interpolation::evaluate_motion(&motion, midpoint);
-    assert_eq!(state.s_m, knots[1].s_m);
+    assert_eq!(state.s_m, knots[0].s_m);
     assert_eq!(state.v_mps, 0.0);
 }
 
@@ -82,10 +90,9 @@ fn dwell_uses_reported_departure() {
     let stops = vec![make_stop("A", 1000.0, 200.0)];
     let mut trip = make_trip(stops, 500.0);
     trip.stops[0].departure_unix += 15.0;
-    let kinematics = BusKinematicsConfig::default();
-    let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
+    let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip).unwrap();
 
-    let dwell = knots[2].t_event - knots[1].t_event;
+    let dwell = knots[1].t_event - knots[0].t_event;
     assert!(
         (dwell - 15.0).abs() < 1e-6,
         "dwell should use the reported 15s, got {dwell}"
@@ -93,16 +100,11 @@ fn dwell_uses_reported_departure() {
 }
 
 #[test]
-fn stop_beyond_shape_length_yields_finite_knots() {
-    // Regression: a stop whose distance sits at/past the end of the shape used
-    // to make `s_depart < s_stop`, so `sqrt(s_depart - s_stop)` was NaN and the
-    // clear knot's `t_event` was NaN — which slipped past `validate_knots` and
-    // panicked the sampler's `clamp(t0, t_max)`.
+fn stop_beyond_shape_length_clamps_to_shape_end() {
     let shape_length = 500.0;
     let stops = vec![make_stop("A", 1000.0, shape_length + 25.0)];
     let trip = make_trip(stops, shape_length);
-    let kinematics = BusKinematicsConfig::default();
-    let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip, kinematics);
+    let knots = MtaBusBuilder::build_stop_knots(&trip.stops[0], &trip).unwrap();
 
     for (i, k) in knots.iter().enumerate() {
         assert!(
@@ -111,6 +113,7 @@ fn stop_beyond_shape_length_yields_finite_knots() {
             k.t_event,
             k.s_m
         );
+        assert_eq!(k.s_m, shape_length);
     }
 }
 

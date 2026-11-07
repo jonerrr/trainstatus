@@ -153,9 +153,14 @@ pub fn parse_color(hex: &str) -> [u8; 3] {
     }
 }
 
-pub fn project_wgs84_point_to_epsg(point: &Point<f64>, epsg_code: u16) -> Option<Point<f64>> {
+pub fn wgs84_to_epsg_projectors(epsg_code: u16) -> Option<(Proj, Proj)> {
     let proj_wgs84 = Proj::from_epsg_code(4326).ok()?;
     let proj_target = Proj::from_epsg_code(epsg_code).ok()?;
+    Some((proj_wgs84, proj_target))
+}
+
+pub fn project_wgs84_point_to_epsg(point: &Point<f64>, epsg_code: u16) -> Option<Point<f64>> {
+    let (proj_wgs84, proj_target) = wgs84_to_epsg_projectors(epsg_code)?;
     project_point_wgs84_to_epsg(point, &proj_wgs84, &proj_target)
 }
 

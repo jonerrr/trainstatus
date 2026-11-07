@@ -41,36 +41,42 @@ pub struct MotionInterval {
     pub d: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, ToSchema)]
 pub struct TrajectoryShape {
     pub key: String,
     /// WGS84 vertices; distances use EPSG:6538 projected meters.
+    #[schema(value_type = Vec<(f64, f64)>)]
     pub positions: Vec<[f64; 2]>,
     pub distances_m: Vec<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct GpsEvidence {
+#[derive(Debug, Clone, PartialEq)]
+pub struct GpsFix {
     pub vehicle_id: String,
     pub observed_at: f64,
     pub distance_m: f64,
-    /// Absolute Unix seconds, retained across re-derivation of the same fix.
-    pub correction_deadline: f64,
+    /// Unix timestamp when this `(vehicle_id, observed_at)` fix was first accepted.
+    pub accepted_at: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, ToSchema)]
 pub struct Trajectory {
     pub generated_at: f64,
     pub trip_id: String,
     pub route_id: String,
+    #[schema(value_type = (u8, u8, u8))]
     pub color: [u8; 3],
+    /// Encoded in Arrow as `shape_key`, `shape_positions`, and `shape_distances` (populated on the first row for each shape).
+    #[schema(value_type = TrajectoryShape)]
     pub shape: std::sync::Arc<TrajectoryShape>,
+    /// Encoded in Arrow as `motion` (`List<FixedSizeList<Float64, 6>>` of `[t0, t1, a, b, c, d]`, populated on the first row for each trip).
     pub motion: Vec<MotionInterval>,
-    pub evidence: Option<GpsEvidence>,
+    #[schema(ignore)]
+    pub gps_fix: Option<GpsFix>,
 }
 
 /// Unit metadata references one shared head plan and shape; no sampled coordinates.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, ToSchema)]
 pub struct RenderUnit {
     pub render_unit_id: String,
     pub source: Source,
@@ -82,8 +88,10 @@ pub struct RenderUnit {
     pub is_head: bool,
     pub length_m: f32,
     pub passengers: Option<i32>,
+    #[schema(value_type = (u8, u8, u8))]
     pub color: [u8; 3],
     pub offset_m: f64,
+    #[schema(value_type = Trajectory)]
     pub trajectory: std::sync::Arc<Trajectory>,
 }
 

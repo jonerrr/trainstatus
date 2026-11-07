@@ -1,22 +1,22 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 
-	import { setWorkerUrl, type Map } from 'maplibre-gl';
+	import { setWorkerUrl, type Map as MapInstance } from 'maplibre-gl';
 	import sharedCode from 'maplibre-gl/dist/maplibre-gl-shared.mjs?raw';
 	import workerCode from 'maplibre-gl/dist/maplibre-gl-worker.mjs?raw';
 	import { MapLibre } from 'svelte-maplibre-gl';
 
 	import 'maplibre-gl/dist/maplibre-gl.css';
 
-	import { IconLayer } from '@deck.gl/layers';
+	import type { Source } from '#lib/client/index.js';
 
-	import DeckOverlay from '../map/DeckOverlay.svelte';
 	import FeatureChooser from '../map/FeatureChooser.svelte';
 	import Filters from '../map/Filters.svelte';
 	import { MapFilters } from '../map/filters.svelte';
 	import type { VehiclePicker } from '../map/interactions';
-	import type { ActiveVehicle } from '../map/trajectoryArrow';
-	import { VEHICLE_ICON_ATLAS, VEHICLE_ICON_MAPPING } from '../map/vehicleIcons';
+	import { renderUnitTableFromIPC, type RenderUnitTable } from '../map/trajectory';
+	import { trajectoryFixture } from '../map/trajectoryFixture';
+	import TripMarkers from '../map/TripMarkers.svelte';
 
 	// Vitest's module instrumentation runs in the window, not worker globals.
 	// Load the installed, unmodified MapLibre worker modules as local blobs.
@@ -32,43 +32,37 @@
 		URL.revokeObjectURL(sharedUrl);
 	});
 
-	let map = $state.raw<Map>();
+	let map = $state.raw<MapInstance>();
 	let center = $state<[number, number]>([0, 0]);
 	let enabled = $state(true);
 	let chooser = $state(false);
 	let picker: VehiclePicker | null = null;
-	let filters = $state(new MapFilters());
-	const vehicle: ActiveVehicle = {
-		renderUnitId: 'one',
-		source: 'mta_subway',
-		tripId: 'trip',
-		routeId: 'A',
-		iconKey: 'rail_head',
-		unitIndex: 0,
-		unitCount: 1,
-		isHead: true,
-		lengthM: 20,
-		passengers: null,
-		color: [0, 100, 200, 255],
-		position: [0, 0],
-		bearing: 0
-	};
-	const layers = $derived(
-		enabled
-			? [
-					new IconLayer<ActiveVehicle>({
-						id: 'fixture-vehicle',
-						data: [vehicle],
-						iconAtlas: VEHICLE_ICON_ATLAS,
-						iconMapping: VEHICLE_ICON_MAPPING,
-						getIcon: () => 'puck_body',
-						getPosition: (v) => v.position,
-						getSize: 32,
-						pickable: true
+	const filters = new MapFilters();
+	let {
+		tables = new Map([
+			[
+				'mta_subway',
+				renderUnitTableFromIPC(
+					trajectoryFixture(['one'], 200, {
+						positions: [
+							[-0.001, 0],
+							[0.001, 0]
+						],
+						distances: [0, 200],
+						motion: [{ t0: 100, t1: 200, a: 100, b: 0, c: 0, d: 0 }]
 					})
-				]
-			: []
-	);
+				)
+			]
+		]),
+		at,
+		railDetail = false,
+		busDetail = false
+	}: {
+		tables?: ReadonlyMap<Source, RenderUnitTable>;
+		at?: number;
+		railDetail?: boolean;
+		busDetail?: boolean;
+	} = $props();
 	export function read() {
 		return { map, picker, center };
 	}
@@ -88,20 +82,24 @@
 			layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#111820' } }]
 		}}
 		zoom={12}
+		canvasContextAttributes={{ preserveDrawingBuffer: true }}
 		class="size-full"
 		autoloadGlobalCss={false}
 		attributionControl={false}
 	>
-		{#if enabled}<DeckOverlay
-				{layers}
-				onpicker={(value) => {
+		{#if enabled}<TripMarkers
+				{tables}
+				{at}
+				{railDetail}
+				{busDetail}
+				onPickerReady={(value) => {
 					picker = value;
 				}}
 			/>{/if}
 	</MapLibre>
-	<Filters bind:filters />
+	<Filters {filters} />
 	{#if chooser}<FeatureChooser
-			targets={[{ kind: 'trip', id: 'trip', source: 'mta_subway' }]}
+			targets={[{ kind: 'trip', id: 'trip', source: 'mta_subway', routeId: 'A' }]}
 			point={{ x: 20, y: 200 }}
 			viewportWidth={800}
 			viewportHeight={500}

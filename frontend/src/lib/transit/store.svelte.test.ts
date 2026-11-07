@@ -122,7 +122,7 @@ test('successful map polls retain source age in the shared warning until a new c
 		expect(data.status.warning).toBe(false);
 		expect(http.calls).toHaveLength(0);
 	} finally {
-		stop();
+		stop.destroy();
 	}
 });
 

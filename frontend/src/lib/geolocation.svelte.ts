@@ -14,15 +14,21 @@ export class Geolocation {
 	#status = $state<GeolocationStatus>('loading');
 	#position = $state.raw<GeolocationPosition>();
 	#watch_id: number | undefined;
+	#active = false;
 
 	#subscribe = createSubscriber(() => {
+		this.#active = true;
 		this.#watch();
-		return () => this.#stop();
+		return () => {
+			this.#active = false;
+			this.#stop();
+		};
 	});
 
 	#watch(): void {
 		if (!browser || !navigator.geolocation) return;
 		this.#stop();
+		this.#status = 'loading';
 		this.#watch_id = navigator.geolocation.watchPosition(
 			(position) => {
 				this.#position = position;
@@ -58,7 +64,9 @@ export class Geolocation {
 	resume(): void {
 		if (!browser || !navigator.geolocation) return;
 		this.#status = 'loading';
-		this.#watch();
+		if (this.#active) {
+			this.#watch();
+		}
 	}
 }
 

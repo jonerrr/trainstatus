@@ -35,10 +35,6 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
     let field = Arc::new(Field::new("item", DataType::Float64, false));
     let mut distances = ListBuilder::new(Float64Builder::new()).with_field(field);
     let mut motion = ListBuilder::new(FixedSizeListBuilder::new(Float64Builder::new(), 6));
-    let mut observation_vehicle = StringBuilder::new();
-    let mut observed_at = Float64Builder::new();
-    let mut observed_distance = Float64Builder::new();
-    let mut deadline = Float64Builder::new();
     let mut shapes = std::collections::HashSet::new();
     let mut trips = std::collections::HashSet::new();
 
@@ -114,10 +110,6 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
             }
         }
         motion.append(true);
-        observation_vehicle.append_option(plan.evidence.as_ref().map(|e| e.vehicle_id.as_str()));
-        observed_at.append_option(plan.evidence.as_ref().map(|e| e.observed_at));
-        observed_distance.append_option(plan.evidence.as_ref().map(|e| e.distance_m));
-        deadline.append_option(plan.evidence.as_ref().map(|e| e.correction_deadline));
     }
 
     let batch = RecordBatch::try_new(
@@ -139,10 +131,6 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
             Arc::new(pos_list_builder.finish()),
             Arc::new(distances.finish()),
             Arc::new(motion.finish()),
-            Arc::new(observation_vehicle.finish()),
-            Arc::new(observed_at.finish()),
-            Arc::new(observed_distance.finish()),
-            Arc::new(deadline.finish()),
         ],
     )?;
 
@@ -196,9 +184,5 @@ fn render_unit_schema() -> Arc<Schema> {
             ))),
             false,
         ),
-        Field::new("observation_vehicle", DataType::Utf8, true),
-        Field::new("observed_at", DataType::Float64, true),
-        Field::new("observed_distance", DataType::Float64, true),
-        Field::new("correction_deadline", DataType::Float64, true),
     ]))
 }

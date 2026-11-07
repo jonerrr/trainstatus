@@ -1,7 +1,9 @@
-//! GPS evidence is an estimate input, never an animation continuity anchor.
+//! GPS observations supply present position and velocity estimates before continuity reconciliation.
 use super::{
-    geometry::{ShapeGeometry, project_wgs84_point_to_epsg, projection_candidates},
-    types::{GpsEvidence, TrajectoryKnot, TripSnapshot},
+    geometry::{
+        ShapeGeometry, project_point_wgs84_to_epsg, projection_candidates, wgs84_to_epsg_projectors,
+    },
+    types::{GpsFix, TrajectoryKnot, TripSnapshot},
 };
 use crate::operations::types::position::VehicleObservation;
 use crate::source::Source;
@@ -11,7 +13,6 @@ pub const HISTORY_AGE_S: f64 = 240.0;
 pub const MAX_SPEED_MPS: f64 = 30.0;
 pub const EXTRAPOLATION_S: f64 = 30.0;
 pub const EXTRAPOLATION_M: f64 = 300.0;
-// Provisional budget, exercised by fixed-time replay; transport consumes it too.
 pub const CORRECTION_BUDGET_S: f64 = 10.0;
 
 pub struct AcceptedFix {
@@ -24,6 +25,9 @@ pub fn accepted_fixes(
     geometry: &ShapeGeometry,
     source: Source,
 ) -> Vec<AcceptedFix> {
+    let Some((proj_wgs84, proj_target)) = wgs84_to_epsg_projectors(6538) else {
+        return Vec::new();
+    };
     let now = trip.as_of.timestamp_micros() as f64 / 1e6;
     let mut reports: Vec<&VehicleObservation> = trip
         .positions
@@ -48,19 +52,20 @@ pub fn accepted_fixes(
         {
             continue;
         }
-        let Some(point) = project_wgs84_point_to_epsg(point, 6538) else {
+        let Some(point) = project_point_wgs84_to_epsg(point, &proj_wgs84, &proj_target) else {
             continue;
         };
         let mut candidates = projection_candidates(&point, geometry);
-        if let Some(prev) = accepted
+        let prev_same_vehicle_s = accepted
             .last()
             .filter(|p| p.vehicle_id == report.vehicle_id)
-        {
-            let dt = time - prev.knot.t_event;
-            candidates.retain(|c| {
-                c.0 + 5.0 >= prev.knot.s_m && c.0 - prev.knot.s_m <= MAX_SPEED_MPS * dt + 30.0
+            .map(|prev| {
+                let dt = time - prev.knot.t_event;
+                candidates.retain(|c| {
+                    c.0 + 5.0 >= prev.knot.s_m && c.0 - prev.knot.s_m <= MAX_SPEED_MPS * dt + 30.0
+                });
+                prev.knot.s_m
             });
-        }
         // Use an unambiguous, time-consistent visit occurrence to exclude other
         // loop branches. Never use the first matching stop ID as an occurrence.
         if candidates.len() > 1 {
@@ -80,6 +85,7 @@ pub fn accepted_fixes(
         let Some(distance) = resolve_candidates(trip, candidates, time) else {
             continue;
         };
+        let distance = prev_same_vehicle_s.map_or(distance, |prev_s| distance.max(prev_s));
         accepted.push(AcceptedFix {
             knot: TrajectoryKnot::new(time, distance),
             vehicle_id: report.vehicle_id.clone(),
@@ -135,7 +141,7 @@ pub fn compensate(
     source: Source,
     knots: &mut Vec<TrajectoryKnot>,
     previous: Option<&super::types::Trajectory>,
-) -> Option<GpsEvidence> {
+) -> Option<GpsFix> {
     if trip.recorded_anchor.is_some() {
         return None;
     }
@@ -144,11 +150,11 @@ pub fn compensate(
         .last()
         .filter(|p| trip.as_of.timestamp_micros() as f64 / 1e6 - p.knot.t_event <= MAX_AGE_S)?;
     let now = trip.as_of.timestamp_micros() as f64 / 1e6;
-    let deadline = previous
-        .and_then(|p| p.evidence.as_ref())
-        .filter(|e| e.observed_at == fix.knot.t_event && e.vehicle_id == fix.vehicle_id)
-        .map(|e| e.correction_deadline)
-        .unwrap_or(now + CORRECTION_BUDGET_S);
+    let accepted_at = previous
+        .and_then(|p| p.gps_fix.as_ref())
+        .filter(|f| f.observed_at == fix.knot.t_event && f.vehicle_id == fix.vehicle_id)
+        .map(|f| f.accepted_at)
+        .unwrap_or(now);
     let mut used_history = false;
     if fixes.len() >= 2 {
         let prev = &fixes[fixes.len() - 2];
@@ -159,9 +165,9 @@ pub fn compensate(
             let age = (now - fix.knot.t_event).max(0.0);
             // A normal report interval plus its observed delivery age is not a
             // data outage. Cruise through that window, then decay to rest.
-            let accepted_age = (deadline - CORRECTION_BUDGET_S - fix.knot.t_event).max(0.0);
+            let accepted_age = (accepted_at - fix.knot.t_event).max(0.0);
             let horizon = (2.0 * dt + accepted_age).clamp(EXTRAPOLATION_S, MAX_AGE_S);
-            let cruise = (dt + accepted_age).min(horizon - 1.0);
+            let cruise = (dt + accepted_age).min(horizon - 10.0);
             let budget = (speed * horizon).clamp(EXTRAPOLATION_M, 1000.0);
             let travel = |elapsed: f64| {
                 let elapsed = elapsed.clamp(0.0, horizon);
@@ -171,36 +177,41 @@ pub fn compensate(
                         - decaying * decaying / (2.0 * (horizon - cruise))))
                     .min(budget)
             };
-            let advance = travel(age);
-            let mut distance = (fix.knot.s_m + advance).min(geometry.length_m);
-            if let Some(ceiling) = next_stop_ceiling(trip, fix.knot) {
-                distance = distance.min(ceiling);
-            }
+            let ceiling = next_stop_ceiling(trip, fix.knot);
             // Supported predictions may stop extrapolation sooner, but an old
             // report behind a newer GPS fix cannot pull the estimate backwards.
-            if let Some(stop) = trip.stops.iter().find(|s| {
-                s.stop_distance_m >= fix.knot.s_m
-                    && s.arrival_unix <= now
-                    && s.departure_unix >= now
-            }) {
-                distance = distance.min(stop.stop_distance_m);
-            }
+            let dwell_ceiling = trip
+                .stops
+                .iter()
+                .find(|s| {
+                    s.stop_distance_m >= fix.knot.s_m
+                        && s.arrival_unix <= now
+                        && s.departure_unix >= now
+                })
+                .map(|s| s.stop_distance_m);
+            let clamp_to_ceilings = |mut s: f64| {
+                if let Some(c) = ceiling {
+                    s = s.min(c);
+                }
+                if let Some(c) = dwell_ceiling {
+                    s = s.min(c);
+                }
+                s
+            };
+            let advance = travel(age);
+            let distance = clamp_to_ceilings((fix.knot.s_m + advance).min(geometry.length_m));
             let estimate = TrajectoryKnot::new(now, distance);
             super::builder::retain_anchor_consistent_knots(knots, &estimate);
             knots.push(estimate);
             if age < horizon {
-                let mut terminal = (fix.knot.s_m + travel(horizon)).min(geometry.length_m);
-                if let Some(ceiling) = next_stop_ceiling(trip, fix.knot) {
-                    terminal = terminal.min(ceiling);
-                }
-                if let Some(stop) = trip.stops.iter().find(|s| {
-                    s.stop_distance_m >= fix.knot.s_m
-                        && s.arrival_unix <= now
-                        && s.departure_unix >= now
-                }) {
-                    terminal = terminal.min(stop.stop_distance_m);
-                }
+                let cruise_end =
+                    clamp_to_ceilings((fix.knot.s_m + travel(cruise)).min(geometry.length_m));
+                let terminal =
+                    clamp_to_ceilings((fix.knot.s_m + travel(horizon)).min(geometry.length_m));
                 knots.retain(|k| k.t_event < fix.knot.t_event + horizon && k.s_m <= terminal);
+                if age < cruise {
+                    knots.push(TrajectoryKnot::new(fix.knot.t_event + cruise, cruise_end));
+                }
                 knots.push(TrajectoryKnot::new(fix.knot.t_event + horizon, terminal));
                 // Observed movement supplies the incoming slope. No synthetic
                 // previous target is blended into the accepted GPS estimate.
@@ -219,14 +230,15 @@ pub fn compensate(
     if !used_history {
         // With no speed history, use predictions only for a short bounded
         // interval. A sole fix with no predictions remains stationary.
-        use super::interpolation::{InterpolationMethod, PchipMethod, evaluate_motion};
+        use super::interpolation::{PchipMethod, bounded_prediction_motion, evaluate_motion};
         knots.sort_by(|a, b| {
             a.t_event
                 .total_cmp(&b.t_event)
                 .then(a.s_m.total_cmp(&b.s_m))
         });
         knots.dedup_by(|a, b| a.t_event == b.t_event);
-        let motion = PchipMethod.motion(knots).ok()?;
+        let motion =
+            bounded_prediction_motion(&PchipMethod, knots, MAX_SPEED_MPS, Some(now)).ok()?;
         let horizon = fix.knot.t_event + EXTRAPOLATION_S;
         let end = evaluate_motion(&motion, horizon)
             .s_m
@@ -239,11 +251,11 @@ pub fn compensate(
             *knots = vec![TrajectoryKnot::new(now, end)];
         }
     }
-    Some(GpsEvidence {
+    Some(GpsFix {
         vehicle_id: fix.vehicle_id.clone(),
         observed_at: fix.knot.t_event,
         distance_m: fix.knot.s_m,
-        correction_deadline: deadline,
+        accepted_at,
     })
 }
 

@@ -207,7 +207,7 @@ async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
     let geo::Geometry::LineString(shape) = shape else {
         panic!("fixture must contain a line");
     };
-    let old_point = geo::Point::from(shape.0[0]);
+    let old_point = geo::Point::from(shape.0[1]);
     let observed_at = at - chrono::Duration::seconds(20);
     input.positions.push(CollectedObservation {
         vehicle_id: input.trips[0].0.vehicle_id.clone(),
@@ -245,15 +245,16 @@ async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
         .expect("motion retains the historical observation boundary");
     let u = (event - interval.t0) / (interval.t1 - interval.t0);
     let distance = interval.a + u * (interval.b + u * (interval.c + u * interval.d));
+    let expected_distance = unit.trajectory.shape.distances_m[1];
     assert!(
-        distance.abs() < 1e-5,
-        "historical anchor must remain at the first shape vertex"
+        expected_distance > 0.0 && (distance - expected_distance).abs() < 1e-5,
+        "historical anchor must use the past GPS fix at vertex 1 (s={expected_distance}), got {distance}"
     );
     assert!(
-        unit.trajectory.evidence.is_none(),
+        unit.trajectory.gps_fix.is_none(),
         "history must not carry live correction state"
     );
-    let [lon, lat] = unit.trajectory.shape.positions[0];
+    let [lon, lat] = unit.trajectory.shape.positions[1];
     assert!(
         (lon - old_point.x()).abs() < 0.00001 && (lat - old_point.y()).abs() < 0.00001,
         "rendered position must use the past GPS fix, not schedule-only interpolation or the future fix: {lon}, {lat}"

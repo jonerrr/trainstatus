@@ -15,11 +15,11 @@ test('real WebGL picking survives overlay removal and reattachment', async () =>
 			.read()
 			.picker?.pick({ x: 400, y: 250 })
 			.map((v) => v.tripId) ?? [];
-	await expect.poll(pick).toContain('trip');
+	await expect.poll(pick).toContain('trip-1');
 	await view.getByRole('button', { name: 'Toggle vehicles' }).click();
 	expect(view.component.read().picker).toBeNull();
 	await view.getByRole('button', { name: 'Toggle vehicles' }).click();
-	await expect.poll(pick).toContain('trip');
+	await expect.poll(pick).toContain('trip-1');
 	const map = view.component.read().map!;
 	await view.unmount();
 	expect(map.getCanvas().isConnected).toBe(false);

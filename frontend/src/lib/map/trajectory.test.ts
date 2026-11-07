@@ -2,20 +2,26 @@ import type { TrajectoryShape } from '#lib/client/index.js';
 
 import { expect, test } from 'vitest';
 
+import vectors from '../../../../backend/tests/fixtures/trajectory/motion-vectors.json';
 import {
 	buildActiveVehiclesAtTime,
+	evaluateMotion,
 	positionAtDistance,
 	renderUnitTableFromIPC
-} from './trajectoryArrow';
+} from './trajectory';
 import { trajectoryFixture } from './trajectoryFixture';
 
-test('traverses the source right angle rather than its chord at every frame', () => {
+test('decodes shared geometry and renders expected positions through a corner', () => {
 	const table = renderUnitTableFromIPC(trajectoryFixture());
-	for (let t = 100; t <= 200; t += 1 / 30) {
-		const [x, y] = buildActiveVehiclesAtTime(table, t)[0].position;
-		expect(Math.min(Math.abs(y - 40), Math.abs(x + 73))).toBeLessThan(1e-10);
+	for (const [time, x, y] of [
+		[100, -74, 40],
+		[125, -73.6875, 40],
+		[150, -73, 40],
+		[175, -73, 40.6875],
+		[200, -73, 41]
+	]) {
+		expect(buildActiveVehiclesAtTime(table, time)[0].position).toEqual([x, y]);
 	}
-	expect(buildActiveVehiclesAtTime(table, 150)[0].position).toEqual([-73, 40]);
 	expect(buildActiveVehiclesAtTime(table, 100)[0].bearing).toBeCloseTo(90, 1);
 	expect(buildActiveVehiclesAtTime(table, 200)[0].bearing).toBeCloseTo(0, 1);
 });
@@ -56,4 +62,12 @@ test('lookup handles repeated coordinates and zero-length geometry edges in back
 	expect(positionAtDistance(shape, 35)).toEqual([0, 0.5]);
 	expect(positionAtDistance(shape, -1)).toEqual([0, 0]);
 	expect(positionAtDistance(shape, 50)).toEqual([0, 1]);
+});
+
+test('backend and browser share numerical vectors including joins and holds', () => {
+	for (const [time, distance, speed] of vectors.samples) {
+		const state = evaluateMotion(vectors.motion, time);
+		expect(Math.abs(state.distance - distance)).toBeLessThan(vectors.tolerance);
+		expect(Math.abs(state.speed - speed)).toBeLessThan(vectors.tolerance);
+	}
 });

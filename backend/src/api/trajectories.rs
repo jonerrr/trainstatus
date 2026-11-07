@@ -16,13 +16,21 @@ use crate::trajectory::encode_render_units;
     path = "/trajectories/{source}",
     tag = "REALTIME",
     summary = "Get rendered trajectories",
-    description = "Returns distance-space motion as an Apache Arrow IPC stream. Each unit references shape_key and trip_id. shape_positions (WGS84) and shape_distances (EPSG:6538 meters) occur once per distinct shape; motion occurs once per trip as float64 [t0,t1,a,b,c,d] cubics in normalized interval time. Subtract offset_m from head distance for each unit. Outside motion bounds hold the endpoint with zero speed; at joins use the following interval. observed_at, observed_distance and correction_deadline describe accepted GPS evidence and its absolute display correction deadline. All currently supported sources are accepted. Live responses include `x-source-updated-at`, the source commit time in Unix seconds, once a snapshot has been committed. Historical requests use `at` to derive trajectories from retained trips and recorded vehicle locations.",
+    description = "Returns distance-space motion as an Apache Arrow IPC stream. Each unit references shape_key and trip_id. shape_positions (WGS84) and shape_distances (EPSG:6538 meters) occur once per distinct shape; motion occurs once per trip as float64 [t0,t1,a,b,c,d] cubics in normalized interval time. Subtract offset_m from head distance for each unit. Outside motion bounds hold the endpoint with zero speed; at joins use the following interval. All currently supported sources are accepted. Live responses include `x-source-updated-at`, the source commit time in Unix seconds, once a snapshot has been committed. Historical requests use `at` to derive trajectories from retained trips and recorded vehicle locations.",
     params(
         ("source" = Source, Path, description = "Data source"),
         TimeQuery
     ),
     responses(
-        (status = 200, description = "Arrow IPC stream of trajectories"),
+        (
+            status = 200,
+            description = "Arrow IPC stream of trajectories",
+            body = [RenderUnit],
+            content_type = "application/vnd.apache.arrow.stream",
+            headers(
+                ("x-source-updated-at" = Option<i64>, description = "Unix timestamp of the last committed live snapshot")
+            )
+        ),
         (status = 400, description = "Invalid source path or query parameter"),
         (status = 500, description = "Trajectory calculation, database, or internal service error")
     )

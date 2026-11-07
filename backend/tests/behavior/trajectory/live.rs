@@ -211,26 +211,18 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
 }
 
 #[tokio::test]
-async fn gps_target_ignores_old_synthetic_state() {
+async fn gps_reconciles_reachable_previous_state_and_discards_unreachable_backward_jump() {
     let mut snapshot = fixture();
     snapshot.committed_at -= Duration::seconds(5);
     for position in &mut snapshot.positions {
         position.updated_at -= Duration::seconds(20);
     }
-    let deadline = snapshot.committed_at.timestamp_micros() as f64 / 1e6 + 10.0;
     let id = snapshot.trips[0].id;
     let cache = Arc::new(TrajectoryCache::new());
     let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
     let first = deriver.derive(&snapshot).await.unwrap();
     let expected = first.plans[&id].motion[0].a;
-    assert_eq!(
-        first.plans[&id]
-            .evidence
-            .as_ref()
-            .unwrap()
-            .correction_deadline,
-        deadline
-    );
+    let accepted_at = first.plans[&id].gps_fix.as_ref().unwrap().accepted_at;
     snapshot.committed_at += Duration::seconds(3);
     let mut previous = first.clone();
     Arc::make_mut(previous.plans.get_mut(&id).unwrap()).motion[0].a = 500.0;
@@ -238,16 +230,8 @@ async fn gps_target_ignores_old_synthetic_state() {
     let second = deriver.derive(snapshot).await.unwrap();
     assert!((second.plans[&id].motion[0].a - expected).abs() < 1.0);
     assert_eq!(
-        first.plans[&id]
-            .evidence
-            .as_ref()
-            .unwrap()
-            .correction_deadline,
-        second.plans[&id]
-            .evidence
-            .as_ref()
-            .unwrap()
-            .correction_deadline
+        second.plans[&id].gps_fix.as_ref().unwrap().accepted_at,
+        accepted_at
     );
 }
 

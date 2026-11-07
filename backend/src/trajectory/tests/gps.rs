@@ -6,7 +6,10 @@ use crate::{
         trip::StopTimeData,
     },
     trajectory::{
-        geometry::{build_shape_geometry, distance_to_coord, ordered_stop_distances},
+        geometry::{
+            build_shape_geometry, distance_to_coord, ordered_stop_distances,
+            project_wgs84_point_to_epsg,
+        },
         types::TrajectoryStop,
     },
 };
@@ -73,14 +76,14 @@ fn distinct_fixes_compensate_latency_without_redating_or_smoothing_evidence() {
         assert_eq!(raw.t_event, 1020.0);
         assert!((raw.s_m - 100.0).abs() < 0.1);
         let mut knots = vec![raw];
-        let evidence = compensate(&trip, &g, source, &mut knots, None).unwrap();
-        assert_eq!(evidence.observed_at, 1020.0);
+        let fix = compensate(&trip, &g, source, &mut knots, None).unwrap();
+        assert_eq!(fix.observed_at, 1020.0);
         assert!((knots.iter().find(|k| k.t_event == 1030.0).unwrap().s_m - 150.0).abs() < 0.2);
         assert_eq!(
             knots.iter().find(|k| k.t_event == 1030.0).unwrap().t_event,
             1030.0
         );
-        assert_eq!(evidence.correction_deadline, 1040.0);
+        assert_eq!(fix.accepted_at, 1030.0);
     }
 }
 #[test]
@@ -104,7 +107,7 @@ fn extrapolation_decays_and_stops_and_stale_future_offroute_reports_are_rejected
         report(&trip, &g, source, 1020, 100.0),
     ];
     let mut initial = vec![];
-    let evidence = compensate(&trip, &g, source, &mut initial, None).unwrap();
+    let gps_fix = compensate(&trip, &g, source, &mut initial, None).unwrap();
     let previous = crate::trajectory::Trajectory {
         generated_at: 1030.0,
         trip_id: trip.trip_id.to_string(),
@@ -112,7 +115,7 @@ fn extrapolation_decays_and_stops_and_stale_future_offroute_reports_are_rejected
         color: [0, 0, 0],
         shape: g.path.clone(),
         motion: vec![],
-        evidence: Some(evidence),
+        gps_fix: Some(gps_fix),
     };
     trip.as_of = chrono::DateTime::from_timestamp(1100, 0).unwrap();
     let mut knots = vec![];
@@ -268,9 +271,9 @@ fn optimistic_bus_predictions_respect_speed_limits_without_retiming_gps() {
             )
             .unwrap();
             let trajectory = computed.trajectory;
-            let evidence = trajectory.evidence.unwrap();
-            assert_eq!(evidence.observed_at, observed_at);
-            assert!((evidence.distance_m - observed_distance).abs() < 0.2);
+            let gps_fix = trajectory.gps_fix.unwrap();
+            assert_eq!(gps_fix.observed_at, observed_at);
+            assert!((gps_fix.distance_m - observed_distance).abs() < 0.2);
             let motion = &trajectory.motion;
             validate_motion(motion).unwrap();
             assert!((evaluate_motion(motion, observed_at).s_m - observed_distance).abs() < 0.2);
@@ -383,6 +386,13 @@ fn ten_minute_njt_gps_replay_does_not_stop_between_regular_delayed_reports() {
                 &TrajectoryConfig::for_source(source),
             )
             .unwrap();
+            if let Some(prev) = &previous {
+                let now = trip.as_of.timestamp() as f64;
+                let before = evaluate_motion(&prev.motion, now);
+                let after = evaluate_motion(&computed.trajectory.motion, now);
+                assert!((before.s_m - after.s_m).abs() < 1e-6);
+                assert!((before.v_mps - after.v_mps).abs() < 1e-6);
+            }
             for frame in 0..300 {
                 let state = evaluate_motion(
                     &computed.trajectory.motion,

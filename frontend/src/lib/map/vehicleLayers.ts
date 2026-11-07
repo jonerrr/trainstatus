@@ -2,7 +2,7 @@ import { IconLayer } from '@deck.gl/layers';
 
 import type { MapFeatureKey } from './interactions';
 import { BODY_HEAD_RGB, BODY_RGB, CASING_RGB } from './mapTheme';
-import { normalizeBearingForIcon, type ActiveVehicle } from './trajectoryArrow';
+import { normalizeBearingForIcon, type ActiveVehicle } from './trajectory';
 import {
 	shapeForIconKey,
 	VEHICLE_ICON_ATLAS,
@@ -22,8 +22,7 @@ export function isRailVehicle(vehicle: ActiveVehicle) {
 export function vehicleLayers(
 	partitions: { detail: ActiveVehicle[]; puck: ActiveVehicle[] },
 	selectedTrip: MapFeatureKey | null,
-	frameVersion: number,
-	dataVersion: number
+	frameVersion: number
 ) {
 	const selectedKey = selectedTrip ? `${selectedTrip.source}:${selectedTrip.id}` : null;
 
@@ -88,7 +87,6 @@ export function vehicleLayers(
 					getSize,
 					sizeUnits,
 					billboard: false,
-					alphaCutoff: 0,
 					sizeMinPixels: sizeUnits === 'meters' ? 3 : 0,
 					// Only the topmost pass is pickable, so a hover produces one hit
 					// rather than three stacked ones.
@@ -96,9 +94,8 @@ export function vehicleLayers(
 					updateTriggers: {
 						getPosition: frameVersion,
 						getAngle: frameVersion,
-						getIcon: dataVersion,
-						getColor: [dataVersion, selectedKey],
-						getSize: [dataVersion, selectedKey]
+						getColor: selectedKey,
+						getSize: selectedKey
 					}
 				})
 		);

@@ -3,7 +3,8 @@ use geo::Point;
 
 use super::super::{
     builder::{
-        TrajectoryBuilder, collapse_backtracking_knots_with_stats, retain_anchor_consistent_knots,
+        NEXT_STOP_CEILING_TOLERANCE_M, TrajectoryBuilder, collapse_backtracking_knots_with_stats,
+        dedup_equal_time_knots, retain_anchor_consistent_knots,
     },
     geometry::ShapeGeometry,
     types::{GeneratedKnots, KnotGenerationStats, TrajectoryKnot, TripSnapshot},
@@ -12,9 +13,6 @@ use crate::network::types::stop::StopData;
 #[cfg(test)]
 use crate::operations::types::position::PositionData;
 use crate::source::Source;
-
-// TODO: the other sources have this exact tolerance. make it a global constant or standardize the trajectory configuration better
-const DISTANCE_TOLERANCE_M: f64 = 1.0;
 
 #[derive(Default)]
 pub struct NjtBusBuilder;
@@ -70,7 +68,7 @@ impl TrajectoryBuilder for NjtBusBuilder {
             retain_anchor_consistent_knots(&mut knots, &anchor);
             stats.pre_anchor_knots_dropped = (before - knots.len()) as u32;
             if let Some(ceiling) = ceiling {
-                knots.retain(|k| k.s_m <= ceiling + DISTANCE_TOLERANCE_M);
+                knots.retain(|k| k.s_m <= ceiling + NEXT_STOP_CEILING_TOLERANCE_M);
             }
             knots.push(anchor);
         }
@@ -90,18 +88,7 @@ impl TrajectoryBuilder for NjtBusBuilder {
                 .total_cmp(&b.t_event)
                 .then(a.s_m.total_cmp(&b.s_m))
         });
-        // Equal-time predictions cannot be interpolated. Keep the furthest distance,
-        // except at a GPS anchor, whose timestamp conflicts were removed above.
-        let mut unique: Vec<TrajectoryKnot> = Vec::new();
-        for knot in knots {
-            if let Some(last) = unique.last_mut()
-                && last.t_event == knot.t_event
-            {
-                *last = knot;
-            } else {
-                unique.push(knot);
-            }
-        }
+        let unique = dedup_equal_time_knots(knots);
         let (knots, removed) = collapse_backtracking_knots_with_stats(&unique);
         stats.backtracking_knots_removed = removed;
         Ok(GeneratedKnots { knots, stats })

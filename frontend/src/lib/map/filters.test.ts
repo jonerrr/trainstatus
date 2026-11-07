@@ -18,8 +18,7 @@ describe('countActiveFilters', () => {
 						layer: 'stop',
 						filters: { mta_subway: { north_headsign: 'Uptown' }, mta_bus: {}, njt_bus: {} }
 					},
-					{ layer: 'route', filters: { mta_subway: {}, mta_bus: {}, njt_bus: {} } },
-					{ layer: 'trip', filters: { mta_subway: {}, mta_bus: {}, njt_bus: {} } }
+					{ layer: 'route', filters: { mta_subway: {}, mta_bus: {}, njt_bus: {} } }
 				]
 			})
 		).toBe(3);
@@ -51,7 +50,7 @@ describe('countActiveFilters', () => {
 		const filters = new MapFilters();
 		filters.sources = ['mta_bus'];
 		filters.layers.stop = false;
-		filters.stop_filters.mta_bus.direction = 'n';
+		filters.stop_filters.mta_bus.direction = ['n'];
 
 		filters.reset();
 
@@ -75,12 +74,16 @@ describe('countActiveFilters', () => {
 	it('keeps an unfiltered source when another source has a property filter', () => {
 		const filters = new MapFilters();
 		filters.sources = ['mta_subway', 'mta_bus'];
-		filters.stop_filters.mta_bus.direction = 'n';
+		filters.stop_filters.mta_bus.direction = ['n'];
 
 		expect(filters.stop).toEqual([
 			'any',
 			['==', ['get', 'source'], 'mta_subway'],
-			['all', ['==', ['get', 'source'], 'mta_bus'], ['==', ['get', 'direction'], 'n']]
+			[
+				'all',
+				['==', ['get', 'source'], 'mta_bus'],
+				['in', ['get', 'direction'], ['literal', ['n']]]
+			]
 		]);
 	});
 

@@ -5,6 +5,7 @@ use crate::{
     trajectory::{
         builders::{mta_subway::MtaSubwayBuilder, njt_bus::NjtBusBuilder},
         compute_trajectory,
+        continuity::ContinuityDiscardReason,
         geometry::build_shape_geometry,
         interpolation::{PchipMethod, evaluate_motion},
         types::{TrajectoryConfig, TrajectoryStop, TripSnapshot},
@@ -66,13 +67,14 @@ fn trip() -> (TripSnapshot, super::super::geometry::ShapeGeometry) {
     )
 }
 #[test]
-fn ten_minute_subway_replay_flags_excessive_target_speed() {
+fn ten_minute_subway_revisions_preserve_continuity_and_bounded_forward_motion() {
     let fixture = replay();
     let (mut trip, geometry) = trip();
     let mut previous = None;
     let mut fastest = 0.0_f64;
     let mut fastest_at = 0.0;
     let mut frames = 0;
+    let mut last_distance = None;
     for refresh in (0..fixture.duration_s).step_by(fixture.refresh_s as usize) {
         trip.as_of = at(refresh);
         trip.stops = fixture
@@ -114,9 +116,27 @@ fn ten_minute_subway_replay_flags_excessive_target_speed() {
             &TrajectoryConfig::for_source(Source::MtaSubway),
         )
         .unwrap();
+        if let Some(previous) = &previous {
+            let time = trip.as_of.timestamp() as f64;
+            let before = evaluate_motion(&previous.motion, time);
+            let after = evaluate_motion(&computed.trajectory.motion, time);
+            assert!(
+                (before.s_m - after.s_m).abs() < 1e-6,
+                "position jump at {refresh}"
+            );
+            assert!(
+                (before.v_mps - after.v_mps).abs() < 1e-6,
+                "velocity jump at {refresh}"
+            );
+        }
         for frame in 0..fixture.refresh_s * fixture.frame_hz {
             let time = trip.as_of.timestamp() as f64 + frame as f64 / fixture.frame_hz as f64;
             let state = evaluate_motion(&computed.trajectory.motion, time);
+            if let Some(previous_distance) = last_distance {
+                assert!(state.s_m >= previous_distance - 1e-6, "reverse at {time}");
+            }
+            assert!(state.v_mps >= -1e-6, "negative speed at {time}");
+            last_distance = Some(state.s_m);
             frames += 1;
             if state.v_mps > fastest {
                 fastest = state.v_mps;
@@ -132,13 +152,14 @@ fn ten_minute_subway_replay_flags_excessive_target_speed() {
     );
 }
 #[test]
-fn ten_minute_njt_prediction_replay_flags_a_bus_pinned_to_its_first_future_stop() {
+fn ten_minute_njt_predictions_preserve_compatible_handoffs_and_make_forward_progress() {
     let fixture = replay();
     let (mut trip, geometry) = trip();
     let mut previous = None;
     let mut first = None;
     let mut last = 0.0;
     let mut stopped = 0;
+    let mut last_distance = None;
     for refresh in (60..60 + fixture.duration_s).step_by(fixture.refresh_s as usize) {
         trip.as_of = at(refresh);
         trip.stops = (0..3)
@@ -168,11 +189,46 @@ fn ten_minute_njt_prediction_replay_flags_a_bus_pinned_to_its_first_future_stop(
             &TrajectoryConfig::for_source(Source::NjtBus),
         )
         .unwrap();
+        if let Some(previous) = &previous {
+            let time = trip.as_of.timestamp() as f64;
+            let before = evaluate_motion(&previous.motion, time);
+            let after = evaluate_motion(&computed.trajectory.motion, time);
+            if computed.continuity_stats.prev_state_discarded {
+                // Rolling ETAs can exceed the configured backward-gap allowance.
+                // Such a reset is explicit; compatible revisions must stay continuous.
+                assert_eq!(
+                    computed.continuity_stats.discard_reason,
+                    Some(ContinuityDiscardReason::BackwardGap)
+                );
+                assert!(
+                    before.s_m - after.s_m
+                        > TrajectoryConfig::for_source(Source::NjtBus).max_backward_gap_m
+                );
+                last_distance = None;
+            } else {
+                assert!(
+                    (before.s_m - after.s_m).abs() < 1e-6,
+                    "position jump at {refresh}"
+                );
+                assert!(
+                    (before.v_mps - after.v_mps).abs() < 1e-6,
+                    "velocity jump at {refresh}"
+                );
+            }
+        }
         for frame in 0..fixture.refresh_s * fixture.frame_hz {
             let state = evaluate_motion(
                 &computed.trajectory.motion,
                 trip.as_of.timestamp() as f64 + frame as f64 / fixture.frame_hz as f64,
             );
+            if let Some(previous_distance) = last_distance {
+                assert!(
+                    state.s_m >= previous_distance - 1e-6,
+                    "reverse at {refresh}, frame {frame}"
+                );
+            }
+            assert!((0.0..=30.0 + 1e-6).contains(&state.v_mps));
+            last_distance = Some(state.s_m);
             first.get_or_insert(state.s_m);
             last = state.s_m;
             if state.v_mps < 0.1 {

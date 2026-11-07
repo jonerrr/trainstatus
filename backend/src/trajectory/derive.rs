@@ -59,23 +59,22 @@ impl TrajectoryDeriver {
             async move {
                 let result = async {
                     let mut input = snapshot_from_persisted_trip(trip, stops, positions, &revision, &self.cache, at).await?;
-                    let shape = self.cache.get_shape_geometry(source, &input.shape_key, &input.shape).await.ok_or_else(|| anyhow::anyhow!("Missing shape geometry"))?;
-                    let compatible = prev.as_deref().filter(|p| p.shape.key==shape.path.key);
+                    let compatible = prev.as_deref().filter(|p| p.shape.key == input.shape_key);
                     if compatible.is_some() {
                         for old in history {
-                            if !input.positions.iter().any(|p|p.updated_at==old.updated_at && p.vehicle_id==old.vehicle_id) {input.positions.push(old);}
+                            if !input.positions.iter().any(|p| p.updated_at == old.updated_at && p.vehicle_id == old.vehicle_id) {
+                                input.positions.push(old);
+                            }
                         }
                     }
-                    input.positions.retain(|p|(at-p.updated_at).num_seconds()<=super::gps::HISTORY_AGE_S as i64);
-                    input.positions.sort_by_key(|p|p.updated_at);
-                    if input.positions.len()>8 {input.positions.drain(..input.positions.len()-8);}
-                    let mut computed = compute_trajectory_async(&self.engine, source, &input, prev.as_deref(), &self.cache, &config).await?;
-                    if let Some(evidence) = &mut computed.trajectory.evidence {
-                        let repeated = prev.as_deref().and_then(|p| p.evidence.as_ref()).is_some_and(|e| e.observed_at==evidence.observed_at && e.vehicle_id==evidence.vehicle_id);
-                        if !repeated { evidence.correction_deadline = snapshot.committed_at.timestamp_micros() as f64/1e6 + super::gps::CORRECTION_BUDGET_S; }
+                    input.positions.retain(|p| (at - p.updated_at).num_seconds() <= super::gps::HISTORY_AGE_S as i64);
+                    input.positions.sort_by_key(|p| p.updated_at);
+                    if input.positions.len() > 8 {
+                        input.positions.drain(..input.positions.len() - 8);
                     }
-                    let units = expand_render_units(source, &input, &computed.trajectory, &shape);
-                    Ok::<_, anyhow::Error>((trip.id, computed, units, prev.is_some(), input.positions))
+                    let computed = compute_trajectory_async(&self.engine, source, &input, compatible, &self.cache, &config).await?;
+                    let units = expand_render_units(source, &input, &computed.trajectory);
+                    Ok::<_, anyhow::Error>((trip.id, computed, units, compatible.is_some(), input.positions))
                 }.await;
                 if let Err(error) = &result { tracing::debug!(%source, trip_id = %trip.id, %error, "Skipping invalid trajectory input"); }
                 result.ok()

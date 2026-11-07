@@ -62,10 +62,10 @@ fn expand_render_units_emits_one_row_per_subway_car() {
         motion: vec![crate::trajectory::interpolation::hermite(
             100.0, 120.0, 220.0, 260.0, 0.0, 0.0,
         )],
-        evidence: None,
+        gps_fix: None,
     };
 
-    let units = expand_render_units(Source::MtaSubway, &trip, &trajectory, &shape_geom);
+    let units = expand_render_units(Source::MtaSubway, &trip, &trajectory);
     let config = source_render_config(Source::MtaSubway);
 
     assert_eq!(units.len(), 8);

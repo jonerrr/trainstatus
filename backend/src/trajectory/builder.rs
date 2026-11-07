@@ -5,6 +5,27 @@ use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
 
 pub const KNOT_COLLAPSE_TOLERANCE_M: f64 = 0.5;
 
+/// Slack allowed above the reported next-stop distance when truncating the
+/// schedule ahead of the live feed. Keeps the arrival/departure dwell knots
+/// (which sit exactly at the stop distance) from being trimmed by rounding.
+pub const NEXT_STOP_CEILING_TOLERANCE_M: f64 = 1.0;
+
+/// Equal-time predictions cannot be interpolated. Keep the furthest distance
+/// at each timestamp (assuming `knots` is already sorted by `(t_event, s_m)`).
+pub fn dedup_equal_time_knots(knots: Vec<TrajectoryKnot>) -> Vec<TrajectoryKnot> {
+    let mut unique: Vec<TrajectoryKnot> = Vec::with_capacity(knots.len());
+    for knot in knots {
+        if let Some(last) = unique.last_mut()
+            && last.t_event == knot.t_event
+        {
+            *last = knot;
+        } else {
+            unique.push(knot);
+        }
+    }
+    unique
+}
+
 /// Drop schedule knots that contradict a live GPS anchor.
 ///
 /// Knots that share the anchor timestamp are removed so the caller can insert

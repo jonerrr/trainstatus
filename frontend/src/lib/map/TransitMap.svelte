@@ -25,14 +25,14 @@
 	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './mapTheme';
 	import RouteLayers from './RouteLayers.svelte';
 	import StopLayers from './StopLayers.svelte';
-	import TripMarkersLoader from './TripMarkersLoader.svelte';
+	import { createTrajectories } from './trajectories.svelte.js';
+	import TripMarkers from './TripMarkers.svelte';
 
 	const current_time = getCurrentTime();
 
 	type MapOverlay =
 		| { kind: 'hover'; target: MapTarget; point: ScreenPoint }
 		| { kind: 'choose'; targets: MapTarget[]; point: ScreenPoint }
-		| { kind: 'error'; message: string }
 		| null;
 
 	let map = $state.raw<MapInstance>();
@@ -44,14 +44,17 @@
 	let ready = $state(false);
 	let width = $state(0);
 	let height = $state(0);
-	let filters = $state(new MapFilters());
+	const filters = new MapFilters();
 	const interactions = new MapInteractionController();
 	const transit = getTransitData();
+	const trajectories = createTrajectories(() => ({
+		sources: filters.layers.trip ? filters.sources : [],
+		at: current_time.value
+	}));
 	// Reset any active overlay whenever the visible network or the selected time changes.
 	let overlay = $derived.by<MapOverlay>(() => {
 		void filters.route;
 		void filters.stop;
-		void filters.trip;
 		void filters.layers.route;
 		void filters.layers.stop;
 		void filters.layers.trip;
@@ -62,7 +65,7 @@
 	const activeRoute = $derived<MapFeatureKey | null>(
 		hoveredTarget?.kind === 'route'
 			? { id: hoveredTarget.id, source: hoveredTarget.source }
-			: hoveredTarget?.routeId
+			: hoveredTarget?.kind === 'trip'
 				? { id: hoveredTarget.routeId, source: hoveredTarget.source }
 				: null
 	);
@@ -82,7 +85,7 @@
 			canvas.style.cursor = '';
 		};
 	});
-	function targetsAt(point: ScreenPoint): MapTarget[] {
+	function targetsAt(point: ScreenPoint, closest = false): MapTarget[] {
 		if (!map) return [];
 		const layers = ['stop-subway-hit-layer', 'stop-bus-hit-layer', 'route-hit-layer'].filter((id) =>
 			map?.getLayer(id)
@@ -101,16 +104,11 @@
 						return [{ kind, id, source }];
 					})
 			: [];
-		const result = interactions.resolve(point, targets);
-		return result.kind === 'choose'
-			? result.targets
-			: result.kind === 'open'
-				? [result.target]
-				: [];
+		return interactions.resolve(point, targets, closest);
 	}
 	function mousemove(event: MapMouseEvent) {
 		if (moving || overlay?.kind === 'choose' || event.originalEvent.buttons) return;
-		const target = targetsAt(event.point)[0];
+		const target = targetsAt(event.point, true)[0];
 		if (target) overlay = { kind: 'hover', target, point: event.point };
 		else if (overlay?.kind === 'hover') overlay = null;
 	}
@@ -118,7 +116,7 @@
 		overlay = null;
 		if (target.kind !== 'trip') {
 			open_modal({ type: target.kind, source: target.source, id: target.id });
-		} else if (target.routeId) {
+		} else {
 			// The trip modal loads the vehicle's route service when it opens.
 			open_modal({
 				type: 'trip',
@@ -126,11 +124,6 @@
 				route_id: target.routeId,
 				id: target.id
 			});
-		} else {
-			overlay = {
-				kind: 'error',
-				message: 'This vehicle has no route. Select another vehicle.'
-			};
 		}
 	}
 	function click(event: MapMouseEvent) {
@@ -149,7 +142,7 @@
 	data-map-zoom={zoom}
 	data-map-bearing={bearing}
 >
-	<Filters bind:filters />
+	<Filters {filters} />
 	<MapLibre
 		bind:map
 		bind:center
@@ -183,7 +176,7 @@
 		}}
 		onmovestart={() => {
 			moving = true;
-			if (overlay?.kind !== 'error') overlay = null;
+			overlay = null;
 		}}
 		onmoveend={() => {
 			moving = false;
@@ -201,8 +194,9 @@
 		{#if filters.layers.route}<RouteLayers filter={filters.route} {activeRoute} />{/if}
 		{#if filters.layers.stop}<StopLayers filter={filters.stop} />{/if}
 		{#if filters.layers.trip && filters.sources.length}
-			<TripMarkersLoader
-				sources={filters.sources}
+			<TripMarkers
+				tables={trajectories.current.tables}
+				at={current_time.value}
 				railDetail={settledZoom >= RAIL_DETAIL_ZOOM}
 				busDetail={settledZoom >= BUS_DETAIL_ZOOM}
 				{selectedTrip}
@@ -230,12 +224,5 @@
 			viewportWidth={width}
 			viewportHeight={height}
 		/>
-	{:else if overlay?.kind === 'error'}
-		<div
-			role="status"
-			class="absolute right-12 bottom-3 left-3 rounded-none bg-canvas p-3 text-sm text-status-warning"
-		>
-			{overlay.message}
-		</div>
 	{/if}
 </div>

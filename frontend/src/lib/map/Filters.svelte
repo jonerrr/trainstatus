@@ -8,7 +8,7 @@
 
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
-	import { layer_data, type FilterValue, type MapFilters } from './filters.svelte';
+	import { layer_data, type MapFilters } from './filters.svelte';
 	import SourceFilterGroup from './SourceFilterGroup.svelte';
 
 	interface Props {
@@ -18,7 +18,7 @@
 	type LayerKey = keyof MapFilters['layers'];
 	const layerEntries = Object.entries(layer_data) as [LayerKey, (typeof layer_data)[LayerKey]][];
 
-	let { filters = $bindable() }: Props = $props();
+	let { filters }: Props = $props();
 
 	let filtersOpen = $state(false);
 	let trigger = $state<HTMLButtonElement>();
@@ -150,30 +150,16 @@
 			</section>
 
 			{#each layerEntries as [layer] (layer)}
-				{#if filters.layers[layer] && filters.sources.length > 0}
+				{#if layer !== 'trip' && filters.layers[layer] && filters.sources.length > 0}
 					<section class="flex flex-col gap-1.5 border-t border-border-subtle pt-3">
 						<h3 class="text-xs font-semibold tracking-wide text-muted uppercase">
 							{layer} filters
 						</h3>
 						{#each filters.sources as source (source)}
 							{#if layer === 'stop'}
-								<SourceFilterGroup
-									{layer}
-									{source}
-									bind:filters={filters.stop_filters[source] as Record<string, FilterValue>}
-								/>
-							{:else if layer === 'route'}
-								<SourceFilterGroup
-									{layer}
-									{source}
-									bind:filters={filters.route_filters[source] as Record<string, FilterValue>}
-								/>
+								<SourceFilterGroup {layer} {source} bind:filters={filters.stop_filters[source]} />
 							{:else}
-								<SourceFilterGroup
-									{layer}
-									{source}
-									bind:filters={filters.trip_filters[source] as Record<string, FilterValue>}
-								/>
+								<SourceFilterGroup {layer} {source} bind:filters={filters.route_filters[source]} />
 							{/if}
 						{/each}
 					</section>

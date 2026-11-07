@@ -68,7 +68,7 @@ pub fn compute_trajectory(
     let t_now = trip.as_of.timestamp_micros() as f64 / 1e6;
     let mut knots = raw_knots;
     let source = builder.source();
-    let evidence = if source != Source::MtaSubway {
+    let gps_fix = if source != Source::MtaSubway {
         super::gps::compensate(trip, shape_geom, source, &mut knots, previous)
     } else {
         None
@@ -84,13 +84,11 @@ pub fn compute_trajectory(
         method,
         &knots,
         config.max_speed_mps,
-        evidence.as_ref().map(|_| t_now),
+        gps_fix.as_ref().map(|_| t_now),
     )?;
     let mut continuity_stats = continuity::ContinuityStats::default();
-    if evidence.is_none()
-        && trip.recorded_anchor.is_none()
-        && let Some(previous) =
-            previous.filter(|p| p.evidence.is_none() && p.shape.key == shape_geom.path.key)
+    if trip.recorded_anchor.is_none()
+        && let Some(previous) = previous.filter(|p| p.shape.key == shape_geom.path.key)
     {
         (motion, continuity_stats) = continuity::reconcile(motion, previous, config, t_now);
     }
@@ -105,7 +103,7 @@ pub fn compute_trajectory(
         color: parse_color(&trip.route_color),
         shape: shape_geom.path.clone(),
         motion,
-        evidence,
+        gps_fix,
     };
 
     Ok(ComputedTrajectory {

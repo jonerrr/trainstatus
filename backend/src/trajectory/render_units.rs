@@ -1,4 +1,3 @@
-use super::geometry::ShapeGeometry;
 use super::types::{RenderUnit, Trajectory, TripSnapshot};
 use crate::operations::types::position::PositionData;
 use crate::source::Source;
@@ -34,7 +33,6 @@ pub fn expand_render_units(
     source: Source,
     trip: &TripSnapshot,
     trajectory: &Trajectory,
-    _shape: &ShapeGeometry,
 ) -> Vec<RenderUnit> {
     let config = source_render_config(source);
     let expanded = config.expand_consists

@@ -3,7 +3,7 @@ use crate::trajectory::{
     arrow::encode_render_units,
     geometry::build_shape_geometry,
     interpolation::hermite,
-    types::{GpsEvidence, RenderUnit, Trajectory},
+    types::{RenderUnit, Trajectory},
 };
 use arrow::array::{Array, FixedSizeListArray, Float64Array, ListArray, StringArray};
 use arrow::ipc::reader::StreamReader;
@@ -19,7 +19,6 @@ fn empty_response_retains_distance_contract() {
         "shape_distances",
         "motion",
         "offset_m",
-        "correction_deadline",
     ] {
         assert!(reader.schema().field_with_name(name).is_ok());
     }
@@ -47,12 +46,7 @@ fn arrow_shares_geometry_and_motion_and_preserves_float64_coefficients() {
             0.0,
             0.0,
         )],
-        evidence: Some(GpsEvidence {
-            vehicle_id: "bus".into(),
-            observed_at: 100.125,
-            distance_m: 50.123456789,
-            correction_deadline: 115.125,
-        }),
+        gps_fix: None,
     });
     let unit = RenderUnit {
         render_unit_id: "one".into(),
@@ -104,13 +98,6 @@ fn arrow_shares_geometry_and_motion_and_preserves_float64_coefficients() {
         .unwrap();
     assert_eq!(values.value(0), 100.125);
     assert_eq!(values.value(2), 50.123456789);
-    let deadlines = batch
-        .column_by_name("correction_deadline")
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Float64Array>()
-        .unwrap();
-    assert_eq!(deadlines.value(1), 115.125);
     let keys = batch
         .column_by_name("shape_key")
         .unwrap()

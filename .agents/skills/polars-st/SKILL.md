@@ -13,7 +13,7 @@ Use `polars-st` as the default geospatial layer for this project. Keep geometry 
 2. Check the installed version before relying on a version-sensitive method:
 
    ```bash
-   mise exec -- uv run python -c "import importlib.metadata as md; print(md.version('polars-st'))"
+   uv run python -c "import importlib.metadata as md; print(md.version('polars-st'))"
    ```
 
 3. Search this skill's API map and the official reference before inventing a helper:

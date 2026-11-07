@@ -1,116 +1,109 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-
-	import { SvelteMap } from 'svelte/reactivity';
-
 	import type { Source } from '#lib/client/index.js';
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
 
-	import DeckOverlay from './DeckOverlay.svelte';
+	import { MapLibreOverlay } from '@deck.gl/maplibre';
+	import { getMapContext } from 'svelte-maplibre-gl';
+
 	import type { MapFeatureKey, VehiclePicker } from './interactions';
-	import { createTrajectories } from './trajectories.svelte.js';
-	import { buildActiveVehiclesAtTime, type ActiveVehicle } from './trajectoryArrow';
-	import { MotionControllers } from './trajectoryMotion';
+	import {
+		buildActiveVehiclesAtTime,
+		type ActiveVehicle,
+		type RenderUnitTable
+	} from './trajectory';
 	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
 
-	const current_time = getCurrentTime();
-
 	let {
-		sources,
+		tables,
+		at,
 		railDetail = false,
 		busDetail = false,
 		selectedTrip = null,
 		onPickerReady
 	}: {
-		sources: Source[];
+		tables: ReadonlyMap<Source, RenderUnitTable>;
+		at: number | undefined;
 		railDetail?: boolean;
 		busDetail?: boolean;
 		selectedTrip?: MapFeatureKey | null;
 		onPickerReady: (picker: VehiclePicker | null) => void;
 	} = $props();
 
-	const trajectories = createTrajectories(() => ({ sources, at: current_time.value }));
-	const snapshot = $derived(trajectories.current);
-	const identities = new WeakMap<ActiveVehicle[], string[]>();
-	const pools = new SvelteMap<Source, ActiveVehicle[]>();
-	const controllers = new SvelteMap<Source, MotionControllers>();
-	let browsingTime: number | undefined;
-	let frame = $state(0);
-	let membership = $state(0);
-
-	function update(time: number) {
-		let changed = false;
-		for (const source of pools.keys()) {
-			if (!snapshot.tables.has(source)) {
-				pools.delete(source);
-				controllers.delete(source);
-				changed = true;
+	const context = getMapContext();
+	let overlay = $state.raw<MapLibreOverlay>();
+	$effect(() => {
+		const map = context.map;
+		if (!map) return;
+		const control = new MapLibreOverlay({ interleaved: true });
+		map.addControl(control);
+		overlay = control;
+		onPickerReady({
+			pickClosest(point, radius = 8) {
+				return (
+					(control.pickObject({ ...point, radius })?.object as ActiveVehicle | undefined) ?? null
+				);
+			},
+			pick(point, radius = 8) {
+				return control
+					.pickMultipleObjects({ ...point, radius, depth: 20 })
+					.map((info) => info.object as ActiveVehicle);
 			}
-		}
-		for (const [source, table] of snapshot.tables) {
-			const pool = pools.get(source) ?? [];
-			const previousIds = identities.get(pool) ?? [];
-			identities.set(pool, previousIds);
-			let controller = controllers.get(source);
-			if (!controller) {
-				controller = new MotionControllers();
-				controllers.set(source, controller);
-			}
-			buildActiveVehiclesAtTime(
-				table,
-				time,
-				pool,
-				current_time.value === undefined ? controller : undefined
-			);
-			// Reuse the identity buffer rather than allocating arrays/strings every frame.
-			if (previousIds.length !== pool.length) changed = true;
-			for (let i = 0; i < pool.length; i++) {
-				if (previousIds[i] !== pool[i].renderUnitId) changed = true;
-				previousIds[i] = pool[i].renderUnitId;
-			}
-			previousIds.length = pool.length;
-			pools.set(source, pool);
-		}
-		if (changed) membership++;
-		frame++;
-	}
+		});
+		return () => {
+			onPickerReady(null);
+			if (map.hasControl(control)) map.removeControl(control);
+			overlay = undefined;
+		};
+	});
 
 	$effect(() => {
-		void snapshot;
-		const at = current_time.value;
-		if (at !== browsingTime) {
-			controllers.clear();
-			browsingTime = at;
-		}
-		untrack(() => {
-			update(at ?? Date.now() / 1000);
-			membership++;
-		});
-		if (at !== undefined) return;
-		let previous = 0;
-		let id: number;
-		function animate(now: number) {
-			if (now - previous >= 1000 / 30) {
-				update(Date.now() / 1000);
-				previous = now;
+		const control = overlay;
+		const snapshot = tables;
+		const time = at;
+		const rail = railDetail;
+		const bus = busDetail;
+		const selection = selectedTrip;
+		if (!control) return;
+
+		const vehicles: ActiveVehicle[] = [];
+		let detail: ActiveVehicle[] = [];
+		let puck: ActiveVehicle[] = [];
+		let frame = 0;
+		const draw = (time: number) => {
+			let detailCount = 0;
+			let puckCount = 0;
+			let changed = false;
+			for (const table of snapshot.values()) {
+				buildActiveVehiclesAtTime(table, time, vehicles);
+				for (const vehicle of vehicles) {
+					if (isRailVehicle(vehicle) ? rail : bus) {
+						changed ||= detail[detailCount] !== vehicle;
+						detail[detailCount++] = vehicle;
+					} else if (!isRailVehicle(vehicle) || vehicle.isHead) {
+						changed ||= puck[puckCount] !== vehicle;
+						puck[puckCount++] = vehicle;
+					}
+				}
 			}
+			changed ||= detail.length !== detailCount || puck.length !== puckCount;
+			detail.length = detailCount;
+			puck.length = puckCount;
+			// A new container invalidates static attributes when membership changes.
+			// Stable containers need only position and angle uploads during animation.
+			if (changed) {
+				detail = detail.slice();
+				puck = puck.slice();
+			}
+			control.setProps({ layers: vehicleLayers({ detail, puck }, selection, ++frame) });
+		};
+
+		draw(time ?? Date.now() / 1000);
+		if (time !== undefined) return;
+		let id: number;
+		function animate() {
+			draw(Date.now() / 1000);
 			id = requestAnimationFrame(animate);
 		}
 		id = requestAnimationFrame(animate);
 		return () => cancelAnimationFrame(id);
 	});
-	const partitions = $derived.by(() => {
-		void membership;
-		const detail: ActiveVehicle[] = [];
-		const puck: ActiveVehicle[] = [];
-		for (const source of sources)
-			for (const vehicle of pools.get(source) ?? []) {
-				if (isRailVehicle(vehicle) ? railDetail : busDetail) detail.push(vehicle);
-				else if (!isRailVehicle(vehicle) || vehicle.isHead) puck.push(vehicle);
-			}
-		return { detail, puck };
-	});
-	const layers = $derived(vehicleLayers(partitions, selectedTrip, frame, membership));
 </script>
-
-<DeckOverlay {layers} onpicker={onPickerReady} />
