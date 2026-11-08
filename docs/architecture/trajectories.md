@@ -17,23 +17,20 @@ Motion validity belongs to the backend, which builds and reconciles trajectory p
 
 ## Frontend display
 
-The browser retains displayed distance and speed per source/trip. Replacements start from the displayed state advanced to receipt time, accelerating, braking and holding without reversing. GPS targets carry an absolute correction deadline from their first source commit; infeasible or expired corrections resynchronize. Hidden gaps over 15 s, changed geometry/run identity and historical-time changes reset display state. Historical rendering bypasses the live controller and uses recorded observation times.
+`TripMarkers.svelte` passes each current table and the render time to `buildActiveVehiclesAtTime`, which evaluates the supplied motion directly. The browser retains no displayed speed and runs no display controller; live rendering uses the current time and historical rendering uses the selected time.
 
 ## Limits
 
 Conservative defaults validated on synthetic cases only. They have **not** been tuned from production captures or a ride-along.
 
-| Policy                                         | Default                                                          |
-| ---------------------------------------------- | ---------------------------------------------------------------- |
-| Accepted live GPS age / cross-track offset     | 120 s / 100 m                                                    |
-| Projection alternatives / corner consolidation | 5 m / 5 m                                                        |
-| Bus speed estimate cap                         | 30 m/s                                                           |
-| GPS extrapolation                              | Pair: at most 120 s / 1,000 m. Single-fix fallback: 30 s / 300 m |
-| Retained live report history                   | At most 8 observations per run within 240 s                      |
-| GPS correction deadline                        | First source commit + 10 s                                       |
-| Display bus speed / accel / braking            | 30 m/s / 1 m/s² / 1.5 m/s²                                       |
-| Display subway speed / accel / braking         | 25 m/s / 0.8 m/s² / 1 m/s²                                       |
-| Correction horizon / hidden-gap reset          | 8 s / 15 s                                                       |
+| Policy                                         | Default                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Accepted live GPS age / cross-track offset     | 120 s / 100 m                                                                                |
+| Projection alternatives / corner consolidation | 5 m / 5 m                                                                                    |
+| Motion speed cap (bus / subway)                | 30 m/s / 25 m/s                                                                              |
+| GPS extrapolation                              | Pair: at most 120 s / 1,000 m. Single-fix fallback: 30 s / 300 m                             |
+| Retained live report history                   | At most 8 observations per run within 240 s                                                  |
+| GPS correction rejoin                          | `continuity::reconcile` derivation time + 10 s; other intervals if that bridge is infeasible |
 
 The subway ceiling rounds the 55 mph not-to-exceed speed from the [MTA speed and capacity review](https://www.mta.info/document/13046). Before treating limits as tuned, replay consecutive provider captures, profile full-network geometry and mobile frames, and compare GPS targets with later observations and a bus ride-along. Full-network heap/RSS and mobile frame cost remain unmeasured.
 

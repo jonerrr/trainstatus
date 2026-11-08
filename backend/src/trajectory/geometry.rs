@@ -242,7 +242,9 @@ pub fn projection_candidates(point: &Point<f64>, geometry: &ShapeGeometry) -> Ve
 }
 
 /// Resolve the entire visit chain, allowing equal distances for colocated stops.
-/// A projection is published only if all feasible directed traversals agree.
+/// Chains may skip stops that fit no traversal, so one stray projection cannot
+/// erase the rest; only chains placing the most stops count. A projection is
+/// published only if all such directed traversals agree.
 pub fn ordered_stop_distances(candidates: &[Vec<(f64, f64)>], ids: &[String]) -> Vec<Option<f64>> {
     let active: Vec<_> = candidates
         .iter()
@@ -250,47 +252,79 @@ pub fn ordered_stop_distances(candidates: &[Vec<(f64, f64)>], ids: &[String]) ->
         .filter(|(_, c)| !c.is_empty())
         .map(|(i, _)| i)
         .collect();
-    if active.is_empty() {
-        return vec![None; candidates.len()];
-    }
     let compatible =
         |i: usize, a: f64, j: usize, b: f64| b >= a && (ids[i] != ids[j] || b > a + 1.0);
-    let mut forward: Vec<Vec<bool>> = active
-        .iter()
-        .map(|i| vec![false; candidates[*i].len()])
-        .collect();
-    forward[0].fill(true);
-    for row in 1..active.len() {
-        let i = active[row - 1];
-        let j = active[row];
-        for (b, cb) in candidates[j].iter().enumerate() {
-            forward[row][b] = candidates[i]
-                .iter()
-                .enumerate()
-                .any(|(a, ca)| forward[row - 1][a] && compatible(i, ca.0, j, cb.0));
-        }
+    // Most stops placed by a chain that ends (forward) or starts (backward) at each candidate.
+    let mut forward: Vec<Vec<usize>> = Vec::with_capacity(active.len());
+    for (row, &j) in active.iter().enumerate() {
+        let counts = candidates[j]
+            .iter()
+            .map(|cb| {
+                1 + (0..row)
+                    .flat_map(|prev| {
+                        let i = active[prev];
+                        candidates[i]
+                            .iter()
+                            .zip(&forward[prev])
+                            .filter(move |(ca, _)| compatible(i, ca.0, j, cb.0))
+                            .map(|(_, count)| *count)
+                    })
+                    .max()
+                    .unwrap_or(0)
+            })
+            .collect();
+        forward.push(counts);
     }
-    let mut backward: Vec<Vec<bool>> = active
-        .iter()
-        .map(|i| vec![false; candidates[*i].len()])
-        .collect();
-    backward.last_mut().unwrap().fill(true);
-    for row in (0..active.len() - 1).rev() {
+    let mut backward: Vec<Vec<usize>> = vec![Vec::new(); active.len()];
+    for row in (0..active.len()).rev() {
         let i = active[row];
-        let j = active[row + 1];
-        for (a, ca) in candidates[i].iter().enumerate() {
-            backward[row][a] = candidates[j]
-                .iter()
-                .enumerate()
-                .any(|(b, cb)| backward[row + 1][b] && compatible(i, ca.0, j, cb.0));
+        backward[row] = candidates[i]
+            .iter()
+            .map(|ca| {
+                1 + (row + 1..active.len())
+                    .flat_map(|next| {
+                        let j = active[next];
+                        candidates[j]
+                            .iter()
+                            .zip(&backward[next])
+                            .filter(move |(cb, _)| compatible(i, ca.0, j, cb.0))
+                            .map(|(_, count)| *count)
+                    })
+                    .max()
+                    .unwrap_or(0)
+            })
+            .collect();
+    }
+    let best = forward
+        .iter()
+        .zip(&backward)
+        .flat_map(|(f, b)| f.iter().zip(b).map(|(f, b)| f + b - 1))
+        .max()
+        .unwrap_or(0);
+    // Every maximal chain places exactly one stop at each rank, so a stop that
+    // alone owns some rank is placed by all of them.
+    let mut rank_owner: Vec<Option<Option<usize>>> = vec![None; best + 1];
+    for (row, (f, b)) in forward.iter().zip(&backward).enumerate() {
+        for (f, b) in f.iter().zip(b) {
+            if f + b - 1 == best {
+                let owner = &mut rank_owner[*f];
+                *owner = match owner {
+                    None => Some(Some(row)),
+                    Some(Some(existing)) if *existing == row => Some(Some(row)),
+                    _ => Some(None),
+                };
+            }
         }
     }
     let mut out = vec![None; candidates.len()];
     for (row, &index) in active.iter().enumerate() {
+        if !rank_owner.contains(&Some(Some(row))) {
+            continue;
+        }
         let viable: Vec<_> = candidates[index]
             .iter()
             .enumerate()
-            .filter(|(i, _)| forward[row][*i] && backward[row][*i])
+            .filter(|(i, _)| forward[row][*i] + backward[row][*i] - 1 == best)
             .map(|(_, c)| c.0)
             .collect();
         if let (Some(first), Some(last)) = (viable.first(), viable.last())

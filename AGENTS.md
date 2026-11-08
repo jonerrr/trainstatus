@@ -35,7 +35,7 @@ See [README.md](README.md) for setup and environment variables.
 - Backend errors: `AppError(anyhow::Error)` maps to 500; use `?` freely.
 - Use SQLx compile-time macros for describable SQL. After changing checked SQL or schema, follow the metadata workflow in [backend/TESTING.md](backend/TESTING.md).
 - Frontend API types come only from the generated client in `frontend/src/lib/client`.
-- Components read API data only through `TransitData`; they hold no request state.
+- Components read passenger API data only through `TransitData`; they hold no request state. `TransitMap.svelte` fetches trajectories separately through `createTrajectories`, which registers their update status with `TransitData`.
 - Frontend error handling stays minimal: the shared update indicator and the shared error screen only. Do not add per-view error states or UIs.
 
 ## Rules

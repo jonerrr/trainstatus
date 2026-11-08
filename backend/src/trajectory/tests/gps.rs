@@ -194,6 +194,34 @@ fn ambiguous_traversals_are_omitted_and_colocated_stops_may_share_distance() {
         ),
         vec![Some(10.0), Some(10.0)]
     );
+    // C sits just behind B, so no chain places both; the pair is ambiguous but
+    // must not erase the unambiguous stops around it.
+    assert_eq!(
+        ordered_stop_distances(
+            &[
+                vec![(0.0, 0.0)],
+                vec![(100.0, 0.0)],
+                vec![(99.5, 0.0)],
+                vec![(200.0, 0.0)],
+            ],
+            &["A", "B", "C", "D"].map(String::from)
+        ),
+        vec![Some(0.0), None, None, Some(200.0)]
+    );
+    // A stray projection far behind is skipped; its neighbours keep their distances.
+    assert_eq!(
+        ordered_stop_distances(
+            &[
+                vec![(10.0, 0.0)],
+                vec![(100.0, 0.0)],
+                vec![(5.0, 0.0)],
+                vec![(150.0, 0.0)],
+                vec![(200.0, 0.0)],
+            ],
+            &["A", "B", "C", "D", "E"].map(String::from)
+        ),
+        vec![Some(10.0), Some(100.0), None, Some(150.0), Some(200.0)]
+    );
 }
 
 #[test]
@@ -229,6 +257,31 @@ fn published_plan_stops_without_another_feed_commit_and_preserves_present_estima
     );
     assert_eq!(evaluate_motion(motion, 1200.0).v_mps, 0.0);
     assert!(evaluate_motion(motion, 1200.0).s_m <= 400.0);
+}
+
+#[test]
+fn late_stop_inside_cruise_window_does_not_reverse_synthetic_motion() {
+    use crate::trajectory::{
+        builders::mta_bus::MtaBusBuilder, compute_trajectory, interpolation::PchipMethod,
+        types::TrajectoryConfig,
+    };
+    let source = Source::MtaBus;
+    let (mut trip, g) = fixture(source);
+    trip.positions = vec![
+        report(&trip, &g, source, 1000, 0.0),
+        report(&trip, &g, source, 1020, 100.0),
+    ];
+    // The cruise point lands at 1050 s / 250 m; the schedule reaches 200 m later.
+    trip.stops = vec![stop("C", 1060.0, 200.0)];
+    compute_trajectory(
+        &MtaBusBuilder,
+        &trip,
+        None,
+        &g,
+        &PchipMethod,
+        &TrajectoryConfig::default(),
+    )
+    .unwrap();
 }
 
 #[test]

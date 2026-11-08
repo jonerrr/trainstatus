@@ -213,7 +213,9 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
 #[tokio::test]
 async fn gps_reconciles_reachable_previous_state_and_discards_unreachable_backward_jump() {
     let mut snapshot = fixture();
-    snapshot.committed_at -= Duration::seconds(5);
+    // A sole GPS fix stays stationary, so elapsed setup time cannot change
+    // the expected position between derivations.
+    snapshot.stop_times.clear();
     for position in &mut snapshot.positions {
         position.updated_at -= Duration::seconds(20);
     }
@@ -221,18 +223,32 @@ async fn gps_reconciles_reachable_previous_state_and_discards_unreachable_backwa
     let cache = Arc::new(TrajectoryCache::new());
     let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
     let first = deriver.derive(&snapshot).await.unwrap();
-    let expected = first.plans[&id].motion[0].a;
-    let accepted_at = first.plans[&id].gps_fix.as_ref().unwrap().accepted_at;
-    snapshot.committed_at += Duration::seconds(3);
-    let mut previous = first.clone();
-    Arc::make_mut(previous.plans.get_mut(&id).unwrap()).motion[0].a = 500.0;
-    cache.set_hot(Source::MtaBus, previous).await;
-    let second = deriver.derive(snapshot).await.unwrap();
-    assert!((second.plans[&id].motion[0].a - expected).abs() < 1.0);
-    assert_eq!(
-        second.plans[&id].gps_fix.as_ref().unwrap().accepted_at,
-        accepted_at
-    );
+    let fix = first.plans[&id].gps_fix.as_ref().unwrap();
+    let expected = fix.distance_m;
+    let accepted_at = fix.accepted_at;
+    for (offset, retained_offset) in [(10.0, 10.0), (500.0, 0.0)] {
+        let mut previous = first.clone();
+        for interval in &mut Arc::make_mut(previous.plans.get_mut(&id).unwrap()).motion {
+            interval.a += offset;
+        }
+        cache.set_hot(Source::MtaBus, previous).await;
+        let next = deriver.derive(&snapshot).await.unwrap();
+        let plan = &next.plans[&id];
+        let state = plan
+            .motion
+            .iter()
+            .find(|p| p.t0 <= plan.generated_at && plan.generated_at <= p.t1)
+            .expect("motion covers derivation time")
+            .evaluate(plan.generated_at);
+        assert!(
+            (state.s_m - expected - retained_offset).abs() < 1e-6,
+            "previous offset {offset}: expected {}, got {}",
+            expected + retained_offset,
+            state.s_m
+        );
+        assert!(state.v_mps.abs() < 1e-6);
+        assert_eq!(plan.gps_fix.as_ref().unwrap().accepted_at, accepted_at);
+    }
 }
 
 #[tokio::test]

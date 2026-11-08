@@ -99,8 +99,14 @@
 		draw(time ?? Date.now() / 1000);
 		if (time !== undefined) return;
 		let id: number;
-		function animate() {
-			draw(Date.now() / 1000);
+		let last = -Infinity;
+		function animate(timestamp: number) {
+			// Cap redraws at 30 fps; the slack keeps rAF jitter on 60/120 Hz displays from
+			// skipping an extra frame.
+			if (timestamp - last >= 1000 / 30 - 4) {
+				last = timestamp;
+				draw(Date.now() / 1000);
+			}
 			id = requestAnimationFrame(animate);
 		}
 		id = requestAnimationFrame(animate);

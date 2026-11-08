@@ -209,10 +209,20 @@ pub fn compensate(
                 let terminal =
                     clamp_to_ceilings((fix.knot.s_m + travel(horizon)).min(geometry.length_m));
                 knots.retain(|k| k.t_event < fix.knot.t_event + horizon && k.s_m <= terminal);
+                // Schedule knots that disagree with a synthetic point would make
+                // distance decrease around it, e.g. a stop inside the cruise window
+                // that the schedule reaches only after the cruise ends.
+                let mut push_synthetic = |point: TrajectoryKnot| {
+                    knots.retain(|k| {
+                        !(k.t_event < point.t_event && k.s_m > point.s_m
+                            || k.t_event > point.t_event && k.s_m < point.s_m)
+                    });
+                    knots.push(point);
+                };
                 if age < cruise {
-                    knots.push(TrajectoryKnot::new(fix.knot.t_event + cruise, cruise_end));
+                    push_synthetic(TrajectoryKnot::new(fix.knot.t_event + cruise, cruise_end));
                 }
-                knots.push(TrajectoryKnot::new(fix.knot.t_event + horizon, terminal));
+                push_synthetic(TrajectoryKnot::new(fix.knot.t_event + horizon, terminal));
                 // Observed movement supplies the incoming slope. No synthetic
                 // previous target is blended into the accepted GPS estimate.
                 if prev.knot.s_m <= fix.knot.s_m {

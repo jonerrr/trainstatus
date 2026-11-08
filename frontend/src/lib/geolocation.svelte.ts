@@ -66,15 +66,7 @@ export class Geolocation {
 	}
 
 	resume(): void {
-		if (!browser) return;
-		if (!navigator.geolocation) {
-			this.#status = 'denied';
-			return;
-		}
-		this.#status = 'loading';
-		if (this.#active) {
-			this.#watch();
-		}
+		if (this.#active) this.#watch();
 	}
 }
 
