@@ -36,6 +36,10 @@ The service worker caches the shell per deployment and catalogs in a stable `cat
 
 Each entity type has `Button.svelte` + `Modal.svelte` in `src/lib/{Route,Stop,Trip}/`. Modal routing uses shallow URL params with the source: `?s=&src=`, `?r=&src=`, `?t=&r=&src=`. View transitions use `document.startViewTransition`.
 
+The Stops page searches the selected source. Exact route IDs filter to that route's stops (in stop-sequence order for subway routes). Otherwise, name matches appear first, followed by an exact stop-ID match if it is not already included; an ID never hides matching names.
+
+On initial load and client-side navigation into Stops, the search field receives focus only when the primary pointer supports hover and fine pointing (`(hover: hover) and (pointer: fine)`). Touch-first devices keep normal page focus so visiting Stops does not open the on-screen keyboard.
+
 Reactive state files use `.svelte.ts`. Current time is scoped per layout through `createCurrentTime`, `setCurrentTime` and `getCurrentTime`; retrieve the context during component initialization.
 
 ## Map

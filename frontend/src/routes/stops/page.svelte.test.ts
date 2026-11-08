@@ -26,8 +26,8 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 		catalog.routes.push({ ...route, id: '9', short_name: '9' });
 		catalog.stops = catalog.stops.slice(0, 3).map((stop, i) => ({
 			...stop,
-			id: ['4', '100', '200'][i],
-			name: ['Unrelated stop', 'First route stop', 'Second route stop'][i],
+			id: ['4', '49', '200'][i],
+			name: ['Unrelated stop', 'First route stop', '49 St'][i],
 			routes: [{ ...stop.routes[0], route_id: i === 0 ? '9' : '4', stop_sequence: i }]
 		}));
 		const data = fixtureTransitData({
@@ -47,28 +47,24 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 				.element(view.getByText('Unrelated stop', { exact: true }))
 				.not.toBeInTheDocument();
 			await expect.element(view.getByText('First route stop', { exact: true })).toBeVisible();
-			await expect.element(view.getByText('Second route stop', { exact: true })).toBeVisible();
+			await expect.element(view.getByText('49 St', { exact: true })).toBeVisible();
 			await search.fill('9');
 			await expect
 				.element(view.getByText('First route stop', { exact: true }))
 				.not.toBeInTheDocument();
-			await expect
-				.element(view.getByText('Second route stop', { exact: true }))
-				.not.toBeInTheDocument();
+			await expect.element(view.getByText('49 St', { exact: true })).not.toBeInTheDocument();
 			await expect.element(view.getByText('Unrelated stop', { exact: true })).toBeVisible();
-			await search.fill('100');
-			await expect
-				.element(view.getByText('Second route stop', { exact: true }))
-				.not.toBeInTheDocument();
+			await search.fill('49');
+			await expect.element(view.getByText('49 St', { exact: true })).toBeVisible();
 			await expect.element(view.getByText('First route stop', { exact: true })).toBeVisible();
 			await expect
 				.element(view.getByText('Unrelated stop', { exact: true }))
 				.not.toBeInTheDocument();
-			await search.fill('Second');
+			await search.fill('49 St');
 			await expect
 				.element(view.getByText('First route stop', { exact: true }))
 				.not.toBeInTheDocument();
-			await expect.element(view.getByText('Second route stop', { exact: true })).toBeVisible();
+			await expect.element(view.getByText('49 St', { exact: true })).toBeVisible();
 			await view.getByRole('button', { name: 'Clear search' }).click();
 			await expect.element(view.getByText('Unrelated stop', { exact: true })).toBeVisible();
 			await expect.element(search).toHaveValue('');

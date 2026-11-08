@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 
 	import type { CatalogStop, Source } from '#lib/client/index.js';
@@ -32,6 +33,14 @@
 	);
 
 	const search_input = createThrottled('', 150);
+	let search_element: HTMLInputElement | undefined;
+
+	afterNavigate(() => {
+		// Avoid opening an on-screen keyboard on touch-first devices.
+		if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+			search_element?.focus({ preventScroll: true });
+		}
+	});
 
 	function matching_stops(term: string): readonly CatalogStop[] | undefined {
 		const catalog = catalogs.find((c) => c.source === selected_source.current)?.value;
@@ -59,10 +68,11 @@
 				: stops;
 		}
 		const stop = catalog.stops_by_id.get(id_check);
-		if (stop) return [stop];
 
 		// TODO: no-match fallback is unfinished; see frontend/TESTING.md
 		const results = search_stops(catalog, term);
+		// An exact ID must not hide name matches such as "49 St".
+		if (stop && !results.some((match) => match.id === stop.id)) return [...results, stop];
 		return results.length ? results : undefined;
 	}
 
@@ -103,6 +113,7 @@
 			<!-- TODO: maybe add autocomplete="off" -->
 			<input
 				name="search"
+				bind:this={search_element}
 				bind:value={search_input.get, search_input.set}
 				type="search"
 				placeholder="Search stops by name, ID, or route..."

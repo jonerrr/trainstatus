@@ -3,6 +3,26 @@ import { expect, test } from './fixtures';
 
 const qualifying = ['full_time', 'part_time', 'rush_hour'];
 
+for (const mobile of [false, true]) {
+	test.describe(mobile ? 'touch-first' : 'desktop', () => {
+		test.use({ isMobile: mobile, hasTouch: mobile });
+
+		test('stop search focuses only on desktop page entry', async ({ page }) => {
+			await page.goto('/stops');
+			const search = page.getByRole('searchbox');
+			await expect(search).toBeVisible();
+			if (mobile) await expect(search).not.toBeFocused();
+			else await expect(search).toBeFocused();
+
+			await page.getByRole('link', { name: 'Home', exact: true }).click();
+			await page.getByRole('link', { name: 'Stops', exact: true }).click();
+			await expect(search).toBeVisible();
+			if (mobile) await expect(search).not.toBeFocused();
+			else await expect(search).toBeFocused();
+		});
+	});
+}
+
 test('subway stop search filters by name, stop id, and route id', async ({ page }) => {
 	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
 		.stops;
