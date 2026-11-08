@@ -3,8 +3,8 @@
 
 	import type { Source } from '#lib/client/index.js';
 	import ModalList from '#lib/ModalList.svelte';
+	import ModalListSkeleton from '#lib/ModalListSkeleton.svelte';
 	import Icon from '#lib/Route/Icon.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
 	import type { Call } from '#lib/transit/decode.js';
 	import { getTransitData, type TripRead } from '#lib/transit/store.svelte.js';
 	import Transfers from '#lib/Trip/Transfers.svelte';
@@ -213,7 +213,7 @@
 				{:else}<p class="p-2 text-center text-muted">No predictions to show</p>{/each}
 			</ModalList>
 		{:else if catalog_read.state === 'loading' || trip_read.state === 'loading'}
-			<Skeleton lines={6} class="p-2" />
+			<ModalListSkeleton rows={6} timeline />
 		{:else if catalog && trip_read.state === 'missing'}
 			<p class="p-2 text-center text-muted">This trip is not currently running.</p>
 		{/if}

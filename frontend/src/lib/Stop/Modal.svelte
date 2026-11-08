@@ -2,8 +2,8 @@
 	import Button from '#lib/Button.svelte';
 	import type { CatalogStop, Source } from '#lib/client/index.js';
 	import ModalList from '#lib/ModalList.svelte';
+	import ModalListSkeleton from '#lib/ModalListSkeleton.svelte';
 	import Icon from '#lib/Route/Icon.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
 	import BusArrow from '#lib/Stop/BusArrow.svelte';
 	import Transfers from '#lib/Stop/Transfers.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
@@ -106,12 +106,12 @@
 	{#key `${source}:${stop.id}`}<Transfers {stop} {time_format} />{/key}
 {/if}
 {#if catalog_read.state === 'loading'}
-	<Skeleton lines={5} class="p-2" />
+	<ModalListSkeleton />
 {:else if catalog && !stop}
 	<p class="p-2 text-center text-muted">Stop not found</p>
 {:else if stop}
 	{#if !visible_arrivals.length && arrivals_read.state === 'loading'}
-		<Skeleton lines={5} class="p-2" />
+		<ModalListSkeleton />
 	{:else if !visible_arrivals.length}
 		{#if arrivals_read.state === 'ready'}
 			<div class="px-4 py-8 text-center text-base font-semibold text-muted">
@@ -176,7 +176,7 @@
 			{/each}
 		</ModalList>
 		{#if read?.pending.length}
-			<Skeleton lines={1} class="p-2" />
+			<ModalListSkeleton rows={1} />
 		{/if}
 	{/if}
 {/if}

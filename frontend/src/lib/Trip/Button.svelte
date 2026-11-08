@@ -39,7 +39,7 @@
 </script>
 
 {#if (!catalog || !route_data) && (catalog_read.state === 'loading' || route_read.state === 'loading')}
-	<Skeleton lines={2} class="w-full" />
+	<Skeleton lines={2} class="w-full" height="h-9" />
 {:else if !catalog || !route_data}
 	<span class="text-muted">—</span>
 {:else}

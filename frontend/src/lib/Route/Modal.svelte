@@ -76,7 +76,7 @@
 	{#if route}
 		<FeatureSummary feature={{ route, title: route.long_name }} />
 	{:else if catalog.state === 'loading'}
-		<Skeleton lines={1} class="w-40" />
+		<Skeleton lines={1} class="w-40" height="h-7" />
 	{:else}
 		<div class="text-sm font-semibold text-primary">Route {route_id}</div>
 	{/if}
@@ -84,7 +84,7 @@
 	{#if route}
 		<div class="flex items-center gap-1 text-lg font-semibold text-primary">
 			{#if alerts_read.state === 'loading'}
-				<Skeleton lines={1} class="w-24" />
+				<Skeleton lines={1} class="w-24" height="h-7" />
 			{:else if route_alerts.length && idx < route_alerts.length}
 				{const alert_data = $derived(route_alerts[idx].data)}
 				{#if alert_data.source === 'mta_subway' || alert_data.source === 'mta_bus'}

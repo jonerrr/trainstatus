@@ -31,7 +31,7 @@
 	{#if alerts_read.state === 'failed'}
 		<span class="text-muted">—</span>
 	{:else if !alerts}
-		<Skeleton lines={1} class="w-24" />
+		<Skeleton lines={1} class="w-24" height="h-6" />
 	{:else if alerts.length}
 		{const alert_data = $derived(alerts[0].data)}
 		<div class="font-semibold">

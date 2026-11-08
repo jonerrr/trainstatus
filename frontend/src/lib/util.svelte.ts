@@ -2,7 +2,8 @@ import type {
 	CatalogRoute,
 	CatalogStop,
 	CatalogStopRoute,
-	ServiceTrip
+	ServiceTrip,
+	Source
 } from '#lib/client/index.js';
 import { calculateTextHeight } from '#lib/text_measurement.js';
 import type { Call } from '#lib/transit/decode.js';
@@ -160,7 +161,17 @@ export const main_route_stops = (
 	);
 };
 
-export const calculate_route_height = () => 54;
+const ROUTE_ROW_HEIGHT = 54;
+const TRIP_ROW_HEIGHT = 94;
+// p-2 on the stop row (8px top + 8px bottom)
+const STOP_ROW_PADDING = 16;
+// One bus route: icon row plus its first direction label and ETA row
+const BUS_ROUTE_HEIGHT = 56;
+const BUS_EXTRA_LABEL_HEIGHT = 24;
+// One arrival row (route icon + ETA chips)
+const SUBWAY_ARRIVAL_ROW_HEIGHT = 24;
+
+export const calculate_route_height = () => ROUTE_ROW_HEIGHT;
 
 // Fonts matching the Tailwind classes used in Stop/Button.svelte
 // text-lg font-medium → 500 18px/28px Inter
@@ -181,7 +192,7 @@ const HEADSIGN_MAX_WIDTH = 140;
 
 export function calculate_stop_height(item: CatalogStop) {
 	// 16px total padding (p-2 = 8px top + 8px bottom)
-	let height = 16;
+	let height = STOP_ROW_PADDING;
 
 	// Stop name — may wrap on narrow screens
 	height += calculateTextHeight(
@@ -200,7 +211,7 @@ export function calculate_stop_height(item: CatalogStop) {
 					: route.data.source === 'njt_bus'
 						? route.data.directions.length
 						: 1;
-			return total + 56 + (Math.max(1, labels) - 1) * 24;
+			return total + BUS_ROUTE_HEIGHT + (Math.max(1, labels) - 1) * BUS_EXTRA_LABEL_HEIGHT;
 		}, 0);
 	} else if (item.data.source === 'mta_subway') {
 		// Two direction columns — measure the taller headsign
@@ -220,10 +231,23 @@ export function calculate_stop_height(item: CatalogStop) {
 
 		// Route arrival rows (24px each)
 		const main_routes = main_route_stops(item.routes);
-		height += main_routes.length * 24;
+		height += main_routes.length * SUBWAY_ARRIVAL_ROW_HEIGHT;
 	}
 
 	return height;
 }
 
-export const calculate_trip_height = () => 94;
+export const calculate_trip_height = () => TRIP_ROW_HEIGHT;
+
+/**
+ * Height of a list row skeleton: the same constants as the calculators above, for the
+ * smallest real row (one headsign line, one route), so skeletons can't drift from them.
+ */
+export function skeleton_row_height(type: 'stop' | 'route' | 'trip', source?: Source) {
+	if (type === 'route') return calculate_route_height();
+	if (type === 'trip') return calculate_trip_height();
+	const base = STOP_ROW_PADDING + STOP_NAME_LINE_HEIGHT;
+	return source === 'mta_subway'
+		? base + HEADSIGN_LINE_HEIGHT + SUBWAY_ARRIVAL_ROW_HEIGHT
+		: base + BUS_ROUTE_HEIGHT;
+}

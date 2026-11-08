@@ -20,10 +20,10 @@
 	import { page } from '$app/state';
 
 	import type { CatalogRoute, CatalogStop } from '#lib/client/index.js';
+	import ListSkeleton from '#lib/ListSkeleton.svelte';
 	import Pin from '#lib/Pin.svelte';
 	import type { Pins } from '#lib/pins.svelte.js';
 	import RouteButton from '#lib/Route/Button.svelte';
-	import Skeleton from '#lib/Skeleton.svelte';
 	import { source_icons } from '#lib/source_icons.js';
 	import { source_config } from '#lib/sources.js';
 	import StopButton from '#lib/Stop/Button.svelte';
@@ -31,6 +31,7 @@
 	import { getTransitData } from '#lib/transit/store.svelte.js';
 	import TripButton from '#lib/Trip/Button.svelte';
 	import { open_modal } from '#lib/url_params.svelte.js';
+	import { skeleton_row_height } from '#lib/util.svelte.js';
 
 	type ItemType = 'stop' | 'route' | 'trip';
 
@@ -245,8 +246,25 @@
 		items_before_scroll !== undefined && items.length > 0 && items.length <= items_before_scroll
 	);
 
+	const showing_skeleton = $derived(pending && !items.length);
+	const skeleton_source = $derived(
+		page.data.selected_sources.includes(selected_source.current)
+			? selected_source.current
+			: page.data.selected_sources[0]
+	);
+
+	// Pins live in LocalStorage and are unknown during SSR, so the space left for this list
+	// can't be computed there. Render enough rows to cover any screen; the flex-sized
+	// viewport clips the excess, which also accounts for pinned lists above it.
+	const SKELETON_COVER_PX = 2400;
+	const skeleton_count = $derived(
+		items_before_scroll ?? Math.ceil(SKELETON_COVER_PX / skeleton_row_height(type, skeleton_source))
+	);
+
 	const preview_height = $derived(
-		items_before_scroll !== undefined && !fits_without_scroll ? `${total_height}px` : undefined
+		items_before_scroll !== undefined && !fits_without_scroll && !showing_skeleton
+			? `${total_height}px`
+			: undefined
 	);
 </script>
 
@@ -322,7 +340,8 @@
 		style:-webkit-overflow-scrolling="touch"
 		style:height={preview_height}
 		class={[
-			'relative overflow-y-auto text-base',
+			'relative text-base',
+			showing_skeleton ? 'overflow-hidden' : 'overflow-y-auto',
 			list_class,
 			items_before_scroll ? 'flex-none' : 'min-h-0 flex-1'
 		]}
@@ -363,8 +382,8 @@
 				{/each}
 			</div>
 		</div>
-		{#if pending && !items.length}
-			<Skeleton lines={6} class="p-2" />
+		{#if showing_skeleton}
+			<ListSkeleton {type} source={skeleton_source} count={skeleton_count} />
 		{/if}
 	</div>
 </div>
