@@ -1,4 +1,4 @@
-use super::types::{TrajectoryConfig, TrajectoryKnot, TrajectoryState};
+use super::types::TrajectoryConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContinuityDiscardReason {
@@ -10,8 +10,6 @@ pub enum ContinuityDiscardReason {
 /// Per-trip continuity filtering stats (aggregated at refresh time for logging).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ContinuityStats {
-    pub knots_in: u32,
-    pub knots_out: u32,
     pub prev_state_discarded: bool,
     pub discard_reason: Option<ContinuityDiscardReason>,
     pub live_anchor_gap_m: Option<f64>,
@@ -27,8 +25,6 @@ pub struct ContinuityStatsBatch {
     pub stale_prev_state_discarded: u32,
     pub backward_gap_discarded: u32,
     pub forward_jump_discarded: u32,
-    pub knots_in: u64,
-    pub knots_out: u64,
     pub trips_with_live_anchor: u32,
     pub live_anchor_gap_sum_m: f64,
     pub live_anchor_gap_max_m: f64,
@@ -52,8 +48,6 @@ impl ContinuityStatsBatch {
         if had_prev_state {
             self.trips_with_prev_state += 1;
         }
-        self.knots_in += stats.knots_in as u64;
-        self.knots_out += stats.knots_out as u64;
         if let Some(gap) = stats.live_anchor_gap_m {
             self.trips_with_live_anchor += 1;
             self.live_anchor_gap_sum_m += gap;
@@ -63,14 +57,8 @@ impl ContinuityStatsBatch {
         self.backtracking_knots_removed += stats.backtracking_knots_removed as u64;
     }
 
-    pub fn knots_removed(&self) -> u64 {
-        self.knots_in.saturating_sub(self.knots_out)
-    }
-
     pub fn log_summary(&self, source: &str) {
-        let knots_removed = self.knots_removed();
         if self.prev_state_discarded == 0
-            && knots_removed == 0
             && self.trips_with_live_anchor == 0
             && self.pre_anchor_knots_dropped == 0
             && self.backtracking_knots_removed == 0
@@ -78,7 +66,7 @@ impl ContinuityStatsBatch {
             return;
         }
 
-        if self.prev_state_discarded > 0 || knots_removed > 0 {
+        if self.prev_state_discarded > 0 {
             tracing::warn!(
                 source,
                 prev_state_discarded = self.prev_state_discarded,
@@ -86,8 +74,6 @@ impl ContinuityStatsBatch {
                 backward_gap_discarded = self.backward_gap_discarded,
                 forward_jump_discarded = self.forward_jump_discarded,
                 trips_with_prev_state = self.trips_with_prev_state,
-                knots_removed,
-                knots_in = self.knots_in,
                 "trajectory continuity filtering"
             );
         }
@@ -114,113 +100,165 @@ impl ContinuityStatsBatch {
     }
 }
 
-/// Apply realtime continuity: anchor to prev_state, hold on schedule regression, teleport on large gap.
-pub fn apply(
-    mut knots: Vec<TrajectoryKnot>,
-    prev_state: Option<TrajectoryState>,
+/// Preserve the old plan at the *new* derivation time. Geometry compatibility is
+/// checked by the caller.
+pub fn reconcile(
+    motion: Vec<super::types::MotionInterval>,
+    previous: &super::types::Trajectory,
     config: &TrajectoryConfig,
-    t_now: f64,
-) -> (Vec<TrajectoryKnot>, ContinuityStats) {
-    let knots_in = knots.len() as u32;
-
-    let Some(prev) = prev_state else {
-        let out = enforce_monotonic_distance(knots);
-        let knots_out = out.len() as u32;
-        return (
-            out,
-            ContinuityStats {
-                knots_in,
-                knots_out,
-                prev_state_discarded: false,
-                ..Default::default()
-            },
-        );
+    now: f64,
+) -> (Vec<super::types::MotionInterval>, ContinuityStats) {
+    use super::interpolation::{evaluate_motion, hermite, validate_motion};
+    let mut stats = ContinuityStats::default();
+    let old = evaluate_motion(&previous.motion, now);
+    let new = evaluate_motion(&motion, now);
+    let reason = if now - previous.generated_at > config.max_prev_state_age_s {
+        Some(ContinuityDiscardReason::StalePrevState)
+    } else if new.s_m - old.s_m > config.max_forward_jump_m {
+        Some(ContinuityDiscardReason::ForwardJump)
+    } else if old.s_m - new.s_m > config.max_backward_gap_m {
+        Some(ContinuityDiscardReason::BackwardGap)
+    } else {
+        None
     };
-
-    if t_now - prev.t_unix > config.max_prev_state_age_s {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::StalePrevState);
+    if let Some(reason) = reason {
+        stats.prev_state_discarded = true;
+        stats.discard_reason = Some(reason);
+        return (motion, stats);
     }
-
-    let first_new_s = knots.first().map(|k| k.s_m).unwrap_or(prev.s_m);
-    if first_new_s + config.max_backward_gap_m < prev.s_m {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::BackwardGap);
-    }
-    if first_new_s > prev.s_m + config.max_forward_jump_m {
-        return discard_prev_state(knots, knots_in, ContinuityDiscardReason::ForwardJump);
-    }
-
-    knots.retain(|k| k.t_event >= t_now - 1.0 || k.s_m >= prev.s_m - 1.0);
-
-    let bridge = TrajectoryKnot::new(t_now, prev.s_m);
-    let mut out = vec![bridge];
-    out.extend(knots);
-    out = enforce_monotonic_distance(out);
-    let out = apply_hold_strategy(out, prev.s_m);
-    let knots_out = out.len() as u32;
-    (
-        out,
-        ContinuityStats {
-            knots_in,
-            knots_out,
-            prev_state_discarded: false,
-            ..Default::default()
-        },
-    )
-}
-
-fn discard_prev_state(
-    knots: Vec<TrajectoryKnot>,
-    knots_in: u32,
-    reason: ContinuityDiscardReason,
-) -> (Vec<TrajectoryKnot>, ContinuityStats) {
-    let out = enforce_monotonic_distance(knots);
-    let knots_out = out.len() as u32;
-    (
-        out,
-        ContinuityStats {
-            knots_in,
-            knots_out,
-            prev_state_discarded: true,
-            discard_reason: Some(reason),
-            ..Default::default()
-        },
-    )
-}
-
-fn enforce_monotonic_distance(mut knots: Vec<TrajectoryKnot>) -> Vec<TrajectoryKnot> {
-    if knots.is_empty() {
-        return knots;
-    }
-    knots.sort_by(|a, b| {
-        a.t_event
-            .partial_cmp(&b.t_event)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    let mut cleaned: Vec<TrajectoryKnot> = Vec::with_capacity(knots.len());
-    for knot in knots {
-        if let Some(last) = cleaned.last() {
-            if (knot.t_event - last.t_event).abs() < 1e-6 {
-                continue;
-            }
-            if knot.s_m + 1e-6 < last.s_m {
-                continue;
+    // A short synthetic prefix supplies the required zero-speed first boundary
+    // without accumulating an unbounded history of previous motion intervals.
+    let s0 = (old.s_m - old.v_mps * 0.5).max(0.0);
+    let (prefix_duration, prefix_v1) = if old.v_mps > 1e-9 && old.s_m > s0 {
+        (2.0 * (old.s_m - s0) / old.v_mps, old.v_mps)
+    } else {
+        (1.0, 0.0)
+    };
+    let prefix = hermite(now - prefix_duration, now, s0, old.s_m, 0.0, prefix_v1);
+    for (index, interval) in motion.iter().enumerate() {
+        if interval.t1 <= now {
+            continue;
+        }
+        if new.s_m > old.s_m + 1e-3 {
+            let rejoin_time = now + super::gps::CORRECTION_BUDGET_S;
+            if interval.t0 <= rejoin_time && rejoin_time < interval.t1 {
+                let rejoin = interval.evaluate(rejoin_time);
+                let end = interval.evaluate(interval.t1);
+                let bridge = hermite(
+                    now,
+                    rejoin_time,
+                    old.s_m,
+                    rejoin.s_m,
+                    prefix_v1,
+                    rejoin.v_mps,
+                );
+                let tail = hermite(
+                    rejoin_time,
+                    interval.t1,
+                    rejoin.s_m,
+                    end.s_m,
+                    rejoin.v_mps,
+                    end.v_mps,
+                );
+                if bridge.is_monotonic()
+                    && bridge.max_speed_mps() <= config.max_speed_mps + 1e-7
+                    && tail.is_monotonic()
+                    && tail.max_speed_mps() <= config.max_speed_mps + 1e-7
+                {
+                    let mut candidate = Vec::with_capacity(motion.len() - index + 2);
+                    candidate.push(prefix);
+                    candidate.push(bridge);
+                    candidate.push(tail);
+                    candidate.extend_from_slice(&motion[index + 1..]);
+                    if validate_motion(&candidate).is_ok() {
+                        return (candidate, stats);
+                    }
+                }
             }
         }
-        cleaned.push(knot);
-    }
-    cleaned
-}
-
-fn apply_hold_strategy(knots: Vec<TrajectoryKnot>, s_floor: f64) -> Vec<TrajectoryKnot> {
-    let mut out = Vec::with_capacity(knots.len() + 4);
-    let mut current_s = s_floor;
-    for knot in knots {
-        if knot.s_m < current_s - 1e-6 {
-            out.push(TrajectoryKnot::new(knot.t_event, current_s));
-        } else {
-            current_s = knot.s_m;
-            out.push(knot);
+        let target = interval.evaluate(interval.t1);
+        let bridge = hermite(
+            now,
+            interval.t1,
+            old.s_m,
+            target.s_m,
+            prefix_v1,
+            target.v_mps,
+        );
+        if bridge.is_monotonic() && bridge.max_speed_mps() <= config.max_speed_mps + 1e-7 {
+            let mut candidate = Vec::with_capacity(motion.len() - index + 1);
+            candidate.push(prefix);
+            candidate.push(bridge);
+            candidate.extend_from_slice(&motion[index + 1..]);
+            if validate_motion(&candidate).is_ok() {
+                return (candidate, stats);
+            }
+        } else if target.v_mps.abs() < 1e-6 && target.s_m > old.s_m && prefix_v1 > 1e-9 {
+            // When a station arrival is delayed so `interval.t1 - now > 3 * ds / v0`,
+            // a single cubic to `(target.s_m, 0)` would overshoot and reverse.
+            // Decelerate smoothly to `target.s_m` and hold until `interval.t1`.
+            let stop_duration = 2.0 * (target.s_m - old.s_m) / prefix_v1;
+            if stop_duration >= prefix_v1 / 2.0
+                && stop_duration < interval.t1 - now
+                && prefix_v1 <= config.max_speed_mps + 1e-7
+            {
+                let decel = hermite(
+                    now,
+                    now + stop_duration,
+                    old.s_m,
+                    target.s_m,
+                    prefix_v1,
+                    0.0,
+                );
+                let hold = hermite(
+                    now + stop_duration,
+                    interval.t1,
+                    target.s_m,
+                    target.s_m,
+                    0.0,
+                    0.0,
+                );
+                if decel.is_monotonic() && hold.is_monotonic() {
+                    let mut candidate = Vec::with_capacity(motion.len() - index + 2);
+                    candidate.push(prefix);
+                    candidate.push(decel);
+                    candidate.push(hold);
+                    candidate.extend_from_slice(&motion[index + 1..]);
+                    if validate_motion(&candidate).is_ok() {
+                        return (candidate, stats);
+                    }
+                }
+            }
         }
     }
-    out
+    // Delayed predictions cannot pull a moving train backwards. Brake to a hold
+    // along the compatible path, and try the predictions again next revision.
+    let shape_end = previous
+        .shape
+        .distances_m
+        .last()
+        .copied()
+        .unwrap_or(old.s_m)
+        .max(old.s_m);
+    let max_stop = old.s_m + prefix_v1 * prefix_v1.max(1.0) / 2.0;
+    let stop = max_stop.min(shape_end);
+    let duration = if prefix_v1 > 1e-9 && stop > old.s_m {
+        (2.0 * (stop - old.s_m) / prefix_v1).max(1e-3)
+    } else {
+        1.0
+    };
+    let braking_v0 = if stop > old.s_m { prefix_v1 } else { 0.0 };
+    let prefix = if braking_v0 == 0.0 {
+        hermite(now - 1.0, now, old.s_m, old.s_m, 0.0, 0.0)
+    } else {
+        prefix
+    };
+    let braking = hermite(now, now + duration, old.s_m, stop, braking_v0, 0.0);
+    let hold = hermite(now + duration, now + duration + 300.0, stop, stop, 0.0, 0.0);
+    let out = vec![prefix, braking, hold];
+    if validate_motion(&out).is_ok() {
+        return (out, stats);
+    }
+    stats.prev_state_discarded = true;
+    (motion, stats)
 }

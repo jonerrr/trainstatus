@@ -74,15 +74,7 @@ async fn busy_trajectory_worker_collapses_pending_snapshots_without_blocking_sen
 async fn derivation_error_keeps_hot_generation_and_empty_snapshot_clears_it() {
     let cache = trajectories();
     let mut previous = HotSnapshot::empty();
-    let id = uuid::Uuid::now_v7();
-    previous.prev_states.insert(
-        id,
-        crate::trajectory::TrajectoryState {
-            t_unix: 1.0,
-            s_m: 12.0,
-            v_mps: 0.0,
-        },
-    );
+    previous.generated_at = chrono::DateTime::from_timestamp(1, 0).unwrap();
     cache.publish_live(Source::NjtBus, previous).await;
     let (tx, rx) = watch::channel(None);
     let (started, mut observed) = mpsc::unbounded_channel();
@@ -109,9 +101,9 @@ async fn derivation_error_keeps_hot_generation_and_empty_snapshot_clears_it() {
             .snapshot(Source::NjtBus, None)
             .await
             .unwrap()
-            .prev_states[&id]
-            .s_m,
-        12.0
+            .generated_at
+            .timestamp(),
+        1
     );
     tx.send(Some(persisted(2))).unwrap();
     assert_eq!(observed.recv().await, Some(2));
@@ -121,7 +113,7 @@ async fn derivation_error_keeps_hot_generation_and_empty_snapshot_clears_it() {
             .snapshot(Source::NjtBus, None)
             .await
             .unwrap()
-            .prev_states
+            .plans
             .is_empty()
     );
     drop(tx);

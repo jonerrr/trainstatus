@@ -25,9 +25,15 @@
 	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './mapTheme';
 	import RouteLayers from './RouteLayers.svelte';
 	import StopLayers from './StopLayers.svelte';
-	import TripMarkersLoader from './TripMarkersLoader.svelte';
+	import { createTrajectories } from './trajectories.svelte.js';
+	import TripMarkers from './TripMarkers.svelte';
 
 	const current_time = getCurrentTime();
+
+	type MapOverlay =
+		| { kind: 'hover'; target: MapTarget; point: ScreenPoint }
+		| { kind: 'choose'; targets: MapTarget[]; point: ScreenPoint }
+		| null;
 
 	let map = $state.raw<MapInstance>();
 	let center = $state<[number, number]>([-74.006, 40.7128]);
@@ -38,37 +44,34 @@
 	let ready = $state(false);
 	let width = $state(0);
 	let height = $state(0);
-	let hover = $state<{ target: MapTarget; point: ScreenPoint } | null>(null);
-	let chooser = $state<{ targets: MapTarget[]; point: ScreenPoint } | null>(null);
-	let selectionError = $state('');
-	let filters = $state(new MapFilters());
+	const filters = new MapFilters();
 	const interactions = new MapInteractionController();
 	const transit = getTransitData();
+	const trajectories = createTrajectories(() => ({
+		sources: filters.layers.trip ? filters.sources : [],
+		at: current_time.value
+	}));
+	// Reset any active overlay whenever the visible network or the selected time changes.
+	let overlay = $derived.by<MapOverlay>(() => {
+		void filters.route;
+		void filters.stop;
+		void filters.layers.route;
+		void filters.layers.stop;
+		void filters.layers.trip;
+		void current_time.value;
+		return null;
+	});
+	const hoveredTarget = $derived(overlay?.kind === 'hover' ? overlay.target : null);
 	const activeRoute = $derived<MapFeatureKey | null>(
-		hover?.target.kind === 'route'
-			? { id: hover.target.id, source: hover.target.source }
-			: hover?.target.routeId
-				? { id: hover.target.routeId, source: hover.target.source }
+		hoveredTarget?.kind === 'route'
+			? { id: hoveredTarget.id, source: hoveredTarget.source }
+			: hoveredTarget?.kind === 'trip'
+				? { id: hoveredTarget.routeId, source: hoveredTarget.source }
 				: null
 	);
 	const selectedTrip = $derived<MapFeatureKey | null>(
-		hover?.target.kind === 'trip' ? { id: hover.target.id, source: hover.target.source } : null
+		hoveredTarget?.kind === 'trip' ? { id: hoveredTarget.id, source: hoveredTarget.source } : null
 	);
-	// New object whenever the visible network or the selected time changes.
-	const interactionScope = $derived({
-		route: filters.route,
-		stop: filters.stop,
-		trip: filters.trip,
-		routeLayer: filters.layers.route,
-		stopLayer: filters.layers.stop,
-		tripLayer: filters.layers.trip,
-		at: current_time.value
-	});
-	$effect(() => {
-		void interactionScope;
-		hover = null;
-		chooser = null;
-	});
 	$effect(() => {
 		if (!map) return;
 		map.touchZoomRotate.disableRotation();
@@ -77,12 +80,12 @@
 	$effect(() => {
 		if (!map) return;
 		const canvas = map.getCanvas();
-		canvas.style.cursor = hover && !moving ? 'pointer' : '';
+		canvas.style.cursor = overlay?.kind === 'hover' && !moving ? 'pointer' : '';
 		return () => {
 			canvas.style.cursor = '';
 		};
 	});
-	function targetsAt(point: ScreenPoint): MapTarget[] {
+	function targetsAt(point: ScreenPoint, closest = false): MapTarget[] {
 		if (!map) return [];
 		const layers = ['stop-subway-hit-layer', 'stop-bus-hit-layer', 'route-hit-layer'].filter((id) =>
 			map?.getLayer(id)
@@ -101,25 +104,19 @@
 						return [{ kind, id, source }];
 					})
 			: [];
-		const result = interactions.resolve(point, targets);
-		return result.kind === 'choose'
-			? result.targets
-			: result.kind === 'open'
-				? [result.target]
-				: [];
+		return interactions.resolve(point, targets, closest);
 	}
 	function mousemove(event: MapMouseEvent) {
-		if (moving || chooser || event.originalEvent.buttons) return;
-		const target = targetsAt(event.point)[0];
-		hover = target ? { target, point: event.point } : null;
+		if (moving || overlay?.kind === 'choose' || event.originalEvent.buttons) return;
+		const target = targetsAt(event.point, true)[0];
+		if (target) overlay = { kind: 'hover', target, point: event.point };
+		else if (overlay?.kind === 'hover') overlay = null;
 	}
 	function openTarget(target: MapTarget) {
-		hover = null;
-		chooser = null;
-		selectionError = '';
+		overlay = null;
 		if (target.kind !== 'trip') {
 			open_modal({ type: target.kind, source: target.source, id: target.id });
-		} else if (target.routeId) {
+		} else {
 			// The trip modal loads the vehicle's route service when it opens.
 			open_modal({
 				type: 'trip',
@@ -127,16 +124,12 @@
 				route_id: target.routeId,
 				id: target.id
 			});
-		} else {
-			selectionError = 'This vehicle has no route. Select another vehicle.';
 		}
 	}
 	function click(event: MapMouseEvent) {
 		const targets = targetsAt(event.point);
-		selectionError = '';
-		hover = null;
 		if (targets.length === 1) openTarget(targets[0]);
-		else chooser = targets.length ? { targets, point: event.point } : null;
+		else overlay = targets.length ? { kind: 'choose', targets, point: event.point } : null;
 	}
 </script>
 
@@ -149,7 +142,7 @@
 	data-map-zoom={zoom}
 	data-map-bearing={bearing}
 >
-	<Filters bind:filters />
+	<Filters {filters} />
 	<MapLibre
 		bind:map
 		bind:center
@@ -179,12 +172,11 @@
 		onclick={click}
 		onmousemove={mousemove}
 		onmouseout={() => {
-			hover = null;
+			if (overlay?.kind === 'hover') overlay = null;
 		}}
 		onmovestart={() => {
 			moving = true;
-			hover = null;
-			chooser = null;
+			overlay = null;
 		}}
 		onmoveend={() => {
 			moving = false;
@@ -202,8 +194,9 @@
 		{#if filters.layers.route}<RouteLayers filter={filters.route} {activeRoute} />{/if}
 		{#if filters.layers.stop}<StopLayers filter={filters.stop} />{/if}
 		{#if filters.layers.trip && filters.sources.length}
-			<TripMarkersLoader
-				sources={filters.sources}
+			<TripMarkers
+				tables={trajectories.current.tables}
+				at={current_time.value}
 				railDetail={settledZoom >= RAIL_DETAIL_ZOOM}
 				busDetail={settledZoom >= BUS_DETAIL_ZOOM}
 				{selectedTrip}
@@ -211,31 +204,25 @@
 			/>
 		{/if}
 	</MapLibre>
-	{#if chooser}
+	{#if overlay?.kind === 'choose'}
 		<FeatureChooser
-			targets={chooser.targets}
-			point={chooser.point}
+			targets={overlay.targets}
+			point={overlay.point}
 			viewportWidth={width}
 			viewportHeight={height}
 			onselect={openTarget}
 			ondismiss={() => {
-				chooser = null;
+				if (overlay?.kind === 'choose') overlay = null;
 			}}
 		>
 			{#snippet children(target)}<MapFeatureSummary {target} />{/snippet}
 		</FeatureChooser>
-	{:else if hover && !page.state.modal}
+	{:else if overlay?.kind === 'hover' && !page.state.modal}
 		<FeaturePreview
-			target={hover.target}
-			point={hover.point}
+			target={overlay.target}
+			point={overlay.point}
 			viewportWidth={width}
 			viewportHeight={height}
 		/>
 	{/if}
-	{#if selectionError}<div
-			role="status"
-			class="absolute right-12 bottom-3 left-3 rounded-none bg-canvas p-3 text-sm text-status-warning"
-		>
-			{selectionError}
-		</div>{/if}
 </div>

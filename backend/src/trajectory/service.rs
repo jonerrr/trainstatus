@@ -66,9 +66,6 @@ impl TrajectoryService {
                 let engine = engine.clone();
                 let cache = cache.clone();
                 async move {
-                    let shape_geom = cache
-                        .get_shape_geometry(source, &snapshot.shape_key, &snapshot.shape)
-                        .await?;
                     let computed = match compute_trajectory_async(&engine, source, &snapshot, None, &cache, &config).await {
                         Ok(computed) => computed,
                         Err(error) => {
@@ -76,8 +73,7 @@ impl TrajectoryService {
                             return None;
                         }
                     };
-                    let units =
-                        expand_render_units(source, &snapshot, &computed.trajectory, &shape_geom);
+                    let units = expand_render_units(source, &snapshot, &computed.trajectory);
                     Some(units)
                 }
             })

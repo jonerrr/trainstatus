@@ -1,10 +1,30 @@
 use crate::source::Source;
-use geo::{Distance, Euclidean, Point};
 
 use super::geometry::ShapeGeometry;
 use super::types::{GeneratedKnots, TrajectoryKnot, TripSnapshot};
 
 pub const KNOT_COLLAPSE_TOLERANCE_M: f64 = 0.5;
+
+/// Slack allowed above the reported next-stop distance when truncating the
+/// schedule ahead of the live feed. Keeps the arrival/departure dwell knots
+/// (which sit exactly at the stop distance) from being trimmed by rounding.
+pub const NEXT_STOP_CEILING_TOLERANCE_M: f64 = 1.0;
+
+/// Equal-time predictions cannot be interpolated. Keep the furthest distance
+/// at each timestamp (assuming `knots` is already sorted by `(t_event, s_m)`).
+pub fn dedup_equal_time_knots(knots: Vec<TrajectoryKnot>) -> Vec<TrajectoryKnot> {
+    let mut unique: Vec<TrajectoryKnot> = Vec::with_capacity(knots.len());
+    for knot in knots {
+        if let Some(last) = unique.last_mut()
+            && last.t_event == knot.t_event
+        {
+            *last = knot;
+        } else {
+            unique.push(knot);
+        }
+    }
+    unique
+}
 
 /// Drop schedule knots that contradict a live GPS anchor.
 ///
@@ -45,23 +65,12 @@ pub(super) fn recorded_anchor_knot(
         &sample.point,
         super::types::source_projected_epsg_code(source),
     )?;
-    let distance = super::geometry::project_point_onto_line(
-        &projected,
-        &geometry.projected_line,
-        &geometry.cum_dist,
+    let candidates = super::geometry::projection_candidates(&projected, geometry);
+    let distance = super::gps::resolve_candidates(
+        trip,
+        candidates,
+        sample.observed_at.timestamp_micros() as f64 / 1e6,
     )?;
-    if source == Source::NjtBus {
-        let snapped = super::geometry::distance_to_coord(
-            distance,
-            &geometry.projected_line,
-            &geometry.cum_dist,
-        )?;
-        if Euclidean.distance(&projected, &Point::from(snapped))
-            > super::builders::njt_bus::NJT_MAX_GPS_OFFSET_METERS
-        {
-            return None;
-        }
-    }
     Some(TrajectoryKnot::new(
         sample.observed_at.timestamp_micros() as f64 / 1_000_000.0,
         distance.clamp(0.0, trip.shape_length_m),
@@ -70,6 +79,7 @@ pub(super) fn recorded_anchor_knot(
 
 /// Source-specific knot synthesis from trip snapshots.
 pub trait TrajectoryBuilder: Send + Sync {
+    fn source(&self) -> Source;
     fn generate_knots(
         &self,
         trip: &TripSnapshot,

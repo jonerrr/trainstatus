@@ -1,14 +1,11 @@
 import type { Source } from '#lib/client/index.js';
-import type { ActiveVehicle } from '#lib/map/trajectoryArrow.js';
+import type { ActiveVehicle } from '#lib/map/trajectory.js';
 
 export type MapTargetKind = 'trip' | 'stop' | 'route';
 
-export interface MapTarget {
-	kind: MapTargetKind;
-	id: string;
-	source: Source;
-	routeId?: string;
-}
+export type MapTarget = { id: string; source: Source } & (
+	{ kind: 'trip'; routeId: string } | { kind: 'route' | 'stop' }
+);
 
 /** Identity of a route or trip, without a picked feature kind. */
 export type MapFeatureKey = Pick<MapTarget, 'id' | 'source'>;
@@ -19,11 +16,9 @@ export interface ScreenPoint {
 }
 
 export interface VehiclePicker {
+	pickClosest(point: ScreenPoint, radius?: number): ActiveVehicle | null;
 	pick(point: ScreenPoint, radius?: number): ActiveVehicle[];
 }
-
-export type MapTargetResolution =
-	{ kind: 'none' } | { kind: 'open'; target: MapTarget } | { kind: 'choose'; targets: MapTarget[] };
 
 const targetPriority: Record<MapTargetKind, number> = {
 	trip: 0,
@@ -38,9 +33,15 @@ export class MapInteractionController {
 		this.#vehiclePicker = picker;
 	}
 
-	resolve(point: ScreenPoint, mapTargets: readonly MapTarget[]): MapTargetResolution {
+	resolve(point: ScreenPoint, mapTargets: readonly MapTarget[], closest = false): MapTarget[] {
 		const vehicleTargets: MapTarget[] = [];
-		for (const vehicle of this.#vehiclePicker?.pick(point) ?? []) {
+		const nearest = closest ? this.#vehiclePicker?.pickClosest(point) : null;
+		const vehicles = closest
+			? nearest
+				? [nearest]
+				: []
+			: (this.#vehiclePicker?.pick(point) ?? []);
+		for (const vehicle of vehicles) {
 			vehicleTargets.push({
 				kind: 'trip',
 				id: vehicle.tripId,
@@ -53,18 +54,14 @@ export class MapInteractionController {
 	}
 }
 
-export function resolveMapTargets(targets: readonly MapTarget[]): MapTargetResolution {
+export function resolveMapTargets(targets: readonly MapTarget[]): MapTarget[] {
 	const uniqueTargets = new Map<string, MapTarget>();
 
 	for (const target of targets) {
 		uniqueTargets.set(`${target.kind}:${target.source}:${target.id}`, target);
 	}
 
-	const resolvedTargets = Array.from(uniqueTargets.values()).sort(
+	return Array.from(uniqueTargets.values()).sort(
 		(a, b) => targetPriority[a.kind] - targetPriority[b.kind]
 	);
-
-	if (resolvedTargets.length === 0) return { kind: 'none' };
-	if (resolvedTargets.length === 1) return { kind: 'open', target: resolvedTargets[0] };
-	return { kind: 'choose', targets: resolvedTargets };
 }

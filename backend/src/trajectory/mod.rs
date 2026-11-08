@@ -6,6 +6,7 @@ mod calculator;
 pub(crate) mod continuity;
 mod derive;
 pub(crate) mod geometry;
+mod gps;
 mod history;
 pub(crate) mod interpolation;
 mod platform;

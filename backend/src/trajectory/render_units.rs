@@ -1,8 +1,7 @@
+use super::types::{RenderUnit, Trajectory, TripSnapshot};
 use crate::operations::types::position::PositionData;
 use crate::source::Source;
-
-use super::geometry::{ShapeGeometry, bearing_at_distance, distance_to_coord};
-use super::types::{RenderUnit, Trajectory, TripSnapshot};
+use std::sync::Arc;
 
 const DEFAULT_SUBWAY_CAR_LENGTH_M: f32 = 18.288;
 const DEFAULT_BUS_LENGTH_M: f32 = 12.0;
@@ -14,7 +13,6 @@ pub struct SourceRenderConfig {
     pub expand_consists: bool,
     pub default_length_m: f32,
 }
-
 pub fn source_render_config(source: Source) -> SourceRenderConfig {
     match source {
         Source::MtaSubway => SourceRenderConfig {
@@ -23,7 +21,7 @@ pub fn source_render_config(source: Source) -> SourceRenderConfig {
             expand_consists: true,
             default_length_m: DEFAULT_SUBWAY_CAR_LENGTH_M,
         },
-        Source::MtaBus | Source::NjtBus => SourceRenderConfig {
+        _ => SourceRenderConfig {
             primary_icon_key: "bus",
             trailing_icon_key: "bus",
             expand_consists: false,
@@ -31,149 +29,58 @@ pub fn source_render_config(source: Source) -> SourceRenderConfig {
         },
     }
 }
-
 pub fn expand_render_units(
     source: Source,
     trip: &TripSnapshot,
     trajectory: &Trajectory,
-    shape_geom: &ShapeGeometry,
 ) -> Vec<RenderUnit> {
     let config = source_render_config(source);
-    let passengers = trip_passengers(trip);
-
-    if config.expand_consists
-        && let (Some(unit_count), Some(car_length_m)) =
-            (trip.consist_car_count, trip.consist_car_length_m)
-    {
-        let expanded = expand_consist_units(
-            source,
-            trajectory,
-            shape_geom,
-            unit_count,
-            car_length_m,
-            passengers,
-            config,
-        );
-        if !expanded.is_empty() {
-            return expanded;
-        }
-    }
-
-    build_single_unit(source, trip, trajectory, passengers, config)
-        .into_iter()
-        .collect()
-}
-
-fn expand_consist_units(
-    source: Source,
-    trajectory: &Trajectory,
-    shape_geom: &ShapeGeometry,
-    unit_count: i16,
-    car_length_m: f32,
-    passengers: Option<i32>,
-    config: SourceRenderConfig,
-) -> Vec<RenderUnit> {
-    let mut units = Vec::new();
-
-    for unit_index in 0..unit_count {
-        let offset_m = unit_index as f64 * car_length_m as f64 + (car_length_m as f64 / 2.0);
-        let mut positions = Vec::with_capacity(trajectory.path.len());
-        let mut timestamps = Vec::with_capacity(trajectory.timestamps.len());
-        let mut bearings = Vec::with_capacity(trajectory.bearings.len());
-
-        for (sample_index, &head_distance) in trajectory.distances_m.iter().enumerate() {
-            let center_distance = head_distance - offset_m;
-            if !(0.0..=shape_geom.length_m).contains(&center_distance) {
-                continue;
-            }
-
-            let Some(coord) = distance_to_coord(
-                center_distance,
-                &shape_geom.wgs84_line,
-                &shape_geom.cum_dist,
-            ) else {
-                continue;
-            };
-
-            positions.push([coord.x, coord.y]);
-            timestamps.push(trajectory.timestamps[sample_index]);
-            bearings.push(
-                bearing_at_distance(
-                    center_distance,
-                    &shape_geom.wgs84_line,
-                    &shape_geom.cum_dist,
-                )
-                .unwrap_or(trajectory.bearings[sample_index]),
-            );
-        }
-
-        if positions.len() < 2 {
-            continue;
-        }
-
-        units.push(RenderUnit {
-            render_unit_id: format!("{}:{}:{}", source.as_str(), trajectory.trip_id, unit_index),
-            source,
-            trip_id: trajectory.trip_id.clone(),
-            route_id: trajectory.route_id.clone(),
-            icon_key: if unit_index == 0 {
-                config.primary_icon_key.to_string()
-            } else {
-                config.trailing_icon_key.to_string()
-            },
-            unit_index: Some(unit_index),
-            unit_count: Some(unit_count),
-            is_head: unit_index == 0,
-            length_m: car_length_m,
-            passengers,
-            color: trajectory.color,
-            positions,
-            timestamps,
-            bearings,
-        });
-    }
-
-    units
-}
-
-fn build_single_unit(
-    source: Source,
-    trip: &TripSnapshot,
-    trajectory: &Trajectory,
-    passengers: Option<i32>,
-    config: SourceRenderConfig,
-) -> Option<RenderUnit> {
-    if trajectory.path.len() < 2 || trajectory.timestamps.len() < 2 || trajectory.bearings.len() < 2
-    {
-        return None;
-    }
-
-    Some(RenderUnit {
-        render_unit_id: format!("{}:{}:0", source.as_str(), trajectory.trip_id),
-        source,
-        trip_id: trajectory.trip_id.clone(),
-        route_id: trajectory.route_id.clone(),
-        icon_key: config.primary_icon_key.to_string(),
-        unit_index: None,
-        unit_count: None,
-        is_head: true,
-        length_m: trip
-            .consist_car_length_m
-            .or_else(|| trip.consist_length_m.map(|len| len as f32))
-            .unwrap_or(config.default_length_m),
-        passengers,
-        color: trajectory.color,
-        positions: trajectory.path.clone(),
-        timestamps: trajectory.timestamps.clone(),
-        bearings: trajectory.bearings.clone(),
-    })
-}
-
-fn trip_passengers(trip: &TripSnapshot) -> Option<i32> {
-    trip.positions
+    let expanded = config.expand_consists
+        && trip.consist_car_count.is_some_and(|n| n > 0)
+        && trip.consist_car_length_m.is_some();
+    let count = if expanded {
+        trip.consist_car_count.unwrap()
+    } else {
+        1
+    };
+    let length = trip
+        .consist_car_length_m
+        .or_else(|| trip.consist_length_m.map(|l| l as f32))
+        .unwrap_or(config.default_length_m);
+    let passengers = trip
+        .positions
         .iter()
-        .find_map(|position| match &position.data {
+        .filter(|p| matches!(p.data, PositionData::MtaBus(_)))
+        .max_by_key(|p| p.updated_at)
+        .and_then(|p| match &p.data {
             PositionData::MtaBus(data) => data.passengers,
             _ => None,
+        });
+    let trajectory = Arc::new(trajectory.clone());
+    (0..count)
+        .map(|index| RenderUnit {
+            render_unit_id: format!("{}:{}:{}", source.as_str(), trip.trip_id, index),
+            source,
+            trip_id: trip.trip_id.to_string(),
+            route_id: trip.route_id.clone(),
+            icon_key: if index == 0 {
+                config.primary_icon_key
+            } else {
+                config.trailing_icon_key
+            }
+            .into(),
+            unit_index: expanded.then_some(index),
+            unit_count: expanded.then_some(count),
+            is_head: index == 0,
+            length_m: length,
+            passengers,
+            color: trajectory.color,
+            offset_m: if expanded {
+                (index as f64 + 0.5) * length as f64
+            } else {
+                0.0
+            },
+            trajectory: trajectory.clone(),
         })
+        .collect()
 }

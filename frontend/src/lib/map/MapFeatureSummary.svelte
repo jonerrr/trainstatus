@@ -11,10 +11,12 @@
 
 	let { target }: { target: MapTarget } = $props();
 	const catalog = $derived(transit.peekCatalog(target.source));
-	const route_id = $derived(target.kind === 'route' ? target.id : target.routeId);
+	const route_id = $derived(
+		target.kind === 'route' ? target.id : target.kind === 'trip' ? target.routeId : undefined
+	);
 	// Hover summaries use loaded service only; opening the trip loads its route.
 	const read = $derived(
-		target.kind === 'trip' && target.routeId
+		target.kind === 'trip'
 			? transit.loadedTrip(target.source, target.routeId, target.id, current_time.value)
 			: undefined
 	);

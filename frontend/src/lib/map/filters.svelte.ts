@@ -4,7 +4,7 @@ import type { Source } from '#lib/client/index.js';
 import { COMPASS_DIRECTION_OPTIONS } from '#lib/compassDirections.js';
 import { all_sources } from '#lib/sources.js';
 
-import * as maplibregl from 'maplibre-gl';
+import type * as maplibregl from 'maplibre-gl';
 
 // Layer metadata
 export const layer_data = {
@@ -21,15 +21,11 @@ export const layer_data = {
 
 export type LayerKey = keyof typeof layer_data;
 
-export type FilterFieldType = 'boolean' | 'enum' | 'string' | 'number';
+export type PropertyLayerKey = Exclude<LayerKey, 'trip'>;
 
-export interface FilterFieldDef {
-	type: FilterFieldType;
-	label: string;
-	options?: readonly string[];
-	min?: number;
-	max?: number;
-}
+export type FilterFieldDef =
+	| { type: 'boolean' | 'string'; label: string }
+	| { type: 'enum'; label: string; options: readonly string[] };
 
 // Stop filter definitions by source
 const stop_filter_defs = {
@@ -37,52 +33,44 @@ const stop_filter_defs = {
 		north_headsign: {
 			type: 'string',
 			label: 'North Headsign'
-		} as FilterFieldDef,
+		},
 		south_headsign: {
 			type: 'string',
 			label: 'South Headsign'
-		} as FilterFieldDef
+		}
 	} as const,
 	mta_bus: {
 		direction: {
 			type: 'enum',
 			label: 'Direction',
 			options: COMPASS_DIRECTION_OPTIONS
-		} as FilterFieldDef
+		}
 	} as const,
 	njt_bus: {
 		// nothing yet to filter
 	} as const
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
-// Route filter definitions by source (minimal for MVP)
+// Route filter definitions by source
 const route_filter_defs = {
 	mta_subway: {} as const,
 	mta_bus: {
 		shuttle: {
 			type: 'boolean',
 			label: 'Shuttle'
-		} as FilterFieldDef
+		}
 	} as const,
-	njt_bus: {} as const
-} satisfies Record<Source, Record<string, FilterFieldDef>>;
-
-// Trip filter definitions (none for MVP - trips have minimal source-specific data)
-const trip_filter_defs = {
-	mta_subway: {} as const,
-	mta_bus: {} as const,
 	njt_bus: {} as const
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
 // All layer filter definitions combined
 const layer_filter_defs = {
 	route: route_filter_defs,
-	stop: stop_filter_defs,
-	trip: trip_filter_defs
+	stop: stop_filter_defs
 } as const;
 
 export function getFilterDefsForLayer(
-	layer: LayerKey
+	layer: PropertyLayerKey
 ): Record<Source, Record<string, FilterFieldDef>> {
 	return layer_filter_defs[layer];
 }
@@ -91,16 +79,15 @@ export function getFilterDefsForLayer(
 // FILTER STATE AND EXPRESSIONS
 // ============================================================================
 
-export type FilterValue = boolean | string | string[] | [number, number] | undefined;
+export type FilterValue = boolean | string | string[] | undefined;
 
-type PropertyFilterMap = Partial<Record<Source, Record<string, FilterValue>>>;
+type PropertyFilterMap = Record<Source, Record<string, FilterValue>>;
 
-function hasFilterValue(value: FilterValue, fieldDef?: FilterFieldDef) {
+function hasFilterValue(value: FilterValue, fieldDef: FilterFieldDef) {
 	if (value === undefined) return false;
 	if (typeof value === 'string') return value.length > 0;
 	if (Array.isArray(value)) {
-		if (fieldDef?.type === 'enum' && fieldDef.options && value.length === fieldDef.options.length)
-			return false;
+		if (fieldDef.type === 'enum' && value.length === fieldDef.options.length) return false;
 		return value.length > 0;
 	}
 	return true;
@@ -115,7 +102,7 @@ export function countActiveFilters({
 	initialSources: readonly Source[];
 	sources: readonly Source[];
 	layers: Record<LayerKey, boolean>;
-	propertyFilters: readonly { layer: LayerKey; filters: PropertyFilterMap }[];
+	propertyFilters: readonly { layer: PropertyLayerKey; filters: PropertyFilterMap }[];
 }) {
 	const sameSources =
 		initialSources.length === sources.length &&
@@ -124,13 +111,10 @@ export function countActiveFilters({
 	count += Object.values(layers).filter((enabled) => !enabled).length;
 
 	for (const group of propertyFilters) {
-		const groupDefinitions = layer_filter_defs[group.layer] as Record<
-			Source,
-			Record<string, FilterFieldDef>
-		>;
+		const groupDefinitions = getFilterDefsForLayer(group.layer);
 		for (const [source, sourceFilters] of Object.entries(group.filters)) {
-			for (const [property, value] of Object.entries(sourceFilters ?? {})) {
-				const fieldDef = groupDefinitions[source as Source]?.[property];
+			for (const [property, value] of Object.entries(sourceFilters)) {
+				const fieldDef = groupDefinitions[source as Source][property];
 				if (!fieldDef) continue;
 				if (hasFilterValue(value, fieldDef)) count += 1;
 			}
@@ -148,7 +132,7 @@ function emptyPropertyFilters(): Record<Source, Record<string, FilterValue>> {
 }
 
 export class MapFilters {
-	readonly initialSources = [...(page.data.selected_sources ?? [])];
+	readonly initialSources = [...page.data.selected_sources];
 
 	// Source selection state
 	sources = $state<Source[]>([...this.initialSources]);
@@ -158,15 +142,8 @@ export class MapFilters {
 
 	route_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
-	trip_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
-
 	// Layers enabled/disabled
-	layers = $state(
-		Object.fromEntries(Object.keys(layer_data).map((layer) => [layer, true])) as Record<
-			LayerKey,
-			boolean
-		>
-	);
+	layers = $state({ route: true, stop: true, trip: true });
 
 	/**
 	 * Build a MapLibre filter expression for a single property filter.
@@ -187,39 +164,19 @@ export class MapFilters {
 				return null;
 
 			case 'enum':
-				if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+				if (Array.isArray(value) && value.length > 0) {
 					// Multi-select enum: if all options selected, skip filter
-					if (fieldDef.options && value.length === fieldDef.options.length) {
+					if (value.length === fieldDef.options.length) {
 						return null;
 					}
 					return ['in', ['get', property], ['literal', value]];
 				}
-				// Single value enum
-				if (typeof value === 'string') {
-					return ['==', ['get', property], value];
-				}
-				return null;
-
-			case 'number':
-				if (
-					Array.isArray(value) &&
-					value.length === 2 &&
-					typeof value[0] === 'number' &&
-					typeof value[1] === 'number'
-				) {
-					const [min, max] = value;
-					return ['all', ['>=', ['get', property], min], ['<=', ['get', property], max]];
-				}
 				return null;
 
 			case 'string':
-				// For MVP, treat string as exact match (not regex)
 				if (typeof value === 'string' && value.length > 0) {
 					return ['==', ['get', property], value];
 				}
-				return null;
-
-			default:
 				return null;
 		}
 	}
@@ -233,10 +190,10 @@ export class MapFilters {
 	 * headsign filter would drop every bus stop.
 	 */
 	#buildLayerFilter(
-		layerKey: LayerKey,
+		layerKey: PropertyLayerKey,
 		propertyFilters: Record<Source, Record<string, FilterValue>>
 	): maplibregl.FilterSpecification {
-		const filterDefs = layer_filter_defs[layerKey];
+		const filterDefs = getFilterDefsForLayer(layerKey);
 		const sourceClauses: maplibregl.ExpressionSpecification[] = [];
 
 		for (const source of this.sources) {
@@ -244,15 +201,12 @@ export class MapFilters {
 			const sourceDefs = filterDefs[source];
 			const exprs: maplibregl.ExpressionSpecification[] = [['==', ['get', 'source'], source]];
 
-			if (sourceDefs && sourceFilters) {
-				for (const [property, value] of Object.entries(sourceFilters)) {
-					const fieldDef = sourceDefs[property as keyof typeof sourceDefs] as
-						FilterFieldDef | undefined;
-					if (!fieldDef) continue;
+			for (const [property, value] of Object.entries(sourceFilters)) {
+				const fieldDef = sourceDefs[property];
+				if (!fieldDef) continue;
 
-					const propFilter = this.#buildPropertyFilter(property, value, fieldDef);
-					if (propFilter) exprs.push(propFilter);
-				}
+				const propFilter = this.#buildPropertyFilter(property, value, fieldDef);
+				if (propFilter) exprs.push(propFilter);
 			}
 
 			sourceClauses.push(
@@ -266,17 +220,9 @@ export class MapFilters {
 	}
 
 	// Final filter expressions for each layer, automatically updated when sources or property filters change
-	route: maplibregl.FilterSpecification = $derived.by(() => {
-		return this.#buildLayerFilter('route', this.route_filters);
-	});
+	route = $derived(this.#buildLayerFilter('route', this.route_filters));
 
-	stop: maplibregl.FilterSpecification = $derived.by(() => {
-		return this.#buildLayerFilter('stop', this.stop_filters);
-	});
-
-	trip: maplibregl.FilterSpecification = $derived.by(() => {
-		return this.#buildLayerFilter('trip', this.trip_filters);
-	});
+	stop = $derived(this.#buildLayerFilter('stop', this.stop_filters));
 
 	activeFilterCount = $derived(
 		countActiveFilters({
@@ -285,8 +231,7 @@ export class MapFilters {
 			layers: this.layers,
 			propertyFilters: [
 				{ layer: 'stop', filters: this.stop_filters },
-				{ layer: 'route', filters: this.route_filters },
-				{ layer: 'trip', filters: this.trip_filters }
+				{ layer: 'route', filters: this.route_filters }
 			]
 		})
 	);
@@ -306,6 +251,5 @@ export class MapFilters {
 		this.layers = { route: true, stop: true, trip: true };
 		this.stop_filters = emptyPropertyFilters();
 		this.route_filters = emptyPropertyFilters();
-		this.trip_filters = emptyPropertyFilters();
 	}
 }

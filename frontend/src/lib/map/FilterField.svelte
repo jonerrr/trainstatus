@@ -2,53 +2,36 @@
 	import type { FilterFieldDef, FilterValue } from './filters.svelte';
 
 	interface Props {
-		label: string;
 		fieldDef: FilterFieldDef;
 		value?: FilterValue;
-		onChange?: (value: FilterValue) => void;
+		onChange: (value: FilterValue) => void;
 	}
 
-	let { label, fieldDef, value = undefined, onChange }: Props = $props();
+	let { fieldDef, value, onChange }: Props = $props();
 
 	function handleBooleanChange(checked: boolean) {
-		// undefined = "all" (no filter), false = explicitly unchecked, true = checked
+		// An unchecked checkbox removes the filter.
 		const newValue = checked ? true : undefined;
-		onChange?.(newValue);
+		onChange(newValue);
 	}
 
-	function handleEnumChange(selectedValue: string, multiSelect: boolean) {
-		if (!multiSelect) {
-			onChange?.(selectedValue);
-			return;
-		}
-
-		// Multi-select: toggle in array
-		const currentArray =
-			Array.isArray(value) && value.length === 2 && typeof value[0] === 'number'
-				? []
-				: Array.isArray(value)
-					? value
-					: [];
-		const stringArray = currentArray.filter((v): v is string => typeof v === 'string');
-
-		if (stringArray.includes(selectedValue)) {
-			const newValue = stringArray.filter((v) => v !== selectedValue);
-			onChange?.(newValue.length > 0 ? newValue : undefined);
-		} else {
-			onChange?.([...stringArray, selectedValue] as FilterValue);
-		}
+	function handleEnumChange(selectedValue: string) {
+		const selected = Array.isArray(value) ? value : [];
+		const next = selected.includes(selectedValue)
+			? selected.filter((option) => option !== selectedValue)
+			: [...selected, selectedValue];
+		onChange(next.length ? next : undefined);
 	}
 
 	function handleStringChange(inputValue: string) {
-		onChange?.(inputValue.length > 0 ? inputValue : undefined);
+		onChange(inputValue.length > 0 ? inputValue : undefined);
 	}
 </script>
 
 <div class="flex flex-col gap-1.5">
-	<!-- TODO: add "undefined" option in checkbox -->
 	{#if fieldDef.type === 'boolean'}
 		<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded-none px-1">
-			<span class="text-sm">{label}</span>
+			<span class="text-sm">{fieldDef.label}</span>
 			<input
 				type="checkbox"
 				checked={value === true}
@@ -57,47 +40,28 @@
 			/>
 		</label>
 	{:else if fieldDef.type === 'enum'}
-		{const isMultiSelect = $derived((fieldDef.options?.length ?? 0) > 2)}
 		<div class="flex flex-col gap-1">
-			<span class="text-sm">{label}</span>
-			{#if isMultiSelect}
-				<!-- Multi-select: checkboxes -->
-				<div class="ml-1.5 flex flex-col gap-0.5">
-					{const stringValues = $derived(
-						Array.isArray(value) && value.length > 0 && typeof value[0] === 'string'
-							? (value as string[])
-							: []
-					)}
-					{#each fieldDef.options ?? [] as option (option)}
-						{const isChecked = $derived(stringValues.includes(option))}
-						<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded-none px-1">
-							<span class="text-xs">{option}</span>
-							<input
-								type="checkbox"
-								checked={isChecked}
-								onchange={() => handleEnumChange(option, true)}
-								class="size-5 cursor-pointer"
-							/>
-						</label>
-					{/each}
-				</div>
-			{:else}
-				<!-- Single-select: dropdown -->
-				<select
-					value={typeof value === 'string' ? value : ''}
-					onchange={(e) => handleEnumChange(e.currentTarget.value, false)}
-					class="min-h-10 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
-				>
-					<option value="">All</option>
-					{#each fieldDef.options ?? [] as option (option)}
-						<option value={option}>{option}</option>
-					{/each}
-				</select>
-			{/if}
+			<span class="text-sm">{fieldDef.label}</span>
+			<!-- Multi-select: checkboxes -->
+			<div class="ml-1.5 flex flex-col gap-0.5">
+				{const stringValues = $derived(Array.isArray(value) ? value : [])}
+				{#each fieldDef.options as option (option)}
+					{const isChecked = $derived(stringValues.includes(option))}
+					<label class="grid min-h-10 grid-cols-[1fr_auto] items-center gap-2 rounded-none px-1">
+						<span class="text-xs">{option}</span>
+						<input
+							type="checkbox"
+							checked={isChecked}
+							onchange={() => handleEnumChange(option)}
+							class="size-5 cursor-pointer"
+						/>
+					</label>
+				{/each}
+			</div>
 		</div>
 	{:else if fieldDef.type === 'string'}
 		<label class="flex flex-col gap-1">
-			<span class="text-sm">{label}</span>
+			<span class="text-sm">{fieldDef.label}</span>
 			<input
 				type="text"
 				value={typeof value === 'string' ? value : ''}
@@ -106,44 +70,5 @@
 				class="min-h-10 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
 			/>
 		</label>
-	{:else if fieldDef.type === 'number'}
-		{const min = $derived(
-			Array.isArray(value) && typeof value[0] === 'number' ? value[0] : (fieldDef.min ?? 0)
-		)}
-		{const max = $derived(
-			Array.isArray(value) && typeof value[1] === 'number' ? value[1] : (fieldDef.max ?? 100)
-		)}
-		<div class="flex flex-col gap-1">
-			<span class="text-sm">{label}</span>
-			<div class="flex gap-1.5">
-				<input
-					type="number"
-					min={fieldDef.min}
-					max={fieldDef.max}
-					value={min}
-					onchange={(e) => {
-						const min = Number(e.currentTarget.value);
-						const newValue: FilterValue =
-							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
-						onChange?.(newValue);
-					}}
-					class="min-h-10 w-20 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
-				/>
-				<span class="self-center text-sm">to</span>
-				<input
-					type="number"
-					min={fieldDef.min}
-					max={fieldDef.max}
-					value={max}
-					onchange={(e) => {
-						const max = Number(e.currentTarget.value);
-						const newValue: FilterValue =
-							min !== (fieldDef.min ?? 0) || max !== (fieldDef.max ?? 100) ? [min, max] : undefined;
-						onChange?.(newValue);
-					}}
-					class="min-h-10 w-20 rounded-none border border-border-strong bg-surface-2 px-2 py-1 text-sm text-primary"
-				/>
-			</div>
-		</div>
 	{/if}
 </div>

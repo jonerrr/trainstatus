@@ -20,11 +20,9 @@ use backend::operations::types::trip::TripData;
 use backend::operations::types::trip::TripRun;
 use backend::source::Source;
 use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
-use backend::trajectory::HotSnapshot;
 use backend::trajectory::TrajectoryCache;
 use backend::trajectory::TrajectoryCalculator;
 use backend::trajectory::TrajectoryDeriver;
-use backend::trajectory::TrajectoryState;
 use backend::trajectory::snapshot_from_persisted_trip;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
@@ -105,8 +103,41 @@ async fn trajectory_from_persisted_snapshot() {
     let unit = hot.render_units.values().next().unwrap();
     assert_eq!(unit.trip_id, id.to_string());
     assert_eq!(unit.passengers, Some(12));
-    assert!(unit.positions.windows(2).any(|p| p[0] != p[1]));
-    assert!(hot.prev_states.contains_key(&id));
+    assert!(
+        unit.trajectory
+            .motion
+            .iter()
+            .any(|p| p.a != p.a + p.b + p.c + p.d)
+    );
+    assert!(hot.plans.contains_key(&id));
+}
+
+#[tokio::test]
+async fn trajectory_passengers_use_the_latest_report_with_retained_gps_history() {
+    let mut snapshot = fixture();
+    snapshot.positions[0].updated_at -= Duration::seconds(20);
+    let cache = Arc::new(TrajectoryCache::new());
+    let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
+    let first = deriver.derive(&snapshot).await.unwrap();
+    assert_eq!(
+        first.render_units.values().next().unwrap().passengers,
+        Some(12)
+    );
+    cache.set_hot(Source::MtaBus, first).await;
+
+    for passengers in [Some(25), None] {
+        snapshot.positions[0].updated_at += Duration::seconds(5);
+        let PositionData::MtaBus(data) = &mut snapshot.positions[0].data else {
+            unreachable!();
+        };
+        data.passengers = passengers;
+        let hot = deriver.derive(&snapshot).await.unwrap();
+        assert_eq!(
+            hot.render_units.values().next().unwrap().passengers,
+            passengers
+        );
+        cache.set_hot(Source::MtaBus, hot).await;
+    }
 }
 
 #[tokio::test]
@@ -169,45 +200,55 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
     let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
     let hot = deriver.derive(snapshot).await.unwrap();
     assert_eq!(hot.render_units.len(), 1);
-    assert!(hot.prev_states.contains_key(&valid_id));
+    assert!(hot.plans.contains_key(&valid_id));
     cache.set_hot(Source::MtaBus, hot).await;
     let mut empty = fixture();
     empty.trips.clear();
     empty.stop_times.clear();
     empty.positions.clear();
     let cleared = deriver.derive(empty).await.unwrap();
-    assert!(cleared.render_units.is_empty() && cleared.prev_states.is_empty());
+    assert!(cleared.render_units.is_empty() && cleared.plans.is_empty());
 }
 
 #[tokio::test]
-async fn trajectory_preserves_previous_hot_state_continuity() {
+async fn gps_reconciles_reachable_previous_state_and_discards_unreachable_backward_jump() {
     let mut snapshot = fixture();
-    let id = snapshot.trips[0].id;
-    snapshot.positions.clear();
-    for stop in &mut snapshot.stop_times {
-        stop.arrival += Duration::seconds(60);
-        stop.departure += Duration::seconds(60);
+    // A sole GPS fix stays stationary, so elapsed setup time cannot change
+    // the expected position between derivations.
+    snapshot.stop_times.clear();
+    for position in &mut snapshot.positions {
+        position.updated_at -= Duration::seconds(20);
     }
+    let id = snapshot.trips[0].id;
     let cache = Arc::new(TrajectoryCache::new());
-    let mut previous = HotSnapshot::empty();
-    previous.prev_states.insert(
-        id,
-        TrajectoryState {
-            t_unix: Utc::now().timestamp() as f64,
-            s_m: 20.0,
-            v_mps: 0.0,
-        },
-    );
-    cache.set_hot(Source::MtaBus, previous).await;
-    let hot = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache)
-        .derive(snapshot)
-        .await
-        .unwrap();
-    assert_eq!(hot.render_units.len(), 1);
-    assert!(
-        (hot.prev_states[&id].s_m - 20.0).abs() < 0.1,
-        "continuity must anchor the trip to the previous source generation"
-    );
+    let deriver = TrajectoryDeriver::new(Arc::new(TrajectoryCalculator::new()), cache.clone());
+    let first = deriver.derive(&snapshot).await.unwrap();
+    let fix = first.plans[&id].gps_fix.as_ref().unwrap();
+    let expected = fix.distance_m;
+    let accepted_at = fix.accepted_at;
+    for (offset, retained_offset) in [(10.0, 10.0), (500.0, 0.0)] {
+        let mut previous = first.clone();
+        for interval in &mut Arc::make_mut(previous.plans.get_mut(&id).unwrap()).motion {
+            interval.a += offset;
+        }
+        cache.set_hot(Source::MtaBus, previous).await;
+        let next = deriver.derive(&snapshot).await.unwrap();
+        let plan = &next.plans[&id];
+        let state = plan
+            .motion
+            .iter()
+            .find(|p| p.t0 <= plan.generated_at && plan.generated_at <= p.t1)
+            .expect("motion covers derivation time")
+            .evaluate(plan.generated_at);
+        assert!(
+            (state.s_m - expected - retained_offset).abs() < 1e-6,
+            "previous offset {offset}: expected {}, got {}",
+            expected + retained_offset,
+            state.s_m
+        );
+        assert!(state.v_mps.abs() < 1e-6);
+        assert_eq!(plan.gps_fix.as_ref().unwrap().accepted_at, accepted_at);
+    }
 }
 
 #[tokio::test]
@@ -374,8 +415,8 @@ async fn trajectory_nonfinite_position_does_not_hide_other_trips() {
     .derive(snapshot)
     .await
     .unwrap();
-    assert_eq!(hot.prev_states.len(), 1);
-    assert!(hot.prev_states.contains_key(&id));
+    assert_eq!(hot.plans.len(), 1);
+    assert!(hot.plans.contains_key(&id));
 }
 
 #[tokio::test]
@@ -460,5 +501,68 @@ async fn trajectory_subway_rejects_unrelated_topological_legs_even_with_shared_c
     assert!(
         result.is_err(),
         "different station identities must not join just because coordinates coincide"
+    );
+}
+
+#[tokio::test]
+async fn captured_subway_trajectories_stay_below_speed_limit_over_ten_minutes() {
+    let root = support::fixture_root();
+    let manifest =
+        load_manifest_for(&root, Source::MtaSubway, FixtureKind::Realtime, "basic").unwrap();
+    let collected =
+        build_realtime_from_fixture(read_json_payload(&root, &manifest, "trips").unwrap()).unwrap();
+    let at = chrono::DateTime::from_timestamp(1783352000, 0).unwrap();
+    let revision = NetworkRevision::from_dataset(&support::mta_subway_dataset());
+    let cache = TrajectoryCache::new();
+    let engine = TrajectoryCalculator::new();
+    let config = backend::trajectory::TrajectoryConfig::for_source(Source::MtaSubway);
+    let mut worst = (0.0_f64, String::new(), 0.0);
+    let mut frames = 0;
+    for (trip, stops) in collected.trips {
+        let id = uuid::Uuid::now_v7();
+        let trip = trip.with_id(id);
+        let stops = stops.into_iter().map(|s| s.with_trip_id(id)).collect();
+        let input = snapshot_from_persisted_trip(&trip, stops, vec![], &revision, &cache, at)
+            .await
+            .unwrap();
+        let Ok(computed) = backend::trajectory::compute_trajectory_async(
+            &engine,
+            Source::MtaSubway,
+            &input,
+            None,
+            &cache,
+            &config,
+        )
+        .await
+        else {
+            continue;
+        };
+        let motion = &computed.trajectory.motion;
+        for frame in 0..18_000 {
+            let time = at.timestamp() as f64 + frame as f64 / 30.0;
+            let index = motion
+                .partition_point(|p| p.t1 <= time)
+                .min(motion.len() - 1);
+            let speed = if time <= motion[0].t0 || time >= motion.last().unwrap().t1 {
+                0.0
+            } else {
+                motion[index].evaluate(time).v_mps
+            };
+            frames += 1;
+            if speed > worst.0 {
+                worst = (speed, trip.original_id.clone(), time);
+            }
+        }
+    }
+    assert!(
+        frames >= 18_000,
+        "captured trips must exercise a full replay"
+    );
+    assert!(
+        worst.0 <= 25.0 + 1e-6,
+        "captured subway replay: {frames} frames, peak {:.2} m/s on trip {} at {}",
+        worst.0,
+        worst.1,
+        worst.2
     );
 }

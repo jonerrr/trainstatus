@@ -30,8 +30,13 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
         FixedSizeListBuilder::new(UInt8Builder::with_capacity(render_units.len() * 3), 3);
     color_builder = color_builder.with_field(color_field);
 
-    let ts_field = Arc::new(Field::new("item", DataType::Float64, false));
-    let mut ts_list_builder = ListBuilder::new(Float64Builder::new()).with_field(ts_field);
+    let mut shape_key = StringBuilder::new();
+    let mut offset_m = Float64Builder::new();
+    let field = Arc::new(Field::new("item", DataType::Float64, false));
+    let mut distances = ListBuilder::new(Float64Builder::new()).with_field(field);
+    let mut motion = ListBuilder::new(FixedSizeListBuilder::new(Float64Builder::new(), 6));
+    let mut shapes = std::collections::HashSet::new();
+    let mut trips = std::collections::HashSet::new();
 
     let coord_field = Arc::new(Field::new("item", DataType::Float64, true));
     let pair_field = Arc::new(Field::new(
@@ -42,10 +47,6 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
     let mut pos_list_builder =
         ListBuilder::new(FixedSizeListBuilder::new(Float64Builder::new(), 2))
             .with_field(pair_field);
-
-    let bearing_field = Arc::new(Field::new("item", DataType::Float32, false));
-    let mut bearing_list_builder =
-        ListBuilder::new(Float32Builder::new()).with_field(bearing_field);
 
     for unit in render_units {
         render_unit_id.append_value(&unit.render_unit_id);
@@ -77,23 +78,38 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
         color.append_value(unit.color[2]);
         color_builder.append(true);
 
-        for &ts in &unit.timestamps {
-            ts_list_builder.values().append_value(ts);
-        }
-        ts_list_builder.append(true);
-
-        for [lon, lat] in &unit.positions {
-            let pair = pos_list_builder.values();
-            pair.values().append_value(*lon);
-            pair.values().append_value(*lat);
-            pair.append(true);
+        let plan = &unit.trajectory;
+        shape_key.append_value(&plan.shape.key);
+        offset_m.append_value(unit.offset_m);
+        if shapes.insert(plan.shape.key.clone()) {
+            for [lon, lat] in &plan.shape.positions {
+                let pair = pos_list_builder.values();
+                pair.values().append_value(*lon);
+                pair.values().append_value(*lat);
+                pair.append(true);
+            }
+            for distance in &plan.shape.distances_m {
+                distances.values().append_value(*distance);
+            }
         }
         pos_list_builder.append(true);
-
-        for &bearing in &unit.bearings {
-            bearing_list_builder.values().append_value(bearing);
+        distances.append(true);
+        if trips.insert((unit.source, unit.trip_id.clone())) {
+            for interval in &plan.motion {
+                for value in [
+                    interval.t0,
+                    interval.t1,
+                    interval.a,
+                    interval.b,
+                    interval.c,
+                    interval.d,
+                ] {
+                    motion.values().values().append_value(value);
+                }
+                motion.values().append(true);
+            }
         }
-        bearing_list_builder.append(true);
+        motion.append(true);
     }
 
     let batch = RecordBatch::try_new(
@@ -110,9 +126,11 @@ pub fn encode_render_units(render_units: &[RenderUnit]) -> anyhow::Result<Vec<u8
             Arc::new(length_m.finish()),
             Arc::new(passengers.finish()),
             Arc::new(color_builder.finish()),
-            Arc::new(ts_list_builder.finish()),
+            Arc::new(shape_key.finish()),
+            Arc::new(offset_m.finish()),
             Arc::new(pos_list_builder.finish()),
-            Arc::new(bearing_list_builder.finish()),
+            Arc::new(distances.finish()),
+            Arc::new(motion.finish()),
         ],
     )?;
 
@@ -141,23 +159,29 @@ fn render_unit_schema() -> Arc<Schema> {
             DataType::FixedSizeList(Arc::new(Field::new("item", DataType::UInt8, false)), 3),
             false,
         ),
+        Field::new("shape_key", DataType::Utf8, false),
+        Field::new("offset_m", DataType::Float64, false),
         Field::new(
-            "timestamps",
-            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
-            false,
-        ),
-        Field::new(
-            "positions",
+            "shape_positions",
             DataType::List(Arc::new(Field::new(
                 "item",
-                DataType::FixedSizeList(coord_field, 2),
+                DataType::FixedSizeList(coord_field.clone(), 2),
                 true,
             ))),
             false,
         ),
         Field::new(
-            "bearings",
-            DataType::List(Arc::new(Field::new("item", DataType::Float32, false))),
+            "shape_distances",
+            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+            false,
+        ),
+        Field::new(
+            "motion",
+            DataType::List(Arc::new(Field::new(
+                "item",
+                DataType::FixedSizeList(coord_field, 6),
+                true,
+            ))),
             false,
         ),
     ]))

@@ -1,6 +1,6 @@
 # Backend testing
 
-Run commands from `backend/`, prefixed with `mise exec --`.
+Run commands from `backend/`.
 
 | Task                                        | Purpose                                                                              |
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -12,7 +12,7 @@ Run commands from `backend/`, prefixed with `mise exec --`.
 | `mise run sqlx:check`                       | Verify committed query metadata against that database                                |
 | `mise run test:performance`                 | Opt-in ingestion WAL and static import/restart benchmarks; use an idle machine       |
 
-For a focused service-free test, use `cargo test --features fixture-capture --lib --test behavior <name>` through `mise exec --`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
+For a focused service-free test, use `cargo test --features fixture-capture --lib --test behavior <name>`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
 
 ## Placement and ownership
 
@@ -24,7 +24,7 @@ Cargo has three explicit public test targets:
 - `tests/integration/`: ingestion transactions, historical stores, static import lifecycle and persistence, service-backed source scenarios, and HTTP/geometry output.
 - `tests/performance/`: opt-in benchmarks, never part of the ordinary suite.
 
-For captured NJT schedule import/restart memory, run `mise exec -- mise run test:services performance njt_static_import_and_restart_memory` on an idle PostgreSQL server. This reports expanded trip count, import/restart timing, RSS during overlapping pinned revisions, and peak RSS with the executable's jemalloc allocator. The capture's calendar must include today; the test fails explicitly when it has expired. It uses the full captured GTFS but a small captured GIS pattern set, so it does not measure the complete production workload.
+For captured NJT schedule import/restart memory, run `mise run test:services performance njt_static_import_and_restart_memory` on an idle PostgreSQL server. This reports expanded trip count, import/restart timing, RSS during overlapping pinned revisions, and peak RSS with the executable's jemalloc allocator. The capture's calendar must include today; the test fails explicitly when it has expired. It uses the full captured GTFS but a small captured GIS pattern set, so it does not measure the complete production workload.
 
 The large captured NJT GTFS import remains an ignored library test. Run it explicitly by its name with `--ignored` when checking the full import; the ordinary suite uses smaller committed cases.
 
@@ -38,7 +38,7 @@ Tests accepting `PgPool` through `#[sqlx::test]` get a fresh database with migra
 
 Use `query!`, `query_as!` or `query_scalar!` for SQL that SQLx can describe. Complex nested JSON/spatial projections and PostgreSQL utility commands remain runtime queries and are covered by integration tests. Private persistence rows stay separate from domain and API types. `backend/sqlx.toml` maps geometry and source enum types to their Rust representations.
 
-Normal backend mise builds/tests use `SQLX_OFFLINE=true` and committed `.sqlx/` metadata; `test:services` still executes real SQL in isolated databases. After changing checked SQL or migrations, use the configured, migrated development database to run `mise exec -- mise run sqlx:prepare`, then `mise exec -- mise run sqlx:check`. These tasks set `SQLX_OFFLINE=false` and include all targets plus fixture/engine features. They describe queries without ingesting data or initializing a database. Commit the regenerated metadata with the SQL changes.
+Normal backend mise builds/tests use `SQLX_OFFLINE=true` and committed `.sqlx/` metadata; `test:services` still executes real SQL in isolated databases. After changing checked SQL or migrations, use the configured, migrated development database to run `mise run sqlx:prepare`, then `mise run sqlx:check`. These tasks set `SQLX_OFFLINE=false` and include all targets plus fixture/engine features. They describe queries without ingesting data or initializing a database. Commit the regenerated metadata with the SQL changes.
 
 Each store/service owns its in-memory caches. Construct fresh stores for test isolation; no external cache or container cleanup is required. Never reset the development pod for tests.
 
@@ -54,6 +54,6 @@ Before deleting a test, identify the obsolete requirement or surviving test that
 
 ## Fixture commands
 
-Use `mise exec -- mise run fixtures --help` for the complete command help and examples. `capture` fetches provider data; `list`, `verify`, and `update-expected` inspect existing bundles without fetching. Capture needs the source's provider credentials. `update-expected` rewrites supported expected summaries and requires review of the resulting diff; `verify` compares only expected files that already exist and does not replace domain tests.
+Use `mise run fixtures --help` for the complete command help and examples. `capture` fetches provider data; `list`, `verify`, and `update-expected` inspect existing bundles without fetching. Capture needs the source's provider credentials. `update-expected` rewrites supported expected summaries and requires review of the resulting diff; `verify` compares only expected files that already exist and does not replace domain tests.
 
 `--scenario` is an optional bundle label, defaulting to `basic`: `<root>/<source>/<kind>/<scenario>`. It lets you store another captured case alongside the basic capture. It does not change normalization, simulate a detour, or register a new test; a test must load the label explicitly. Reusing the same label overwrites that bundle's captured files. Use `--output /tmp/trainstatus-fixtures` to inspect a capture before updating committed fixtures.

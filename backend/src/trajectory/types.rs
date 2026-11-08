@@ -30,20 +30,53 @@ pub struct TrajectoryState {
     pub v_mps: f64,
 }
 
-/// Sampled trajectory for map animation.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct Trajectory {
-    pub trip_id: String,
-    pub route_id: String,
-    pub color: [u8; 3],
-    pub path: Vec<[f64; 2]>,
-    pub timestamps: Vec<f64>,
-    pub distances_m: Vec<f64>,
-    pub bearings: Vec<f32>,
+/// Normalized cubic: s = a + b*u + c*u² + d*u³, u = (t-t0)/(t1-t0).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct MotionInterval {
+    pub t0: f64,
+    pub t1: f64,
+    pub a: f64,
+    pub b: f64,
+    pub c: f64,
+    pub d: f64,
 }
 
-/// A single rendered vehicle unit (bus or train car) for map animation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, ToSchema)]
+pub struct TrajectoryShape {
+    pub key: String,
+    /// WGS84 vertices; distances use EPSG:6538 projected meters.
+    #[schema(value_type = Vec<(f64, f64)>)]
+    pub positions: Vec<[f64; 2]>,
+    pub distances_m: Vec<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GpsFix {
+    pub vehicle_id: String,
+    pub observed_at: f64,
+    pub distance_m: f64,
+    /// Unix timestamp when this `(vehicle_id, observed_at)` fix was first accepted.
+    pub accepted_at: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, ToSchema)]
+pub struct Trajectory {
+    pub generated_at: f64,
+    pub trip_id: String,
+    pub route_id: String,
+    #[schema(value_type = (u8, u8, u8))]
+    pub color: [u8; 3],
+    /// Encoded in Arrow as `shape_key`, `shape_positions`, and `shape_distances` (populated on the first row for each shape).
+    #[schema(value_type = TrajectoryShape)]
+    pub shape: std::sync::Arc<TrajectoryShape>,
+    /// Encoded in Arrow as `motion` (`List<FixedSizeList<Float64, 6>>` of `[t0, t1, a, b, c, d]`, populated on the first row for each trip).
+    pub motion: Vec<MotionInterval>,
+    #[schema(ignore)]
+    pub gps_fix: Option<GpsFix>,
+}
+
+/// Unit metadata references one shared head plan and shape; no sampled coordinates.
+#[derive(Debug, Clone, PartialEq, ToSchema)]
 pub struct RenderUnit {
     pub render_unit_id: String,
     pub source: Source,
@@ -55,17 +88,17 @@ pub struct RenderUnit {
     pub is_head: bool,
     pub length_m: f32,
     pub passengers: Option<i32>,
+    #[schema(value_type = (u8, u8, u8))]
     pub color: [u8; 3],
-    pub positions: Vec<[f64; 2]>,
-    pub timestamps: Vec<f64>,
-    pub bearings: Vec<f32>,
+    pub offset_m: f64,
+    #[schema(value_type = Trajectory)]
+    pub trajectory: std::sync::Arc<Trajectory>,
 }
 
 /// Result of `compute_trajectory` including continuity state for the next tick.
 #[derive(Debug, Clone)]
 pub struct ComputedTrajectory {
     pub trajectory: Trajectory,
-    pub end_state: TrajectoryState,
     pub continuity_stats: super::continuity::ContinuityStats,
 }
 
@@ -82,6 +115,7 @@ pub struct TrajectoryStop {
 /// Normalized per-trip input for knot builders and the engine.
 #[derive(Clone)]
 pub struct TripSnapshot {
+    pub started_at: DateTime<Utc>,
     pub trip_id: Uuid,
     pub route_id: String,
     pub route_color: String,
@@ -100,7 +134,7 @@ pub struct TripSnapshot {
 
 #[derive(Debug, Clone, Copy)]
 pub struct TrajectoryConfig {
-    pub dt_s: f64,
+    pub max_speed_mps: f64,
     pub max_prev_state_age_s: f64,
     pub max_backward_gap_m: f64,
     pub max_forward_jump_m: f64,
@@ -109,7 +143,7 @@ pub struct TrajectoryConfig {
 impl Default for TrajectoryConfig {
     fn default() -> Self {
         Self {
-            dt_s: 2.0,
+            max_speed_mps: 25.0,
             max_prev_state_age_s: 120.0,
             max_backward_gap_m: 150.0,
             max_forward_jump_m: 1000.0,
@@ -131,13 +165,14 @@ pub struct GeneratedKnots {
 }
 
 /// Latest proactive generation per source.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HotSnapshot {
     pub generated_at: DateTime<Utc>,
     /// Source commit behind live geometry; absent for startup and historical reads.
     pub committed_at: Option<DateTime<Utc>>,
     pub render_units: std::collections::HashMap<String, RenderUnit>,
-    pub prev_states: std::collections::HashMap<Uuid, TrajectoryState>,
+    pub plans: std::collections::HashMap<Uuid, std::sync::Arc<Trajectory>>,
+    pub gps_history: std::collections::HashMap<Uuid, Vec<VehicleObservation>>,
 }
 
 impl HotSnapshot {
@@ -146,7 +181,8 @@ impl HotSnapshot {
             generated_at: Utc::now(),
             committed_at: None,
             render_units: std::collections::HashMap::new(),
-            prev_states: std::collections::HashMap::new(),
+            plans: std::collections::HashMap::new(),
+            gps_history: std::collections::HashMap::new(),
         }
     }
 
@@ -155,7 +191,8 @@ impl HotSnapshot {
             generated_at: Utc::now(),
             committed_at: None,
             render_units,
-            prev_states: std::collections::HashMap::new(),
+            plans: std::collections::HashMap::new(),
+            gps_history: std::collections::HashMap::new(),
         }
     }
 }
@@ -163,9 +200,10 @@ impl HotSnapshot {
 impl TrajectoryConfig {
     pub fn for_source(source: Source) -> Self {
         Self {
-            dt_s: match source {
-                Source::MtaSubway => 2.0,
-                Source::MtaBus | Source::NjtBus => 5.0,
+            max_speed_mps: if source == Source::MtaSubway {
+                25.0
+            } else {
+                30.0
             },
             ..Self::default()
         }

@@ -54,14 +54,27 @@ impl TrajectoryDeriver {
             let stops = stops.remove(&trip.id).unwrap_or_default();
             let positions = positions.remove(&trip.id).unwrap_or_default();
             let revision = snapshot.network_revision.clone();
-            let prev = previous.as_ref().and_then(|hot| hot.prev_states.get(&trip.id).copied());
+            let prev = previous.as_ref().and_then(|hot| hot.plans.get(&trip.id).cloned());
+            let history = previous.as_ref().and_then(|hot| hot.gps_history.get(&trip.id)).cloned().unwrap_or_default();
             async move {
                 let result = async {
-                    let input = snapshot_from_persisted_trip(trip, stops, positions, &revision, &self.cache, at).await?;
-                    let shape = self.cache.get_shape_geometry(source, &input.shape_key, &input.shape).await.ok_or_else(|| anyhow::anyhow!("Missing shape geometry"))?;
-                    let computed = compute_trajectory_async(&self.engine, source, &input, prev, &self.cache, &config).await?;
-                    let units = expand_render_units(source, &input, &computed.trajectory, &shape);
-                    Ok::<_, anyhow::Error>((trip.id, computed, units, prev.is_some()))
+                    let mut input = snapshot_from_persisted_trip(trip, stops, positions, &revision, &self.cache, at).await?;
+                    let compatible = prev.as_deref().filter(|p| p.shape.key == input.shape_key);
+                    if compatible.is_some() {
+                        for old in history {
+                            if !input.positions.iter().any(|p| p.updated_at == old.updated_at && p.vehicle_id == old.vehicle_id) {
+                                input.positions.push(old);
+                            }
+                        }
+                    }
+                    input.positions.retain(|p| (at - p.updated_at).num_seconds() <= super::gps::HISTORY_AGE_S as i64);
+                    input.positions.sort_by_key(|p| p.updated_at);
+                    if input.positions.len() > 8 {
+                        input.positions.drain(..input.positions.len() - 8);
+                    }
+                    let computed = compute_trajectory_async(&self.engine, source, &input, compatible, &self.cache, &config).await?;
+                    let units = expand_render_units(source, &input, &computed.trajectory);
+                    Ok::<_, anyhow::Error>((trip.id, computed, units, compatible.is_some(), input.positions))
                 }.await;
                 if let Err(error) = &result { tracing::debug!(%source, trip_id = %trip.id, %error, "Skipping invalid trajectory input"); }
                 result.ok()
@@ -71,12 +84,18 @@ impl TrajectoryDeriver {
             generated_at: at,
             committed_at: Some(snapshot.committed_at),
             render_units: HashMap::new(),
-            prev_states: HashMap::new(),
+            plans: HashMap::new(),
+            gps_history: HashMap::new(),
         };
         let mut stats = ContinuityStatsBatch::default();
-        for (id, computed, units, had_prev) in join_all(futures).await.into_iter().flatten() {
+        for (id, computed, units, had_prev, positions) in
+            join_all(futures).await.into_iter().flatten()
+        {
             stats.record(computed.continuity_stats, had_prev);
-            hot.prev_states.insert(id, computed.end_state);
+            if let Some(unit) = units.first() {
+                hot.plans.insert(id, unit.trajectory.clone());
+            }
+            hot.gps_history.insert(id, positions);
             for unit in units {
                 hot.render_units.insert(unit.render_unit_id.clone(), unit);
             }

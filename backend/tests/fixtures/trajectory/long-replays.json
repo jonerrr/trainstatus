@@ -1,0 +1,22 @@
+{
+  "duration_s": 600,
+  "frame_hz": 30,
+  "refresh_s": 30,
+  "subway": {
+    "name": "compressed subway predictions",
+    "stop_distances_m": [1000, 4000, 7500, 11000],
+    "arrival_offsets_s": [30, 70, 110, 150],
+    "max_speed_mps": 25
+  },
+  "njt_prediction": {
+    "name": "moving NJT bus without GPS and with rolling ETAs",
+    "start_distance_m": 0,
+    "first_stop_distance_m": 6000,
+    "first_arrival_s": 660,
+    "minimum_progress_m": 1000
+  },
+  "gps": [
+    {"name": "30-second fixes with transport delay", "interval_s": 30, "delay_s": 5, "speed_mps": 8},
+    {"name": "sparse 60-second fixes with provider delay", "interval_s": 60, "delay_s": 45, "speed_mps": 8}
+  ]
+}
