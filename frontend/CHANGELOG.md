@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.2.1...frontend-v2.3.0) (2026-11-08)
+
+
+### Features
+
+* add skeleton loading components for improved UI responsiveness ([2596996](https://github.com/jonerrr/trainstatus/commit/25969960ca77244947bdad800d34c466c9f4b41c))
+
 ## [2.2.1](https://github.com/jonerrr/trainstatus/compare/frontend-v2.2.0...frontend-v2.2.1) (2026-11-03)
 
 
