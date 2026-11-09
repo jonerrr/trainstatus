@@ -1,27 +1,7 @@
-use axum::{
-    Json, ServiceExt,
-    body::Body,
-    error_handling::HandleErrorLayer,
-    extract::Request,
-    response::{IntoResponse, Response},
-    routing::get,
-};
-use http::StatusCode;
-use std::{convert::Infallible, env::var, time::Duration};
-use tokio::signal;
-use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
-use tower_http::{
-    compression::CompressionLayer, normalize_path::NormalizePathLayer, trace::TraceLayer,
-};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use utoipa::OpenApi;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_scalar::{Scalar, Servable as ScalarServable};
-
+use axum::{ServiceExt, extract::Request};
 use backend::VERSION;
-use backend::api;
-use backend::api_prefix;
-use backend::prefixed_path;
+use std::{env::var, process::ExitCode};
+use tokio::signal;
 
 // Use jemalloc instead of the system allocator to curb RSS growth from glibc
 // malloc arena retention/fragmentation under our threaded, bursty workload.
@@ -30,76 +10,43 @@ use backend::prefixed_path;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main]
-async fn main() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "backend=info,tower_http=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-    tracing::info!(version = VERSION, "Starting Train Status API");
+async fn main() -> ExitCode {
+    let telemetry = backend::telemetry::init().await;
+    let result = run().await;
+    let exit = match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            tracing::error!(
+                name: "trainstatus.failed",
+                { error.message = %format_args!("{error:#}") },
+                "Backend failed"
+            );
+            ExitCode::FAILURE
+        }
+    };
+    telemetry.shutdown().await;
+    exit
+}
 
-    let application = backend::app::build()
-        .await
-        .expect("Failed to start application");
+async fn run() -> anyhow::Result<()> {
+    tracing::info!(name: "trainstatus.started", version = VERSION, "Starting Train Status API");
+    let application = backend::app::build().await?;
 
-    let api_prefix = api_prefix().to_owned();
-    let api_v1_prefix = prefixed_path(&api_prefix, "v1");
-    let docs_path = prefixed_path(&api_prefix, "docs");
-    let openapi_path = prefixed_path(&api_prefix, "openapi.json");
-
-    let (router, api) = OpenApiRouter::with_openapi(api::ApiDoc::openapi())
-        .nest(&api_v1_prefix, api::router(application.state.clone()))
-        .split_for_parts();
-
-    let openapi_schema = api.clone();
-
-    let app = router
-        .merge(Scalar::with_url(docs_path, api))
-        .route(
-            "/",
-            get(|| async {
-                let res =
-                    Response::new(Body::from(format!("Train Status API\nVersion: {VERSION}")));
-                Ok::<_, Infallible>(res)
-            }),
-        )
-        .route(&openapi_path, get(move || async { Json(openapi_schema) }))
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
-                .layer(HandleErrorLayer::new(|err: BoxError| async move {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Unhandled error: {}", err),
-                    )
-                }))
-                .layer(BufferLayer::new(1024))
-                .layer(RateLimitLayer::new(750, Duration::from_secs(1))),
-        )
-        .fallback(handler_404);
-
-    let app = NormalizePathLayer::trim_trailing_slash().layer(app);
+    let app = backend::app::http_service(application.state.clone());
 
     let listener =
         tokio::net::TcpListener::bind(var("ADDRESS").unwrap_or_else(|_| "127.0.0.1:3055".into()))
-            .await
-            .unwrap();
-    tracing::info!(address = %listener.local_addr().unwrap(), "Listening");
+            .await?;
+    tracing::info!(name: "trainstatus.listening", address = %listener.local_addr()?, "Listening");
 
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
+            tracing::info!(name: "trainstatus.stopping", "Stopping Train Status API");
             application.shutdown();
         })
-        .await
-        .unwrap();
-}
-
-async fn handler_404() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "404 not found :(")
+        .await?;
+    Ok(())
 }
 
 async fn shutdown_signal() {

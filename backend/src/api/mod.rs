@@ -1,5 +1,3 @@
-//! HTTP handlers organized by API resource.
-
 use crate::AppState;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -7,8 +5,8 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 mod alerts;
 mod catalog;
 mod error;
+pub(crate) mod extract;
 mod health;
-mod query;
 pub(crate) mod service;
 mod trajectories;
 

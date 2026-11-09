@@ -222,23 +222,20 @@ impl StaticAdapter for MtaSubwayStatic {
 async fn fetch_infrastructure(
     client: &reqwest::Client,
 ) -> anyhow::Result<HeliumSubwayInfrastructure> {
-    client
-        .get(SUBWAY_INFRASTRUCTURE_URL)
-        .send()
-        .await?
-        .json()
-        .await
-        .context("Failed to fetch subway infrastructure")
+    crate::integrations::http::fetch(
+        client.get(SUBWAY_INFRASTRUCTURE_URL),
+        |response| async move { response.json().await },
+    )
+    .await
+    .context("Failed to fetch subway infrastructure")
 }
 
 async fn fetch_exit_strategy(client: &reqwest::Client) -> anyhow::Result<ExitStrategyResponse> {
-    client
-        .get(EXIT_STRATEGY_URL)
-        .send()
-        .await?
-        .json()
-        .await
-        .context("Failed to fetch exit strategy data")
+    crate::integrations::http::fetch(client.get(EXIT_STRATEGY_URL), |response| async move {
+        response.json().await
+    })
+    .await
+    .context("Failed to fetch exit strategy data")
 }
 
 fn build_static_dataset(

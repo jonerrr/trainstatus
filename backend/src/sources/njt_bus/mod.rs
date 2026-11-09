@@ -53,14 +53,13 @@ async fn authenticate() -> anyhow::Result<String> {
         .text("username", username)
         .text("password", password);
 
-    let resp: AuthResponse = crate::integrations::http::realtime()
-        .post(NJT_GTFS_AUTH_URL)
-        .multipart(form)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    let resp: AuthResponse = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .post(NJT_GTFS_AUTH_URL)
+            .multipart(form),
+        |response| async move { response.error_for_status()?.json().await },
+    )
+    .await?;
 
     Ok(resp.user_token)
 }
@@ -69,13 +68,12 @@ async fn authenticate() -> anyhow::Result<String> {
 pub(super) fn njt_post_future(url: &'static str, token: String) -> FeedFuture {
     Box::pin(async move {
         let form = reqwest::multipart::Form::new().text("token", token);
-        Ok(crate::integrations::http::realtime()
-            .post(url)
-            .multipart(form)
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?)
+        Ok(crate::integrations::http::fetch(
+            crate::integrations::http::realtime()
+                .post(url)
+                .multipart(form),
+            |response| async move { response.error_for_status()?.bytes().await },
+        )
+        .await?)
     })
 }

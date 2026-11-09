@@ -26,6 +26,10 @@ gtfs-structures = "0.52.0"
 http = "1.2.0"
 jiff = "0.2"
 moka = { version = "0.12.15", features = ["future", "sync"] }
+opentelemetry = { version = "0.33.1", features = ["trace", "metrics", "logs", "internal-logs"] }
+opentelemetry_sdk = { version = "0.33.1", features = ["trace", "metrics", "logs", "internal-logs"] }
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "reqwest-rustls", "trace", "metrics", "logs", "internal-logs"] }
+opentelemetry-appender-tracing = "0.33.1"
 polyline = "0.11.0"
 proj4rs = { version = "0.3.0", features = ["crs-definitions", "geo-types"] }
 prost = "0.14.1"
@@ -35,8 +39,9 @@ serde_json = "1.0.145"
 sqlx = { version = "0.9.0", features = ["chrono", "json", "postgres", "runtime-tokio", "sqlx-toml", "tls-rustls", "uuid"] }
 tokio = { version = "1.48.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["buffer", "limit"] }
-tower-http = { version = "0.7.0", features = ["compression-br", "compression-gzip", "normalize-path", "timeout", "trace"] }
+tower-http = { version = "0.7.0", features = ["compression-br", "compression-gzip", "normalize-path", "timeout"] }
 tracing = "0.1.40"
+tracing-opentelemetry = { version = "0.34.0", default-features = false }
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 utoipa = { version = "6.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.3.0"
@@ -46,6 +51,7 @@ valhalla = "0.7.0"
 
 [dev-dependencies]
 axum-test = "=21.1.0"
+opentelemetry_sdk = { version = "0.33.1", features = ["testing"] }
 test-log = { version = "=0.2.21", default-features = false, features = ["trace"] }
 tokio = { version = "=1.54.1", features = ["test-util"] }
 

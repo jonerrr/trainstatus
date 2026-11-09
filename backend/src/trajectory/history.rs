@@ -50,7 +50,14 @@ pub(super) async fn load_historical_inputs(
                 inputs.push(input);
             }
             Err(error) => {
-                tracing::debug!(%source, trip_id = %trip.id, %error, "Skipping invalid historical trajectory input")
+                tracing::debug!(
+                    {
+                        trainstatus.source = source.as_str(),
+                        trainstatus.trip.id = %trip.id,
+                        error.message = %format_args!("{error:#}"),
+                    },
+                    "Skipping invalid historical trajectory input"
+                );
             }
         }
     }

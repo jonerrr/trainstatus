@@ -6,7 +6,10 @@ pub struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        error!(error = %self.0, "Internal server error");
+        error!(
+            error.message = %format_args!("{:#}", self.0),
+            "Internal server error"
+        );
 
         (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong :(").into_response()
     }

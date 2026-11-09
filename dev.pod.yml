@@ -73,6 +73,40 @@ spec:
           cpu: "500m"
           memory: "512Mi"
 
+    # Optional Datadog: copy dev.configmap.yml.example to dev.configmap.yml,
+    # set the API key, then uncomment this container. Recreate the pod to apply.
+    # - name: datadog
+    #   image: registry.datadoghq.com/agent:7
+    #   env:
+    #     - name: DD_API_KEY
+    #       valueFrom:
+    #         configMapKeyRef:
+    #           name: datadog-config-dev
+    #           key: DD_API_KEY
+    #     - name: DD_SITE
+    #       value: "us5.datadoghq.com"
+    #     - name: DD_ENV
+    #       value: "development"
+    #     - name: DD_HOSTNAME
+    #       value: "trainstatus-local"
+    #     - name: DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT
+    #       value: "0.0.0.0:4318"
+    #     - name: DD_LOGS_ENABLED
+    #       value: "true"
+    #     - name: DD_OTLP_CONFIG_LOGS_ENABLED
+    #       value: "true"
+    #   ports:
+    #     - containerPort: 4318
+    #       hostPort: 4318
+    #       hostIP: "127.0.0.1"
+    #   resources:
+    #     requests:
+    #       cpu: "250m"
+    #       memory: "256Mi"
+    #     limits:
+    #       cpu: "1000m"
+    #       memory: "1Gi"
+
   volumes:
     - name: geo-data
       image:

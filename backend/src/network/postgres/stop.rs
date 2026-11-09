@@ -240,9 +240,11 @@ pub(in crate::network) async fn compute_nearby_stops(
         .await?;
     }
     tracing::info!(
-        ?source,
-        candidates = candidates.len(),
-        elapsed_ms = start.elapsed().as_millis() as u64,
+        {
+            trainstatus.source = source.as_str(),
+            candidates = candidates.len(),
+            elapsed_ms = start.elapsed().as_millis() as u64,
+        },
         "Recomputed nearby boarding stops"
     );
     Ok(())

@@ -1,9 +1,12 @@
-use super::{AppError, query::TimeQuery};
+use super::{
+    AppError,
+    extract::{SourcePath, TimeQuery},
+};
 use crate::AppState;
 use crate::api::dto::alerts::ApiAlert;
 use crate::source::Source;
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 
 #[utoipa::path(
     get,
@@ -23,7 +26,7 @@ use axum::extract::{Path, Query, State};
 )]
 pub async fn alerts_handler(
     State(state): State<AppState>,
-    Path(source): Path<Source>,
+    SourcePath(source): SourcePath,
     Query(time): Query<TimeQuery>,
 ) -> Result<Json<Vec<ApiAlert>>, AppError> {
     let alerts = state.alerts.get_all(source, time.at).await?;

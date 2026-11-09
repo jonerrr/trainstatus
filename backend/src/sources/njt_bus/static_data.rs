@@ -102,14 +102,13 @@ impl StaticAdapter for NjtBusStatic {
 async fn download_gtfs(token: &str) -> anyhow::Result<Vec<u8>> {
     let form = reqwest::multipart::Form::new().text("token", token.to_owned());
 
-    let bytes = crate::integrations::http::static_data()
-        .post(NJT_GTFS_URL)
-        .multipart(form)
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
+    let bytes = crate::integrations::http::fetch(
+        crate::integrations::http::static_data()
+            .post(NJT_GTFS_URL)
+            .multipart(form),
+        |response| async move { response.error_for_status()?.bytes().await },
+    )
+    .await?;
 
     Ok(bytes.to_vec())
 }
@@ -271,7 +270,11 @@ fn collapse_stops(gtfs: &gtfs_structures::Gtfs) -> (Vec<Stop>, HashMap<String, S
         if seen.insert(s.id.to_uppercase()) {
             true
         } else {
-            warn!(stop_id = %s.id, "Dropping NJT stop with case-insensitive duplicate id");
+            warn!(
+                trainstatus.source = Source::NjtBus.as_str(),
+                trainstatus.stop.id = %s.id,
+                "Dropping NJT stop with case-insensitive duplicate id"
+            );
             false
         }
     });

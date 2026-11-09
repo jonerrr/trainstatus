@@ -10,6 +10,7 @@ pub mod operations;
 mod postgres;
 pub mod source;
 pub mod sources;
+pub mod telemetry;
 pub mod trajectory;
 pub mod utils;
 

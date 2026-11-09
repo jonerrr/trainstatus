@@ -16,13 +16,12 @@ pub struct MtaBusAlerts;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let bytes = crate::integrations::http::realtime()
-        .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fbus-alerts")
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
+    let bytes = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fbus-alerts"),
+        |response| async move { response.error_for_status()?.bytes().await },
+    )
+    .await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert("alerts.pb".to_string(), bytes.to_vec());

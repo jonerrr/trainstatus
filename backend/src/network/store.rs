@@ -243,14 +243,26 @@ impl Network {
             match serde_json::from_value(metadata.trip_patterns) {
                 Ok(value) => value,
                 Err(error) => {
-                    tracing::warn!(%source, %error, "Invalid static metadata; importing again");
+                    tracing::warn!(
+                        {
+                            trainstatus.source = source.as_str(),
+                            error.message = %error,
+                        },
+                        "Invalid static metadata; importing again"
+                    );
                     return Ok(None);
                 }
             };
         let remap = match serde_json::from_value(metadata.stop_remap) {
             Ok(value) => value,
             Err(error) => {
-                tracing::warn!(%source, %error, "Invalid stop remap; importing again");
+                tracing::warn!(
+                    {
+                        trainstatus.source = source.as_str(),
+                        error.message = %error,
+                    },
+                    "Invalid stop remap; importing again"
+                );
                 return Ok(None);
             }
         };

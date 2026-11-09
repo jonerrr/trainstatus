@@ -150,7 +150,11 @@ impl NjtBusRealtime {
             })
             .and_then(|observed| infer_service_date(revision, &trip_id, observed));
         let Some(start_date_str) = trip_desc.start_date.clone().or(inferred_date) else {
-            warn!(trip_id, "Missing NJT service date; isolating ambiguous run");
+            warn!(
+                trainstatus.source = Source::NjtBus.as_str(),
+                trainstatus.trip.id = %trip_id,
+                "Missing NJT service date; isolating ambiguous run"
+            );
             return (None, vec![]);
         };
 
@@ -162,7 +166,8 @@ impl NjtBusRealtime {
             .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
-                    trip_id,
+                    trainstatus.source = Source::NjtBus.as_str(),
+                    trainstatus.trip.id = %trip_id,
                     "Missing route_id for NJT trip and not found in cache"
                 );
                 "".to_string() // Fallback to empty if really not found

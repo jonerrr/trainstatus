@@ -85,7 +85,10 @@ impl GtfsAlertSource for NjtBusAlerts {
 
         // Only proceed if we have some text to show
         if translations.is_empty() {
-            tracing::warn!("NJT Bus alert has no description text translations, skipping",);
+            tracing::warn!(
+                trainstatus.source = Source::NjtBus.as_str(),
+                "NJT Bus alert has no description text translations, skipping"
+            );
             return None;
         }
 

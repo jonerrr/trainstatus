@@ -86,13 +86,16 @@ pub struct MtaSubwayRealtime;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let response = crate::integrations::http::realtime()
-        .get(SUBWAY_TRIPS_URL)
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<serde_json::Value>()
-        .await?;
+    let response = crate::integrations::http::fetch(
+        crate::integrations::http::realtime().get(SUBWAY_TRIPS_URL),
+        |response| async move {
+            response
+                .error_for_status()?
+                .json::<serde_json::Value>()
+                .await
+        },
+    )
+    .await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert(
@@ -116,8 +119,9 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
     for helium_trip in response.trips {
         let Some(direction) = normalize_subway_direction(&helium_trip.direction) else {
             warn!(
-                direction = helium_trip.direction,
-                trip_id = helium_trip.trip_id,
+                trainstatus.source = Source::MtaSubway.as_str(),
+                direction = %helium_trip.direction,
+                trainstatus.trip.id = %helium_trip.trip_id,
                 "Unknown direction"
             );
             continue;
@@ -139,7 +143,11 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
         };
         let Some(created_at) = parse_created_at_from_trip_id(&helium_trip.trip_id, reference)
         else {
-            warn!(trip_id = helium_trip.trip_id, "Invalid subway run identity");
+            warn!(
+                trainstatus.source = Source::MtaSubway.as_str(),
+                trainstatus.trip.id = %helium_trip.trip_id,
+                "Invalid subway run identity"
+            );
             continue;
         };
 
@@ -256,13 +264,16 @@ impl RealtimeSource for MtaSubwayRealtime {
         &self,
         revision: std::sync::Arc<crate::network::index::NetworkRevision>,
     ) -> anyhow::Result<CollectedSnapshot> {
-        let response = crate::integrations::http::realtime()
-            .get(SUBWAY_TRIPS_URL)
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<HeliumTripsResponse>()
-            .await?;
+        let response = crate::integrations::http::fetch(
+            crate::integrations::http::realtime().get(SUBWAY_TRIPS_URL),
+            |response| async move {
+                response
+                    .error_for_status()?
+                    .json::<HeliumTripsResponse>()
+                    .await
+            },
+        )
+        .await?;
         let mut snapshot = build_realtime_from_response(response);
         snapshot.network_revision = Some(revision);
         Ok(snapshot)

@@ -202,6 +202,7 @@ impl Alerts {
             .filter(|a| !cloned_mta_ids.contains(&a.original_id.as_str()))
             .filter(|a| seen.insert((a.created_at, &a.original_id)))
             .collect();
+        let published_count = alerts.len();
         let _guard = self.refresh_locks[&source].lock().await;
         let mut tx = self.pg_pool.begin().await?;
         sqlx::query!(
@@ -491,6 +492,10 @@ impl Alerts {
 
         // Populate cache (write-through)
         self.cache.insert(source, Arc::new(candidate)).await;
+
+        if let Some(metrics) = crate::telemetry::metrics() {
+            metrics.alerts_published(source, published_count);
+        }
 
         Ok(())
     }

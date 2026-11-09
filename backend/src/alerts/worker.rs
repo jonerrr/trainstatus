@@ -1,8 +1,8 @@
 use crate::alerts::store::Alerts;
 use crate::sources::AlertsAdapter;
+use crate::telemetry::{Operation, operation, operation_error_type};
 use std::sync::Arc;
 use tokio::time::sleep;
-use tracing::error;
 
 pub async fn run(
     alerts: &Alerts,
@@ -14,14 +14,21 @@ pub async fn run(
 
         workers.push(
             tokio::spawn(async move {
+                let source = adapter.source();
                 loop {
-                    if let Err(e) = adapter.run(&alerts).await {
-                        error!(
-                            source = %adapter.source(),
-                            error = %e,
-                            "Alert pipeline error"
-                        );
-                    }
+                    let _ = operation(source, Operation::AlertsPoll, async {
+                        adapter.run(&alerts).await.inspect_err(|error| {
+                            tracing::error!(
+                                name: "trainstatus.alerts.failed",
+                                {
+                                    error.message = %format_args!("{error:#}"),
+                                    error.type = %operation_error_type(error),
+                                },
+                                "alert pipeline failed"
+                            );
+                        })
+                    })
+                    .await;
 
                     sleep(adapter.refresh_interval()).await;
                 }

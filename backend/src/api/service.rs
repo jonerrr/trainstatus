@@ -1,4 +1,7 @@
-use super::{AppError, query::TimeQuery};
+use super::{
+    AppError,
+    extract::{SourcePath, TimeQuery},
+};
 use crate::AppState;
 use crate::api::dto::service::Service;
 use crate::operations::service::RouteSelection;
@@ -6,7 +9,7 @@ use crate::operations::service::ServiceError;
 use crate::source::Source;
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     response::{IntoResponse, Response},
 };
 use http::{StatusCode, header};
@@ -44,7 +47,7 @@ pub struct UnknownRoutes {
 )]
 pub(super) async fn service_handler(
     State(state): State<AppState>,
-    Path(source): Path<Source>,
+    SourcePath(source): SourcePath,
     Query(params): Query<ServiceQuery>,
     Query(time): Query<TimeQuery>,
 ) -> Response {

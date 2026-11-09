@@ -35,6 +35,7 @@ frontend/blob-report/
 
 # config map with secrets
 demo.configmap.yml
+dev.configmap.yml
 
 # science
 data/

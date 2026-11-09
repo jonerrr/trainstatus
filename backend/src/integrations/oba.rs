@@ -7,15 +7,14 @@ use tracing::error;
 
 /// Generic OBA API fetch function that works with any OneBusAway-compatible API
 pub async fn fetch_vehicles(url: &str, api_key: &str) -> anyhow::Result<Vec<VehicleStatus>> {
-    let res = crate::integrations::http::realtime()
-        .get(url)
-        .query(&[("key", api_key)])
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<Response>()
-        .await?;
+    let res = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .get(url)
+            .query(&[("key", api_key)])
+            .timeout(std::time::Duration::from_secs(5)),
+        |response| async move { response.error_for_status()?.json::<Response>().await },
+    )
+    .await?;
 
     if res.data.limit_exceeded {
         bail!("OBA API limit exceeded");
@@ -30,7 +29,7 @@ pub async fn fetch_vehicles(url: &str, api_key: &str) -> anyhow::Result<Vec<Vehi
         let json_path = "./debug_data/oba/vehicles.json";
         let json_str = serde_json::to_string_pretty(&res)?;
         if let Err(e) = write(json_path, json_str).await {
-            error!(json_path, %e, "Failed to write OBA debug output");
+            error!(json_path, error.message = %e, "Failed to write OBA debug output");
         }
     }
 

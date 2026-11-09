@@ -133,11 +133,11 @@ pub trait GtfsAlertSource: Send + Sync {
 }
 
 /// The main pipeline: Fetch -> Process -> Save
-#[instrument(level = "debug", skip(adapter, alerts), fields(source = %adapter.source()))]
+#[instrument(level = "debug", skip(adapter, alerts), fields(trainstatus.source = adapter.source().as_str()))]
 pub async fn run_pipeline<T: GtfsAlertSource>(adapter: &T, alerts: &Alerts) -> anyhow::Result<()> {
     let feeds = adapter.fetch_feeds().await?;
     if feeds.is_empty() {
-        warn!(source = %adapter.source(), "No alert feeds fetched");
+        warn!("No alert feeds fetched");
         return Ok(());
     }
 
@@ -158,6 +158,6 @@ pub async fn run_pipeline<T: GtfsAlertSource>(adapter: &T, alerts: &Alerts) -> a
         }
     }
 
-    info!(source = %adapter.source(), count = processed.len(), "Processed alerts");
+    info!(count = processed.len(), "Processed alerts");
     alerts.save_all(adapter.collection(processed)).await
 }
