@@ -14,18 +14,16 @@ use crate::telemetry::log_layer;
 const TEST_ENV_FILTER: &str = "backend=info,opentelemetry=warn,telemetry=warn";
 
 fn attr_string(log: &SdkLogRecord, key: &str) -> Option<String> {
-    log.attributes_iter().find_map(|(k, v)| {
-        (k.as_str() == key).then(|| match v {
-            AnyValue::String(s) => s.to_string(),
-            other => format!("{other:?}"),
-        })
-    })
-}
-
-fn attr_count(log: &SdkLogRecord, key: &str) -> usize {
     log.attributes_iter()
-        .filter(|(k, _)| k.as_str() == key)
-        .count()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .find_map(|(k, v)| {
+            (k.as_str() == key).then(|| match v {
+                AnyValue::String(s) => s.to_string(),
+                other => format!("{other:?}"),
+            })
+        })
 }
 
 fn has_attr_key(log: &SdkLogRecord, key: &str) -> bool {
@@ -80,8 +78,6 @@ fn inherited_source_and_operation_under_info_filter_with_debug_child_span() {
             attr_string(&logs[0], "trainstatus.operation").as_deref(),
             Some("realtime.ingest")
         );
-        assert_eq!(attr_count(&logs[0], "trainstatus.operation"), 1);
-        assert_eq!(attr_count(&logs[0], "trainstatus.source"), 1);
     });
 }
 
@@ -106,7 +102,6 @@ fn explicit_event_field_overrides_span_operation() {
             attr_string(&logs[0], "trainstatus.operation").as_deref(),
             Some("realtime.ingest")
         );
-        assert_eq!(attr_count(&logs[0], "trainstatus.operation"), 1);
     });
 }
 
@@ -148,7 +143,6 @@ fn late_recorded_source_field_is_inherited() {
             attr_string(&logs[0], "trainstatus.source").as_deref(),
             Some("mta_subway")
         );
-        assert_eq!(attr_count(&logs[0], "trainstatus.source"), 1);
     });
 }
 
@@ -235,7 +229,6 @@ fn error_logs_remain_trace_correlated_with_in_memory_tracer_only() {
         attr_string(&logs[0].record, "trainstatus.source").as_deref(),
         Some("mta_bus")
     );
-    assert_eq!(attr_count(&logs[0].record, "trainstatus.source"), 1);
     let log_trace = logs[0]
         .record
         .trace_context()

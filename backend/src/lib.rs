@@ -33,11 +33,6 @@ pub struct AppState {
     pub trajectories: crate::trajectory::TrajectoryService,
 }
 
-// pub fn mta_api_url() -> &'static str {
-//     static API_URL: OnceLock<String> = OnceLock::new();
-//     API_URL.get_or_init(|| var("MTA_API_URL").expect("MTA_API_URL must be set"))
-// }
-
 pub fn mta_oba_api_key() -> &'static str {
     static API_KEY: OnceLock<String> = OnceLock::new();
     API_KEY.get_or_init(|| var("MTA_OBA_API_KEY").expect("MTA_OBA_API_KEY must be set"))
@@ -67,6 +62,46 @@ pub fn api_prefix() -> &'static str {
 
         format!("/{}", trimmed.trim_matches('/'))
     })
+}
+
+fn otel_signal_enabled(exporter_key: &str, endpoint_key: &str) -> bool {
+    if var("OTEL_SDK_DISABLED").as_deref() == Ok("true")
+        || var(exporter_key).as_deref() == Ok("none")
+    {
+        return false;
+    }
+    var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok() || var(endpoint_key).is_ok()
+}
+
+pub fn otel_traces_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        otel_signal_enabled("OTEL_TRACES_EXPORTER", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+    })
+}
+
+pub fn otel_metrics_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        otel_signal_enabled(
+            "OTEL_METRICS_EXPORTER",
+            "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        )
+    })
+}
+
+pub fn otel_logs_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        otel_signal_enabled("OTEL_LOGS_EXPORTER", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT")
+    })
+}
+
+pub fn otel_service_name() -> Option<&'static str> {
+    static SERVICE_NAME: OnceLock<Option<String>> = OnceLock::new();
+    SERVICE_NAME
+        .get_or_init(|| var("OTEL_SERVICE_NAME").ok())
+        .as_deref()
 }
 
 pub fn prefixed_path(prefix: &str, path: &str) -> String {

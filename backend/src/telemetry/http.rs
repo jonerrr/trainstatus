@@ -15,9 +15,6 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::telemetry::{metrics, trace_export_enabled};
 
-const TRACEPARENT: &str = "traceparent";
-const TRACESTATE: &str = "tracestate";
-
 /// Axum middleware: server spans, optional W3C parent extraction, and request duration metrics.
 pub async fn observe(request: Request, next: Next) -> Response {
     observe_inner(request, next, trace_export_enabled()).await
@@ -28,43 +25,26 @@ pub(crate) async fn observe_inner(request: Request, next: Next, trace_enabled: b
     let matched_path = request.extensions().get::<MatchedPath>().cloned();
     let route = matched_path.as_ref().map(|path| path.as_str());
 
-    let span = if trace_enabled {
-        let otel_name = span_name(method_label, route);
-        let span = tracing::info_span!(
-            target: "backend::telemetry::http",
-            parent: None,
-            "http.server",
-            otel.name = %otel_name,
-            otel.kind = "server",
-            http.request.method = %method_label,
-            http.route = tracing::field::Empty,
-            http.response.status_code = tracing::field::Empty,
-            error.type = tracing::field::Empty,
-            trainstatus.source = tracing::field::Empty,
-        );
-        if let Some(route) = route {
-            span.record("http.route", route);
-        }
+    let span = tracing::info_span!(
+        target: "backend::telemetry::http",
+        parent: None,
+        "http.server",
+        otel.name = tracing::field::Empty,
+        otel.kind = "server",
+        http.request.method = %method_label,
+        http.route = tracing::field::Empty,
+        http.response.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+        trainstatus.source = tracing::field::Empty,
+    );
+    if let Some(route) = route {
+        span.record("http.route", route);
+    }
+    if trace_enabled {
+        span.record("otel.name", span_name(method_label, route).as_str());
         let parent = TraceContextPropagator::new().extract(&HeaderExtractor(request.headers()));
         let _ = span.set_parent(parent);
-        span
-    } else {
-        let span = tracing::info_span!(
-            target: "backend::telemetry::http",
-            parent: None,
-            "http.server",
-            otel.kind = "server",
-            http.request.method = %method_label,
-            http.route = tracing::field::Empty,
-            http.response.status_code = tracing::field::Empty,
-            error.type = tracing::field::Empty,
-            trainstatus.source = tracing::field::Empty,
-        );
-        if let Some(route) = route {
-            span.record("http.route", route);
-        }
-        span
-    };
+    }
 
     let timing = metrics().map(|m| (m, Instant::now()));
     let execution_span = span.clone();
@@ -104,19 +84,15 @@ pub(crate) async fn observe_inner(request: Request, next: Next, trace_enabled: b
     .await
 }
 
-/// W3C `traceparent` / `tracestate` lookup only (`TraceContextPropagator` calls `get` for these).
 struct HeaderExtractor<'a>(&'a HeaderMap);
 
 impl Extractor for HeaderExtractor<'_> {
     fn get(&self, key: &str) -> Option<&str> {
-        if key != TRACEPARENT && key != TRACESTATE {
-            return None;
-        }
         self.0.get(key).and_then(|value| value.to_str().ok())
     }
 
     fn keys(&self) -> Vec<&str> {
-        vec![TRACEPARENT, TRACESTATE]
+        self.0.keys().map(http::HeaderName::as_str).collect()
     }
 }
 

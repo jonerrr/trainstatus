@@ -4,10 +4,7 @@
 //! failures are fail-open: human stdout logging remains, and startup does not depend
 //! on telemetry.
 
-mod config;
 pub mod http;
-mod log_enrichment;
-use log_enrichment::LogLayer;
 pub(crate) mod metrics;
 pub(crate) use metrics::metrics;
 pub use metrics::register_state;
@@ -22,8 +19,7 @@ use opentelemetry::InstrumentationScope;
 use opentelemetry::KeyValue;
 use opentelemetry::metrics::MeterProvider as _;
 use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_otlp::Protocol;
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_appender_tracing::layer::{OpenTelemetryTracingBridge, TracingSpanAttributes};
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::resource::{EnvResourceDetector, Resource, TelemetryResourceDetector};
@@ -36,7 +32,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
 
-const SERVICE_NAME: &str = "service.name";
 const SERVICE_VERSION: &str = "service.version";
 const SERVICE_INSTANCE_ID: &str = "service.instance.id";
 const SCOPE_NAME: &str = "trainstatus.backend";
@@ -49,14 +44,6 @@ struct Providers {
     tracer: Option<SdkTracerProvider>,
     meter: Option<SdkMeterProvider>,
     logger: Option<SdkLoggerProvider>,
-}
-
-enum PendingWarning {
-    Config(config::Warning),
-    Exporter {
-        signal: &'static str,
-        key: &'static str,
-    },
 }
 
 /// Guard for initialized telemetry providers and the installed global subscriber.
@@ -73,41 +60,30 @@ pub fn trace_export_enabled() -> bool {
 
 /// Read runtime configuration, construct optional OTLP providers, and install subscriber layers.
 pub async fn init() -> TelemetryGuard {
-    let mut pending = Vec::<PendingWarning>::new();
+    let traces = crate::otel_traces_enabled();
+    let metrics = crate::otel_metrics_enabled();
+    let logs = crate::otel_logs_enabled();
 
-    let config = config::Config::read(|key| std::env::var(key).ok());
-    pending.extend(config.warnings.into_iter().map(PendingWarning::Config));
-
-    let export_requested =
-        config.traces.is_some() || config.metrics.is_some() || config.logs.is_some();
-
-    let providers = if export_requested {
-        let service_name_override = std::env::var("OTEL_SERVICE_NAME")
-            .ok()
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty());
-
-        let resource = build_resource(service_name_override);
-        let config_for_blocking = ReadConfig {
-            traces_endpoint: config.traces.clone(),
-            metrics_endpoint: config.metrics.clone(),
-            logs_endpoint: config.logs.clone(),
-        };
-
-        let (providers, exporter_warnings) =
-            tokio::task::spawn_blocking(move || build_providers(config_for_blocking, resource))
-                .await
-                .unwrap_or_default();
-        pending.extend(exporter_warnings);
-        providers
+    let (providers, failed_signals) = if traces || metrics || logs {
+        let resource = build_resource();
+        tokio::task::spawn_blocking(move || build_providers(traces, metrics, logs, resource))
+            .await
+            .unwrap_or_default()
     } else {
-        Providers::default()
+        (Providers::default(), Vec::new())
     };
 
     let _ = TRACE_EXPORT_ENABLED.set(providers.tracer.is_some());
 
     install_subscriber(providers.tracer.as_ref(), providers.logger.as_ref());
-    emit_pending_warnings(&pending);
+    for signal in failed_signals {
+        tracing::warn!(
+            name: "telemetry.exporter.init_failed",
+            target: "telemetry",
+            { trainstatus.telemetry.signal = signal },
+            "telemetry exporter failed to initialize for this signal"
+        );
+    }
     if let Some(provider) = providers.meter.as_ref() {
         metrics::initialize(provider.meter_with_scope(backend_scope()));
     }
@@ -169,22 +145,18 @@ impl TelemetryGuard {
     }
 }
 
-#[derive(Clone)]
-struct ReadConfig {
-    traces_endpoint: Option<String>,
-    metrics_endpoint: Option<String>,
-    logs_endpoint: Option<String>,
-}
-
-fn build_providers(config: ReadConfig, resource: Resource) -> (Providers, Vec<PendingWarning>) {
+fn build_providers(
+    traces: bool,
+    metrics: bool,
+    logs: bool,
+    resource: Resource,
+) -> (Providers, Vec<&'static str>) {
     let mut providers = Providers::default();
-    let mut exporter_warnings = Vec::new();
+    let mut failed = Vec::new();
 
-    if let Some(endpoint) = config.traces_endpoint {
+    if traces {
         match opentelemetry_otlp::SpanExporter::builder()
             .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(endpoint)
             .build()
         {
             Ok(exporter) => {
@@ -195,18 +167,13 @@ fn build_providers(config: ReadConfig, resource: Resource) -> (Providers, Vec<Pe
                         .build(),
                 );
             }
-            Err(_) => exporter_warnings.push(PendingWarning::Exporter {
-                signal: "traces",
-                key: "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-            }),
+            Err(_) => failed.push("traces"),
         }
     }
 
-    if let Some(endpoint) = config.metrics_endpoint {
+    if metrics {
         match opentelemetry_otlp::MetricExporter::builder()
             .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(endpoint)
             .build()
         {
             Ok(exporter) => {
@@ -217,18 +184,13 @@ fn build_providers(config: ReadConfig, resource: Resource) -> (Providers, Vec<Pe
                         .build(),
                 );
             }
-            Err(_) => exporter_warnings.push(PendingWarning::Exporter {
-                signal: "metrics",
-                key: "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
-            }),
+            Err(_) => failed.push("metrics"),
         }
     }
 
-    if let Some(endpoint) = config.logs_endpoint {
+    if logs {
         match opentelemetry_otlp::LogExporter::builder()
             .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(endpoint)
             .build()
         {
             Ok(exporter) => {
@@ -239,40 +201,29 @@ fn build_providers(config: ReadConfig, resource: Resource) -> (Providers, Vec<Pe
                         .build(),
                 );
             }
-            Err(_) => exporter_warnings.push(PendingWarning::Exporter {
-                signal: "logs",
-                key: "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
-            }),
+            Err(_) => failed.push("logs"),
         }
     }
 
-    (providers, exporter_warnings)
+    (providers, failed)
 }
 
-fn build_resource(service_name_override: Option<String>) -> Resource {
-    let resource = Resource::builder_empty()
-        .with_attribute(KeyValue::new(SERVICE_NAME, "trainstatus-backend"))
+fn build_resource() -> Resource {
+    let mut builder = Resource::builder_empty()
+        .with_service_name("trainstatus-backend")
         .with_attribute(KeyValue::new(SERVICE_VERSION, crate::VERSION))
         .with_attribute(KeyValue::new(
             SERVICE_INSTANCE_ID,
             Uuid::now_v7().to_string(),
         ))
         .with_detector(Box::new(TelemetryResourceDetector))
-        .with_detector(Box::new(EnvResourceDetector::new()))
-        .build();
+        .with_detector(Box::new(EnvResourceDetector::new()));
 
-    let Some(service_name) = service_name_override else {
-        return resource;
-    };
+    if let Some(service_name) = crate::otel_service_name() {
+        builder = builder.with_service_name(service_name);
+    }
 
-    Resource::builder_empty()
-        .with_attributes(
-            resource
-                .iter()
-                .map(|(key, value)| KeyValue::new(key.clone(), value.clone())),
-        )
-        .with_attribute(KeyValue::new(SERVICE_NAME, service_name))
-        .build()
+    builder.build()
 }
 
 fn backend_scope() -> InstrumentationScope {
@@ -303,10 +254,16 @@ fn log_layer<S>(provider: &SdkLoggerProvider, env_filter: EnvFilter) -> impl Lay
 where
     S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
-    LogLayer::new(provider).with_filter(
-        filter_fn(|metadata| metadata.target().starts_with("backend"))
-            .and(filter_fn(|metadata| metadata.is_span()).or(env_filter)),
-    )
+    OpenTelemetryTracingBridge::builder(provider)
+        .with_tracing_span_attributes(TracingSpanAttributes::allowlist([
+            "trainstatus.source",
+            "trainstatus.operation",
+        ]))
+        .build()
+        .with_filter(
+            filter_fn(|metadata| metadata.target().starts_with("backend"))
+                .and(filter_fn(|metadata| metadata.is_span()).or(env_filter)),
+        )
 }
 
 fn open_telemetry_span_layer<S>(
@@ -326,53 +283,9 @@ where
 }
 
 fn stdout_env_filter() -> EnvFilter {
-    let directive = match std::env::var("RUST_LOG") {
-        Ok(rust_log) if !rust_log.trim().is_empty() => {
-            let mut merged = rust_log;
-            if !rust_log_has_target(&merged, "opentelemetry") {
-                merged.push_str(",opentelemetry=warn");
-            }
-            if !rust_log_has_target(&merged, "telemetry") {
-                merged.push_str(",telemetry=warn");
-            }
-            merged
-        }
-        _ => "backend=info,tower_http=info,opentelemetry=warn,telemetry=warn".into(),
-    };
-
-    EnvFilter::try_new(&directive).unwrap_or_else(|_| {
+    EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::new("backend=info,tower_http=info,opentelemetry=warn,telemetry=warn")
     })
-}
-
-fn rust_log_has_target(rust_log: &str, target: &str) -> bool {
-    rust_log.split([',', ' ']).any(|part| {
-        let name = part.split(['=', ':']).next().unwrap_or(part).trim();
-        name == target || name.starts_with(&format!("{target}::"))
-    })
-}
-
-fn emit_pending_warnings(warnings: &[PendingWarning]) {
-    for warning in warnings {
-        match warning {
-            PendingWarning::Config(config::Warning { signal, key }) => {
-                tracing::warn!(
-                    name: "telemetry.config.invalid",
-                    target: "telemetry",
-                    { trainstatus.telemetry.signal = signal, trainstatus.telemetry.config_key = key },
-                    "telemetry configuration disabled export for this signal"
-                );
-            }
-            PendingWarning::Exporter { signal, key } => {
-                tracing::warn!(
-                    name: "telemetry.exporter.init_failed",
-                    target: "telemetry",
-                    { trainstatus.telemetry.signal = signal, trainstatus.telemetry.config_key = key },
-                    "telemetry exporter failed to initialize for this signal"
-                );
-            }
-        }
-    }
 }
 
 fn warn_provider_operation(

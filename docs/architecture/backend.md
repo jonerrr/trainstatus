@@ -64,7 +64,7 @@ PostgreSQL with PostGIS. Geometry is WKB decoded by `geozero`. `source_enum` map
 
 Application code is vendor-neutral and reads no `DD_*` settings. SDK and lifecycle diagnostics go to stdout only, avoiding recursive export failures. Providers use dedicated threads with blocking HTTP export and are drained off Tokio workers on shutdown (best effort; panics and SIGKILL excluded).
 
-**Logs.** OTLP logs carry backend events only. They inherit only `trainstatus.source` and `trainstatus.operation` from enclosing spans (nearest wins, explicit event fields override), even when trace export is disabled.
+**Logs.** OTLP logs carry backend events only and inherit only `trainstatus.source` and `trainstatus.operation` from enclosing spans via `TracingSpanAttributes::allowlist`, even when trace export is disabled.
 
 **Spans.** Finite operation spans and duration histograms cover realtime poll/collect/ingest, static imports, alert attempts and live trajectory refreshes. `app::http_service` owns the production router; observability wraps compression, error handling, buffering and rate limiting, and path normalization wraps routing. Server span names and `http.route` use matched templates (unmatched routes omit the attribute), unknown methods use `_OTHER`, and only 5xx sets server error status. `SourcePath` in `api/extract.rs` records the validated source on the server span. Incoming traces extract W3C trace context only; none is injected into provider requests. `integrations::http::fetch` measures send plus body decoding and strips URLs from errors, so paths, queries and credentials never become attributes.
 
