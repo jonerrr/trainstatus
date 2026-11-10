@@ -1,20 +1,20 @@
-use super::postgres::{ObservationRow, TripRow};
-use super::{CollectedObservation, CollectedVisit, RunKey};
-use std::{collections::HashMap, sync::Arc};
-
+use super::{
+    live::LiveSnapshots,
+    postgres::{ObservationRow, TripRow},
+    source::{CollectedObservation, CollectedSnapshot, CollectedVisit, RunKey},
+    types::{
+        position::VehicleObservation,
+        trip::{StopVisit, TripRun},
+    },
+};
+use crate::network::index::{NetworkIndex, NetworkRevision};
+use crate::source::Source;
 use anyhow::Context;
 use chrono::{DateTime, SubsecRound, Utc};
 use geo::{Distance, Euclidean};
 use sqlx::{PgPool, Postgres, Transaction};
+use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;
-
-use super::{CollectedSnapshot, LiveSnapshots};
-use crate::network::index::NetworkIndex;
-use crate::network::index::NetworkRevision;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
-use crate::source::Source;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IngestionChanges {
@@ -40,7 +40,7 @@ pub struct SourceSnapshot {
 #[derive(Clone)]
 pub struct OperationsIngestor {
     pg_pool: PgPool,
-    pub(super) live_snapshots: LiveSnapshots,
+    pub live_snapshots: LiveSnapshots,
     network_index: NetworkIndex,
     commit_locks: Arc<HashMap<Source, tokio::sync::Mutex<()>>>,
 }
@@ -193,7 +193,7 @@ impl OperationsIngestor {
         // Publish synchronously after commit, even with no trajectory subscriber.
         // Every live consumer retains this Arc until the next successful commit.
         self.live_snapshots.publish(persisted.clone());
-        if let Some(metrics) = crate::telemetry::metrics() {
+        if let Some(metrics) = crate::telemetry::metrics::metrics() {
             metrics.committed(persisted.as_ref());
         }
         let changes = persisted.changes;

@@ -1,17 +1,12 @@
-use crate::AppState;
-use crate::alerts;
-use crate::integrations;
-use crate::network;
-use crate::operations::LiveSnapshots;
-use crate::operations::OperationsIngestor;
-use crate::operations::RealtimeEngine;
-use crate::operations::RealtimeSource;
-use crate::sources;
+use crate::operations::engine::RealtimeEngine;
+use crate::operations::ingestor::OperationsIngestor;
+use crate::operations::live::LiveSnapshots;
+use crate::operations::source::RealtimeSource;
 use crate::sources::StaticAdapter;
 use crate::sources::mta_bus::realtime::MtaBusRealtime;
 use crate::sources::mta_subway::realtime::MtaSubwayRealtime;
 use crate::sources::njt_bus::realtime::NjtBusRealtime;
-use crate::valhalla_tile_extract;
+use crate::{AppState, alerts, integrations, network, sources, valhalla_tile_extract};
 use anyhow::Context;
 use axum::{
     Json,
@@ -25,8 +20,7 @@ use sqlx::{
     PgPool,
     postgres::{PgConnectOptions, PgPoolOptions},
 };
-use std::{convert::Infallible, time::Duration};
-use std::{env::var, sync::Arc};
+use std::{convert::Infallible, env::var, sync::Arc, time::Duration};
 use tower::{BoxError, Layer, ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
     compression::CompressionLayer,
@@ -34,7 +28,7 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
-use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use utoipa_scalar::{Scalar, Servable};
 
 /// Production HTTP assembly, shared by the binary and wire verification.
 pub fn http_service(state: AppState) -> NormalizePath<axum::Router> {
@@ -130,8 +124,12 @@ pub async fn build() -> anyhow::Result<Application> {
     let live_snapshots = LiveSnapshots::default();
     let alerts = crate::alerts::store::Alerts::new(pg_pool.clone());
     let index = network::index::NetworkIndex::new();
-    if crate::telemetry::metrics().is_some() {
-        crate::telemetry::register_state(pg_pool.clone(), live_snapshots.clone(), index.clone());
+    if crate::telemetry::metrics::metrics().is_some() {
+        crate::telemetry::metrics::register_state(
+            pg_pool.clone(),
+            live_snapshots.clone(),
+            index.clone(),
+        );
     }
     let catalog = crate::network::catalog::CatalogReader::new(index.clone());
     let operations = crate::operations::service::Operations::new(
@@ -164,7 +162,7 @@ pub async fn build() -> anyhow::Result<Application> {
         Arc::new(NjtBusRealtime),
     ];
 
-    let trajectories = crate::trajectory::TrajectoryService::new(pg_pool.clone());
+    let trajectories = crate::trajectory::service::TrajectoryService::new(pg_pool.clone());
 
     let mut workers = RealtimeEngine::new(
         OperationsIngestor::new(

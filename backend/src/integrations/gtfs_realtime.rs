@@ -1,13 +1,11 @@
 use crate::debug_rt_data;
 use crate::feed::FeedMessage;
 use crate::network::index::NetworkRevision;
-use crate::operations::types::position::VehicleObservation as VehiclePositionModel;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::{StopVisit, TripRun};
 use anyhow::Context;
 use futures::future::BoxFuture;
-use prost::Message;
-use prost::bytes;
+use prost::{Message, bytes};
 use tokio::fs::{create_dir_all, write};
 use tracing::error;
 /// A future that fetches a GTFS-RT feed and returns the raw protobuf bytes.
@@ -17,11 +15,12 @@ pub type FeedFuture = BoxFuture<'static, anyhow::Result<bytes::Bytes>>;
 pub fn get_bytes(url: impl Into<String>) -> FeedFuture {
     let url = url.into();
     Box::pin(async move {
-        Ok(crate::integrations::http::fetch(
-            crate::integrations::http::realtime().get(&url),
-            |response| async move { response.error_for_status()?.bytes().await },
+        Ok(
+            super::http::fetch(super::http::realtime().get(&url), |response| async move {
+                response.error_for_status()?.bytes().await
+            })
+            .await?,
         )
-        .await?)
     })
 }
 
@@ -71,7 +70,7 @@ pub async fn fetch_feeds(
 }
 
 /// A missing event uses the other event; an event without an absolute time is rejected.
-pub(crate) fn stop_event_times(
+pub fn stop_event_times(
     arrival: Option<crate::feed::trip_update::StopTimeEvent>,
     departure: Option<crate::feed::trip_update::StopTimeEvent>,
 ) -> Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> {
@@ -103,7 +102,7 @@ mod tests;
 pub fn remap_realtime_stop_ids<I>(
     revision: &NetworkRevision,
     data: &mut [(TripRun<I>, Vec<StopVisit<I>>)],
-    positions: &mut [VehiclePositionModel<I>],
+    positions: &mut [VehicleObservation<I>],
 ) {
     for (_trip, stop_times) in data.iter_mut() {
         for st in stop_times.iter_mut() {

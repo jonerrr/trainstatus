@@ -5,31 +5,30 @@
 //! on telemetry.
 
 pub mod http;
-pub(crate) mod metrics;
-pub(crate) use metrics::metrics;
-pub use metrics::register_state;
+pub mod metrics;
 
 #[cfg(test)]
 mod tests;
 
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::{sync::OnceLock, time::Duration};
 
-use opentelemetry::InstrumentationScope;
-use opentelemetry::KeyValue;
-use opentelemetry::metrics::MeterProvider as _;
-use opentelemetry::trace::TracerProvider as _;
+use opentelemetry::{
+    InstrumentationScope, KeyValue, metrics::MeterProvider as _, trace::TracerProvider as _,
+};
 use opentelemetry_appender_tracing::layer::{OpenTelemetryTracingBridge, TracingSpanAttributes};
-use opentelemetry_sdk::logs::SdkLoggerProvider;
-use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::resource::{EnvResourceDetector, Resource, TelemetryResourceDetector};
-use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::{
+    logs::SdkLoggerProvider,
+    metrics::SdkMeterProvider,
+    resource::{EnvResourceDetector, Resource, TelemetryResourceDetector},
+    trace::SdkTracerProvider,
+};
 use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::Layer;
-use tracing_subscriber::filter::{FilterExt, filter_fn};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{
+    EnvFilter, Layer,
+    filter::{FilterExt, filter_fn},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 use uuid::Uuid;
 
 const SERVICE_VERSION: &str = "service.version";
@@ -303,7 +302,7 @@ fn warn_provider_operation(
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum Operation {
+pub enum Operation {
     RealtimePoll,
     RealtimeCollect,
     RealtimeIngest,
@@ -312,7 +311,7 @@ pub(crate) enum Operation {
     TrajectoryRefresh,
 }
 impl Operation {
-    pub(crate) const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::RealtimePoll => "realtime.poll",
             Self::RealtimeCollect => "realtime.collect",
@@ -324,7 +323,7 @@ impl Operation {
     }
 }
 
-pub(crate) fn operation_error_type(error: &anyhow::Error) -> std::borrow::Cow<'static, str> {
+pub fn operation_error_type(error: &anyhow::Error) -> std::borrow::Cow<'static, str> {
     for cause in error.chain() {
         if let Some(error) = cause.downcast_ref::<reqwest::Error>() {
             return crate::integrations::http::error_type(error);
@@ -340,7 +339,7 @@ pub(crate) fn operation_error_type(error: &anyhow::Error) -> std::borrow::Cow<'s
     "operation_failed".into()
 }
 
-pub(crate) async fn operation<T, F>(
+pub async fn operation<T, F>(
     source: crate::source::Source,
     operation: Operation,
     future: F,
@@ -369,14 +368,14 @@ where
             trainstatus.operation = name, error.type = tracing::field::Empty)
     };
     async {
-        let start = metrics().map(|_| std::time::Instant::now());
+        let start = metrics::metrics().map(|_| std::time::Instant::now());
         let result = future.await;
         if let Err(error) = &result {
             let error_type = operation_error_type(error);
             span.record("error.type", error_type.as_ref());
             span.set_status(opentelemetry::trace::Status::error(""));
         }
-        if let (Some(metrics), Some(start)) = (metrics(), start) {
+        if let (Some(metrics), Some(start)) = (metrics::metrics(), start) {
             metrics.operation.record(
                 start.elapsed().as_secs_f64(),
                 &[

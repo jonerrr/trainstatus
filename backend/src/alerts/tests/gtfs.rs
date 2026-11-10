@@ -1,11 +1,9 @@
 use super::*;
-use crate::feed::TimeRange;
-use crate::feed::TranslatedString;
-use crate::feed::translated_string::Translation;
+use crate::feed::{Alert, TimeRange, TranslatedString, translated_string::Translation};
 
 #[test]
 fn mta_translation_language_and_format_are_shared_across_sections() {
-    let alert = GtfsAlert {
+    let alert = Alert {
         header_text: Some(TranslatedString {
             translation: vec![
                 Translation {
@@ -53,7 +51,7 @@ fn mta_translation_language_and_format_are_shared_across_sections() {
 
 #[test]
 fn periods_require_a_valid_start_and_preserve_open_ends() {
-    let alert = GtfsAlert {
+    let alert = Alert {
         active_period: vec![
             TimeRange {
                 start: None,

@@ -1,19 +1,22 @@
-use crate::operations::SourceSnapshot;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::telemetry::metrics;
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryCache;
-use crate::trajectory::TrajectoryCalculator;
-use crate::trajectory::TrajectoryConfig;
-use crate::trajectory::compute_trajectory_async;
-use crate::trajectory::continuity::ContinuityStatsBatch;
-use crate::trajectory::expand_render_units;
-use crate::trajectory::snapshot_from_persisted_trip;
+use std::{borrow::Borrow, collections::HashMap, sync::Arc};
+
 use chrono::Utc;
 use futures::future::join_all;
 use opentelemetry::KeyValue;
-use std::{borrow::Borrow, collections::HashMap, sync::Arc};
+
+use super::{
+    cache::TrajectoryCache,
+    calculator::{TrajectoryCalculator, compute_trajectory_async},
+    continuity::ContinuityStatsBatch,
+    render_units::expand_render_units,
+    snapshot::snapshot_from_persisted_trip,
+    types::{HotSnapshot, TrajectoryConfig},
+};
+use crate::operations::{
+    ingestor::SourceSnapshot,
+    types::{position::VehicleObservation, trip::StopVisit},
+};
+use crate::telemetry::metrics;
 
 /// CPU derivation has no stores or database handle. Scheduling and publication
 /// belong to the source engine, which supplies only committed snapshots.

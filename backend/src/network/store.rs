@@ -28,7 +28,7 @@ impl Network {
 
     /// Decide whether to collect upstream data, restoring a fresh persisted
     /// revision on startup when the in-memory index is still empty.
-    pub(super) async fn needs_import(
+    pub async fn needs_import(
         &self,
         source: Source,
         refresh: std::time::Duration,

@@ -1,13 +1,14 @@
-use crate::network::dataset::NetworkDataset;
-use crate::network::index::NetworkRevision;
-use crate::operations::IngestionChanges;
-use crate::operations::SourceSnapshot;
-use crate::operations::engine::trajectory_worker;
-use crate::source::Source;
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryService;
 use std::{sync::Arc, time::Duration};
+
 use tokio::sync::{Semaphore, mpsc, watch};
+
+use crate::network::{dataset::NetworkDataset, index::NetworkRevision};
+use crate::operations::{
+    engine::trajectory_worker,
+    ingestor::{IngestionChanges, SourceSnapshot},
+};
+use crate::source::Source;
+use crate::trajectory::{service::TrajectoryService, types::HotSnapshot};
 
 fn trajectories() -> TrajectoryService {
     let pool = sqlx::postgres::PgPoolOptions::new()

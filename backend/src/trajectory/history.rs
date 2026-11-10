@@ -1,14 +1,18 @@
-use super::snapshot::{GeometryInputs, snapshot_from_geometry};
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
+
+use super::{
+    cache::TrajectoryCache,
+    snapshot::{GeometryInputs, snapshot_from_geometry},
+    types::TripSnapshot,
+};
 use crate::operations::history::History;
 use crate::source::Source;
-use crate::trajectory::TrajectoryCache;
-use crate::trajectory::TripSnapshot;
-use chrono::{DateTime, Utc};
-use std::collections::HashMap;
 
 /// Load retained inputs for the same snapshot builder and trajectory calculator
 /// used by live derivation. History supplies GPS anchors instead of current status.
-pub(super) async fn load_historical_inputs(
+pub async fn load_historical_inputs(
     history: &History,
     cache: &TrajectoryCache,
     source: Source,

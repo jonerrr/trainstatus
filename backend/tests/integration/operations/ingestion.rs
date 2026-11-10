@@ -1,25 +1,28 @@
-use crate::support;
-use backend::geometry::Geom;
-use backend::network::index::NetworkRevision;
-use backend::operations::history::History;
-use backend::operations::types::position::MtaBusPositionData;
-use backend::operations::types::trip::MtaBusData;
-
-use backend::operations::CollectedObservation as VehicleObservation;
-use backend::operations::CollectedSnapshot;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::operations::LiveSnapshots;
-use backend::operations::OperationsIngestor;
-use backend::operations::types::position::MtaSubwayPositionData;
-use backend::operations::types::position::PositionData;
-use backend::operations::types::trip::MtaSubwayStopTimeData;
-use backend::operations::types::trip::MtaSubwayTripData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::TripData;
-use backend::source::Source;
 use chrono::{Duration, TimeZone, Utc};
 use uuid::Uuid;
+
+use crate::support;
+use backend::{
+    geometry::Geom,
+    network::index::NetworkRevision,
+    operations::{
+        history::History,
+        ingestor::OperationsIngestor,
+        live::LiveSnapshots,
+        source::{CollectedSnapshot, RunKey},
+        types::{
+            position::{
+                MtaBusPositionData, MtaSubwayPositionData, NjtBusPositionData, OccupancyStatus,
+                PositionData, VehicleObservation,
+            },
+            trip::{
+                MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, StopTimeData, StopVisit,
+                TripData, TripRun,
+            },
+        },
+    },
+    source::Source,
+};
 
 async fn ingestor(pool: &sqlx::PgPool) -> (OperationsIngestor, LiveSnapshots) {
     let stores = support::test_owners(pool.clone());
@@ -33,7 +36,7 @@ async fn ingestor(pool: &sqlx::PgPool) -> (OperationsIngestor, LiveSnapshots) {
 
 fn snapshot() -> CollectedSnapshot {
     let now = Utc.timestamp_opt(1_780_000_000, 0).unwrap();
-    let id: backend::operations::RunKey = Uuid::now_v7().into();
+    let id: RunKey = Uuid::now_v7().into();
     let trip = TripRun {
         id,
         original_id: "ingestion-trip".into(),
@@ -676,7 +679,7 @@ async fn unknown_replacement_shape_drops_previous_retained_geometry(pool: sqlx::
     input.trips[0].0.shape_ids = vec!["unknown-replacement".into()];
     let replacement = stores.ingestor.ingest(input).await.unwrap();
     assert_eq!(replacement.trips[0].shape_ids, ["unknown-replacement"]);
-    let history = backend::operations::history::History::new(pool)
+    let history = History::new(pool)
         .load_trajectories(Source::MtaSubway, first.trips[0].created_at)
         .await
         .unwrap();
@@ -742,8 +745,7 @@ async fn same_provider_run_identity_is_independent_across_sources(pool: sqlx::Pg
     let mut bus = snapshot();
     bus.source = Source::MtaBus;
     bus.trips[0].0.route_id = bus_dataset.routes[0].id.clone();
-    bus.trips[0].0.data =
-        TripData::MtaBus(backend::operations::types::trip::MtaBusData { deviation: None });
+    bus.trips[0].0.data = TripData::MtaBus(MtaBusData { deviation: None });
     bus.trips[0].1.clear();
     bus.positions.clear();
     let bus = stores.ingestor.ingest(bus).await.unwrap();
@@ -759,10 +761,9 @@ async fn mixed_source_payloads_reject_before_writes_and_keep_previous_publicatio
     let (ingestor, live) = ingestor(&pool).await;
     let committed = ingestor.ingest(snapshot()).await.unwrap();
     let mut mixed = snapshot();
-    mixed.positions[0].data =
-        PositionData::NjtBus(backend::operations::types::position::NjtBusPositionData {
-            occupancy_status: backend::operations::types::position::OccupancyStatus::Empty,
-        });
+    mixed.positions[0].data = PositionData::NjtBus(NjtBusPositionData {
+        occupancy_status: OccupancyStatus::Empty,
+    });
     let error = ingestor.ingest(mixed).await.err().unwrap();
     assert!(error.to_string().contains("Observation has another source"));
     assert!(std::sync::Arc::ptr_eq(

@@ -1,20 +1,19 @@
-use crate::operations::RunKey;
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 
-use crate::operations::CollectedSnapshot;
-use crate::operations::RealtimeSource;
-use crate::operations::RealtimeSourceConfig;
-use crate::operations::source::CollectedObservation as VehicleObservation;
-use crate::operations::source::CollectedTrip as TripRun;
-use crate::operations::source::CollectedVisit as StopVisit;
-use crate::operations::types::position::MtaSubwayPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::trip::Consist;
-use crate::operations::types::trip::MtaSubwayStopTimeData;
-use crate::operations::types::trip::MtaSubwayTripData;
-use crate::operations::types::trip::StopTimeData;
-use crate::operations::types::trip::TripData;
+use crate::operations::{
+    normalize::gtfs_start,
+    source::{
+        CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
+        RealtimeSourceConfig, RunKey,
+    },
+    types::{
+        position::{MtaSubwayPositionData, PositionData},
+        trip::{
+            Consist, ConsistCar, MtaSubwayStopTimeData, MtaSubwayTripData, StopTimeData, TripData,
+        },
+    },
+};
 use crate::source::Source;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveTime, Utc};
@@ -167,7 +166,7 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
             created_at,
             direction,
         );
-        let trip = TripRun {
+        let trip = CollectedTrip {
             id: trip_id,
             original_id: helium_trip.trip_id.clone(),
             route_id: helium_trip.route_id.clone(),
@@ -181,7 +180,7 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
                 consist_cars: helium_trip
                     .consist_cars
                     .into_iter()
-                    .map(|c| crate::operations::types::trip::ConsistCar {
+                    .map(|c| ConsistCar {
                         number: c.number,
                         car_type: c.car_type,
                     })
@@ -197,7 +196,7 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
             .enumerate()
             .filter_map(|(index, stop)| {
                 let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
-                Some(StopVisit {
+                Some(CollectedVisit {
                     trip_id,
                     stop_sequence: i32::try_from(index).ok()?,
                     stop_id: stop.station_id.to_string(),
@@ -226,7 +225,7 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
                 _ => None,
             };
 
-            positions.push(VehicleObservation {
+            positions.push(CollectedObservation {
                 vehicle_id: helium_trip.trip_id.clone(),
                 trip_id: Some(trip_id),
                 stop_id: Some(stop.station_id.to_string()),
@@ -344,17 +343,17 @@ fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<Da
     let today_et = now_et.date_naive();
 
     // Try today first
-    let candidate = crate::operations::normalize::gtfs_start(today_et, &origin_time)?;
+    let candidate = gtfs_start(today_et, &origin_time)?;
     let diff_hours = (candidate - now).num_hours();
 
     if diff_hours > 6 {
         // Origin time is far in the future — this trip is from yesterday's service
         let yesterday = today_et - chrono::Duration::days(1);
-        crate::operations::normalize::gtfs_start(yesterday, &origin_time)
+        gtfs_start(yesterday, &origin_time)
     } else if diff_hours < -18 {
         // Origin time is far in the past — this trip is from tomorrow's service (just past midnight)
         let tomorrow = today_et + chrono::Duration::days(1);
-        crate::operations::normalize::gtfs_start(tomorrow, &origin_time)
+        gtfs_start(tomorrow, &origin_time)
     } else {
         Some(candidate)
     }

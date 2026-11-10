@@ -2,7 +2,7 @@
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 
 /// GTFS permits hours beyond 24:00; preserve the service-date day offset.
-pub(crate) fn gtfs_start(date: NaiveDate, time: &str) -> Option<DateTime<Utc>> {
+pub fn gtfs_start(date: NaiveDate, time: &str) -> Option<DateTime<Utc>> {
     let parts = time
         .split(':')
         .map(str::parse::<u32>)
@@ -20,7 +20,7 @@ pub(crate) fn gtfs_start(date: NaiveDate, time: &str) -> Option<DateTime<Utc>> {
 // to retain visit identity; rejecting ambiguous repeated stops avoids overwrites.
 /// Missing sequence can be recovered only from a unique scheduled occurrence.
 /// A repeated stop cannot safely be identified by its position in a partial poll.
-pub(crate) fn visit_sequence(
+pub fn visit_sequence(
     provided: Option<u32>,
     stop: &str,
     scheduled: &[crate::network::schedule::ScheduledStopTime],

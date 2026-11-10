@@ -1,24 +1,20 @@
-use crate::alerts::gtfs as gtfs_alert;
-use crate::alerts::gtfs::GtfsAlertSource;
+use super::{NJT_ALERTS_URL, get_token, njt_post_future};
+use crate::alerts::{
+    gtfs::{GtfsAlertSource, active_periods, run_pipeline},
+    store::Alerts,
+    types::{
+        AffectedEntity, AlertCollection, AlertDetails, AlertFormat, AlertSection, AlertTranslation,
+    },
+};
+use crate::feed::{Alert, FeedMessage};
+use crate::integrations::gtfs_realtime;
+use crate::source::Source;
+use crate::sources::AlertsAdapter;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 use uuid::Uuid;
-
-use crate::alerts::store::Alerts;
-use crate::alerts::types::AffectedEntity;
-use crate::alerts::types::AlertFormat;
-use crate::alerts::types::AlertSection;
-use crate::alerts::types::AlertTranslation;
-use crate::alerts::types::{AlertCollection, AlertDetails};
-use crate::feed::Alert as GtfsAlert;
-use crate::feed::FeedMessage;
-use crate::integrations::gtfs_realtime;
-use crate::source::Source;
-use crate::sources::AlertsAdapter;
-
-use super::{NJT_ALERTS_URL, get_token, njt_post_future};
 
 pub struct NjtBusAlerts;
 
@@ -52,7 +48,7 @@ impl GtfsAlertSource for NjtBusAlerts {
         .await
     }
 
-    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<Self::Alert> {
+    fn process_alert(&self, entity_id: String, alert: Alert) -> Option<Self::Alert> {
         // Derive a stable created_at from the first active period start time so repeated
         // runs upsert to the same row on (created_at, original_id, source).
         let first_period_start = alert
@@ -92,7 +88,7 @@ impl GtfsAlertSource for NjtBusAlerts {
             return None;
         }
 
-        let active_periods = gtfs_alert::active_periods(&alert);
+        let active_periods = active_periods(&alert);
 
         if active_periods.is_empty() {
             return None;
@@ -144,6 +140,6 @@ impl AlertsAdapter for NjtBusAlerts {
     }
 
     async fn run(&self, alerts: &Alerts) -> anyhow::Result<()> {
-        gtfs_alert::run_pipeline(self, alerts).await
+        run_pipeline(self, alerts).await
     }
 }

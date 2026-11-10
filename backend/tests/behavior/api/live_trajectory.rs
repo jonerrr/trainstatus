@@ -30,7 +30,7 @@ async fn trajectory_live_hot_miss_returns_empty_without_database() {
 #[tokio::test]
 async fn trajectory_responses_keep_the_source_commit_time_across_reads() {
     use backend::network::{dataset::NetworkDataset, index::NetworkRevision};
-    use backend::operations::{IngestionChanges, SourceSnapshot};
+    use backend::operations::ingestor::{IngestionChanges, SourceSnapshot};
     use backend::source::Source;
     use std::sync::Arc;
 

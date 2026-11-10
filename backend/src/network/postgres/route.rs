@@ -1,10 +1,9 @@
-use crate::network::types::route::Route;
-use crate::network::types::shape::Shape;
+use super::super::types::{route::Route, shape::Shape};
 use crate::source::Source;
 use sqlx::PgConnection;
 
 /// Raw DB query for all routes of a source.
-pub(in crate::network) async fn query_all_on(
+pub async fn query_all_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Route>> {
@@ -43,7 +42,7 @@ pub(in crate::network) async fn query_all_on(
 }
 
 /// Persist routes inside the owning static import transaction.
-pub(in crate::network) async fn save_all_on(
+pub async fn save_all_on(
     connection: &mut PgConnection,
     source: Source,
     routes: &[Route],
@@ -103,7 +102,7 @@ pub(in crate::network) async fn save_all_on(
     Ok(())
 }
 
-pub(in crate::network) async fn save_all_shapes_on(
+pub async fn save_all_shapes_on(
     connection: &mut PgConnection,
     source: Source,
     shapes: &[Shape],
@@ -161,7 +160,7 @@ pub(in crate::network) async fn save_all_shapes_on(
     Ok(())
 }
 
-pub(in crate::network) async fn get_all_shapes_on(
+pub async fn get_all_shapes_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Shape>> {

@@ -7,10 +7,10 @@ use opentelemetry::{
 use std::sync::{Arc, OnceLock};
 
 static METRICS: OnceLock<Metrics> = OnceLock::new();
-pub(crate) fn metrics() -> Option<&'static Metrics> {
+pub fn metrics() -> Option<&'static Metrics> {
     METRICS.get()
 }
-pub(super) fn initialize(meter: Meter) {
+pub fn initialize(meter: Meter) {
     let _ = METRICS.set(Metrics::new(meter));
 }
 
@@ -23,17 +23,17 @@ const OPERATION: &[f64] = &[
 const OBSERVATION: &[f64] = &[1., 5., 15., 30., 60., 120., 300., 600., 1800.];
 const GAP: &[f64] = &[1., 5., 10., 25., 50., 100., 250., 500., 1000.];
 
-pub(crate) struct AlertSummary {
-    pub count: usize,
-    pub committed_at: DateTime<Utc>,
+struct AlertSummary {
+    count: usize,
+    committed_at: DateTime<Utc>,
 }
-pub(crate) struct TrajectorySummary {
+pub struct TrajectorySummary {
     pub plans: usize,
     pub render_units: usize,
     pub committed_at: Option<DateTime<Utc>>,
 }
 
-pub(crate) struct Metrics {
+pub struct Metrics {
     meter: Meter,
     pub operation: Histogram<f64>,
     changed: Counter<u64>,
@@ -74,7 +74,7 @@ fn age(now: DateTime<Utc>, committed: DateTime<Utc>) -> f64 {
         / 1_000_000.
 }
 impl Metrics {
-    pub(super) fn new(meter: Meter) -> Self {
+    pub fn new(meter: Meter) -> Self {
         let alerts = Arc::new(SourceSnapshot::<AlertSummary>::new());
         let trajectories = Arc::new(SourceSnapshot::<TrajectorySummary>::new());
         let alert_store = alerts.clone();
@@ -182,10 +182,10 @@ impl Metrics {
             state: OnceLock::new(),
         }
     }
-    pub(crate) fn attrs(&self, source: Source) -> &[KeyValue; 1] {
+    pub fn attrs(&self, source: Source) -> &[KeyValue; 1] {
         &self.source_attrs[source.index()]
     }
-    pub(crate) fn committed(&self, snapshot: &crate::operations::SourceSnapshot) {
+    pub fn committed(&self, snapshot: &crate::operations::ingestor::SourceSnapshot) {
         let source = self.source_attrs[snapshot.source.index()][0].clone();
         let changes = snapshot.changes;
         for (entity, count) in [
@@ -206,7 +206,7 @@ impl Metrics {
             );
         }
     }
-    pub(crate) fn alerts_published(&self, source: Source, count: usize) {
+    pub fn alerts_published(&self, source: Source, count: usize) {
         self.alerts.replace(
             source,
             AlertSummary {
@@ -215,10 +215,10 @@ impl Metrics {
             },
         );
     }
-    pub(crate) fn trajectory_published(&self, source: Source, summary: TrajectorySummary) {
+    pub fn trajectory_published(&self, source: Source, summary: TrajectorySummary) {
         self.trajectories.replace(source, summary);
     }
-    pub(crate) fn continuity(
+    pub fn continuity(
         &self,
         source: Source,
         stats: &crate::trajectory::continuity::ContinuityStatsBatch,
@@ -247,7 +247,7 @@ impl Metrics {
     fn register_state(
         &self,
         pool: sqlx::PgPool,
-        live: crate::operations::LiveSnapshots,
+        live: crate::operations::live::LiveSnapshots,
         network: crate::network::index::NetworkIndex,
     ) {
         self.state.get_or_init(|| {
@@ -367,7 +367,7 @@ impl Metrics {
 }
 pub fn register_state(
     pool: sqlx::PgPool,
-    live: crate::operations::LiveSnapshots,
+    live: crate::operations::live::LiveSnapshots,
     network: crate::network::index::NetworkIndex,
 ) {
     if let Some(metrics) = metrics() {

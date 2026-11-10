@@ -2,15 +2,14 @@ use crate::AppState;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-mod alerts;
-mod catalog;
-mod error;
-pub(crate) mod extract;
-mod health;
-pub(crate) mod service;
-mod trajectories;
-
-pub use error::AppError;
+pub mod alerts;
+pub mod catalog;
+pub mod dto;
+pub mod error;
+pub mod extract;
+pub mod health;
+pub mod service;
+pub mod trajectories;
 
 fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -22,8 +21,6 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(alerts::alerts_handler))
         .routes(routes!(trajectories::trajectories_handler))
 }
-
-pub mod dto;
 
 #[derive(OpenApi)]
 #[openapi(info(title = "Train Status API", version = crate::VERSION, description = "Live service for MTA subway, MTA bus and NJ Transit bus. Use ?at=<unix_timestamp> to view retained trips with an arrival or departure in the following four hours, alerts active at that time, and trajectories based on retained schedules and recorded vehicle locations."),

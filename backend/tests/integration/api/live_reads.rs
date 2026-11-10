@@ -1,17 +1,24 @@
-use crate::support;
 use axum_test::TestServer;
-use backend::geometry::Geom;
-use backend::network::dataset::NetworkDataset;
-use backend::network::types::route::Route;
-use backend::network::types::stop::Stop;
-use backend::operations::CollectedObservation as VehicleObservation;
-use backend::operations::CollectedSnapshot;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::source::Source;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 use uuid::Uuid;
+
+use crate::support;
+use backend::{
+    geometry::Geom,
+    network::{
+        dataset::NetworkDataset,
+        types::{route::Route, stop::Stop},
+    },
+    operations::{
+        source::{CollectedSnapshot, RunKey},
+        types::{
+            position::VehicleObservation,
+            trip::{StopVisit, TripRun},
+        },
+    },
+    source::Source,
+};
 
 fn dataset(source: Source) -> NetworkDataset {
     let mut d = NetworkDataset::new(source);
@@ -55,7 +62,7 @@ fn generation(source: Source, now: chrono::DateTime<Utc>) -> CollectedSnapshot {
         positions: vec![],
     };
     for (name, route) in [("remaining", "A"), ("omitted", "A"), ("other-route", "B")] {
-        let id: backend::operations::RunKey = Uuid::now_v7().into();
+        let id: RunKey = Uuid::now_v7().into();
         let tag = source.as_str();
         let trip = TripRun {
             id,

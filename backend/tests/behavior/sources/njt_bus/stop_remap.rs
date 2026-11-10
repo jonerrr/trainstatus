@@ -1,20 +1,16 @@
-use backend::integrations::gtfs_realtime::remap_realtime_stop_ids;
-use backend::network::index::NetworkIndex;
-use backend::network::index::NetworkRevision;
-use backend::operations::types::position::NjtBusPositionData;
-use backend::operations::types::position::OccupancyStatus;
-use backend::operations::types::position::PositionData;
-use backend::operations::types::position::VehicleObservation;
-use backend::operations::types::trip::NjtBusData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::StopVisit;
-use backend::operations::types::trip::TripData;
-use backend::operations::types::trip::TripRun;
-use backend::source::Source;
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::support::njt_bus_dataset;
+use backend::{
+    integrations::gtfs_realtime::remap_realtime_stop_ids,
+    network::index::{NetworkIndex, NetworkRevision},
+    operations::types::{
+        position::{NjtBusPositionData, OccupancyStatus, PositionData, VehicleObservation},
+        trip::{NjtBusData, StopTimeData, StopVisit, TripData, TripRun},
+    },
+    source::Source,
+};
 
 fn trip() -> TripRun {
     let now = Utc::now();

@@ -1,12 +1,12 @@
+use super::super::{
+    ingestor::IngestionChanges,
+    types::{
+        position::{MtaBusPositionData, PositionData},
+        trip::{MtaBusData, StopTimeData, TripData},
+    },
+};
 use super::*;
-use crate::network::index::IndexedRoute;
-use crate::network::index::NetworkRevision;
-use crate::operations::IngestionChanges;
-use crate::operations::types::position::MtaBusPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::trip::MtaBusData;
-use crate::operations::types::trip::StopTimeData;
-use crate::operations::types::trip::TripData;
+use crate::network::index::{IndexedRoute, NetworkRevision};
 use chrono::TimeZone;
 use serde_json::{Value, json};
 

@@ -6,13 +6,13 @@ use axum::{
 };
 
 use super::{
-    AppError,
+    error::AppError,
     extract::{SourcePath, TimeQuery},
 };
 use crate::AppState;
 use crate::source::Source;
-use crate::trajectory::RenderUnit;
-use crate::trajectory::encode_render_units;
+use crate::trajectory::arrow::encode_render_units;
+use crate::trajectory::types::RenderUnit;
 
 #[utoipa::path(
     get,

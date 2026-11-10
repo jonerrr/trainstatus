@@ -1,13 +1,15 @@
+use super::super::super::{
+    calculator::compute_trajectory,
+    geometry::build_shape_geometry,
+    interpolation::PchipMethod,
+    types::{TrajectoryConfig, TrajectoryStop},
+};
 use super::*;
 use crate::network::types::stop::NjtBusStopData;
-use crate::operations::types::position::NjtBusPositionData;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopTimeData;
-use crate::trajectory::compute_trajectory;
-use crate::trajectory::geometry::build_shape_geometry;
-use crate::trajectory::interpolation::PchipMethod;
-use crate::trajectory::types::TrajectoryConfig;
-use crate::trajectory::types::TrajectoryStop;
+use crate::operations::types::{
+    position::{NjtBusPositionData, OccupancyStatus, VehicleObservation},
+    trip::StopTimeData,
+};
 fn trip() -> (TripSnapshot, ShapeGeometry) {
     let shape = geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)]);
     let geometry = build_shape_geometry(&shape, 6538).unwrap();
@@ -54,7 +56,7 @@ fn position(trip: &TripSnapshot, at: i64, lon: f64) -> VehicleObservation {
         updated_at: chrono::DateTime::from_timestamp(at, 0).unwrap(),
         geom: Some(geo::Geometry::Point(Point::new(lon, 40.7)).into()),
         data: PositionData::NjtBus(NjtBusPositionData {
-            occupancy_status: crate::operations::types::position::OccupancyStatus::Empty,
+            occupancy_status: OccupancyStatus::Empty,
         }),
     }
 }

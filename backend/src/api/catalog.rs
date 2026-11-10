@@ -1,13 +1,11 @@
-use super::{AppError, extract::SourcePath};
+use super::{dto::catalog::Catalog, error::AppError, extract::SourcePath};
 use crate::AppState;
-use crate::api::dto::catalog::Catalog;
 use crate::source::Source;
 use axum::{
     extract::State,
     response::{IntoResponse, Response},
 };
-use http::header;
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, StatusCode, header};
 
 #[utoipa::path(
     get,

@@ -13,14 +13,14 @@ use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::telemetry::{metrics, trace_export_enabled};
+use super::{metrics::metrics, trace_export_enabled};
 
 /// Axum middleware: server spans, optional W3C parent extraction, and request duration metrics.
 pub async fn observe(request: Request, next: Next) -> Response {
     observe_inner(request, next, trace_export_enabled()).await
 }
 
-pub(crate) async fn observe_inner(request: Request, next: Next, trace_enabled: bool) -> Response {
+pub async fn observe_inner(request: Request, next: Next, trace_enabled: bool) -> Response {
     let method_label = method_label(request.method());
     let matched_path = request.extensions().get::<MatchedPath>().cloned();
     let route = matched_path.as_ref().map(|path| path.as_str());
@@ -97,7 +97,7 @@ impl Extractor for HeaderExtractor<'_> {
 }
 
 /// Bound method labels independently of arbitrary request methods.
-pub(crate) fn method_label(method: &Method) -> &'static str {
+pub fn method_label(method: &Method) -> &'static str {
     match *method {
         Method::GET => "GET",
         Method::HEAD => "HEAD",

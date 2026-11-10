@@ -1,20 +1,17 @@
+use crate::feed::FeedMessage;
 use crate::network::dataset::NetworkDataset;
+use crate::operations::types::position::VehicleObservation;
+use crate::operations::types::trip::{StopVisit, TripRun};
+use crate::source::Source;
+use anyhow::Context;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     fmt,
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use anyhow::Context;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-
-use crate::feed::FeedMessage;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
-use crate::source::Source;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

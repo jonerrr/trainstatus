@@ -20,18 +20,18 @@ fn build_client(timeout: Duration) -> reqwest::Client {
 }
 
 /// Realtime collection must finish before its next refresh can start.
-pub(crate) fn realtime() -> &'static reqwest::Client {
+pub fn realtime() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| build_client(Duration::from_secs(15)))
 }
 
 /// Static feeds are larger than realtime responses and need a separate budget.
-pub(crate) fn static_data() -> &'static reqwest::Client {
+pub fn static_data() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| build_client(Duration::from_secs(120)))
 }
 
-pub(crate) fn error_type(error: &reqwest::Error) -> Cow<'static, str> {
+pub fn error_type(error: &reqwest::Error) -> Cow<'static, str> {
     if let Some(status) = error.status() {
         status.as_u16().to_string().into()
     } else if error.is_timeout() {
@@ -76,7 +76,7 @@ struct ClientLabels {
 }
 
 fn record_client_duration(started: Option<Instant>, labels: ClientLabels) {
-    let (Some(metrics), Some(started)) = (crate::telemetry::metrics(), started) else {
+    let (Some(metrics), Some(started)) = (crate::telemetry::metrics::metrics(), started) else {
         return;
     };
     let mut attrs: [KeyValue; 5] =
@@ -114,7 +114,7 @@ fn mark_span_error(kind: &str) {
 
 /// Sends a prepared request, times the full response-consumption future, records bounded
 /// client telemetry, and strips URLs from every returned error.
-pub(crate) async fn fetch<T, F, Fut>(
+pub async fn fetch<T, F, Fut>(
     builder: reqwest::RequestBuilder,
     consume: F,
 ) -> Result<T, reqwest::Error>
@@ -122,7 +122,7 @@ where
     F: FnOnce(reqwest::Response) -> Fut,
     Fut: Future<Output = Result<T, reqwest::Error>>,
 {
-    let started = crate::telemetry::metrics().map(|_| Instant::now());
+    let started = crate::telemetry::metrics::metrics().map(|_| Instant::now());
     let trace = crate::telemetry::trace_export_enabled();
     let label_client = started.is_some() || trace;
 

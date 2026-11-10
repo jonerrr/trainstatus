@@ -1,14 +1,18 @@
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+
 use super::{
-    HotSnapshot, TrajectoryCache, TrajectoryCalculator, TrajectoryConfig, TrajectoryDeriver,
-    compute_trajectory_async, expand_render_units,
+    cache::TrajectoryCache,
+    calculator::{TrajectoryCalculator, compute_trajectory_async},
+    derive::TrajectoryDeriver,
+    history::load_historical_inputs,
+    render_units::expand_render_units,
+    types::{HotSnapshot, TrajectoryConfig},
 };
-use crate::operations::SourceSnapshot;
-use crate::operations::history::History;
+use crate::operations::{history::History, ingestor::SourceSnapshot};
 use crate::source::Source;
 use crate::telemetry::metrics::{self, TrajectorySummary};
-use crate::trajectory::history::load_historical_inputs;
-use chrono::{DateTime, Utc};
-use std::sync::Arc;
 
 /// Owns live publication and historical derivation behind one read interface.
 #[derive(Clone)]

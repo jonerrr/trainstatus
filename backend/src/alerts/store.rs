@@ -493,7 +493,7 @@ impl Alerts {
         // Populate cache (write-through)
         self.cache.insert(source, Arc::new(candidate)).await;
 
-        if let Some(metrics) = crate::telemetry::metrics() {
+        if let Some(metrics) = crate::telemetry::metrics::metrics() {
             metrics.alerts_published(source, published_count);
         }
 

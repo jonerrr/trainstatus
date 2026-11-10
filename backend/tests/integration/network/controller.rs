@@ -1,16 +1,18 @@
-use crate::support::mta_bus_dataset;
-use crate::support::test_owners;
-use async_trait::async_trait;
-use backend::network::controller as static_data;
-use backend::network::dataset::NetworkDataset;
-use backend::source::Source;
-use backend::sources::StaticAdapter;
 use std::{
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
+};
+
+use async_trait::async_trait;
+
+use crate::support::{mta_bus_dataset, test_owners};
+use backend::{
+    network::{controller, dataset::NetworkDataset},
+    source::Source,
+    sources::StaticAdapter,
 };
 
 struct CountingStaticAdapter {
@@ -50,7 +52,7 @@ async fn static_controller_initializes_empty_index_even_when_database_is_fresh(p
 
     let stores = test_owners(pool.clone());
     let imports = Arc::new(AtomicUsize::new(0));
-    let controller = static_data::run(
+    let controller = controller::run(
         &stores.network,
         vec![Arc::new(CountingStaticAdapter {
             imports: imports.clone(),
@@ -131,7 +133,7 @@ async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
     let imports = Arc::new(AtomicUsize::new(0));
     for _ in 0..2 {
         let restarted = test_owners(pool.clone());
-        let controller = static_data::run(
+        let controller = controller::run(
             &restarted.network,
             vec![Arc::new(CountingNjtAdapter {
                 imports: imports.clone(),

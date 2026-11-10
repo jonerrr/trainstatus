@@ -8,7 +8,7 @@ use crate::source::Source;
 
 /// Validated `{source}` path segment: same extraction and rejection as [`Path<Source>`],
 /// and records `trainstatus.source` on the active HTTP server span.
-pub(crate) struct SourcePath(pub Source);
+pub struct SourcePath(pub Source);
 
 impl<S> FromRequestParts<S> for SourcePath
 where
@@ -25,7 +25,7 @@ where
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
-pub(super) struct TimeQuery {
+pub struct TimeQuery {
     /// Unix timestamp used for a historical query. If omitted, the latest committed realtime snapshot is returned.
     #[serde(default, with = "chrono::serde::ts_seconds_option")]
     #[param(value_type = Option<i64>)]

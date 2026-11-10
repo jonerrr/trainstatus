@@ -3,12 +3,14 @@ use std::{future::Future, sync::Arc};
 use tokio::{sync::watch, time::sleep};
 use tracing::{Span, error, info, warn};
 
-use super::{CollectedSnapshot, OperationsIngestor, RealtimeSource, SourceSnapshot};
+use super::{
+    ingestor::{OperationsIngestor, SourceSnapshot},
+    source::{CollectedSnapshot, RealtimeSource},
+};
 use crate::network::controller::NetworkController;
 use crate::source::Source;
-use crate::telemetry::{Operation, operation, operation_error_type};
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryService;
+use crate::telemetry::{Operation, metrics::metrics, operation, operation_error_type};
+use crate::trajectory::{service::TrajectoryService, types::HotSnapshot};
 
 /// Each source collects and commits independently of its newest-value trajectory
 /// worker. A busy worker retains its current generation and only the latest
@@ -59,7 +61,7 @@ impl RealtimeEngine {
         workers
     }
 
-    pub(super) async fn collect_source(self, source: Arc<dyn RealtimeSource>) {
+    pub async fn collect_source(self, source: Arc<dyn RealtimeSource>) {
         let config = source.config();
         loop {
             let _ = self.collect_once(source.as_ref()).await;
@@ -68,7 +70,7 @@ impl RealtimeEngine {
         }
     }
 
-    pub(super) async fn collect_once(
+    pub async fn collect_once(
         &self,
         source: &dyn RealtimeSource,
     ) -> anyhow::Result<Arc<SourceSnapshot>> {
@@ -121,7 +123,7 @@ impl RealtimeEngine {
                     name: "trainstatus.realtime.static_recovery",
                     "missing static data; forcing static import before retry"
                 );
-                if let Some(metrics) = crate::telemetry::metrics() {
+                if let Some(metrics) = metrics() {
                     metrics.static_recovery.add(1, metrics.attrs(source_id));
                 }
                 self.static_controller.force_update(source_id).await?;
@@ -155,7 +157,7 @@ fn is_foreign_key_violation(error: &anyhow::Error) -> bool {
 
 /// The closure is the derivation operation, not an adapter abstraction. Keeping
 /// scheduling independent from CPU work permits deterministic paused-time tests.
-pub(super) async fn trajectory_worker<F, Fut>(
+pub async fn trajectory_worker<F, Fut>(
     source: Source,
     mut rx: watch::Receiver<Option<Arc<SourceSnapshot>>>,
     trajectories: TrajectoryService,

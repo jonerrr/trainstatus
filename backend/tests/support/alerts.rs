@@ -1,11 +1,12 @@
-use backend::feed::Alert as GtfsAlert;
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::source::Source;
+use backend::{
+    feed::Alert,
+    fixtures::{self, FixtureKind},
+    source::Source,
+};
 
-pub fn fixture_alert_where<F>(source: Source, predicate: F) -> (String, GtfsAlert)
+pub fn fixture_alert_where<F>(source: Source, predicate: F) -> (String, Alert)
 where
-    F: Fn(&GtfsAlert) -> bool,
+    F: Fn(&Alert) -> bool,
 {
     let root = super::fixture_root();
     let manifest =

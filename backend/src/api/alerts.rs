@@ -1,12 +1,14 @@
 use super::{
-    AppError,
+    dto::alerts::ApiAlert,
+    error::AppError,
     extract::{SourcePath, TimeQuery},
 };
 use crate::AppState;
-use crate::api::dto::alerts::ApiAlert;
 use crate::source::Source;
-use axum::Json;
-use axum::extract::{Query, State};
+use axum::{
+    Json,
+    extract::{Query, State},
+};
 
 #[utoipa::path(
     get,

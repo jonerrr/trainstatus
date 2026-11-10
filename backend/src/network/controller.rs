@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
-use tracing::{error, info};
-
-use crate::network::index::NetworkIndex;
-use crate::network::store::Network;
+use super::{index::NetworkIndex, store::Network};
 use crate::source::Source;
 use crate::sources::StaticAdapter;
 use crate::telemetry::{Operation, operation, operation_error_type};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{mpsc, oneshot};
+use tracing::{error, info};
 
 type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
 
@@ -29,7 +26,7 @@ pub struct NetworkController {
 }
 
 impl NetworkController {
-    pub(crate) fn shutdown(&self) {
+    pub fn shutdown(&self) {
         for worker in self.workers.iter() {
             worker.abort();
         }

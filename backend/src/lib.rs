@@ -30,7 +30,7 @@ pub struct AppState {
     pub alerts: crate::alerts::store::Alerts,
     pub network: crate::network::catalog::CatalogReader,
     pub operations: crate::operations::service::Operations,
-    pub trajectories: crate::trajectory::TrajectoryService,
+    pub trajectories: crate::trajectory::service::TrajectoryService,
 }
 
 pub fn mta_oba_api_key() -> &'static str {

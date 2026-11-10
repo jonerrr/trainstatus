@@ -11,12 +11,16 @@
 //!   the observation time. Coordinates and bearing belong to the map transport.
 //! - Calls: trip, stop, visit sequence, arrival and departure. Subway tracks and platform
 //!   edges are not rendered and are omitted.
+use super::{
+    history::History,
+    ingestor::SourceSnapshot,
+    live::LiveSnapshots,
+    types::{
+        position::VehicleObservation,
+        trip::{StopVisit, TripRun},
+    },
+};
 use crate::network::index::NetworkIndex;
-use crate::operations::LiveSnapshots;
-use crate::operations::SourceSnapshot;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
 use crate::source::Source;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -358,7 +362,7 @@ impl Operations {
                 ids.clone()
             }
         };
-        let retained = crate::operations::history::History::new(self.pg_pool.clone())
+        let retained = History::new(self.pg_pool.clone())
             .load(
                 source,
                 at,

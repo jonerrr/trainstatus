@@ -1,19 +1,19 @@
-use crate::support;
-use backend::geometry::Geom;
-use backend::operations::CollectedObservation as VehicleObservation;
-use backend::operations::CollectedObservation;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::operations::history::History;
-use backend::operations::types::position::MtaBusPositionData;
-use backend::operations::types::position::PositionData;
-use backend::operations::types::trip::MtaBusData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::TripData;
-
-use backend::source::Source;
-use support::{mta_bus_dataset, test_owners};
 use uuid::Uuid;
+
+use crate::support::{mta_bus_dataset, test_owners};
+use backend::{
+    geometry::Geom,
+    operations::{
+        history::History,
+        source::{CollectedObservation, CollectedSnapshot, RunKey},
+        types::{
+            position::{MtaBusPositionData, PositionData, VehicleObservation},
+            trip::{MtaBusData, StopTimeData, StopVisit, TripData, TripRun},
+        },
+    },
+    source::Source,
+    trajectory::service::TrajectoryService,
+};
 
 /// Real B94 stops (from the checked-in Helium fixture) all served by shape
 /// `B940017`, in directed traversal order. Used to build a synthetic realtime trip whose stop sequence
@@ -22,7 +22,7 @@ const B94_STOP_IDS: [&str; 5] = ["904218", "904979", "504409", "901701", "904219
 
 #[sqlx::test]
 async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
-    let service = backend::trajectory::TrajectoryService::new(pool);
+    let service = TrajectoryService::new(pool);
     let at = crate::support::fixtures::fixed_time();
     let results =
         futures::future::join_all((0..8).map(|_| service.snapshot(Source::MtaBus, Some(at)))).await;
@@ -57,11 +57,11 @@ async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(p
         at.timestamp().div_euclid(300),
         later.timestamp().div_euclid(300)
     );
-    let first = backend::trajectory::TrajectoryService::new(pool.clone())
+    let first = TrajectoryService::new(pool.clone())
         .snapshot(Source::MtaBus, Some(at))
         .await
         .unwrap();
-    let second = backend::trajectory::TrajectoryService::new(pool.clone())
+    let second = TrajectoryService::new(pool.clone())
         .snapshot(Source::MtaBus, Some(later))
         .await
         .unwrap();
@@ -72,7 +72,7 @@ async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(p
         "generations retain their requested second even when the motion polynomials agree"
     );
     for order in [[at, later], [later, at]] {
-        let service = backend::trajectory::TrajectoryService::new(pool.clone());
+        let service = TrajectoryService::new(pool.clone());
         for time in order {
             let snapshot = service.snapshot(Source::MtaBus, Some(time)).await.unwrap();
             let expected = if time == at {
@@ -87,7 +87,7 @@ async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(p
 
 #[sqlx::test]
 async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
-    let service = backend::trajectory::TrajectoryService::new(pool.clone());
+    let service = TrajectoryService::new(pool.clone());
     let at = crate::support::fixtures::fixed_time();
     sqlx::query("ALTER TABLE realtime.trip RENAME TO unavailable_trip")
         .execute(&pool)
@@ -101,8 +101,8 @@ async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
     service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
 }
 
-fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::CollectedSnapshot {
-    let id: backend::operations::RunKey = Uuid::now_v7().into();
+fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
+    let id: RunKey = Uuid::now_v7().into();
     let now = crate::support::fixtures::fixed_time();
     let trip = TripRun {
         id,
@@ -130,7 +130,7 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::Col
             }
         })
         .collect();
-    backend::operations::CollectedSnapshot {
+    CollectedSnapshot {
         source: Source::MtaBus,
         network_revision: None,
         renormalize: None,
@@ -227,7 +227,7 @@ async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
     input.positions[0].updated_at = at + chrono::Duration::seconds(20);
     input.positions[0].geom = Some(Geom::from(geo::Point::from(*shape.0.last().unwrap())));
     stores.ingestor.ingest(input).await.unwrap();
-    let rendered = backend::trajectory::TrajectoryService::new(pool)
+    let rendered = TrajectoryService::new(pool)
         .snapshot(Source::MtaBus, Some(at))
         .await
         .unwrap();

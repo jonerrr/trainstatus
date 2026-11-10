@@ -1,5 +1,4 @@
-use crate::trajectory::builder::collapse_backtracking_knots_with_stats;
-use crate::trajectory::types::TrajectoryKnot;
+use super::super::{builder::collapse_backtracking_knots_with_stats, types::TrajectoryKnot};
 
 #[test]
 fn collapse_drops_backtrack_keeps_dwell() {

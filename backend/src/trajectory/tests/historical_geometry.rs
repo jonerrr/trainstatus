@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use super::super::{
+    cache::TrajectoryCache,
+    snapshot::{GeometryInputs, snapshot_from_geometry},
+};
 use crate::{
     network::{
         index::IndexedStop,
@@ -7,10 +11,6 @@ use crate::{
     },
     operations::types::trip::{MtaBusData, StopTimeData, StopVisit, TripData, TripRun},
     source::Source,
-    trajectory::{
-        TrajectoryCache,
-        snapshot::{GeometryInputs, snapshot_from_geometry},
-    },
 };
 
 #[tokio::test]

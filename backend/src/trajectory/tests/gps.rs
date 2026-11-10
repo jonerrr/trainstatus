@@ -1,16 +1,16 @@
+use super::super::{
+    geometry::{
+        build_shape_geometry, distance_to_coord, ordered_stop_distances,
+        project_wgs84_point_to_epsg,
+    },
+    types::TrajectoryStop,
+};
 use super::*;
 use crate::{
     network::types::stop::{CompassDirection, MtaBusStopData, StopData},
     operations::types::{
         position::{MtaBusPositionData, NjtBusPositionData, OccupancyStatus, PositionData},
         trip::StopTimeData,
-    },
-    trajectory::{
-        geometry::{
-            build_shape_geometry, distance_to_coord, ordered_stop_distances,
-            project_wgs84_point_to_epsg,
-        },
-        types::TrajectoryStop,
     },
 };
 fn fixture(source: Source) -> (TripSnapshot, ShapeGeometry) {
@@ -108,7 +108,7 @@ fn extrapolation_decays_and_stops_and_stale_future_offroute_reports_are_rejected
     ];
     let mut initial = vec![];
     let gps_fix = compensate(&trip, &g, source, &mut initial, None).unwrap();
-    let previous = crate::trajectory::Trajectory {
+    let previous = super::super::types::Trajectory {
         generated_at: 1030.0,
         trip_id: trip.trip_id.to_string(),
         route_id: trip.route_id.clone(),
@@ -226,9 +226,9 @@ fn ambiguous_traversals_are_omitted_and_colocated_stops_may_share_distance() {
 
 #[test]
 fn published_plan_stops_without_another_feed_commit_and_preserves_present_estimate() {
-    use crate::trajectory::{
+    use super::super::{
         builders::mta_bus::MtaBusBuilder,
-        compute_trajectory,
+        calculator::compute_trajectory,
         interpolation::{PchipMethod, evaluate_motion},
         types::TrajectoryConfig,
     };
@@ -261,9 +261,9 @@ fn published_plan_stops_without_another_feed_commit_and_preserves_present_estima
 
 #[test]
 fn late_stop_inside_cruise_window_does_not_reverse_synthetic_motion() {
-    use crate::trajectory::{
-        builders::mta_bus::MtaBusBuilder, compute_trajectory, interpolation::PchipMethod,
-        types::TrajectoryConfig,
+    use super::super::{
+        builders::mta_bus::MtaBusBuilder, calculator::compute_trajectory,
+        interpolation::PchipMethod, types::TrajectoryConfig,
     };
     let source = Source::MtaBus;
     let (mut trip, g) = fixture(source);
@@ -286,8 +286,8 @@ fn late_stop_inside_cruise_window_does_not_reverse_synthetic_motion() {
 
 #[test]
 fn optimistic_bus_predictions_respect_speed_limits_without_retiming_gps() {
-    use crate::trajectory::{
-        TrajectoryCalculator, compute_trajectory,
+    use super::super::{
+        calculator::{TrajectoryCalculator, compute_trajectory},
         interpolation::{PchipMethod, evaluate_motion, validate_motion},
         types::TrajectoryConfig,
     };
@@ -394,9 +394,9 @@ fn adjacent_corner_segments_form_one_branch_but_a_loop_return_remains_distinct()
 
 #[test]
 fn ten_minute_njt_gps_replay_does_not_stop_between_regular_delayed_reports() {
-    use crate::trajectory::{
+    use super::super::{
         builders::njt_bus::NjtBusBuilder,
-        compute_trajectory,
+        calculator::compute_trajectory,
         interpolation::{PchipMethod, evaluate_motion},
         types::TrajectoryConfig,
     };

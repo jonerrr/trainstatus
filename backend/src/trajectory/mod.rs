@@ -1,35 +1,19 @@
-pub(crate) mod arrow;
-pub(crate) mod builder;
-pub(crate) mod builders;
-pub(crate) mod cache;
-mod calculator;
-pub(crate) mod continuity;
-mod derive;
-pub(crate) mod geometry;
-mod gps;
-mod history;
-pub(crate) mod interpolation;
-mod platform;
-pub(crate) mod render_units;
-mod service;
-pub(crate) mod snapshot;
+pub mod arrow;
+pub mod builder;
+pub mod builders;
+pub mod cache;
+pub mod calculator;
+pub mod continuity;
+pub mod derive;
+pub mod geometry;
+pub mod gps;
+pub mod history;
+pub mod interpolation;
+pub mod platform;
+pub mod render_units;
+pub mod service;
+pub mod snapshot;
 pub mod types;
 
 #[cfg(test)]
 mod tests;
-
-pub use arrow::encode_render_units;
-pub use builder::{TrajectoryBuilder, collapse_backtracking_knots_with_stats, validate_knots};
-pub use cache::TrajectoryCache;
-pub use calculator::{TrajectoryCalculator, compute_trajectory, compute_trajectory_async};
-pub use continuity::ContinuityDiscardReason;
-pub use geometry::{route_length_m, shape_key_from_line};
-pub use render_units::{expand_render_units, source_render_config};
-pub use snapshot::snapshot_from_persisted_trip;
-pub use types::{
-    ComputedTrajectory, GeneratedKnots, HotSnapshot, KnotGenerationStats, RenderUnit, Trajectory,
-    TrajectoryConfig, TrajectoryKnot, TrajectoryState, TripSnapshot, source_projected_epsg_code,
-};
-
-pub use derive::TrajectoryDeriver;
-pub use service::TrajectoryService;

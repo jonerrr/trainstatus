@@ -2,33 +2,24 @@ use chrono::{DateTime, Utc};
 use geo::{Coord, LineString};
 use uuid::Uuid;
 
+use super::super::super::{
+    geometry::{ShapeGeometry, build_shape_geometry, distance_to_coord},
+    interpolation::hermite,
+    platform::select_platform,
+    render_units::{expand_render_units, source_render_config},
+    types::{GeneratedKnots, Trajectory, source_projected_epsg_code},
+};
+use super::*;
 use crate::geometry::Geom;
-use crate::network::types::stop::CarMarker;
-use crate::network::types::stop::EgressPoint;
-use crate::network::types::stop::EgressType;
-use crate::network::types::stop::MtaSubwayStopData;
-use crate::network::types::stop::PlatformDirection;
-use crate::network::types::stop::PlatformEdge;
-use crate::network::types::stop::StopData;
-use crate::network::types::stop::VerticalDirection;
-use crate::operations::types::position::MtaSubwayPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::MtaSubwayStopTimeData;
-use crate::operations::types::trip::StopTimeData;
+use crate::network::types::stop::{
+    CarMarker, EgressPoint, EgressType, MtaSubwayStopData, PlatformDirection, PlatformEdge,
+    StopData, VerticalDirection,
+};
+use crate::operations::types::{
+    position::{MtaSubwayPositionData, PositionData, VehicleObservation},
+    trip::{MtaSubwayStopTimeData, StopTimeData},
+};
 use crate::source::Source;
-use crate::trajectory::builder::TrajectoryBuilder;
-use crate::trajectory::builders::mta_subway::MtaSubwayBuilder;
-
-use crate::trajectory::expand_render_units;
-use crate::trajectory::geometry::build_shape_geometry;
-use crate::trajectory::geometry::distance_to_coord;
-use crate::trajectory::source_render_config;
-use crate::trajectory::types::Trajectory;
-
-use crate::trajectory::types::TrajectoryStop;
-use crate::trajectory::types::TripSnapshot;
-use crate::trajectory::types::source_projected_epsg_code;
 
 #[test]
 fn match_platform_edge_picks_best_candidate() {
@@ -45,7 +36,7 @@ fn match_platform_edge_picks_best_candidate() {
         ),
     ];
 
-    let matched = crate::trajectory::platform::select_platform(&edges, 1, 146.304).unwrap();
+    let matched = select_platform(&edges, 1, 146.304).unwrap();
     // The exact consist marker is at 120 feet, rather than the fallback's 50 feet.
     assert!((matched.position_m - 36.576).abs() < 1e-6);
 }
@@ -59,9 +50,7 @@ fn expand_render_units_emits_one_row_per_subway_car() {
         route_id: trip.route_id.clone(),
         color: [0, 57, 166],
         shape: shape_geom.path.clone(),
-        motion: vec![crate::trajectory::interpolation::hermite(
-            100.0, 120.0, 220.0, 260.0, 0.0, 0.0,
-        )],
+        motion: vec![hermite(100.0, 120.0, 220.0, 260.0, 0.0, 0.0)],
         gps_fix: None,
     };
 
@@ -176,9 +165,8 @@ fn trajectory_platform_selection_respects_pinned_marker_data() {
         data.platform_edges[0].car_markers[0].position_ft = 200.0;
     }
     let second = builder.generate_knots(&trip, &shape).unwrap();
-    let marker = |knots: &crate::trajectory::types::GeneratedKnots| {
-        knots.knots.iter().find(|k| k.t_event == 200.0).unwrap().s_m
-    };
+    let marker =
+        |knots: &GeneratedKnots| knots.knots.iter().find(|k| k.t_event == 200.0).unwrap().s_m;
     assert!(
         (marker(&second) - marker(&first) - 30.48).abs() < 0.01,
         "same platform ID with another revision's marker must recompute its match"
@@ -189,7 +177,7 @@ fn trip_with_anchor(
     status: &str,
     stops: Vec<TrajectoryStop>,
     anchor_distance_m: f64,
-) -> (TripSnapshot, crate::trajectory::geometry::ShapeGeometry) {
+) -> (TripSnapshot, ShapeGeometry) {
     let line = LineString::new(vec![
         Coord {
             x: -73.991,

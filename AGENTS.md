@@ -30,7 +30,10 @@ See [README.md](README.md) for setup and environment variables.
 ## Core invariants
 
 - Live reads use the last committed source snapshot and never touch SQL. Failed collection preserves it; a successful empty collection clears it.
-- Each owner module (`network`, `operations`, `alerts`, `trajectory`) owns its SQL. SQL rows never leave their owner.
+- Each owner module (`network`, `operations`, `alerts`, `trajectory`) owns its SQL. SQL rows never leave their owner. Keep `mod postgres;` private at the module root (`src/lib.rs`, `src/network/mod.rs`, `src/operations/mod.rs`).
+- Direct submodule imports: declare submodules as `pub mod` without barrel re-exports (`pub use`) in `mod.rs`. Consumers import directly from defining submodules (e.g., `crate::operations::ingestor::OperationsIngestor`). Enforced by `clippy::pub_use`.
+- Visibility is binary: plain `pub` for items shared across files, private for file-local items. No scoped visibilities (`pub(crate)`, `pub(super)`, `pub(in ...)`). Enforced by `hk` step `backend:no-scoped-pub`.
+- Imports: no renaming `as` aliases for internal types or modules. Group multi-item imports (`use foo::{A, B};`). Use `super::` within the same top-level domain module, `crate::` across top-level modules.
 - Add a source by implementing `RealtimeSource` + `AlertsAdapter` + `StaticAdapter` in `backend/src/sources/<name>/`, then register it in `app.rs`, `Source::ALL` and the per-source `LiveSnapshots` registry.
 - Backend errors: `AppError(anyhow::Error)` maps to 500; use `?` freely.
 - Use SQLx compile-time macros for describable SQL. After changing checked SQL or schema, follow the metadata workflow in [backend/TESTING.md](backend/TESTING.md).

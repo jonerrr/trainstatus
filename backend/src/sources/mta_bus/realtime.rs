@@ -1,22 +1,20 @@
-use crate::feed::FeedMessage;
-use crate::feed::TripUpdate;
-use crate::feed::VehiclePosition as GtfsVehiclePosition;
-use crate::integrations::gtfs_realtime;
-use crate::integrations::oba;
+use super::super::mta_subway::realtime::parse_origin_time;
+use super::AGENCIES;
+use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
+use crate::integrations::{gtfs_realtime, oba};
 use crate::mta_oba_api_key;
-use crate::operations::CollectedSnapshot;
-use crate::operations::RealtimeSource;
-use crate::operations::RealtimeSourceConfig;
-use crate::operations::RunKey;
-use crate::operations::source::CollectedObservation as VehicleObservation;
-use crate::operations::source::CollectedTrip as TripRun;
-use crate::operations::source::CollectedVisit as StopVisit;
-use crate::operations::types::position::MtaBusPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::trip::StopTimeData;
+use crate::operations::{
+    normalize::gtfs_start,
+    source::{
+        CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
+        RealtimeSourceConfig, RunKey,
+    },
+    types::{
+        position::{MtaBusPositionData, PositionData},
+        trip::{MtaBusData, StopTimeData, TripData},
+    },
+};
 use crate::source::Source;
-use crate::sources::mta_bus::AGENCIES;
-use crate::sources::mta_subway::realtime::parse_origin_time;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
@@ -115,7 +113,7 @@ impl MtaBusRealtime {
         &self,
         update: TripUpdate,
         observed_at: Option<DateTime<Utc>>,
-    ) -> (Option<TripRun>, Vec<StopVisit>) {
+    ) -> (Option<CollectedTrip>, Vec<CollectedVisit>) {
         let trip_desc = update.trip;
 
         // Extract trip ID and route ID
@@ -182,14 +180,14 @@ impl MtaBusRealtime {
         let created_at = match trip_desc
             .start_time
             .as_deref()
-            .and_then(|time| crate::operations::normalize::gtfs_start(start_date, time))
-            .or_else(|| TripRun::created_at(start_date, start_time))
+            .and_then(|time| gtfs_start(start_date, time))
+            .or_else(|| CollectedTrip::created_at(start_date, start_time))
         {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
 
-        let trip = TripRun {
+        let trip = CollectedTrip {
             id: RunKey::new(Source::MtaBus, &mta_id, created_at, direction),
             original_id: mta_id,
             route_id,
@@ -203,15 +201,13 @@ impl MtaBusRealtime {
                 .and_then(|time| DateTime::from_timestamp(time, 0))
                 .or(observed_at)
                 .unwrap_or(created_at),
-            data: crate::operations::types::trip::TripData::MtaBus(
-                crate::operations::types::trip::MtaBusData {
-                    deviation: update.delay,
-                },
-            ),
+            data: TripData::MtaBus(MtaBusData {
+                deviation: update.delay,
+            }),
         };
 
         // Process stop times for bus
-        let stop_times: Vec<StopVisit> = update
+        let stop_times: Vec<CollectedVisit> = update
             .stop_time_update
             .into_iter()
             .filter_map(|st| {
@@ -220,9 +216,9 @@ impl MtaBusRealtime {
                 let stop_id = st.stop_id?;
 
                 let (arrival, departure) =
-                    crate::integrations::gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
+                    gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
 
-                Some(StopVisit {
+                Some(CollectedVisit {
                     trip_id: trip.id,
                     stop_sequence,
                     stop_id,
@@ -238,9 +234,9 @@ impl MtaBusRealtime {
 
     fn process_vehicle(
         &self,
-        vehicle: GtfsVehiclePosition,
+        vehicle: VehiclePosition,
         observed_at: Option<DateTime<Utc>>,
-    ) -> Option<VehicleObservation> {
+    ) -> Option<CollectedObservation> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -256,7 +252,7 @@ impl MtaBusRealtime {
         let point: geo::Geometry =
             Point::new(position.longitude as f64, position.latitude as f64).into();
 
-        Some(VehicleObservation {
+        Some(CollectedObservation {
             vehicle_id,
             trip_id: None, // Will be set during trip linking
             stop_id,

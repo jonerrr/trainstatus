@@ -1,13 +1,13 @@
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::network::index::NetworkRevision;
-use backend::network::schedule::ScheduledTrip;
-use backend::operations::CollectedSnapshot;
-use backend::source::Source;
-use backend::sources::njt_bus::realtime::NjtBusRealtime;
 use chrono::TimeZone;
 
 use crate::support::fixture_root;
+use backend::{
+    fixtures::{self, FixtureKind},
+    network::{index::NetworkRevision, schedule::ScheduledTrip},
+    operations::source::CollectedSnapshot,
+    source::Source,
+    sources::njt_bus::realtime::NjtBusRealtime,
+};
 
 #[tokio::test]
 async fn realtime_infers_missing_service_date_from_schedule() {

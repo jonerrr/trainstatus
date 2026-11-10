@@ -1,8 +1,9 @@
+use crate::network::schedule::ScheduledStopTime;
 use crate::operations::{
-    RunKey,
     normalize::{gtfs_start, visit_sequence},
+    source::RunKey,
 };
-use crate::{network::schedule::ScheduledStopTime, source::Source};
+use crate::source::Source;
 use chrono::{NaiveDate, TimeZone, Utc};
 
 #[test]

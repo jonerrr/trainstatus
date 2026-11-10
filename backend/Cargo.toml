@@ -83,3 +83,7 @@ required-features = ["fixture-capture", "integration-tests"]
 name = "performance"
 path = "tests/performance.rs"
 required-features = ["fixture-capture", "integration-tests"]
+
+[lints.clippy]
+pub_use = "deny"
+wildcard_imports = "warn"
