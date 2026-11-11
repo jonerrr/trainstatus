@@ -52,7 +52,7 @@ pub struct TelemetryGuard {
     logger_provider: Option<SdkLoggerProvider>,
 }
 
-/// Whether trace export was enabled during the most recent [`init`] call.
+/// Whether trace export was enabled by the first [`init`] call in this process.
 pub fn trace_export_enabled() -> bool {
     TRACE_EXPORT_ENABLED.get().copied().unwrap_or(false)
 }
@@ -67,7 +67,15 @@ pub async fn init() -> TelemetryGuard {
         let resource = build_resource();
         tokio::task::spawn_blocking(move || build_providers(traces, metrics, logs, resource))
             .await
-            .unwrap_or_default()
+            .unwrap_or_else(|_| {
+                // A panic during construction must still surface as a warning.
+                let enabled = [(traces, "traces"), (metrics, "metrics"), (logs, "logs")];
+                let failed = enabled
+                    .into_iter()
+                    .filter_map(|(on, name)| on.then_some(name))
+                    .collect();
+                (Providers::default(), failed)
+            })
     } else {
         (Providers::default(), Vec::new())
     };

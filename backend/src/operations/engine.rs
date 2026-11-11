@@ -64,6 +64,7 @@ impl RealtimeEngine {
     pub async fn collect_source(self, source: Arc<dyn RealtimeSource>) {
         let config = source.config();
         loop {
+            // `collect_once` logs and records its own failures.
             let _ = self.collect_once(source.as_ref()).await;
             // Match the existing delay after every attempt, including errors.
             sleep(config.refresh_interval).await;

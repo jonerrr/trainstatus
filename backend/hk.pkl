@@ -24,8 +24,8 @@ steps {
     depends = "clippy"
   }
   ["no-scoped-pub"] {
-    glob = List("src/**/*.rs")
-    check = "! rg -n 'pub\\((crate|super|in )' {{files}}"
+    glob = List("src/**/*.rs", "tests/**/*.rs")
+    check = "! rg -n 'pub ?\\((crate|super|in )' {{files}}"
   }
   ["mise-format"] = Builtins.mise
 }
