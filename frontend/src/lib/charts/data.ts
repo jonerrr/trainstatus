@@ -43,6 +43,7 @@ function mergeStops(axis: string[], pattern: string[]): string[] {
 	return merged.concat(axis.slice(i), pattern.slice(j));
 }
 
+/** Build deduplicated travel-order edges and incoming counts for each stop. */
 function stopGraph(patterns: string[][]) {
 	const edges = new Map<string, Set<string>>();
 	const indegrees = new Map<string, number>();
@@ -98,6 +99,7 @@ function rankDefiniteStops(patterns: string[][]): Map<string, number> {
 	const groups = new Map<string, string[]>();
 	const groupFor = new Map<string, string>();
 
+	/** Assign a stop and its reachable neighbors to strongly connected groups. */
 	function visit(stop: string) {
 		const index = indices.size;
 		indices.set(stop, index);
@@ -156,6 +158,7 @@ export function chartXDomain(
 	return [Math.max(earliest, now - span), now + span];
 }
 
+/** Preserve timed visits and align trip itineraries on a shared stop axis. */
 export function buildChartData(inputs: readonly ChartInput[]) {
 	const names = new Map<string, string>();
 	const series = inputs.map(({ source, route_id, trip, calls, stops }) => ({

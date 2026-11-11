@@ -3,9 +3,13 @@ import type { Source } from '#lib/client/index.js';
 import '../../app.css';
 
 import { page } from '#lib/test/page.svelte.js';
-import { fixtureTransitData, type TransitFixture } from '#lib/test/transit-fixture.js';
+import {
+	fixtureFetcher,
+	fixtureTransitData,
+	type TransitFixture
+} from '#lib/test/transit-fixture.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
-import type { TransitData } from '#lib/transit/store.svelte.js';
+import { TransitData } from '#lib/transit/store.svelte.js';
 
 import { afterEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
@@ -14,9 +18,11 @@ import { userEvent } from 'vitest/browser';
 import ChartsPage from '../../routes/charts/+page.svelte';
 import { chartFixture, chartNow } from './fixtures.js';
 
+const clock = vi.hoisted(() => ({ ms: 0 }));
+
 vi.mock('#lib/url_params.svelte.js', async (original) => ({
 	...(await original<typeof import('#lib/url_params.svelte.js')>()),
-	getCurrentTime: () => ({ value: undefined, ms: chartNow }),
+	getCurrentTime: () => ({ value: undefined, ms: clock.ms }),
 	open_modal: () => {}
 }));
 
@@ -24,6 +30,7 @@ let fixture: TransitFixture = { catalogs: {}, services: {} };
 let data: TransitData | undefined;
 
 function setFixture(source: Source, direction: number, patterns?: string[][]) {
+	clock.ms = chartNow;
 	const built = chartFixture(source, direction, patterns);
 	fixture = { catalogs: { [source]: built.catalog }, services: { [source]: built.service } };
 	page.data = { selected_sources: [source] };
@@ -35,8 +42,8 @@ afterEach(() => {
 	data = undefined;
 });
 
-async function renderChart() {
-	data = fixtureTransitData(fixture);
+async function renderChart(provided?: TransitData) {
+	data = provided ?? fixtureTransitData(fixture);
 	const { container } = await render(TransitProvider, {
 		props: {
 			data,
@@ -127,6 +134,7 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 test('multiple sources keep colliding trip/stop/route IDs separate and use their own route colors', async () => {
 	const sources: Source[] = ['mta_subway', 'mta_bus', 'njt_bus'];
 	const built = sources.map((source) => chartFixture(source, 0));
+	clock.ms = chartNow;
 	fixture = {
 		catalogs: Object.fromEntries(built.map((b, i) => [sources[i], b.catalog])),
 		services: Object.fromEntries(built.map((b, i) => [sources[i], b.service]))
@@ -158,4 +166,104 @@ test('multiple sources keep colliding trip/stop/route IDs separate and use their
 		'#abcdef'
 	]);
 	expect(document.querySelectorAll('.stop-name').length).toBe(15);
+});
+
+test('only intersecting trips are rendered and focusable, including segments crossing either boundary', async () => {
+	const times = [
+		[-5, -4],
+		[4, 5],
+		[-4, -2],
+		[2, 4],
+		[-4, 4],
+		[-3, -3],
+		[3, 3]
+	];
+	const built = setFixture(
+		'mta_subway',
+		0,
+		times.map(() => ['a', 'b'])
+	);
+	const calls = built.service.routes['4'].calls;
+	calls.arrival = calls.trip.map(
+		(trip, i) => chartNow / 1000 + times[trip][calls.sequence[i]] * 3600
+	);
+	calls.departure = [...calls.arrival];
+	await renderChart();
+	await expect.poll(() => document.querySelectorAll('.path-line').length).toBe(5);
+	expect(
+		[...document.querySelectorAll('.path-hitarea')].map((path) => path.getAttribute('aria-label'))
+	).toEqual([2, 3, 4, 5, 6].map((i) => `View details for trip trip-${i}`));
+});
+
+test('fully off-domain trips show the empty state without keyboard targets', async () => {
+	const built = setFixture('mta_subway', 0, [
+		['a', 'b'],
+		['a', 'b']
+	]);
+	const calls = built.service.routes['4'].calls;
+	calls.arrival = calls.trip.map((trip) => chartNow / 1000 + (trip ? 5 : -5) * 3600);
+	calls.departure = [...calls.arrival];
+	await renderChart();
+	await expect.poll(() => document.body.textContent).toContain('No data available');
+	expect(document.querySelectorAll('.path-hitarea').length).toBe(0);
+});
+
+test('ticks label the domain starting day and the next day at midnight', async () => {
+	const built = setFixture('mta_subway', 0, [['a', 'b']]);
+	clock.ms = new Date(2026, 9, 6, 0, 30).getTime();
+	const calls = built.service.routes['4'].calls;
+	calls.arrival = calls.sequence.map((sequence) => clock.ms / 1000 + (sequence - 1) * 3600);
+	calls.departure = [...calls.arrival];
+	await renderChart();
+	await expect.poll(() => document.querySelector('.x-axis tspan')?.textContent).toBe('2026-10-06');
+	const boundary = document.querySelector('.x-axis tspan')!;
+	expect(boundary.parentElement?.textContent).toContain('12:00 AM');
+	expect(document.querySelector('.layercake-layout-svg')?.textContent).toContain('2026-10-05');
+});
+
+test('SVG export contains wide rendered stop labels without shrinking the chart bounds', async () => {
+	const built = setFixture('mta_subway', 0);
+	built.stops[0].name = 'W'.repeat(25);
+	await renderChart();
+	await expectChartSize();
+	const svg = document.querySelector<SVGSVGElement>('.layercake-layout-svg')!;
+	const labels = svg.querySelector<SVGGElement>('.y-axis')!.getBBox();
+	expect(labels.x).toBeLessThan(-160);
+	const createURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:chart-export');
+	const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+	try {
+		await userEvent.click(document.querySelector('[aria-label="Export chart as SVG"]')!);
+		const blob = createURL.mock.calls[0][0] as Blob;
+		const exported = new DOMParser().parseFromString(await blob.text(), 'image/svg+xml');
+		const viewBox = exported.documentElement.getAttribute('viewBox')!.split(' ').map(Number);
+		const [x, y, width, height] = viewBox;
+		expect(x).toBeLessThanOrEqual(labels.x);
+		expect(x + width).toBeGreaterThanOrEqual(svg.getBoundingClientRect().width + 10);
+		expect(y).toBeLessThanOrEqual(-20);
+		expect(y + height).toBeGreaterThanOrEqual(svg.getBoundingClientRect().height + 44);
+		expect(exported.querySelector('rect')?.getAttribute('x')).toBe(String(x));
+	} finally {
+		createURL.mockRestore();
+		click.mockRestore();
+	}
+});
+
+test('a failed refresh keeps the loaded chart and its keyboard targets', async () => {
+	setFixture('mta_subway', 0);
+	const fetcher = fixtureFetcher(fixture);
+	let fail = false;
+	const store = new TransitData({
+		sources: ['mta_subway'],
+		fetcher: (...args) => (fail ? Promise.reject(new TypeError('Offline')) : fetcher(...args))
+	});
+	await renderChart(store);
+	await expect.poll(() => document.querySelectorAll('.path-line').length).toBe(3);
+	const paths = [...document.querySelectorAll('.path-line')].map((path) => path.getAttribute('d'));
+	fail = true;
+	store.retry();
+	await expect.poll(() => store.status.warning).toBe(true);
+	expect(
+		[...document.querySelectorAll('.path-line')].map((path) => path.getAttribute('d'))
+	).toEqual(paths);
+	expect(document.querySelectorAll('.path-hitarea').length).toBe(3);
 });

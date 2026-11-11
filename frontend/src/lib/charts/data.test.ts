@@ -97,6 +97,10 @@ describe('chart stop ordering', () => {
 
 	it('keeps past visits but filters unknown stops and invalid dates without inventing points', () => {
 		const input = inputs('njt_bus', [['a', 'b', 'c']]);
+		const past = chartNow - 60_000;
+		input[0].calls = input[0].calls.map((call) =>
+			call.stop_id === 'a' ? { ...call, arrival: past, departure: past } : call
+		);
 		input[0].calls = [
 			...input[0].calls,
 			{ ...input[0].calls[0], stop_id: 'missing' },
@@ -104,6 +108,7 @@ describe('chart stop ordering', () => {
 		];
 		const chart = buildChartData(input);
 		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b', 'c']);
+		expect(chart.route_trips[0].points[0].time.getTime()).toBe(past);
 		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['a', 'b', 'c']);
 		expect(buildChartData([]).yDomain).toEqual([]);
 	});
