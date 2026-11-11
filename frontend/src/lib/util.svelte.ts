@@ -162,7 +162,8 @@ export const main_route_stops = (
 };
 
 const ROUTE_ROW_HEIGHT = 54;
-const TRIP_ROW_HEIGHT = 94;
+// Trip/Button reserves 68px including the occupancy meter; List adds p-2 and two 1px borders.
+const TRIP_ROW_HEIGHT = 68 + 16 + 2;
 // p-2 on the stop row (8px top + 8px bottom)
 const STOP_ROW_PADDING = 16;
 // One bus route: icon row plus its first direction label and ETA row

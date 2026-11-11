@@ -14,6 +14,8 @@
 
 	import { RotateCcw } from '@lucide/svelte';
 
+	import { trip_vehicle_summary } from './status.js';
+
 	const current_time = getCurrentTime();
 
 	interface Props {
@@ -67,25 +69,7 @@
 {#snippet title_row(read: TripRead | undefined)}
 	{const status = $derived(read?.trip.status)}
 	{const is_bus = $derived(source === 'mta_bus' || source === 'njt_bus')}
-	{const trip_data = $derived(read?.trip.data)}
-	{const model = $derived(
-		trip_data?.source === 'mta_subway' ? trip_data.consist_cars?.[0]?.type : undefined
-	)}
-	{const car_count = $derived(
-		trip_data?.source === 'mta_subway'
-			? (trip_data.consist?.car_count ?? trip_data.consist_cars?.length)
-			: undefined
-	)}
-	{const vehicle = $derived(
-		[model, car_count ? `${car_count} ${car_count === 1 ? 'car' : 'cars'}` : undefined]
-			.filter(Boolean)
-			.join(' · ')
-	)}
-	{const deviation = $derived(
-		trip_data?.source === 'mta_bus' && trip_data.deviation && Math.abs(trip_data.deviation) > 120
-			? trip_data.deviation / 60
-			: undefined
-	)}
+	{const vehicle = $derived(read ? trip_vehicle_summary(read.trip) : undefined)}
 	<div class="shrink-0 border-b border-border-default p-3">
 		<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3">
 			{#if route}
@@ -107,15 +91,11 @@
 				>
 					<VehicleCapacity {status} />
 				</div>
-				<span
-					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-muted"
-					>Bus #{read.trip.vehicle_id}</span
-				>
 			{/if}
-			{#if vehicle}
+			{#if vehicle?.vehicle_label}
 				<span
 					class="col-start-3 row-start-1 flex min-h-7 shrink-0 items-center self-center text-xs leading-4 text-muted tabular-nums"
-					>{vehicle}</span
+					>{vehicle.vehicle_label}</span
 				>
 			{/if}
 			<div class="col-start-2 row-start-1 flex min-h-7 min-w-0 items-center self-center text-left">
@@ -130,9 +110,14 @@
 					{/if}
 				</div>
 			</div>
-			{#if deviation !== undefined}
-				<div class="col-start-2 row-start-2 flex h-5 items-center text-sm leading-5 text-secondary">
-					{Math.abs(deviation).toFixed(0)} min {deviation > 0 ? 'late' : 'early'}
+			{#if vehicle?.deviation_text}
+				<div
+					class={[
+						'col-start-2 row-start-2 flex h-5 items-center text-sm leading-5',
+						vehicle.deviation_tone === 'warning' ? 'text-status-warning' : 'text-secondary'
+					]}
+				>
+					{vehicle.deviation_text}
 				</div>
 			{/if}
 		</div>

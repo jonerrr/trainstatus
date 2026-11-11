@@ -63,6 +63,39 @@ for (const details of ['model and count', 'count only', 'fleet length', 'unavail
 	});
 }
 
+test('bus header shows vehicle ID and late deviation', async () => {
+	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
+	page.data.selected_sources = ['mta_bus'];
+	const fixture = chartFixture('mta_bus', 0, [['a']]);
+	const trip = fixture.trips[0];
+	if (trip.data.source !== 'mta_bus') throw new Error('Expected bus');
+	trip.vehicle_id = '5842';
+	trip.data.deviation = 240; // 4 mins late
+	const data = fixtureTransitData({
+		catalogs: { mta_bus: fixture.catalog },
+		services: { mta_bus: fixture.service }
+	});
+	try {
+		const view = await render(TransitProvider<ComponentProps<typeof Modal>>, {
+			data,
+			component: Modal,
+			child_props: {
+				source: 'mta_bus',
+				route_id: '4',
+				trip_id: 'trip-0',
+				show_previous: false,
+				time_format: 'countdown'
+			}
+		});
+		await expect.element(view.getByText('Bus #5842')).toBeVisible();
+		await expect.element(view.getByText('4 min late')).toBeVisible();
+		await view.unmount();
+	} finally {
+		data.destroy();
+		vi.restoreAllMocks();
+	}
+});
+
 test('shows three same-direction subway connections without expanding the transfer list', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	page.data.selected_sources = ['mta_subway'];
