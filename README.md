@@ -62,21 +62,22 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 
 1. Clone the repository
 2. Run `mise bootstrap --only tools,task` to install the tools and Git hooks.
-3. Set the environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml` you create.
+3. Copy `dev.pod.yml.example` to `dev.pod.yml`. It includes a Datadog Agent (commented out by default) for [optional telemetry](#optional-telemetry).
+4. Set the environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml` you create.
    - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`.
-4. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
-5. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
-6. Run `mise //geo:export` to export the Valhalla tile extract.
-7. Start Postgres and Martin with `mise containers:up`.
-8. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
+5. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
+6. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
+7. Run `mise //geo:export` to export the Valhalla tile extract.
+8. Start Postgres and Martin with `mise containers:up`.
+9. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
 
 `mise containers:down` stops the dev pod and keeps its volumes. `mise reset` deletes that pod and its volumes, then creates them again. Both commands take an optional suffix, `dev` by default: `mise reset demo` targets the `trainstatus-demo` pod from `demo.pod.yml`.
 
-#### Optional Datadog telemetry
+#### Optional telemetry
 
-1. Copy `dev.configmap.yml.example` to the gitignored `dev.configmap.yml` and set `DD_API_KEY` (stored in plaintext; keep it private).
-2. Uncomment the Datadog container in `dev.pod.yml`; change `DD_SITE` if your account is not on `us5.datadoghq.com`.
-3. Run `mise containers:up` (`mise containers:down` first if the pod exists; volumes are kept).
-4. From `backend/`, run `mise run dev:telemetry` instead of the ordinary dev task.
+The backend exports telemetry over OTLP. Configure a collector in your local `dev.pod.yml` and run:
 
-Filter Datadog by `service:trainstatus-backend env:development`. See the [backend telemetry architecture](docs/architecture/backend.md#optional-telemetry) for details.
+1. Run `mise containers:up` (`mise containers:down` first if the pod exists; volumes are kept).
+2. From `backend/`, run `mise run dev:telemetry` instead of the ordinary dev task.
+
+The `dev.pod.yml.example` file includes a commented Datadog Agent configuration as an example. If you use it, copy `dev.configmap.yml.example` to the gitignored `dev.configmap.yml` and set `DD_API_KEY` (stored in plaintext; keep it private). Filter Datadog by `service:trainstatus-backend env:development`. See the [backend telemetry architecture](docs/architecture/backend.md#optional-telemetry) for details.

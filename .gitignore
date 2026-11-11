@@ -33,7 +33,8 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
 
-# config map with secrets
+# user-specific configuration
+dev.pod.yml
 demo.configmap.yml
 dev.configmap.yml
 

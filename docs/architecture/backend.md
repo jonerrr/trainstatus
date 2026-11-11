@@ -96,7 +96,7 @@ No metric includes GTFS IDs, coordinates, timestamps, URLs or error messages. Ea
 
 ### Datadog
 
-Local setup is in the [README](../../README.md#optional-datadog-telemetry). For other deployments, run a Datadog Agent (7.48+) on the same host as the backend with OTLP ingestion enabled, or a generic Collector/DDOT for a central endpoint, and point the backend at it:
+Local setup is in the [README](../../README.md#optional-telemetry). For other deployments, run a Datadog Agent (7.48+) on the same host as the backend with OTLP ingestion enabled, or a generic Collector/DDOT for a central endpoint, and point the backend at it:
 
 ```sh
 # Backend
