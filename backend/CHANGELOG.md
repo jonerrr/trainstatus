@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/jonerrr/trainstatus/compare/backend-v2.3.0...backend-v2.3.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* setup otel ([#494](https://github.com/jonerrr/trainstatus/issues/494)) ([39aa807](https://github.com/jonerrr/trainstatus/commit/39aa807ba2ec87633027f82ff2377129712afb38))
+
 ## [2.3.0](https://github.com/jonerrr/trainstatus/compare/backend-v2.2.1...backend-v2.3.0) (2026-11-08)
 
 
