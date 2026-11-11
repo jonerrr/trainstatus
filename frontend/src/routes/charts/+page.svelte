@@ -5,7 +5,7 @@
 
 	import AxisX from '#lib/charts/AxisX.svelte';
 	import AxisY from '#lib/charts/AxisY.svelte';
-	import { buildChartData, type ChartInput } from '#lib/charts/data.js';
+	import { buildChartData, chartXDomain, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { CatalogRoute, Source } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
@@ -78,8 +78,10 @@
 				if (calls?.length) inputs.push({ source, route_id: id, trip, calls, stops });
 			}
 		}
-		return buildChartData(inputs, current_time.ms);
+		return buildChartData(inputs);
 	});
+
+	const chart_padding = { top: 20, right: 10, left: 160, bottom: 30 };
 
 	// Create a reference to the SVG element
 	let svgContainer = $state<HTMLDivElement>();
@@ -98,13 +100,22 @@
 		svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 		svgClone.setAttribute('version', '1.1');
 
-		// Get SVG dimensions
-		const width = svgClone.getAttribute('width');
-		const height = svgClone.getAttribute('height');
+		// The plot area is inset by the layout padding; axis labels draw outside it
+		// (negative coordinates), so widen the viewBox to include the margins.
+		const { width, height } = svgElement.getBoundingClientRect();
+		const { top, right, bottom, left } = chart_padding;
+		const total_width = width + left + right;
+		const total_height = height + top + bottom;
+		svgClone.setAttribute('viewBox', `${-left} ${-top} ${total_width} ${total_height}`);
+		svgClone.setAttribute('width', String(total_width));
+		svgClone.setAttribute('height', String(total_height));
+		svgClone.removeAttribute('style');
 
 		const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		background.setAttribute('width', width || '100%');
-		background.setAttribute('height', height || '100%');
+		background.setAttribute('x', String(-left));
+		background.setAttribute('y', String(-top));
+		background.setAttribute('width', String(total_width));
+		background.setAttribute('height', String(total_height));
 		background.setAttribute('fill', '#171717');
 
 		// Insert background as first child so it's behind everything else
@@ -113,11 +124,11 @@
 		// Add watermark
 		const watermark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 		watermark.textContent = 'TrainStat.us';
-		watermark.setAttribute('x', '6');
-		watermark.setAttribute('y', '10');
-		watermark.setAttribute('font-size', '10');
-		watermark.setAttribute('fill', '#666666');
-		watermark.setAttribute('opacity', '0.6');
+		watermark.setAttribute('x', String(6 - left));
+		watermark.setAttribute('y', String(14 - top));
+		watermark.setAttribute('font-size', '16');
+		watermark.setAttribute('font-weight', '600');
+		watermark.setAttribute('fill', '#e5e5e5');
 
 		// Add watermark to the SVG
 		svgClone.appendChild(watermark);
@@ -295,13 +306,9 @@
 		};
 	});
 
-	const xDomain = $derived.by(() => {
-		const startTime = new Date(current_time.ms);
-		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
-		// console.log(xDomain);
-		// Return domain from current time to current time + displayHours
-		return [startTime.getTime(), endTime.getTime()];
-	});
+	const xDomain = $derived(
+		chartXDomain(data.route_trips, current_time.ms, displayHours * 60 * 60 * 1000)
+	);
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;
 	// 	return [0, width];
@@ -547,7 +554,7 @@
 					<LayerCake
 						debug={false}
 						ssr
-						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
+						padding={chart_padding}
 						x="time"
 						y="stop_key"
 						{xDomain}

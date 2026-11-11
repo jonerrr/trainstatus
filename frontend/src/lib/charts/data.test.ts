@@ -3,7 +3,8 @@ import { decodeCatalog, decodeRoute } from '#lib/transit/decode.js';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildChartData, type ChartInput } from './data.js';
+import type { ChartPoint } from './context.js';
+import { buildChartData, chartXDomain, type ChartInput } from './data.js';
 import { chartFixture, chartNow } from './fixtures.js';
 
 function inputs(source: Source, patterns?: string[][]): ChartInput[] {
@@ -20,7 +21,7 @@ function inputs(source: Source, patterns?: string[][]): ChartInput[] {
 }
 
 function checkItineraries(input: ChartInput[]) {
-	const chart = buildChartData(input, chartNow);
+	const chart = buildChartData(input);
 	expect(chart.route_trips).toHaveLength(input.length);
 	for (let i = 0; i < input.length; i++) {
 		const points = chart.route_trips[i].points;
@@ -75,10 +76,9 @@ describe('chart stop ordering', () => {
 
 	it('keeps the axis stable when API trip and stop-time arrays are shuffled', () => {
 		const input = inputs('mta_bus');
-		const original = buildChartData(input, chartNow);
+		const original = buildChartData(input);
 		const shuffled = buildChartData(
-			[...input].reverse().map((item) => ({ ...item, calls: [...item.calls].reverse() })),
-			chartNow
+			[...input].reverse().map((item) => ({ ...item, calls: [...item.calls].reverse() }))
 		);
 		expect(shuffled.yDomain).toEqual(original.yDomain);
 	});
@@ -95,18 +95,17 @@ describe('chart stop ordering', () => {
 		expect(chart.yDomain).toHaveLength(5);
 	});
 
-	it('filters past visits, unknown stops and invalid dates without inventing points', () => {
+	it('keeps past visits but filters unknown stops and invalid dates without inventing points', () => {
 		const input = inputs('njt_bus', [['a', 'b', 'c']]);
 		input[0].calls = [
 			...input[0].calls,
 			{ ...input[0].calls[0], stop_id: 'missing' },
 			{ ...input[0].calls[0], arrival: NaN }
 		];
-		const chart = buildChartData(input, chartNow + 120_000);
-		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['b', 'c']);
-		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['b', 'c']);
-		expect(buildChartData(input, chartNow + 600_000).route_trips).toEqual([]);
-		expect(buildChartData([], chartNow).yDomain).toEqual([]);
+		const chart = buildChartData(input);
+		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b', 'c']);
+		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['a', 'b', 'c']);
+		expect(buildChartData([]).yDomain).toEqual([]);
 	});
 
 	it('accepts simultaneous arrivals without losing either stop', () => {
@@ -116,7 +115,7 @@ describe('chart stop ordering', () => {
 			arrival: chartNow,
 			departure: chartNow
 		}));
-		const chart = buildChartData(input, chartNow);
+		const chart = buildChartData(input);
 		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b']);
 		expect(chart.yDomain).toHaveLength(2);
 	});
@@ -129,7 +128,7 @@ describe('chart stop ordering', () => {
 		input[1].calls = input[1].calls.map((st) =>
 			st.stop_id === 'a' ? { ...st, arrival: chartNow + 60_000, departure: chartNow + 60_000 } : st
 		);
-		const chart = buildChartData(input, chartNow);
+		const chart = buildChartData(input);
 		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['b', 'a', 'c']);
 		expect(chart.route_trips.map((series) => series.points.map((point) => point.stop_id))).toEqual([
 			['b', 'a', 'c'],
@@ -161,12 +160,49 @@ describe('chart stop ordering', () => {
 				? { ...st, arrival: chartNow + 120_000, departure: chartNow + 120_000 }
 				: st
 		);
-		const chart = buildChartData(input, chartNow);
+		const chart = buildChartData(input);
 		expect(
 			chart.route_trips.slice(0, 2).map((series) => series.points.map((point) => point.stop_id))
 		).toEqual([
 			['b', 'c', 'a'],
 			['b', 'c', 'a']
 		]);
+	});
+});
+
+describe('chart x domain', () => {
+	const span = 3_600_000;
+	const trip = (...times: number[]) => ({
+		points: times.map((t) => ({ time: new Date(t) }) as ChartPoint)
+	});
+
+	it('starts at now when there is no history', () => {
+		expect(chartXDomain([], chartNow, span)).toEqual([chartNow, chartNow + span]);
+		expect(chartXDomain([trip(chartNow + 60_000)], chartNow, span)).toEqual([
+			chartNow,
+			chartNow + span
+		]);
+	});
+
+	it('clamps history older than the span', () => {
+		expect(chartXDomain([trip(chartNow - 5 * span)], chartNow, span)).toEqual([
+			chartNow - span,
+			chartNow + span
+		]);
+	});
+
+	it('extends back only to the earliest visit within the span, across trips', () => {
+		const earliest = chartNow - span / 2;
+		expect(
+			chartXDomain([trip(chartNow - 600_000, chartNow + 600_000), trip(earliest)], chartNow, span)
+		).toEqual([earliest, chartNow + span]);
+	});
+
+	it('handles very large inputs', () => {
+		const points = Array.from(
+			{ length: 500_000 },
+			(_, i) => ({ time: new Date(chartNow - i) }) as ChartPoint
+		);
+		expect(chartXDomain([{ points }], chartNow, span)[0]).toBe(chartNow - 499_999);
 	});
 });

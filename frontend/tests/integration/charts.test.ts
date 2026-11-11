@@ -34,16 +34,16 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 		for (const [key, inputs] of graphs) {
 			const expectedVisits = new Map<string, string[]>();
 			for (const { trip, calls } of inputs) {
-				const future = calls.filter((st) => Number.isFinite(st.arrival) && st.arrival >= now);
+				const valid = calls.filter((st) => Number.isFinite(st.arrival));
 				expect(
-					future.filter((st) => !stopsById.has(st.stop_id)),
+					valid.filter((st) => !stopsById.has(st.stop_id)),
 					`${source} ${key} ${trip.id}: stop visits cannot be resolved`
 				).toEqual([]);
-				if (future.length) {
-					expectedVisits.set(trip.id, future.map((st) => `${st.stop_id}:${st.arrival}`).sort());
+				if (valid.length) {
+					expectedVisits.set(trip.id, valid.map((st) => `${st.stop_id}:${st.arrival}`).sort());
 				}
 			}
-			const chart = buildChartData(inputs, now);
+			const chart = buildChartData(inputs);
 			expect(
 				chart.route_trips.map((series) => series.trip.id).sort(),
 				`${source} ${key}: lost or unexpected trips`
@@ -68,7 +68,7 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 			}
 		}
 		console.info(
-			`${source}: audited ${checked}/${graphs.size} active route/direction charts; remaining directions have no future predictions`
+			`${source}: audited ${checked}/${graphs.size} active route/direction charts; remaining directions have no calls`
 		);
 	}, 120_000);
 }

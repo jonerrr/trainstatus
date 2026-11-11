@@ -21,8 +21,9 @@
 </script>
 
 {#if current_time_line}
-	<g transform="translate({cake.xScale(new Date())}, 0)">
-		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px">{formatTime(new Date())}</text
+	<g transform="translate({cake.xScale(current_time.ms)}, 0)">
+		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px"
+			>{formatTime(new Date(current_time.ms))}</text
 		>
 		<line y1={0} y2={cake.height} stroke="#e5e5e5" />
 	</g>

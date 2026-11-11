@@ -25,52 +25,59 @@
 	}
 </script>
 
-<!-- Draw a path for each train trip -->
-{#each cake.data as group (`${group.source}:${group.trip.id}`)}
-	{const tripColor = $derived(
-		routes.find((r) => r.id === group.route_id && r.data.source === group.source)?.color
-	)}
+<!-- Trips can extend past the x domain; keep them out of the axis label margins. -->
+<clipPath id="chart-plot-area">
+	<rect y={-4} width={cake.width} height={cake.height + 8} />
+</clipPath>
 
-	{const tripPath = $derived(path(group.points))}
+<g clip-path="url(#chart-plot-area)">
+	<!-- Draw a path for each train trip -->
+	{#each cake.data as group (`${group.source}:${group.trip.id}`)}
+		{const tripColor = $derived(
+			routes.find((r) => r.id === group.route_id && r.data.source === group.source)?.color
+		)}
 
-	<!-- Invisible wider path for easier clicking -->
-	<path
-		class="path-hitarea"
-		d={tripPath}
-		fill="none"
-		stroke="transparent"
-		stroke-width="15"
-		opacity="0"
-		role="button"
-		tabindex="0"
-		aria-label="View details for trip {group.trip.id}"
-		onclick={() => open_trip(group)}
-		onkeydown={(e) => e.key === 'Enter' && open_trip(group)}
-	/>
+		{const tripPath = $derived(path(group.points))}
 
-	<!-- Visible path for display only -->
-	<path
-		class="path-line"
-		d={tripPath}
-		fill="none"
-		stroke={tripColor}
-		stroke-width="2"
-		opacity="1"
-		pointer-events="none"
-	/>
-	{#if stop_points}
-		{#each group.points as point (point.stop_key)}
-			<circle
-				cx={cake.xGet(point)}
-				cy={cake.yGet(point)}
-				r="3"
-				fill={tripColor}
-				stroke="#fff"
-				stroke-width="1"
-			/>
-		{/each}
-	{/if}
-{/each}
+		<!-- Invisible wider path for easier clicking -->
+		<path
+			class="path-hitarea"
+			d={tripPath}
+			fill="none"
+			stroke="transparent"
+			stroke-width="15"
+			opacity="0"
+			role="button"
+			tabindex="0"
+			aria-label="View details for trip {group.trip.id}"
+			onclick={() => open_trip(group)}
+			onkeydown={(e) => e.key === 'Enter' && open_trip(group)}
+		/>
+
+		<!-- Visible path for display only -->
+		<path
+			class="path-line"
+			d={tripPath}
+			fill="none"
+			stroke={tripColor}
+			stroke-width="2"
+			opacity="1"
+			pointer-events="none"
+		/>
+		{#if stop_points}
+			{#each group.points as point (point.stop_key)}
+				<circle
+					cx={cake.xGet(point)}
+					cy={cake.yGet(point)}
+					r="3"
+					fill={tripColor}
+					stroke="#fff"
+					stroke-width="1"
+				/>
+			{/each}
+		{/if}
+	{/each}
+</g>
 
 <style>
 	.path-line:hover {
