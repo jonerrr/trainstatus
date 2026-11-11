@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Router, extract::Request};
 use http::{Method, StatusCode};
-use opentelemetry::trace::{SpanKind, Status, TraceId, TracerProvider};
+use opentelemetry::trace::{SpanId, SpanKind, Status, TraceId, TracerProvider};
 use opentelemetry_sdk::trace::{
     InMemorySpanExporterBuilder, SdkTracerProvider, SimpleSpanProcessor, SpanData,
 };
@@ -191,55 +191,10 @@ async fn unrecognized_method_records_other() {
 }
 
 #[tokio::test]
-async fn valid_w3c_parent_links_trace_and_span() {
+async fn inbound_traceparent_is_ignored() {
     let app = with_observe(
         Router::new().route("/service/{source}", get(ok_handler)),
         true,
-    );
-
-    let traceparent = format!("00-{PARENT_TRACE}-{PARENT_SPAN}-01");
-    let request = Request::builder()
-        .uri("/service/mta_subway")
-        .header("traceparent", traceparent)
-        .body(Body::empty())
-        .unwrap();
-    let (_response, spans) = exchange(request, app).await;
-    let http = server_spans(&spans);
-    assert_eq!(http.len(), 1);
-    assert_eq!(
-        TraceId::from_hex(PARENT_TRACE).unwrap(),
-        http[0].span_context.trace_id()
-    );
-    assert_eq!(http[0].parent_span_id.to_string(), PARENT_SPAN);
-    assert!(http[0].parent_span_is_remote);
-}
-
-#[tokio::test]
-async fn malformed_w3c_parent_starts_new_root() {
-    let app = with_observe(
-        Router::new().route("/service/{source}", get(ok_handler)),
-        true,
-    );
-
-    let request = Request::builder()
-        .uri("/service/mta_subway")
-        .header("traceparent", "not-a-valid-header")
-        .body(Body::empty())
-        .unwrap();
-    let (_response, spans) = exchange(request, app).await;
-    let http = server_spans(&spans);
-    assert_eq!(http.len(), 1);
-    assert_ne!(
-        TraceId::from_hex(PARENT_TRACE).unwrap(),
-        http[0].span_context.trace_id()
-    );
-}
-
-#[tokio::test]
-async fn w3c_extraction_skipped_when_trace_disabled() {
-    let app = with_observe(
-        Router::new().route("/service/{source}", get(ok_handler)),
-        false,
     );
 
     let traceparent = format!("00-{PARENT_TRACE}-{PARENT_SPAN}-01");
@@ -255,6 +210,7 @@ async fn w3c_extraction_skipped_when_trace_disabled() {
         TraceId::from_hex(PARENT_TRACE).unwrap(),
         http[0].span_context.trace_id()
     );
+    assert_eq!(http[0].parent_span_id, SpanId::INVALID);
 }
 
 #[tokio::test]

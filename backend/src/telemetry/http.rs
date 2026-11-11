@@ -5,17 +5,15 @@ use std::time::Instant;
 use axum::extract::{MatchedPath, Request};
 use axum::middleware::Next;
 use axum::response::Response;
-use http::{HeaderMap, Method};
+use http::Method;
 use opentelemetry::KeyValue;
-use opentelemetry::propagation::{Extractor, TextMapPropagator};
 use opentelemetry::trace::Status;
-use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::{metrics::metrics, trace_export_enabled};
 
-/// Axum middleware: server spans, optional W3C parent extraction, and request duration metrics.
+/// Axum middleware: root server spans (inbound trace context is deliberately ignored) and request duration metrics.
 pub async fn observe(request: Request, next: Next) -> Response {
     observe_inner(request, next, trace_export_enabled()).await
 }
@@ -42,8 +40,6 @@ pub async fn observe_inner(request: Request, next: Next, trace_enabled: bool) ->
     }
     if trace_enabled {
         span.record("otel.name", span_name(method_label, route).as_str());
-        let parent = TraceContextPropagator::new().extract(&HeaderExtractor(request.headers()));
-        let _ = span.set_parent(parent);
     }
 
     let timing = metrics().map(|m| (m, Instant::now()));
@@ -82,18 +78,6 @@ pub async fn observe_inner(request: Request, next: Next, trace_enabled: bool) ->
     }
     .instrument(execution_span)
     .await
-}
-
-struct HeaderExtractor<'a>(&'a HeaderMap);
-
-impl Extractor for HeaderExtractor<'_> {
-    fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).and_then(|value| value.to_str().ok())
-    }
-
-    fn keys(&self) -> Vec<&str> {
-        self.0.keys().map(http::HeaderName::as_str).collect()
-    }
 }
 
 /// Bound method labels independently of arbitrary request methods.
