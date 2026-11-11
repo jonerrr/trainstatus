@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/jonerrr/trainstatus/compare/frontend-v2.3.0...frontend-v2.3.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* prevent exact ID from hiding stops with a similar name and focus stop search on desktop ([25a4adc](https://github.com/jonerrr/trainstatus/commit/25a4adc7a1a0fdf04b3f5d15936d1b2766b74116))
+
 ## [2.3.0](https://github.com/jonerrr/trainstatus/compare/frontend-v2.2.1...frontend-v2.3.0) (2026-11-08)
 
 
