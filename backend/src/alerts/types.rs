@@ -54,7 +54,7 @@ impl std::ops::Deref for Alert {
 }
 
 impl AlertCollection {
-    pub(crate) fn into_alerts(self) -> (Source, Vec<Alert>) {
+    pub fn into_alerts(self) -> (Source, Vec<Alert>) {
         match self {
             Self::MtaSubway(alerts) => (
                 Source::MtaSubway,

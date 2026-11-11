@@ -19,6 +19,12 @@ run = "sqlx migrate run"
 depends = ["//backend:migrate"]
 run = "cargo run"
 
+[tasks."dev:telemetry"]
+depends = ["//backend:migrate"]
+run = "cargo run"
+description = "Run the backend with OTLP export to the local Datadog Agent"
+env = { OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318", OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf", OTEL_SERVICE_NAME = "trainstatus-backend", OTEL_RESOURCE_ATTRIBUTES = "deployment.environment.name=development", OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "Delta" }
+
 [tasks.build]
 run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t ghcr.io/jonerrr/trainstatus-backend ."
 

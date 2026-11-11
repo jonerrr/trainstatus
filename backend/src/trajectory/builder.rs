@@ -51,7 +51,7 @@ pub fn retain_anchor_consistent_knots(knots: &mut Vec<TrajectoryKnot>, anchor: &
 }
 /// Provider builders accept either live vehicle reports or this retained GPS fix.
 /// Historical samples use their observation time and never acquire live status.
-pub(super) fn recorded_anchor_knot(
+pub fn recorded_anchor_knot(
     trip: &TripSnapshot,
     geometry: &ShapeGeometry,
     source: Source,

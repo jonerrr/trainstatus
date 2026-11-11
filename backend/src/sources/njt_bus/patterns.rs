@@ -70,9 +70,8 @@ pub async fn fetch_patterns() -> anyhow::Result<Vec<PatternFeature>> {
         .build()?;
     let mut features = Vec::new();
     loop {
-        let page = client
-            .get(PATTERN_URL)
-            .query(&[
+        let page = crate::integrations::http::fetch(
+            client.get(PATTERN_URL).query(&[
                 ("where", "1=1".to_owned()),
                 (
                     "outFields",
@@ -83,12 +82,10 @@ pub async fn fetch_patterns() -> anyhow::Result<Vec<PatternFeature>> {
                 ("orderByFields", "OBJECTID ASC".to_owned()),
                 ("resultRecordCount", PAGE_SIZE.to_string()),
                 ("resultOffset", features.len().to_string()),
-            ])
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<PatternPage>()
-            .await?;
+            ]),
+            |response| async move { response.error_for_status()?.json::<PatternPage>().await },
+        )
+        .await?;
         if !append_page(&mut features, page)? {
             break;
         }
@@ -304,11 +301,17 @@ pub fn build_patterns(
             Err(error) => {
                 rejected += 1;
                 *rejection_reasons.entry(error.to_string()).or_default() += 1;
-                tracing::debug!(pattern = %id, reason = %error, "Rejected NJT operating pattern");
+                tracing::debug!(
+                    trainstatus.source = Source::NjtBus.as_str(),
+                    pattern = %id,
+                    error.message = %format_args!("{error:#}"),
+                    "Rejected NJT operating pattern"
+                );
             }
         }
     }
     tracing::info!(
+        trainstatus.source = Source::NjtBus.as_str(),
         valid_patterns = shapes.len(),
         rejected_patterns = rejected,
         rejection_reasons = ?rejection_reasons,

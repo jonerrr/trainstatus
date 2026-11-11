@@ -1,20 +1,20 @@
 use super::{
-    TrajectoryCache,
+    cache::TrajectoryCache,
     geometry::{geom_to_linestring, shape_key_from_line},
     types::{TrajectoryStop, TripSnapshot},
 };
 use crate::network::index::NetworkRevision;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripData;
-use crate::operations::types::trip::TripRun;
+use crate::operations::types::{
+    position::VehicleObservation,
+    trip::{StopVisit, TripData, TripRun},
+};
 use crate::source::Source;
 use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};
 use geo::{Coord, Distance, Euclidean, LineString};
 
 /// A borrowed geometry view can come from a live revision or retained inputs.
-pub(crate) struct GeometryInputs<'a> {
+pub struct GeometryInputs<'a> {
     pub source: Source,
     pub historical: bool,
     pub route_color: &'a str,
@@ -142,7 +142,7 @@ pub async fn snapshot_from_persisted_trip(
     snapshot_from_geometry(trip, stop_times, positions, &inputs, cache, as_of).await
 }
 
-pub(crate) async fn snapshot_from_geometry(
+pub async fn snapshot_from_geometry(
     trip: &TripRun,
     mut stop_times: Vec<StopVisit>,
     positions: Vec<VehicleObservation>,

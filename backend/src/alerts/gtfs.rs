@@ -1,19 +1,16 @@
-use crate::alerts::store::Alerts;
-use crate::alerts::types::ActivePeriod;
-use crate::alerts::types::AlertCollection;
-use crate::alerts::types::AlertFormat;
-use crate::alerts::types::AlertSection;
-use crate::alerts::types::AlertTranslation;
-use crate::alerts::types::{AffectedEntity, AlertDetails, MtaAlert, MtaAlertData};
-use crate::feed::Alert as GtfsAlert;
-use crate::feed::FeedMessage;
+use super::store::Alerts;
+use super::types::{
+    ActivePeriod, AffectedEntity, AlertCollection, AlertDetails, AlertFormat, AlertSection,
+    AlertTranslation, MtaAlert, MtaAlertData,
+};
+use crate::feed::{Alert, FeedMessage};
 use crate::source::Source;
 use async_trait::async_trait;
 use chrono::DateTime;
 use tracing::{info, instrument, warn};
 
 /// MTA uses a language suffix to distinguish HTML from plain translations.
-pub(crate) fn mta_translations(alert: &GtfsAlert) -> Vec<AlertTranslation> {
+pub fn mta_translations(alert: &Alert) -> Vec<AlertTranslation> {
     let mut translations = Vec::new();
     for (section, text) in [
         (AlertSection::Header, &alert.header_text),
@@ -38,7 +35,7 @@ pub(crate) fn mta_translations(alert: &GtfsAlert) -> Vec<AlertTranslation> {
     translations
 }
 
-pub(crate) fn active_periods(alert: &GtfsAlert) -> Vec<ActivePeriod> {
+pub fn active_periods(alert: &Alert) -> Vec<ActivePeriod> {
     alert
         .active_period
         .iter()
@@ -56,11 +53,11 @@ pub(crate) fn active_periods(alert: &GtfsAlert) -> Vec<ActivePeriod> {
 }
 
 /// Shared Mercury payload parsing; each source retains its route/stop ID policy.
-pub(crate) fn mta_alert<T: GtfsAlertSource>(
+pub fn mta_alert<T: GtfsAlertSource>(
     adapter: &T,
     entity_id: String,
-    alert: GtfsAlert,
-) -> Option<crate::alerts::types::MtaAlert> {
+    alert: Alert,
+) -> Option<MtaAlert> {
     let mercury = alert.mercury_alert.as_ref()?;
     let created_at = DateTime::from_timestamp(mercury.created_at as i64, 0)?;
     let updated_at = DateTime::from_timestamp(mercury.updated_at as i64, 0)?;
@@ -119,7 +116,7 @@ pub trait GtfsAlertSource: Send + Sync {
     /// Process a GTFS-RT alert into our internal Alert representation.
     /// Returns None if the alert should be skipped (e.g., missing mercury extension).
     /// The entity_id is the original entity ID from the feed.
-    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<Self::Alert>;
+    fn process_alert(&self, entity_id: String, alert: Alert) -> Option<Self::Alert>;
 
     /// Parse route_id for this source (e.g., convert "SS" to "SI" for subway)
     fn parse_route_id(&self, route_id: String) -> Option<String> {
@@ -133,11 +130,11 @@ pub trait GtfsAlertSource: Send + Sync {
 }
 
 /// The main pipeline: Fetch -> Process -> Save
-#[instrument(level = "debug", skip(adapter, alerts), fields(source = %adapter.source()))]
+#[instrument(level = "debug", skip(adapter, alerts), fields(trainstatus.source = adapter.source().as_str()))]
 pub async fn run_pipeline<T: GtfsAlertSource>(adapter: &T, alerts: &Alerts) -> anyhow::Result<()> {
     let feeds = adapter.fetch_feeds().await?;
     if feeds.is_empty() {
-        warn!(source = %adapter.source(), "No alert feeds fetched");
+        warn!("No alert feeds fetched");
         return Ok(());
     }
 
@@ -158,6 +155,6 @@ pub async fn run_pipeline<T: GtfsAlertSource>(adapter: &T, alerts: &Alerts) -> a
         }
     }
 
-    info!(source = %adapter.source(), count = processed.len(), "Processed alerts");
+    info!(count = processed.len(), "Processed alerts");
     alerts.save_all(adapter.collection(processed)).await
 }

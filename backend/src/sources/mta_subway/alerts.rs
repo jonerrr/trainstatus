@@ -1,10 +1,9 @@
-use crate::alerts::gtfs as gtfs_alert;
-use crate::alerts::gtfs::GtfsAlertSource;
-use crate::alerts::store::Alerts;
-use crate::alerts::types::AlertCollection;
-use crate::alerts::types::MtaAlert;
-use crate::feed::Alert as GtfsAlert;
-use crate::feed::FeedMessage;
+use crate::alerts::{
+    gtfs::{GtfsAlertSource, mta_alert, run_pipeline},
+    store::Alerts,
+    types::{AlertCollection, MtaAlert},
+};
+use crate::feed::{Alert, FeedMessage};
 use crate::integrations::gtfs_realtime;
 use crate::source::Source;
 use crate::sources::AlertsAdapter;
@@ -18,13 +17,12 @@ pub struct MtaSubwayAlerts;
 
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
-    let bytes = crate::integrations::http::realtime()
-        .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts")
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
+    let bytes = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .get("https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts"),
+        |response| async move { response.error_for_status()?.bytes().await },
+    )
+    .await?;
 
     let mut fixtures = BTreeMap::new();
     fixtures.insert("alerts.pb".to_string(), bytes.to_vec());
@@ -70,8 +68,8 @@ impl GtfsAlertSource for MtaSubwayAlerts {
         Some(stop_id)
     }
 
-    fn process_alert(&self, entity_id: String, alert: GtfsAlert) -> Option<Self::Alert> {
-        gtfs_alert::mta_alert(self, entity_id, alert)
+    fn process_alert(&self, entity_id: String, alert: Alert) -> Option<Self::Alert> {
+        mta_alert(self, entity_id, alert)
     }
 }
 
@@ -86,6 +84,6 @@ impl AlertsAdapter for MtaSubwayAlerts {
     }
 
     async fn run(&self, alerts: &Alerts) -> anyhow::Result<()> {
-        gtfs_alert::run_pipeline(self, alerts).await
+        run_pipeline(self, alerts).await
     }
 }

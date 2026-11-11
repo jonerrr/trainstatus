@@ -43,7 +43,7 @@ where
 
 impl Geom {
     /// Coordinate serialization is deterministic and independent of provider shape IDs.
-    pub(crate) fn content_id(&self) -> anyhow::Result<String> {
+    pub fn content_id(&self) -> anyhow::Result<String> {
         Ok(blake3::hash(&serde_json::to_vec(self)?)
             .to_hex()
             .to_string())

@@ -68,6 +68,8 @@ else
       exit 1
     fi
     args+=(--configmap "$configmap")
+  elif [[ "$suffix" == "dev" && -f dev.configmap.yml ]]; then
+    args+=(--configmap dev.configmap.yml)
   fi
   podman "${args[@]}"
 fi

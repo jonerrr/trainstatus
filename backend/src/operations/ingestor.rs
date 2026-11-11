@@ -1,20 +1,20 @@
-use super::postgres::{ObservationRow, TripRow};
-use super::{CollectedObservation, CollectedVisit, RunKey};
-use std::{collections::HashMap, sync::Arc};
-
+use super::{
+    live::LiveSnapshots,
+    postgres::{ObservationRow, TripRow},
+    source::{CollectedObservation, CollectedSnapshot, CollectedVisit, RunKey},
+    types::{
+        position::VehicleObservation,
+        trip::{StopVisit, TripRun},
+    },
+};
+use crate::network::index::{NetworkIndex, NetworkRevision};
+use crate::source::Source;
 use anyhow::Context;
 use chrono::{DateTime, SubsecRound, Utc};
 use geo::{Distance, Euclidean};
 use sqlx::{PgPool, Postgres, Transaction};
+use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;
-
-use super::{CollectedSnapshot, LiveSnapshots};
-use crate::network::index::NetworkIndex;
-use crate::network::index::NetworkRevision;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
-use crate::source::Source;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct IngestionChanges {
@@ -40,7 +40,7 @@ pub struct SourceSnapshot {
 #[derive(Clone)]
 pub struct OperationsIngestor {
     pg_pool: PgPool,
-    pub(super) live_snapshots: LiveSnapshots,
+    pub live_snapshots: LiveSnapshots,
     network_index: NetworkIndex,
     commit_locks: Arc<HashMap<Source, tokio::sync::Mutex<()>>>,
 }
@@ -70,7 +70,18 @@ impl OperationsIngestor {
     }
 
     pub async fn ingest(&self, snapshot: CollectedSnapshot) -> anyhow::Result<Arc<SourceSnapshot>> {
-        let started = std::time::Instant::now();
+        crate::telemetry::operation(
+            snapshot.source,
+            crate::telemetry::Operation::RealtimeIngest,
+            self.ingest_committed(snapshot),
+        )
+        .await
+    }
+
+    async fn ingest_committed(
+        &self,
+        snapshot: CollectedSnapshot,
+    ) -> anyhow::Result<Arc<SourceSnapshot>> {
         let source = snapshot.source;
         let _guard = self.commit_locks[&source].lock().await;
         let network_revision = snapshot
@@ -182,7 +193,23 @@ impl OperationsIngestor {
         // Publish synchronously after commit, even with no trajectory subscriber.
         // Every live consumer retains this Arc until the next successful commit.
         self.live_snapshots.publish(persisted.clone());
-        tracing::info!(%source, ?changes, elapsed_ms = started.elapsed().as_millis(), trips = persisted.trips.len(), stop_times = persisted.stop_times.len(), positions = persisted.positions.len(), "Realtime snapshot committed");
+        if let Some(metrics) = crate::telemetry::metrics::metrics() {
+            metrics.committed(persisted.as_ref());
+        }
+        let changes = persisted.changes;
+        tracing::info!(
+            name: "trainstatus.realtime.committed",
+            {
+                trainstatus.changed.trips = changes.trips,
+                trainstatus.changed.stop_times = changes.stop_times,
+                trainstatus.changed.vehicle_observations = changes.positions,
+                trainstatus.changed.resolved_shapes = changes.resolved_shapes,
+                trips = persisted.trips.len(),
+                stop_times = persisted.stop_times.len(),
+                positions = persisted.positions.len(),
+            },
+            "realtime snapshot committed"
+        );
         Ok(persisted)
     }
 }

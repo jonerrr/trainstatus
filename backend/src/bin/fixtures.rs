@@ -6,20 +6,9 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::fixtures::FixtureManifest;
-use backend::fixtures::FixturePayload;
+use backend::fixtures::{self, FixtureKind, FixtureManifest, FixturePayload};
 use backend::source::Source;
-use backend::sources::mta_bus::alerts as mta_bus_alerts;
-use backend::sources::mta_bus::realtime as mta_bus_realtime;
-use backend::sources::mta_bus::static_data as mta_bus_static;
-use backend::sources::mta_subway::alerts as mta_subway_alerts;
-use backend::sources::mta_subway::realtime as mta_subway_realtime;
-use backend::sources::mta_subway::static_data as mta_subway_static;
-use backend::sources::njt_bus::alerts as njt_bus_alerts;
-use backend::sources::njt_bus::realtime as njt_bus_realtime;
-use backend::sources::njt_bus::static_data as njt_bus_static;
+use backend::sources::{mta_bus, mta_subway, njt_bus};
 use serde_json::json;
 
 const DEFAULT_ROOT: &str = "tests/fixtures";
@@ -134,18 +123,20 @@ async fn update_expected(args: Vec<String>) -> Result<()> {
 async fn capture_payloads(source: Source, kind: FixtureKind) -> Result<BTreeMap<String, Vec<u8>>> {
     match (source, kind) {
         (Source::MtaSubway, FixtureKind::Static) => {
-            json_payloads_to_bytes(mta_subway_static::capture_fixtures().await?)
+            json_payloads_to_bytes(mta_subway::static_data::capture_fixtures().await?)
         }
         (Source::MtaBus, FixtureKind::Static) => {
-            json_payloads_to_bytes(mta_bus_static::capture_fixtures().await?)
+            json_payloads_to_bytes(mta_bus::static_data::capture_fixtures().await?)
         }
-        (Source::NjtBus, FixtureKind::Static) => njt_bus_static::capture_fixtures().await,
-        (Source::MtaSubway, FixtureKind::Realtime) => mta_subway_realtime::capture_fixtures().await,
-        (Source::MtaBus, FixtureKind::Realtime) => mta_bus_realtime::capture_fixtures().await,
-        (Source::NjtBus, FixtureKind::Realtime) => njt_bus_realtime::capture_fixtures().await,
-        (Source::MtaSubway, FixtureKind::Alerts) => mta_subway_alerts::capture_fixtures().await,
-        (Source::MtaBus, FixtureKind::Alerts) => mta_bus_alerts::capture_fixtures().await,
-        (Source::NjtBus, FixtureKind::Alerts) => njt_bus_alerts::capture_fixtures().await,
+        (Source::NjtBus, FixtureKind::Static) => njt_bus::static_data::capture_fixtures().await,
+        (Source::MtaSubway, FixtureKind::Realtime) => {
+            mta_subway::realtime::capture_fixtures().await
+        }
+        (Source::MtaBus, FixtureKind::Realtime) => mta_bus::realtime::capture_fixtures().await,
+        (Source::NjtBus, FixtureKind::Realtime) => njt_bus::realtime::capture_fixtures().await,
+        (Source::MtaSubway, FixtureKind::Alerts) => mta_subway::alerts::capture_fixtures().await,
+        (Source::MtaBus, FixtureKind::Alerts) => mta_bus::alerts::capture_fixtures().await,
+        (Source::NjtBus, FixtureKind::Alerts) => njt_bus::alerts::capture_fixtures().await,
     }
 }
 
@@ -415,7 +406,7 @@ fn static_dataset_expected(
         Source::MtaSubway => {
             let infrastructure = fixtures::read_json_payload(root, manifest, "infrastructure")?;
             let exit_strategy = fixtures::read_json_payload(root, manifest, "exit_strategy")?;
-            let dataset = mta_subway_static::build_static_dataset_from_fixtures(
+            let dataset = mta_subway::static_data::build_static_dataset_from_fixtures(
                 infrastructure,
                 exit_strategy,
             )?;
@@ -424,7 +415,8 @@ fn static_dataset_expected(
         Source::MtaBus => {
             let infrastructure = fixtures::read_json_payload(root, manifest, "infrastructure")?;
             let oba = fixtures::read_json_payload(root, manifest, "oba")?;
-            let dataset = mta_bus_static::build_static_dataset_from_fixtures(infrastructure, oba)?;
+            let dataset =
+                mta_bus::static_data::build_static_dataset_from_fixtures(infrastructure, oba)?;
             Ok(Some(fixtures::static_dataset_expected_value(&dataset)))
         }
         Source::NjtBus => Ok(None),
@@ -456,7 +448,7 @@ async fn realtime_domain_expected(
     }
 
     let feed = fixtures::read_gtfs_realtime_payload(root, manifest, "trip_updates")?;
-    let snapshot = mta_bus_realtime::MtaBusRealtime.build_snapshot(vec![feed], Vec::new());
+    let snapshot = mta_bus::realtime::MtaBusRealtime.build_snapshot(vec![feed], Vec::new());
     let processed = snapshot.trips.len();
     let sample = snapshot.trips.into_iter().take(5).collect::<Vec<_>>();
 

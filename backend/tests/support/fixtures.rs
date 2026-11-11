@@ -1,8 +1,8 @@
 use backend::network::dataset::NetworkDataset;
-use backend::sources::mta_bus::static_data as mta_bus_static;
-use backend::sources::mta_subway::static_data as mta_subway_static;
-use backend::sources::njt_bus::patterns::PatternFeature;
-use backend::sources::njt_bus::static_data as njt_bus_static;
+use backend::sources::{
+    mta_bus, mta_subway,
+    njt_bus::{self, patterns::PatternFeature},
+};
 
 pub fn mta_subway_dataset() -> NetworkDataset {
     let root = fixture_root();
@@ -18,7 +18,7 @@ pub fn mta_subway_dataset() -> NetworkDataset {
     let exit_strategy = backend::fixtures::read_json_payload(&root, &manifest, "exit_strategy")
         .expect("MTA subway exit strategy fixture should load");
 
-    mta_subway_static::build_static_dataset_from_fixtures(infrastructure, exit_strategy)
+    mta_subway::static_data::build_static_dataset_from_fixtures(infrastructure, exit_strategy)
         .expect("MTA subway static fixture should build")
 }
 
@@ -36,7 +36,7 @@ pub fn mta_bus_dataset() -> NetworkDataset {
 
     let oba = backend::fixtures::read_json_payload(&root, &manifest, "oba")
         .expect("MTA bus OBA static fixture should load");
-    mta_bus_static::build_static_dataset_from_fixtures(infrastructure, oba)
+    mta_bus::static_data::build_static_dataset_from_fixtures(infrastructure, oba)
         .expect("MTA bus static fixture should build")
 }
 
@@ -58,7 +58,7 @@ pub fn njt_bus_dataset() -> NetworkDataset {
     )
     .expect("NJT bus operating-pattern fixture should decode");
 
-    njt_bus_static::build_static_dataset_from_patterns(&gtfs, patterns).dataset
+    njt_bus::static_data::build_static_dataset_from_patterns(&gtfs, patterns).dataset
 }
 
 pub fn fixture_root() -> std::path::PathBuf {

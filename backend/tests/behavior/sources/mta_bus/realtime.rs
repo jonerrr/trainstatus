@@ -1,11 +1,10 @@
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::operations::CollectedSnapshot;
-use backend::operations::types::position::PositionData;
-use backend::source::Source;
-use backend::sources::mta_bus::realtime::MtaBusRealtime;
-
 use crate::support::fixture_root;
+use backend::{
+    fixtures::{self, FixtureKind},
+    operations::{source::CollectedSnapshot, types::position::PositionData},
+    source::Source,
+    sources::mta_bus::realtime::MtaBusRealtime,
+};
 
 #[test]
 fn realtime_fixture_maps_trips_and_merges_oba_positions() {

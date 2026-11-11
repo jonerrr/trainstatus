@@ -68,12 +68,14 @@ impl ContinuityStatsBatch {
 
         if self.prev_state_discarded > 0 {
             tracing::warn!(
-                source,
-                prev_state_discarded = self.prev_state_discarded,
-                stale_prev_state_discarded = self.stale_prev_state_discarded,
-                backward_gap_discarded = self.backward_gap_discarded,
-                forward_jump_discarded = self.forward_jump_discarded,
-                trips_with_prev_state = self.trips_with_prev_state,
+                {
+                    trainstatus.source = source,
+                    prev_state_discarded = self.prev_state_discarded,
+                    stale_prev_state_discarded = self.stale_prev_state_discarded,
+                    backward_gap_discarded = self.backward_gap_discarded,
+                    forward_jump_discarded = self.forward_jump_discarded,
+                    trips_with_prev_state = self.trips_with_prev_state,
+                },
                 "trajectory continuity filtering"
             );
         }
@@ -88,12 +90,14 @@ impl ContinuityStatsBatch {
                 0.0
             };
             tracing::debug!(
-                source,
-                trips_with_live_anchor = self.trips_with_live_anchor,
-                avg_live_anchor_gap_m,
-                max_live_anchor_gap_m = self.live_anchor_gap_max_m,
-                pre_anchor_knots_dropped = self.pre_anchor_knots_dropped,
-                backtracking_knots_removed = self.backtracking_knots_removed,
+                {
+                    trainstatus.source = source,
+                    trips_with_live_anchor = self.trips_with_live_anchor,
+                    avg_live_anchor_gap_m,
+                    max_live_anchor_gap_m = self.live_anchor_gap_max_m,
+                    pre_anchor_knots_dropped = self.pre_anchor_knots_dropped,
+                    backtracking_knots_removed = self.backtracking_knots_removed,
+                },
                 "trajectory generation metrics"
             );
         }

@@ -1,25 +1,31 @@
-use crate::support;
-
-use backend::feed;
-use backend::feed::FeedMessage;
-use backend::feed::TripUpdate;
-use backend::network::index::NetworkRevision;
-use backend::network::store::Network;
-use backend::operations::OperationsIngestor;
-use backend::source::Source;
-use backend::sources::njt_bus::patterns::PatternFeature;
-use backend::sources::njt_bus::realtime::NjtBusRealtime;
-use backend::sources::njt_bus::static_data::build_static_dataset_from_patterns;
-use chrono::Utc;
 use std::collections::HashMap;
+
+use chrono::Utc;
 use uuid::Uuid;
+
+use crate::support;
+use backend::{
+    feed::{self, FeedMessage, TripUpdate},
+    network::{
+        dataset::NetworkDataset,
+        index::{NetworkRevision, TripPattern},
+        store::Network,
+    },
+    operations::{history::History, ingestor::OperationsIngestor},
+    source::Source,
+    sources::njt_bus::{
+        patterns::PatternFeature, realtime::NjtBusRealtime,
+        static_data::build_static_dataset_from_patterns,
+    },
+    trajectory::service::TrajectoryService,
+};
 
 struct Scenario {
     stores: support::TestOwners,
-    dataset: backend::network::dataset::NetworkDataset,
+    dataset: NetworkDataset,
     feed: FeedMessage,
     update: TripUpdate,
-    patterns: HashMap<String, backend::network::index::TripPattern>,
+    patterns: HashMap<String, TripPattern>,
     scheduled_id: String,
     route_id: String,
     now: chrono::DateTime<Utc>,
@@ -208,7 +214,7 @@ async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPoo
             .await
             .unwrap();
     assert_eq!(position_trips, [Some(trips[0].0)]);
-    let history = backend::operations::history::History::new(pool.clone());
+    let history = History::new(pool.clone());
     let retained = history
         .load_trajectories(Source::NjtBus, scenario.now)
         .await
@@ -230,7 +236,7 @@ async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPoo
             .iter()
             .all(|visit| visit.stop_id != "test-gate")
     );
-    let rendered = backend::trajectory::TrajectoryService::new(pool.clone())
+    let rendered = TrajectoryService::new(pool.clone())
         .snapshot(Source::NjtBus, Some(scenario.now))
         .await
         .unwrap();

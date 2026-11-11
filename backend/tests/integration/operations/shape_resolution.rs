@@ -1,13 +1,13 @@
-use crate::support;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::operations::types::trip::MtaBusData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::TripData;
-
-use backend::source::Source;
-use support::{mta_bus_dataset, test_owners};
 use uuid::Uuid;
+
+use crate::support::{mta_bus_dataset, test_owners};
+use backend::{
+    operations::{
+        source::{CollectedSnapshot, RunKey},
+        types::trip::{MtaBusData, StopTimeData, StopVisit, TripData, TripRun},
+    },
+    source::Source,
+};
 
 /// Real B94 stops (from the checked-in Helium fixture) all served by shape
 /// `B940017`. Used to build a synthetic realtime trip whose stop sequence
@@ -23,8 +23,8 @@ const B94_STOP_COORDS: [(f64, f64); 5] = [
 const B94_REAL_SHAPE: &str = "B940017";
 const DECOY_SHAPE: &str = "TEST_DECOY_SHAPE";
 
-fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::CollectedSnapshot {
-    let id: backend::operations::RunKey = Uuid::now_v7().into();
+fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
+    let id: RunKey = Uuid::now_v7().into();
     let now = crate::support::fixtures::fixed_time();
     let trip = TripRun {
         id,
@@ -52,7 +52,7 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> backend::operations::Col
             }
         })
         .collect();
-    backend::operations::CollectedSnapshot {
+    CollectedSnapshot {
         source: Source::MtaBus,
         network_revision: None,
         renormalize: None,

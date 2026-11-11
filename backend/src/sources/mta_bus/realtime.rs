@@ -1,22 +1,20 @@
-use crate::feed::FeedMessage;
-use crate::feed::TripUpdate;
-use crate::feed::VehiclePosition as GtfsVehiclePosition;
-use crate::integrations::gtfs_realtime;
-use crate::integrations::oba;
+use super::super::mta_subway::realtime::parse_origin_time;
+use super::AGENCIES;
+use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
+use crate::integrations::{gtfs_realtime, oba};
 use crate::mta_oba_api_key;
-use crate::operations::CollectedSnapshot;
-use crate::operations::RealtimeSource;
-use crate::operations::RealtimeSourceConfig;
-use crate::operations::RunKey;
-use crate::operations::source::CollectedObservation as VehicleObservation;
-use crate::operations::source::CollectedTrip as TripRun;
-use crate::operations::source::CollectedVisit as StopVisit;
-use crate::operations::types::position::MtaBusPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::trip::StopTimeData;
+use crate::operations::{
+    normalize::gtfs_start,
+    source::{
+        CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
+        RealtimeSourceConfig, RunKey,
+    },
+    types::{
+        position::{MtaBusPositionData, PositionData},
+        trip::{MtaBusData, StopTimeData, TripData},
+    },
+};
 use crate::source::Source;
-use crate::sources::mta_bus::AGENCIES;
-use crate::sources::mta_subway::realtime::parse_origin_time;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use geo::Point;
@@ -30,20 +28,17 @@ pub struct MtaBusRealtime;
 #[cfg(feature = "fixture-capture")]
 pub async fn capture_fixtures() -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
     let adapter = MtaBusRealtime;
-    let trip_updates = crate::integrations::http::realtime()
-        .get("https://gtfsrt.prod.obanyc.com/tripUpdates")
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
-    let vehicle_positions = crate::integrations::http::realtime()
-        .get("https://gtfsrt.prod.obanyc.com/vehiclePositions")
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
+    let trip_updates = crate::integrations::http::fetch(
+        crate::integrations::http::realtime().get("https://gtfsrt.prod.obanyc.com/tripUpdates"),
+        |response| async move { response.error_for_status()?.bytes().await },
+    )
+    .await?;
+    let vehicle_positions = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .get("https://gtfsrt.prod.obanyc.com/vehiclePositions"),
+        |response| async move { response.error_for_status()?.bytes().await },
+    )
+    .await?;
     let oba_vehicles = adapter.fetch_oba_data().await?;
 
     let mut fixtures = BTreeMap::new();
@@ -73,6 +68,7 @@ impl MtaBusRealtime {
             match oba::fetch_vehicles(&url, mta_oba_api_key()).await {
                 Ok(vehicles) => {
                     debug!(
+                        trainstatus.source = Source::MtaBus.as_str(),
                         agency,
                         vehicle_count = vehicles.len(),
                         "Fetched OBA vehicles"
@@ -80,7 +76,12 @@ impl MtaBusRealtime {
                     all_vehicles.extend(vehicles);
                 }
                 Err(e) => {
-                    warn!(agency, error = %e, "Failed to fetch OBA data");
+                    warn!(
+                        trainstatus.source = Source::MtaBus.as_str(),
+                        agency,
+                        error.message = %format_args!("{e:#}"),
+                        "Failed to fetch OBA data"
+                    );
                 }
             }
         }
@@ -112,7 +113,7 @@ impl MtaBusRealtime {
         &self,
         update: TripUpdate,
         observed_at: Option<DateTime<Utc>>,
-    ) -> (Option<TripRun>, Vec<StopVisit>) {
+    ) -> (Option<CollectedTrip>, Vec<CollectedVisit>) {
         let trip_desc = update.trip;
 
         // Extract trip ID and route ID
@@ -143,8 +144,9 @@ impl MtaBusRealtime {
             None => {
                 // TODO: remove warning after confirming that all bus trips have direction_id populated
                 warn!(
-                    "Missing direction_id in trip descriptor for trip {}",
-                    mta_id
+                    trainstatus.source = Source::MtaBus.as_str(),
+                    trainstatus.trip.id = %mta_id,
+                    "Missing direction_id in trip descriptor"
                 );
 
                 return (None, vec![]);
@@ -167,7 +169,8 @@ impl MtaBusRealtime {
         // Some MTA Bus Co trips use a different format that doesn't include the origin time.
         let start_time = parse_bus_origin_time(&mta_id).unwrap_or_else(|| {
             debug!(
-                trip_id = mta_id,
+                trainstatus.source = Source::MtaBus.as_str(),
+                trainstatus.trip.id = %mta_id,
                 "Failed to parse origin time from trip ID, falling back to midnight",
             );
             // TODO: it might be possible for there to be multiple trips with the same trip_id but different start times, although hopefully the vehicle_id uniqueness helps avoid conflicts
@@ -177,14 +180,14 @@ impl MtaBusRealtime {
         let created_at = match trip_desc
             .start_time
             .as_deref()
-            .and_then(|time| crate::operations::normalize::gtfs_start(start_date, time))
-            .or_else(|| TripRun::created_at(start_date, start_time))
+            .and_then(|time| gtfs_start(start_date, time))
+            .or_else(|| CollectedTrip::created_at(start_date, start_time))
         {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
 
-        let trip = TripRun {
+        let trip = CollectedTrip {
             id: RunKey::new(Source::MtaBus, &mta_id, created_at, direction),
             original_id: mta_id,
             route_id,
@@ -198,15 +201,13 @@ impl MtaBusRealtime {
                 .and_then(|time| DateTime::from_timestamp(time, 0))
                 .or(observed_at)
                 .unwrap_or(created_at),
-            data: crate::operations::types::trip::TripData::MtaBus(
-                crate::operations::types::trip::MtaBusData {
-                    deviation: update.delay,
-                },
-            ),
+            data: TripData::MtaBus(MtaBusData {
+                deviation: update.delay,
+            }),
         };
 
         // Process stop times for bus
-        let stop_times: Vec<StopVisit> = update
+        let stop_times: Vec<CollectedVisit> = update
             .stop_time_update
             .into_iter()
             .filter_map(|st| {
@@ -215,9 +216,9 @@ impl MtaBusRealtime {
                 let stop_id = st.stop_id?;
 
                 let (arrival, departure) =
-                    crate::integrations::gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
+                    gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
 
-                Some(StopVisit {
+                Some(CollectedVisit {
                     trip_id: trip.id,
                     stop_sequence,
                     stop_id,
@@ -233,9 +234,9 @@ impl MtaBusRealtime {
 
     fn process_vehicle(
         &self,
-        vehicle: GtfsVehiclePosition,
+        vehicle: VehiclePosition,
         observed_at: Option<DateTime<Utc>>,
-    ) -> Option<VehicleObservation> {
+    ) -> Option<CollectedObservation> {
         let vehicle_desc = vehicle.vehicle?;
         let vehicle_id = parse_prefixed_id(vehicle_desc.id?);
 
@@ -251,7 +252,7 @@ impl MtaBusRealtime {
         let point: geo::Geometry =
             Point::new(position.longitude as f64, position.latitude as f64).into();
 
-        Some(VehicleObservation {
+        Some(CollectedObservation {
             vehicle_id,
             trip_id: None, // Will be set during trip linking
             stop_id,
@@ -285,7 +286,11 @@ impl RealtimeSource for MtaBusRealtime {
         let (feeds, oba_result) = tokio::join!(self.fetch_feeds(), self.fetch_oba_data());
         let feeds = feeds?;
         let oba = oba_result.unwrap_or_else(|error| {
-            error!(%error, "OBA fetch failed");
+            error!(
+                trainstatus.source = Source::MtaBus.as_str(),
+                error.message = %format_args!("{error:#}"),
+                "OBA fetch failed"
+            );
             Vec::new()
         });
         let mut snapshot = self.build_snapshot(feeds, oba);

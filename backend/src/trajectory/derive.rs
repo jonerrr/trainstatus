@@ -1,17 +1,22 @@
-use crate::operations::SourceSnapshot;
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryCache;
-use crate::trajectory::TrajectoryCalculator;
-use crate::trajectory::TrajectoryConfig;
-use crate::trajectory::compute_trajectory_async;
-use crate::trajectory::continuity::ContinuityStatsBatch;
-use crate::trajectory::expand_render_units;
-use crate::trajectory::snapshot_from_persisted_trip;
+use std::{borrow::Borrow, collections::HashMap, sync::Arc};
+
 use chrono::Utc;
 use futures::future::join_all;
-use std::{borrow::Borrow, collections::HashMap, sync::Arc};
+use opentelemetry::KeyValue;
+
+use super::{
+    cache::TrajectoryCache,
+    calculator::{TrajectoryCalculator, compute_trajectory_async},
+    continuity::ContinuityStatsBatch,
+    render_units::expand_render_units,
+    snapshot::snapshot_from_persisted_trip,
+    types::{HotSnapshot, TrajectoryConfig},
+};
+use crate::operations::{
+    ingestor::SourceSnapshot,
+    types::{position::VehicleObservation, trip::StopVisit},
+};
+use crate::telemetry::metrics;
 
 /// CPU derivation has no stores or database handle. Scheduling and publication
 /// belong to the source engine, which supplies only committed snapshots.
@@ -36,7 +41,10 @@ impl TrajectoryDeriver {
             snapshot.network_revision.source == source,
             "Static revision belongs to another source"
         );
-        tracing::info!(%source, trips = snapshot.trips.len(), "Deriving trajectories from committed snapshot");
+        tracing::debug!(
+            { trainstatus.source = source.as_str(), trainstatus.trips = snapshot.trips.len() },
+            "deriving trajectories from committed snapshot"
+        );
         let at = Utc::now();
         let previous = self.cache.get_hot(source).await;
         let mut stops: HashMap<uuid::Uuid, Vec<StopVisit>> = HashMap::new();
@@ -76,8 +84,13 @@ impl TrajectoryDeriver {
                     let units = expand_render_units(source, &input, &computed.trajectory);
                     Ok::<_, anyhow::Error>((trip.id, computed, units, compatible.is_some(), input.positions))
                 }.await;
-                if let Err(error) = &result { tracing::debug!(%source, trip_id = %trip.id, %error, "Skipping invalid trajectory input"); }
-                result.ok()
+                if let Err(error) = &result {
+                    tracing::debug!(
+                        { trainstatus.source = source.as_str(), trainstatus.trip.id = %trip.id, error.message = %format_args!("{error:#}") },
+                        "skipping invalid trajectory input"
+                    );
+                }
+                result
             }
         });
         let mut hot = HotSnapshot {
@@ -88,9 +101,42 @@ impl TrajectoryDeriver {
             gps_history: HashMap::new(),
         };
         let mut stats = ContinuityStatsBatch::default();
-        for (id, computed, units, had_prev, positions) in
-            join_all(futures).await.into_iter().flatten()
-        {
+        let trip_results = join_all(futures).await;
+        if let Some(m) = metrics::metrics() {
+            let (trip_successes, trip_errors) =
+                trip_results
+                    .iter()
+                    .fold((0usize, 0usize), |(ok, err), result| {
+                        if result.is_ok() {
+                            (ok + 1, err)
+                        } else {
+                            (ok, err + 1)
+                        }
+                    });
+            let base = m.attrs(source)[0].clone();
+            if trip_successes > 0 {
+                m.trajectory_inputs.add(
+                    trip_successes as u64,
+                    &[
+                        base.clone(),
+                        KeyValue::new("trainstatus.outcome", "success"),
+                    ],
+                );
+            }
+            if trip_errors > 0 {
+                m.trajectory_inputs.add(
+                    trip_errors as u64,
+                    &[base, KeyValue::new("trainstatus.outcome", "error")],
+                );
+            }
+        }
+        for (id, computed, units, had_prev, positions) in trip_results.into_iter().flatten() {
+            if let (Some(m), Some(gap)) = (
+                metrics::metrics(),
+                computed.continuity_stats.live_anchor_gap_m,
+            ) {
+                m.anchor_gap.record(gap, m.attrs(source));
+            }
             stats.record(computed.continuity_stats, had_prev);
             if let Some(unit) = units.first() {
                 hot.plans.insert(id, unit.trajectory.clone());
@@ -100,8 +146,14 @@ impl TrajectoryDeriver {
                 hot.render_units.insert(unit.render_unit_id.clone(), unit);
             }
         }
+        if let Some(m) = metrics::metrics() {
+            m.continuity(source, &stats);
+        }
         stats.log_summary(source.as_str());
-        tracing::info!(%source, elapsed_ms = started.elapsed().as_millis(), render_units = hot.render_units.len(), "Committed snapshot trajectories derived");
+        tracing::debug!(
+            { trainstatus.source = source.as_str(), elapsed_ms = started.elapsed().as_millis(), trainstatus.render_units = hot.render_units.len() },
+            "trajectory derivation completed"
+        );
         Ok(hot)
     }
 }

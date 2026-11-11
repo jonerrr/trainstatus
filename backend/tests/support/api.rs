@@ -17,6 +17,6 @@ pub fn app_state_from_owners(pool: sqlx::PgPool, stores: TestOwners) -> AppState
             backend::api::dto::service::ENCODER,
         ),
         alerts: stores.alerts,
-        trajectories: backend::trajectory::TrajectoryService::new(pool),
+        trajectories: backend::trajectory::service::TrajectoryService::new(pool),
     }
 }

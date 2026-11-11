@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::operations::types::position::VehicleObservation;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
+use super::types::{
+    position::VehicleObservation,
+    trip::{StopVisit, TripRun},
+};
 use crate::source::Source;
 
 #[derive(Debug, Clone, Copy)]

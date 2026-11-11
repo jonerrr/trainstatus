@@ -1,5 +1,4 @@
-use crate::network::types::stop::PlatformEdge;
-use crate::network::types::stop::StopData;
+use crate::network::types::stop::{PlatformEdge, StopData};
 use crate::operations::types::trip::StopTimeData;
 use crate::source::Source;
 
@@ -163,7 +162,7 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
                 _ => return Err(anyhow::anyhow!("Expected MTA subway stop data")),
             };
             let platform_edges = Self::platform_edges_for_stop(stop, &stop_data_mta.platform_edges);
-            let platform_match = crate::trajectory::platform::select_platform(
+            let platform_match = super::super::platform::select_platform(
                 &platform_edges,
                 trip.direction,
                 consist_length_m,
@@ -219,3 +218,7 @@ impl TrajectoryBuilder for MtaSubwayBuilder {
         Ok(GeneratedKnots { knots, stats })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/mta_subway.rs"]
+mod tests;

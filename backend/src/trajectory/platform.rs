@@ -1,7 +1,7 @@
 use super::cache::PlatformMatch;
-use crate::network::types::stop::PlatformDirection;
-use crate::network::types::stop::PlatformEdge;
-pub(super) fn platform_position_for_direction(
+use crate::network::types::stop::{PlatformDirection, PlatformEdge};
+
+pub fn platform_position_for_direction(
     position_from_north_m: f64,
     platform_length_m: f64,
     direction: i16,
@@ -13,7 +13,7 @@ pub(super) fn platform_position_for_direction(
     }
 }
 
-pub(super) fn select_platform(
+pub fn select_platform(
     edges: &[PlatformEdge],
     direction: i16,
     consist_length_m: f64,

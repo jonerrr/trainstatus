@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code, unused_imports, clippy::pub_use, clippy::wildcard_imports)]
 
 pub mod api;
 pub mod contracts;

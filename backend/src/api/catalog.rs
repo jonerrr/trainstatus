@@ -1,13 +1,11 @@
-use super::AppError;
+use super::{dto::catalog::Catalog, error::AppError, extract::SourcePath};
 use crate::AppState;
-use crate::api::dto::catalog::Catalog;
 use crate::source::Source;
 use axum::{
-    extract::{Path, State},
+    extract::State,
     response::{IntoResponse, Response},
 };
-use http::header;
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, StatusCode, header};
 
 #[utoipa::path(
     get,
@@ -25,7 +23,7 @@ use http::{HeaderMap, StatusCode};
 )]
 pub async fn catalog_handler(
     State(state): State<AppState>,
-    Path(source): Path<Source>,
+    SourcePath(source): SourcePath,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let response = state.network.response(source).await?;

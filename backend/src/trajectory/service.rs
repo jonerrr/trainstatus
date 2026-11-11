@@ -1,13 +1,18 @@
-use super::{
-    HotSnapshot, TrajectoryCache, TrajectoryCalculator, TrajectoryConfig, TrajectoryDeriver,
-    compute_trajectory_async, expand_render_units,
-};
-use crate::operations::SourceSnapshot;
-use crate::operations::history::History;
-use crate::source::Source;
-use crate::trajectory::history::load_historical_inputs;
-use chrono::{DateTime, Utc};
 use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+
+use super::{
+    cache::TrajectoryCache,
+    calculator::{TrajectoryCalculator, compute_trajectory_async},
+    derive::TrajectoryDeriver,
+    history::load_historical_inputs,
+    render_units::expand_render_units,
+    types::{HotSnapshot, TrajectoryConfig},
+};
+use crate::operations::{history::History, ingestor::SourceSnapshot};
+use crate::source::Source;
+use crate::telemetry::metrics::{self, TrajectorySummary};
 
 /// Owns live publication and historical derivation behind one read interface.
 #[derive(Clone)]
@@ -32,7 +37,15 @@ impl TrajectoryService {
         self.deriver.derive(snapshot).await
     }
     pub async fn publish_live(&self, source: Source, snapshot: HotSnapshot) {
+        let summary = metrics::metrics().map(|_| TrajectorySummary {
+            plans: snapshot.plans.len(),
+            render_units: snapshot.render_units.len(),
+            committed_at: snapshot.committed_at,
+        });
         self.cache.set_hot(source, snapshot).await;
+        if let (Some(metrics), Some(summary)) = (metrics::metrics(), summary) {
+            metrics.trajectory_published(source, summary);
+        }
     }
     pub async fn snapshot(
         &self,
@@ -66,10 +79,21 @@ impl TrajectoryService {
                 let engine = engine.clone();
                 let cache = cache.clone();
                 async move {
-                    let computed = match compute_trajectory_async(&engine, source, &snapshot, None, &cache, &config).await {
+                    let computed = match compute_trajectory_async(
+                        &engine, source, &snapshot, None, &cache, &config,
+                    )
+                    .await
+                    {
                         Ok(computed) => computed,
                         Err(error) => {
-                            tracing::warn!(trip_id = %snapshot.trip_id, %error, "Historical trajectory calculation failed");
+                            tracing::warn!(
+                                {
+                                    trainstatus.source = source.as_str(),
+                                    trainstatus.trip.id = %snapshot.trip_id,
+                                    error.message = %format_args!("{error:#}"),
+                                },
+                                "Historical trajectory calculation failed"
+                            );
                             return None;
                         }
                     };

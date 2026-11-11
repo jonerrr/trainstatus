@@ -1,11 +1,16 @@
-use crate::support;
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::operations::CollectedSnapshot;
-use backend::operations::OperationsIngestor;
-use backend::source::Source;
-use backend::sources::mta_bus::realtime::MtaBusRealtime;
 use uuid::Uuid;
+
+use crate::support;
+use backend::{
+    fixtures::{self, FixtureKind},
+    operations::{
+        ingestor::OperationsIngestor,
+        source::{CollectedObservation, CollectedSnapshot},
+        types::position::{MtaBusPositionData, PositionData},
+    },
+    source::Source,
+    sources::mta_bus::realtime::MtaBusRealtime,
+};
 
 /// Fixture-derived workload matching the original approximately 95k-row cycle.
 /// Identical replay must avoid both physical stop writes and tuple-lock WAL.
@@ -143,23 +148,20 @@ async fn replay_large_snapshot_reports_write_counts(pool: sqlx::PgPool) {
     let mut gps = input;
     gps.trips.truncate(1);
     let run = &gps.trips[0].0;
-    gps.positions
-        .push(backend::operations::CollectedObservation {
-            vehicle_id: run.vehicle_id.clone(),
-            trip_id: Some(run.id),
-            stop_id: None,
-            updated_at: run.updated_at,
-            geom: Some(geo::Point::new(-73.99, 40.75).into()),
-            data: backend::operations::types::position::PositionData::MtaBus(
-                backend::operations::types::position::MtaBusPositionData {
-                    bearing: 0.0,
-                    passengers: None,
-                    capacity: None,
-                    status: None,
-                    phase: None,
-                },
-            ),
-        });
+    gps.positions.push(CollectedObservation {
+        vehicle_id: run.vehicle_id.clone(),
+        trip_id: Some(run.id),
+        stop_id: None,
+        updated_at: run.updated_at,
+        geom: Some(geo::Point::new(-73.99, 40.75).into()),
+        data: PositionData::MtaBus(MtaBusPositionData {
+            bearing: 0.0,
+            passengers: None,
+            capacity: None,
+            status: None,
+            phase: None,
+        }),
+    });
     ingestor.ingest(gps.clone()).await.unwrap();
     let identical = ingestor.ingest(gps.clone()).await.unwrap();
     assert_eq!(identical.changes.positions, 0);

@@ -168,29 +168,34 @@ impl NetworkDataset {
 }
 
 impl ImportReport {
-    // TODO: use tracing::instrument with source field
     pub fn log_summary(&self) {
         info!(
-            source = %self.source,
-            routes = self.route_count,
-            stops = self.stop_count,
-            route_stops = self.route_stop_count,
-            shapes = self.shape_count,
+            {
+                trainstatus.source = self.source.as_str(),
+                routes = self.route_count,
+                stops = self.stop_count,
+                route_stops = self.route_stop_count,
+                shapes = self.shape_count,
+            },
             "Validated static import"
         );
 
         if !self.orphaned_stops.is_empty() {
             debug!(
-                source = %self.source,
-                orphaned_stop_count = self.orphaned_stops.len(),
+                {
+                    trainstatus.source = self.source.as_str(),
+                    orphaned_stop_count = self.orphaned_stops.len(),
+                },
                 "Static import contains orphaned stops"
             );
         }
 
         if !self.missing_shape_references.is_empty() {
             warn!(
-                source = %self.source,
-                missing_shape_reference_count = self.missing_shape_references.len(),
+                {
+                    trainstatus.source = self.source.as_str(),
+                    missing_shape_reference_count = self.missing_shape_references.len(),
+                },
                 "Static import contains route shape references without matching shape rows"
             );
         }

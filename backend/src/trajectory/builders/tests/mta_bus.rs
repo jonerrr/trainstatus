@@ -1,12 +1,14 @@
+use super::super::super::{
+    geometry::build_shape_geometry,
+    interpolation::{InterpolationMethod, PchipMethod, evaluate_motion},
+    types::TrajectoryStop,
+};
 use super::*;
-use crate::network::types::stop::MtaBusStopData;
-use crate::operations::types::position::MtaBusPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::position::VehicleObservation;
-use crate::trajectory::geometry::build_shape_geometry;
-use crate::trajectory::interpolation::InterpolationMethod;
-use crate::trajectory::interpolation::PchipMethod;
-use crate::trajectory::types::TrajectoryStop;
+use crate::network::types::stop::{CompassDirection, MtaBusStopData};
+use crate::operations::types::{
+    position::{MtaBusPositionData, PositionData, VehicleObservation},
+    trip::StopTimeData,
+};
 use geo::LineString;
 
 fn make_stop(stop_id: &str, arrival_unix: f64, stop_distance_m: f64) -> TrajectoryStop {
@@ -15,11 +17,11 @@ fn make_stop(stop_id: &str, arrival_unix: f64, stop_distance_m: f64) -> Trajecto
         arrival_unix,
         departure_unix: arrival_unix, // same in the feed
         stop_distance_m,
-        stop_time_data: crate::operations::types::trip::StopTimeData::MtaBus,
+        stop_time_data: StopTimeData::MtaBus,
         stop_data: StopData::MtaBus(MtaBusStopData {
             bearing: None,
             is_boardable: true,
-            direction: crate::network::types::stop::CompassDirection::Unknown,
+            direction: CompassDirection::Unknown,
         }),
     }
 }
@@ -80,7 +82,7 @@ fn dwell_knots_preserve_stationary_plateau() {
     assert_eq!(knots[0].s_m, knots[1].s_m, "dwell knots should share s_m");
     let midpoint = (knots[0].t_event + knots[1].t_event) / 2.0;
     let motion = PchipMethod.motion(&knots).unwrap();
-    let state = crate::trajectory::interpolation::evaluate_motion(&motion, midpoint);
+    let state = evaluate_motion(&motion, midpoint);
     assert_eq!(state.s_m, knots[0].s_m);
     assert_eq!(state.v_mps, 0.0);
 }
@@ -117,11 +119,7 @@ fn stop_beyond_shape_length_clamps_to_shape_end() {
     }
 }
 
-fn make_position(
-    stop_id: &str,
-    lon: f64,
-    lat: f64,
-) -> crate::operations::types::position::VehicleObservation {
+fn make_position(stop_id: &str, lon: f64, lat: f64) -> VehicleObservation {
     VehicleObservation {
         vehicle_id: "v1".to_string(),
         trip_id: None,

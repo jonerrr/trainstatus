@@ -10,13 +10,11 @@ use tokio::sync::Mutex;
 
 use crate::integrations::gtfs_realtime::FeedFuture;
 
-pub(super) const NJT_GTFS_AUTH_URL: &str =
-    "https://pcsdata.njtransit.com/api/GTFSG2/authenticateUser";
-pub(super) const NJT_TRIP_UPDATES_URL: &str =
-    "https://pcsdata.njtransit.com/api/GTFSG2/getTripUpdates";
-pub(super) const NJT_VEHICLE_POSITIONS_URL: &str =
+const NJT_GTFS_AUTH_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/authenticateUser";
+pub const NJT_TRIP_UPDATES_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getTripUpdates";
+pub const NJT_VEHICLE_POSITIONS_URL: &str =
     "https://pcsdata.njtransit.com/api/GTFSG2/getVehiclePositions";
-pub(super) const NJT_ALERTS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getAlerts";
+pub const NJT_ALERTS_URL: &str = "https://pcsdata.njtransit.com/api/GTFSG2/getAlerts";
 
 #[derive(serde::Deserialize)]
 struct AuthResponse {
@@ -28,7 +26,7 @@ struct AuthResponse {
 static NJT_GTFS_TOKEN: OnceLock<Mutex<Option<(String, Instant)>>> = OnceLock::new();
 
 /// Returns a valid NJT API token, re-authenticating if the cached one is stale.
-pub(super) async fn get_token() -> anyhow::Result<String> {
+pub async fn get_token() -> anyhow::Result<String> {
     let mutex = NJT_GTFS_TOKEN.get_or_init(|| Mutex::new(None));
     let mut guard = mutex.lock().await;
 
@@ -53,29 +51,27 @@ async fn authenticate() -> anyhow::Result<String> {
         .text("username", username)
         .text("password", password);
 
-    let resp: AuthResponse = crate::integrations::http::realtime()
-        .post(NJT_GTFS_AUTH_URL)
-        .multipart(form)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    let resp: AuthResponse = crate::integrations::http::fetch(
+        crate::integrations::http::realtime()
+            .post(NJT_GTFS_AUTH_URL)
+            .multipart(form),
+        |response| async move { response.error_for_status()?.json().await },
+    )
+    .await?;
 
     Ok(resp.user_token)
 }
 
 /// Returns a [`FeedFuture`] that POSTs to an NJT GTFS-RT endpoint with a form token.
-pub(super) fn njt_post_future(url: &'static str, token: String) -> FeedFuture {
+pub fn njt_post_future(url: &'static str, token: String) -> FeedFuture {
     Box::pin(async move {
         let form = reqwest::multipart::Form::new().text("token", token);
-        Ok(crate::integrations::http::realtime()
-            .post(url)
-            .multipart(form)
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?)
+        Ok(crate::integrations::http::fetch(
+            crate::integrations::http::realtime()
+                .post(url)
+                .multipart(form),
+            |response| async move { response.error_for_status()?.bytes().await },
+        )
+        .await?)
     })
 }

@@ -1,20 +1,19 @@
-use backend::network::dataset::NetworkDataset;
 // Matched geometry inputs for output contracts. Adapter normalization has separate coverage.
 
-use backend::geometry::Geom;
-use backend::network::types::shape::Shape;
-use backend::operations::CollectedSnapshot;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::operations::types::trip::Consist;
-use backend::operations::types::trip::MtaBusData;
-use backend::operations::types::trip::MtaSubwayStopTimeData;
-use backend::operations::types::trip::MtaSubwayTripData;
-use backend::operations::types::trip::NjtBusData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::TripData;
-use backend::source::Source;
 use chrono::Duration;
+
+use backend::{
+    geometry::Geom,
+    network::{dataset::NetworkDataset, types::shape::Shape},
+    operations::{
+        source::{CollectedSnapshot, RunKey},
+        types::trip::{
+            Consist, MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, NjtBusData,
+            StopTimeData, StopVisit, TripData, TripRun,
+        },
+    },
+    source::Source,
+};
 
 pub async fn ingest_case(pool: sqlx::PgPool, source: Source) -> super::TestOwners {
     let stores = super::test_owners(pool);
@@ -77,7 +76,7 @@ fn input(source: Source) -> (NetworkDataset, CollectedSnapshot) {
         });
     }
     let now = super::fixtures::fixed_time();
-    let id: backend::operations::RunKey = uuid::Uuid::now_v7().into();
+    let id: RunKey = uuid::Uuid::now_v7().into();
     let stop_ids = if source == Source::MtaSubway {
         vec!["101".to_owned(), "102".to_owned()]
     } else if source == Source::MtaBus {

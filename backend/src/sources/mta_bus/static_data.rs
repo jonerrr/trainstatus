@@ -349,8 +349,9 @@ fn build_static_dataset(
                 Some(id) => id.clone(),
                 None => {
                     tracing::warn!(
+                        trainstatus.source = Source::MtaBus.as_str(),
                         route_name = %r.route_name,
-                        stop_id = s.stop_id,
+                        trainstatus.stop.id = %s.stop_id,
                         "Route name not found in routes list; skipping stop"
                     );
                     continue;
@@ -465,6 +466,7 @@ fn shape_stop_orders<'a>(
         (Proj::from_epsg_code(4326), Proj::from_epsg_code(epsg))
     else {
         tracing::error!(
+            trainstatus.source = Source::MtaBus.as_str(),
             epsg,
             "Failed to build projections; stop sequences will be 0"
         );
@@ -545,21 +547,15 @@ async fn fetch_oba<T: DeserializeOwned>(
         .pop_if_empty()
         .push(method)
         .push(&format!("{id}.json"));
-    let response: ObaResponse<T> = client
-        .get(url)
-        .query(&[
+    let response: ObaResponse<T> = crate::integrations::http::fetch(
+        client.get(url).query(&[
             ("key", mta_oba_api_key()),
             ("version", "2"),
             ("includePolylines", "false"),
-        ])
-        .send()
-        .await
-        .map_err(reqwest::Error::without_url)?
-        .error_for_status()
-        .map_err(reqwest::Error::without_url)?
-        .json()
-        .await
-        .map_err(reqwest::Error::without_url)?;
+        ]),
+        |response| async move { response.error_for_status()?.json().await },
+    )
+    .await?;
     ensure!(
         response.code == 200,
         "OBA {method} {id} returned code {}",
@@ -590,14 +586,11 @@ async fn fetch_oba_static(client: &reqwest::Client) -> anyhow::Result<ObaStaticD
 }
 
 async fn fetch_infrastructure(client: &reqwest::Client) -> anyhow::Result<HeliumBusInfrastructure> {
-    client
-        .get(BUS_INFRASTRUCTURE_URL)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await
-        .context("Failed to fetch bus infrastructure")
+    crate::integrations::http::fetch(client.get(BUS_INFRASTRUCTURE_URL), |response| async move {
+        response.error_for_status()?.json().await
+    })
+    .await
+    .context("Failed to fetch bus infrastructure")
 }
 
 #[cfg(feature = "fixture-capture")]

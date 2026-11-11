@@ -28,7 +28,7 @@ impl Network {
 
     /// Decide whether to collect upstream data, restoring a fresh persisted
     /// revision on startup when the in-memory index is still empty.
-    pub(super) async fn needs_import(
+    pub async fn needs_import(
         &self,
         source: Source,
         refresh: std::time::Duration,
@@ -243,14 +243,26 @@ impl Network {
             match serde_json::from_value(metadata.trip_patterns) {
                 Ok(value) => value,
                 Err(error) => {
-                    tracing::warn!(%source, %error, "Invalid static metadata; importing again");
+                    tracing::warn!(
+                        {
+                            trainstatus.source = source.as_str(),
+                            error.message = %error,
+                        },
+                        "Invalid static metadata; importing again"
+                    );
                     return Ok(None);
                 }
             };
         let remap = match serde_json::from_value(metadata.stop_remap) {
             Ok(value) => value,
             Err(error) => {
-                tracing::warn!(%source, %error, "Invalid stop remap; importing again");
+                tracing::warn!(
+                    {
+                        trainstatus.source = source.as_str(),
+                        error.message = %error,
+                    },
+                    "Invalid stop remap; importing again"
+                );
                 return Ok(None);
             }
         };

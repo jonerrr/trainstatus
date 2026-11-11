@@ -1,23 +1,20 @@
-use crate::network::controller as static_data;
-use crate::network::dataset::NetworkDataset;
-use crate::network::index::NetworkIndex;
-use crate::network::store::Network;
-use crate::network::types::route::Route;
-use crate::network::types::route::RouteData;
-use crate::operations::CollectedSnapshot;
-use crate::operations::LiveSnapshots;
-use crate::operations::OperationsIngestor;
-use crate::operations::RealtimeSource;
-use crate::operations::RealtimeSourceConfig;
-use crate::operations::engine::RealtimeEngine;
-use crate::operations::engine::trajectory_worker;
-use crate::operations::types::trip::NjtBusData;
-use crate::operations::types::trip::TripData;
-use crate::operations::types::trip::TripRun;
+use crate::network::{
+    controller,
+    dataset::NetworkDataset,
+    index::NetworkIndex,
+    store::Network,
+    types::route::{Route, RouteData},
+};
+use crate::operations::{
+    engine::{RealtimeEngine, trajectory_worker},
+    ingestor::OperationsIngestor,
+    live::LiveSnapshots,
+    source::{CollectedSnapshot, RealtimeSource, RealtimeSourceConfig},
+    types::trip::{NjtBusData, TripData, TripRun},
+};
 use crate::source::Source;
 use crate::sources::StaticAdapter;
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryService;
+use crate::trajectory::{service::TrajectoryService, types::HotSnapshot};
 use std::{
     sync::{
         Arc,
@@ -136,7 +133,7 @@ async fn setup(
 ) {
     let static_cache = Network::new(pool.clone(), NetworkIndex::new());
     let imports = Arc::new(AtomicUsize::new(0));
-    let controller = static_data::run(
+    let controller = controller::run(
         &static_cache,
         vec![Arc::new(LiteralStatic {
             imports: imports.clone(),

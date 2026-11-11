@@ -1,11 +1,14 @@
-use super::dataset::NetworkDataset;
+use super::{
+    catalog::CatalogResponse,
+    dataset::NetworkDataset,
+    schedule::{ScheduledTrip, ScheduledTripEntry},
+    types::{
+        route::{Route, RouteData},
+        shape::Shape,
+        stop::{RouteStopData, Stop, StopData},
+    },
+};
 use crate::geometry::Geom;
-use crate::network::types::route::Route;
-use crate::network::types::route::RouteData;
-use crate::network::types::shape::Shape;
-use crate::network::types::stop::RouteStopData;
-use crate::network::types::stop::Stop;
-use crate::network::types::stop::StopData;
 use crate::source::Source;
 use std::{collections::HashMap, sync::Arc};
 
@@ -38,14 +41,14 @@ pub struct IndexedStop {
 pub struct NetworkRevision {
     pub source: Source,
     /// Installed by import/restore before publishing; absent on dataset-only revisions.
-    pub catalog: Option<Arc<crate::network::catalog::CatalogResponse>>,
+    pub catalog: Option<Arc<CatalogResponse>>,
     pub routes: Arc<HashMap<String, IndexedRoute>>,
     pub stops: Arc<HashMap<String, IndexedStop>>,
     pub shapes: Arc<HashMap<String, Geom>>,
     pub route_stop_shapes: Arc<HashMap<(String, String), Vec<String>>>,
     pub trip_patterns: Arc<HashMap<String, TripPattern>>,
     pub stop_remap: Arc<HashMap<String, String>>,
-    pub scheduled_trips: Arc<HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>>>,
+    pub scheduled_trips: Arc<HashMap<String, HashMap<String, ScheduledTripEntry>>>,
 }
 
 impl NetworkRevision {
@@ -59,13 +62,13 @@ impl NetworkRevision {
                 .scheduled_trips
                 .iter()
                 .cloned()
-                .map(|trip| super::schedule::ScheduledTripEntry { trip, expires_at }),
+                .map(|trip| ScheduledTripEntry { trip, expires_at }),
         )
     }
 
-    pub(crate) fn from_dataset_with_schedules(
+    pub fn from_dataset_with_schedules(
         dataset: &NetworkDataset,
-        schedules: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
+        schedules: impl IntoIterator<Item = ScheduledTripEntry>,
     ) -> Self {
         let routes = dataset
             .routes
@@ -133,18 +136,11 @@ impl NetworkRevision {
         }
     }
 
-    pub fn set_schedules(
-        &mut self,
-        trips: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
-    ) {
+    pub fn set_schedules(&mut self, trips: impl IntoIterator<Item = ScheduledTripEntry>) {
         self.scheduled_trips = Arc::new(schedule_index(trips));
     }
 
-    pub fn scheduled_trip(
-        &self,
-        trip_id: &str,
-        service_date: &str,
-    ) -> Option<&super::schedule::ScheduledTrip> {
+    pub fn scheduled_trip(&self, trip_id: &str, service_date: &str) -> Option<&ScheduledTrip> {
         let entry = self.scheduled_trips.get(trip_id)?.get(service_date)?;
         (entry.expires_at > chrono::Utc::now()).then_some(&entry.trip)
     }
@@ -187,10 +183,9 @@ impl NetworkRevision {
 }
 
 fn schedule_index(
-    trips: impl IntoIterator<Item = super::schedule::ScheduledTripEntry>,
-) -> HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>> {
-    let mut index: HashMap<String, HashMap<String, super::schedule::ScheduledTripEntry>> =
-        HashMap::new();
+    trips: impl IntoIterator<Item = ScheduledTripEntry>,
+) -> HashMap<String, HashMap<String, ScheduledTripEntry>> {
+    let mut index: HashMap<String, HashMap<String, ScheduledTripEntry>> = HashMap::new();
     for entry in trips {
         let trip = &entry.trip;
         index

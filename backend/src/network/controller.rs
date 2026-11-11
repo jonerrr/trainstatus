@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
-use tracing::{error, info, instrument};
-
-use crate::network::index::NetworkIndex;
-use crate::network::store::Network;
+use super::{index::NetworkIndex, store::Network};
 use crate::source::Source;
 use crate::sources::StaticAdapter;
+use crate::telemetry::{Operation, operation, operation_error_type};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{mpsc, oneshot};
+use tracing::{error, info};
 
 type ResponseSender = oneshot::Sender<anyhow::Result<()>>;
 
@@ -28,7 +26,7 @@ pub struct NetworkController {
 }
 
 impl NetworkController {
-    pub(crate) fn shutdown(&self) {
+    pub fn shutdown(&self) {
         for worker in self.workers.iter() {
             worker.abort();
         }
@@ -103,7 +101,6 @@ pub async fn run(network: &Network, adapters: Vec<Arc<dyn StaticAdapter>>) -> Ne
     }
 }
 
-#[instrument(skip_all, fields(source = %adapter.source()))]
 async fn run_source_handler(
     network: Network,
     adapter: Arc<dyn StaticAdapter>,
@@ -115,11 +112,6 @@ async fn run_source_handler(
         tokio::select! {
             Some(result) = imports.join_next(), if !imports.is_empty() => {
                 let result = result.unwrap_or_else(|error| Err(error.into()));
-                if let Err(error) = &result {
-                    error!(error = %format!("{error:#}"), "Import failed");
-                } else {
-                    info!("Import successful");
-                }
                 for waiter in pending_waiters.drain(..) {
                     let response = result.as_ref().map(|_| ()).map_err(|error| anyhow::anyhow!("{error:#}"));
                     let _ = waiter.send(response);
@@ -151,10 +143,35 @@ async fn run_source_handler(
                 }
                 let network = network.clone();
                 let adapter = adapter.clone();
+                let source = adapter.source();
                 imports.spawn(async move {
-                    let dataset = adapter.collect().await?;
-                    anyhow::ensure!(dataset.source == adapter.source(), "Static adapter returned another source");
-                    network.persist(&dataset).await
+                    operation(source, Operation::StaticImport, async move {
+                        let result = async {
+                            let dataset = adapter.collect().await?;
+                            anyhow::ensure!(
+                                dataset.source == adapter.source(),
+                                "Static adapter returned another source"
+                            );
+                            network.persist(&dataset).await
+                        }
+                        .await;
+                        match &result {
+                            Ok(()) => info!(
+                                name: "trainstatus.static.completed",
+                                "static import completed"
+                            ),
+                            Err(error) => error!(
+                                name: "trainstatus.static.failed",
+                                {
+                                    error.message = %format_args!("{error:#}"),
+                                    error.type = %operation_error_type(error),
+                                },
+                                "static import failed"
+                            ),
+                        }
+                        result
+                    })
+                    .await
                 });
             }
         }

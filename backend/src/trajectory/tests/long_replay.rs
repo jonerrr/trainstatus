@@ -1,17 +1,18 @@
+use chrono::{DateTime, Utc};
+
+use super::super::{
+    builders::{mta_subway::MtaSubwayBuilder, njt_bus::NjtBusBuilder},
+    calculator::compute_trajectory,
+    continuity::ContinuityDiscardReason,
+    geometry::build_shape_geometry,
+    interpolation::{PchipMethod, evaluate_motion},
+    types::{TrajectoryConfig, TrajectoryStop, TripSnapshot},
+};
 use crate::{
     network::types::stop::{MtaSubwayStopData, NjtBusStopData, StopData},
     operations::types::trip::StopTimeData,
     source::Source,
-    trajectory::{
-        builders::{mta_subway::MtaSubwayBuilder, njt_bus::NjtBusBuilder},
-        compute_trajectory,
-        continuity::ContinuityDiscardReason,
-        geometry::build_shape_geometry,
-        interpolation::{PchipMethod, evaluate_motion},
-        types::{TrajectoryConfig, TrajectoryStop, TripSnapshot},
-    },
 };
-use chrono::{DateTime, Utc};
 
 #[derive(serde::Deserialize)]
 struct Replay {

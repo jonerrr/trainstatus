@@ -1,8 +1,9 @@
-use super::postgres::TripRow;
+use super::{
+    postgres::TripRow,
+    types::trip::{StopVisit, TripRun},
+};
 use crate::geometry::Geom;
 use crate::network::index::IndexedStop;
-use crate::operations::types::trip::StopVisit;
-use crate::operations::types::trip::TripRun;
 use crate::source::Source;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;

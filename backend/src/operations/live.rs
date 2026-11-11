@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::watch;
 
-use super::SourceSnapshot;
+use super::ingestor::SourceSnapshot;
 use crate::source::Source;
 
 /// Last committed generation for each source. Live API reads and trajectory
@@ -34,7 +34,7 @@ impl LiveSnapshots {
     }
 
     // Only ingestion can publish, and only after its transaction commits.
-    pub(super) fn publish(&self, snapshot: Arc<SourceSnapshot>) {
+    pub fn publish(&self, snapshot: Arc<SourceSnapshot>) {
         self.sources[&snapshot.source].send_replace(Some(snapshot));
     }
 }

@@ -1,7 +1,5 @@
+use super::super::types::stop::{NearbyStop, RouteStop, Stop};
 use crate::geometry::Geom;
-use crate::network::types::stop::NearbyStop;
-use crate::network::types::stop::RouteStop;
-use crate::network::types::stop::Stop;
 use crate::source::Source;
 use sqlx::PgConnection;
 
@@ -22,7 +20,7 @@ struct StopRow {
 }
 
 /// Raw DB query for all stops of a source (with embedded nearby stops and route associations).
-pub(in crate::network) async fn query_all_on(
+pub async fn query_all_on(
     source: Source,
     connection: &mut PgConnection,
 ) -> anyhow::Result<Vec<Stop>> {
@@ -83,7 +81,7 @@ pub(in crate::network) async fn query_all_on(
 }
 
 /// Persist stops inside the owning static import transaction.
-pub(in crate::network) async fn save_all_on(
+pub async fn save_all_on(
     connection: &mut PgConnection,
     source: Source,
     stops: &[Stop],
@@ -126,7 +124,7 @@ pub(in crate::network) async fn save_all_on(
 }
 
 /// Persist associations inside the owning static import transaction.
-pub(in crate::network) async fn save_all_route_stops_on(
+pub async fn save_all_route_stops_on(
     connection: &mut PgConnection,
     source: Source,
     route_stops: &[RouteStop],
@@ -173,7 +171,7 @@ pub(in crate::network) async fn save_all_route_stops_on(
 
 /// Recompute source-scoped nearby boarding candidates inside the import transaction.
 /// Distance bounds candidate discovery; route/direction selection belongs to readers.
-pub(in crate::network) async fn compute_nearby_stops(
+pub async fn compute_nearby_stops(
     connection: &mut PgConnection,
     source: Source,
 ) -> anyhow::Result<()> {
@@ -240,9 +238,11 @@ pub(in crate::network) async fn compute_nearby_stops(
         .await?;
     }
     tracing::info!(
-        ?source,
-        candidates = candidates.len(),
-        elapsed_ms = start.elapsed().as_millis() as u64,
+        {
+            trainstatus.source = source.as_str(),
+            candidates = candidates.len(),
+            elapsed_ms = start.elapsed().as_millis() as u64,
+        },
         "Recomputed nearby boarding stops"
     );
     Ok(())

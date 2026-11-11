@@ -1,15 +1,4 @@
 use axum_test::TestServer;
-use backend::operations::CollectedObservation as VehicleObservation;
-use backend::operations::CollectedSnapshot;
-use backend::operations::CollectedTrip as TripRun;
-use backend::operations::CollectedVisit as StopVisit;
-use backend::operations::types::position::MtaSubwayPositionData;
-use backend::operations::types::position::PositionData;
-use backend::operations::types::trip::MtaSubwayStopTimeData;
-use backend::operations::types::trip::MtaSubwayTripData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::TripData;
-use backend::source::Source;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use http::{
     StatusCode,
@@ -18,11 +7,19 @@ use http::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::support::TestOwners;
-use crate::support::app_state_from_owners;
-use crate::support::mta_bus_dataset;
-use crate::support::mta_subway_dataset;
-use crate::support::test_owners;
+use crate::support::{
+    TestOwners, app_state_from_owners, mta_bus_dataset, mta_subway_dataset, test_owners,
+};
+use backend::{
+    operations::{
+        source::{CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit},
+        types::{
+            position::{MtaSubwayPositionData, PositionData},
+            trip::{MtaSubwayStopTimeData, MtaSubwayTripData, StopTimeData, TripData},
+        },
+    },
+    source::Source,
+};
 
 async fn server_with(pool: &sqlx::PgPool, stores: TestOwners) -> TestServer {
     let (router, _) =
@@ -30,8 +27,11 @@ async fn server_with(pool: &sqlx::PgPool, stores: TestOwners) -> TestServer {
     TestServer::new(router)
 }
 
-fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (TripRun, Vec<StopVisit>) {
-    let trip = TripRun {
+fn subway_trip(
+    at: DateTime<Utc>,
+    offsets: &[(&str, Duration)],
+) -> (CollectedTrip, Vec<CollectedVisit>) {
+    let trip = CollectedTrip {
         id: Uuid::now_v7().into(),
         original_id: "service-trip".into(),
         vehicle_id: "service-vehicle".into(),
@@ -48,7 +48,7 @@ fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (TripRun, Vec
     let stops = offsets
         .iter()
         .enumerate()
-        .map(|(i, (stop_id, offset))| StopVisit {
+        .map(|(i, (stop_id, offset))| CollectedVisit {
             trip_id: trip.id,
             stop_sequence: i as i32,
             stop_id: (*stop_id).into(),
@@ -64,8 +64,8 @@ fn subway_trip(at: DateTime<Utc>, offsets: &[(&str, Duration)]) -> (TripRun, Vec
     (trip, stops)
 }
 
-fn subway_position(trip: &TripRun, at: DateTime<Utc>) -> VehicleObservation {
-    VehicleObservation {
+fn subway_position(trip: &CollectedTrip, at: DateTime<Utc>) -> CollectedObservation {
+    CollectedObservation {
         vehicle_id: trip.vehicle_id.clone(),
         trip_id: Some(trip.id),
         stop_id: Some("102".into()),
@@ -230,7 +230,7 @@ async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx:
         &[("101", Duration::minutes(20)), ("102", Duration::hours(6))],
     );
     let (outside, outside_stops) = subway_trip(at, &[("101", Duration::hours(5))]);
-    let outside = TripRun {
+    let outside = CollectedTrip {
         original_id: "outside".into(),
         vehicle_id: "outside-vehicle".into(),
         ..outside
@@ -297,7 +297,7 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
     .map(|(name, arrival, departure)| {
         let (trip, mut stops) = subway_trip(at, &[("101", Duration::minutes(arrival))]);
         stops[0].departure = at + Duration::minutes(departure);
-        let trip = TripRun {
+        let trip = CollectedTrip {
             original_id: name.into(),
             vehicle_id: name.into(),
             created_at: at - Duration::hours(9),

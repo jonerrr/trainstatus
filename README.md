@@ -71,3 +71,12 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 8. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
 
 `mise containers:down` stops the dev pod and keeps its volumes. `mise reset` deletes that pod and its volumes, then creates them again. Both commands take an optional suffix, `dev` by default: `mise reset demo` targets the `trainstatus-demo` pod from `demo.pod.yml`.
+
+#### Optional Datadog telemetry
+
+1. Copy `dev.configmap.yml.example` to the gitignored `dev.configmap.yml` and set `DD_API_KEY` (stored in plaintext; keep it private).
+2. Uncomment the Datadog container in `dev.pod.yml`; change `DD_SITE` if your account is not on `us5.datadoghq.com`.
+3. Run `mise containers:up` (`mise containers:down` first if the pod exists; volumes are kept).
+4. From `backend/`, run `mise run dev:telemetry` instead of the ordinary dev task.
+
+Filter Datadog by `service:trainstatus-backend env:development`. See the [backend telemetry architecture](docs/architecture/backend.md#optional-telemetry) for details.

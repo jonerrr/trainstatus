@@ -1,31 +1,32 @@
-use crate::support;
-use backend::fixtures::FixtureKind;
-use backend::fixtures::load_manifest_for;
-use backend::fixtures::read_json_payload;
-use backend::geometry::Geom;
-use backend::network::index::NetworkRevision;
-use backend::network::types::stop::StopData;
-use backend::operations::IngestionChanges;
-use backend::operations::SourceSnapshot;
-use backend::operations::types::position::MtaBusPositionData;
-use backend::operations::types::position::PositionData;
-use backend::operations::types::position::VehicleObservation;
-use backend::operations::types::trip::Consist;
-use backend::operations::types::trip::MtaBusData;
-use backend::operations::types::trip::MtaSubwayStopTimeData;
-use backend::operations::types::trip::MtaSubwayTripData;
-use backend::operations::types::trip::StopTimeData;
-use backend::operations::types::trip::StopVisit;
-use backend::operations::types::trip::TripData;
-use backend::operations::types::trip::TripRun;
-use backend::source::Source;
-use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
-use backend::trajectory::TrajectoryCache;
-use backend::trajectory::TrajectoryCalculator;
-use backend::trajectory::TrajectoryDeriver;
-use backend::trajectory::snapshot_from_persisted_trip;
-use chrono::{Duration, Utc};
 use std::sync::Arc;
+
+use chrono::{Duration, Utc};
+
+use crate::support;
+use backend::{
+    fixtures::{FixtureKind, load_manifest_for, read_json_payload},
+    geometry::Geom,
+    network::{index::NetworkRevision, types::stop::StopData},
+    operations::{
+        ingestor::{IngestionChanges, SourceSnapshot},
+        types::{
+            position::{MtaBusPositionData, PositionData, VehicleObservation},
+            trip::{
+                Consist, MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, StopTimeData,
+                StopVisit, TripData, TripRun,
+            },
+        },
+    },
+    source::Source,
+    sources::mta_subway::realtime::build_realtime_from_fixture,
+    trajectory::{
+        cache::TrajectoryCache,
+        calculator::{TrajectoryCalculator, compute_trajectory_async},
+        derive::TrajectoryDeriver,
+        snapshot::snapshot_from_persisted_trip,
+        types::TrajectoryConfig,
+    },
+};
 
 fn fixture() -> SourceSnapshot {
     let now = Utc::now();
@@ -515,7 +516,7 @@ async fn captured_subway_trajectories_stay_below_speed_limit_over_ten_minutes() 
     let revision = NetworkRevision::from_dataset(&support::mta_subway_dataset());
     let cache = TrajectoryCache::new();
     let engine = TrajectoryCalculator::new();
-    let config = backend::trajectory::TrajectoryConfig::for_source(Source::MtaSubway);
+    let config = TrajectoryConfig::for_source(Source::MtaSubway);
     let mut worst = (0.0_f64, String::new(), 0.0);
     let mut frames = 0;
     for (trip, stops) in collected.trips {
@@ -525,15 +526,9 @@ async fn captured_subway_trajectories_stay_below_speed_limit_over_ten_minutes() 
         let input = snapshot_from_persisted_trip(&trip, stops, vec![], &revision, &cache, at)
             .await
             .unwrap();
-        let Ok(computed) = backend::trajectory::compute_trajectory_async(
-            &engine,
-            Source::MtaSubway,
-            &input,
-            None,
-            &cache,
-            &config,
-        )
-        .await
+        let Ok(computed) =
+            compute_trajectory_async(&engine, Source::MtaSubway, &input, None, &cache, &config)
+                .await
         else {
             continue;
         };

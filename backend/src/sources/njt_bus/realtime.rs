@@ -1,4 +1,3 @@
-use crate::operations::RunKey;
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
 
@@ -7,24 +6,22 @@ use chrono::{DateTime, NaiveDate, Utc};
 use geo::Point;
 use tracing::{debug, warn};
 
-use crate::feed::FeedMessage;
-use crate::feed::TripUpdate;
-use crate::feed::VehiclePosition as GtfsVehiclePosition;
+use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
+use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
 use crate::integrations::gtfs_realtime;
 use crate::network::index::NetworkRevision;
-use crate::operations::CollectedSnapshot;
-use crate::operations::RealtimeSource;
-use crate::operations::RealtimeSourceConfig;
-use crate::operations::source::CollectedObservation as VehicleObservation;
-use crate::operations::source::CollectedTrip as TripRun;
-use crate::operations::source::CollectedVisit as StopVisit;
-use crate::operations::types::position::NjtBusPositionData;
-use crate::operations::types::position::PositionData;
-use crate::operations::types::trip::StopTimeData;
-use crate::operations::types::trip::TripData;
+use crate::operations::{
+    normalize::{gtfs_start, visit_sequence},
+    source::{
+        CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
+        RealtimeSourceConfig, RunKey,
+    },
+    types::{
+        position::{NjtBusPositionData, OccupancyStatus, PositionData},
+        trip::{NjtBusData, StopTimeData, TripData},
+    },
+};
 use crate::source::Source;
-
-use super::{NJT_TRIP_UPDATES_URL, NJT_VEHICLE_POSITIONS_URL, get_token, njt_post_future};
 
 pub struct NjtBusRealtime;
 
@@ -115,7 +112,7 @@ impl NjtBusRealtime {
         update: TripUpdate,
         revision: &NetworkRevision,
         observed_at: Option<DateTime<Utc>>,
-    ) -> (Option<TripRun>, Vec<StopVisit>) {
+    ) -> (Option<CollectedTrip>, Vec<CollectedVisit>) {
         let trip_desc = update.trip;
 
         let trip_id = match trip_desc.trip_id {
@@ -150,7 +147,11 @@ impl NjtBusRealtime {
             })
             .and_then(|observed| infer_service_date(revision, &trip_id, observed));
         let Some(start_date_str) = trip_desc.start_date.clone().or(inferred_date) else {
-            warn!(trip_id, "Missing NJT service date; isolating ambiguous run");
+            warn!(
+                trainstatus.source = Source::NjtBus.as_str(),
+                trainstatus.trip.id = %trip_id,
+                "Missing NJT service date; isolating ambiguous run"
+            );
             return (None, vec![]);
         };
 
@@ -162,7 +163,8 @@ impl NjtBusRealtime {
             .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
-                    trip_id,
+                    trainstatus.source = Source::NjtBus.as_str(),
+                    trainstatus.trip.id = %trip_id,
                     "Missing route_id for NJT trip and not found in cache"
                 );
                 "".to_string() // Fallback to empty if really not found
@@ -187,7 +189,7 @@ impl NjtBusRealtime {
         let created_at = trip_desc
             .start_time
             .as_deref()
-            .and_then(|time| crate::operations::normalize::gtfs_start(start_date, time))
+            .and_then(|time| gtfs_start(start_date, time))
             .or_else(|| cached_trip.as_ref().map(|trip| trip.start_time));
         let Some(created_at) = created_at else {
             return (None, vec![]);
@@ -204,7 +206,7 @@ impl NjtBusRealtime {
             .map(|id| vec![id])
             .unwrap_or_default();
 
-        let trip = TripRun {
+        let trip = CollectedTrip {
             id: RunKey::new(Source::NjtBus, &trip_id, created_at, direction),
             original_id: trip_id,
             route_id,
@@ -218,18 +220,18 @@ impl NjtBusRealtime {
                 .and_then(|time| DateTime::from_timestamp(time, 0))
                 .or(observed_at)
                 .unwrap_or(created_at),
-            data: TripData::NjtBus(crate::operations::types::trip::NjtBusData {
+            data: TripData::NjtBus(NjtBusData {
                 deviation: update.delay,
                 headsign,
             }),
         };
 
-        let stop_times: Vec<StopVisit> = update
+        let stop_times: Vec<CollectedVisit> = update
             .stop_time_update
             .into_iter()
             .filter_map(|st| {
                 let stop_id = st.stop_id?;
-                let stop_sequence = crate::operations::normalize::visit_sequence(
+                let stop_sequence = visit_sequence(
                     st.stop_sequence,
                     &stop_id,
                     cached_trip
@@ -238,9 +240,9 @@ impl NjtBusRealtime {
                 )?;
 
                 let (arrival, departure) =
-                    crate::integrations::gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
+                    gtfs_realtime::stop_event_times(st.arrival, st.departure)?;
 
-                Some(StopVisit {
+                Some(CollectedVisit {
                     trip_id: trip.id,
                     stop_sequence,
                     stop_id,
@@ -255,17 +257,16 @@ impl NjtBusRealtime {
     }
 
     fn process_vehicle(
-        vehicle: GtfsVehiclePosition,
+        vehicle: VehiclePosition,
         observed_at: Option<DateTime<Utc>>,
-    ) -> Option<VehicleObservation> {
+    ) -> Option<CollectedObservation> {
         let vehicle_desc = vehicle.vehicle.as_ref()?;
         let vehicle_id = vehicle_desc.id.clone()?;
 
         let position = vehicle.position?;
         let stop_id = vehicle.stop_id.clone();
-        let occupancy_status = crate::operations::types::position::OccupancyStatus::from_provider(
-            vehicle.occupancy_status.unwrap_or(7),
-        );
+        let occupancy_status =
+            OccupancyStatus::from_provider(vehicle.occupancy_status.unwrap_or(7));
 
         let updated_at = vehicle
             .timestamp
@@ -276,7 +277,7 @@ impl NjtBusRealtime {
         let geom: geo::Geometry =
             Point::new(position.longitude as f64, position.latitude as f64).into();
 
-        Some(VehicleObservation {
+        Some(CollectedObservation {
             vehicle_id,
             trip_id: None,
             stop_id,

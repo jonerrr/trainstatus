@@ -1,12 +1,14 @@
-use super::{AppError, query::TimeQuery};
+use super::{
+    dto::service::Service,
+    error::AppError,
+    extract::{SourcePath, TimeQuery},
+};
 use crate::AppState;
-use crate::api::dto::service::Service;
-use crate::operations::service::RouteSelection;
-use crate::operations::service::ServiceError;
+use crate::operations::service::{RouteSelection, ServiceError};
 use crate::source::Source;
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     response::{IntoResponse, Response},
 };
 use http::{StatusCode, header};
@@ -42,9 +44,9 @@ pub struct UnknownRoutes {
         (status = 500, description = "Database or internal service error")
     )
 )]
-pub(super) async fn service_handler(
+pub async fn service_handler(
     State(state): State<AppState>,
-    Path(source): Path<Source>,
+    SourcePath(source): SourcePath,
     Query(params): Query<ServiceQuery>,
     Query(time): Query<TimeQuery>,
 ) -> Response {

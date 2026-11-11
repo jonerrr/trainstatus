@@ -1,10 +1,10 @@
-use backend::fixtures;
-use backend::fixtures::FixtureKind;
-use backend::operations::CollectedSnapshot;
-use backend::source::Source;
-use backend::sources::mta_subway::realtime::build_realtime_from_fixture;
-
 use crate::support::fixture_root;
+use backend::{
+    fixtures::{self, FixtureKind},
+    operations::source::CollectedSnapshot,
+    source::Source,
+    sources::mta_subway::realtime::build_realtime_from_fixture,
+};
 
 #[test]
 fn realtime_fixture_maps_trips_and_positions() {

@@ -17,7 +17,7 @@ pub enum Source {
 
 impl Source {
     /// Stable slot in source registries, matching `ALL`.
-    pub(crate) const fn index(self) -> usize {
+    pub const fn index(self) -> usize {
         match self {
             Self::MtaSubway => 0,
             Self::MtaBus => 1,

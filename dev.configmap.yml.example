@@ -1,0 +1,9 @@
+# Copy to dev.configmap.yml and set your Datadog API key before enabling
+# the commented Agent container in dev.pod.yml. Keep the local file private:
+# it is gitignored, but ConfigMaps store plaintext values.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datadog-config-dev
+data:
+  DD_API_KEY: "REPLACE_ME"

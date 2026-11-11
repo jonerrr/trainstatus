@@ -1,13 +1,16 @@
 use std::{future::Future, sync::Arc};
 
 use tokio::{sync::watch, time::sleep};
-use tracing::{error, warn};
+use tracing::{Span, error, info, warn};
 
-use super::{CollectedSnapshot, OperationsIngestor, RealtimeSource, SourceSnapshot};
+use super::{
+    ingestor::{OperationsIngestor, SourceSnapshot},
+    source::{CollectedSnapshot, RealtimeSource},
+};
 use crate::network::controller::NetworkController;
 use crate::source::Source;
-use crate::trajectory::HotSnapshot;
-use crate::trajectory::TrajectoryService;
+use crate::telemetry::{Operation, metrics::metrics, operation, operation_error_type};
+use crate::trajectory::{service::TrajectoryService, types::HotSnapshot};
 
 /// Each source collects and commits independently of its newest-value trajectory
 /// worker. A busy worker retains its current generation and only the latest
@@ -58,52 +61,78 @@ impl RealtimeEngine {
         workers
     }
 
-    pub(super) async fn collect_source(self, source: Arc<dyn RealtimeSource>) {
+    pub async fn collect_source(self, source: Arc<dyn RealtimeSource>) {
         let config = source.config();
         loop {
-            if let Err(error) = self.collect_once(source.as_ref()).await {
-                error!(source = %config.source, error = %format!("{error:#}"), "Realtime pipeline error")
-            }
+            // `collect_once` logs and records its own failures.
+            let _ = self.collect_once(source.as_ref()).await;
             // Match the existing delay after every attempt, including errors.
             sleep(config.refresh_interval).await;
         }
     }
 
-    pub(super) async fn collect_once(
+    pub async fn collect_once(
         &self,
         source: &dyn RealtimeSource,
     ) -> anyhow::Result<Arc<SourceSnapshot>> {
         let config = source.config();
-        self.static_controller.ensure_updated(config.source).await?;
+        let source_id = config.source;
+        operation(source_id, Operation::RealtimePoll, async {
+            let result = self.collect_once_body(source, source_id).await;
+            if let Err(error) = &result {
+                error!(
+                    name: "trainstatus.realtime.failed",
+                    {
+                        error.message = %format_args!("{error:#}"),
+                        error.type = %operation_error_type(error),
+                    },
+                    "realtime poll failed"
+                );
+            }
+            result
+        })
+        .await
+    }
+
+    async fn collect_once_body(
+        &self,
+        source: &dyn RealtimeSource,
+        source_id: Source,
+    ) -> anyhow::Result<Arc<SourceSnapshot>> {
+        self.static_controller.ensure_updated(source_id).await?;
         let revision = self
             .static_controller
             .network_index()
-            .get(config.source)
+            .get(source_id)
             .ok_or_else(|| anyhow::anyhow!("Network unavailable"))?;
-        let snapshot = source.collect(revision.clone()).await?;
+        let mut snapshot = operation(
+            source_id,
+            Operation::RealtimeCollect,
+            source.collect(revision.clone()),
+        )
+        .await?;
         // The engine pins the requested revision for every source. Ingestion checks
         // its source against the collection once, before touching the database.
-        let mut snapshot = snapshot;
         snapshot.network_revision = Some(revision);
         match self.ingestor.ingest(snapshot.clone()).await {
             Ok(committed) => Ok(committed),
             Err(error) => {
-                let is_fk_violation = error
-                    .downcast_ref::<sqlx::Error>()
-                    .and_then(|error| error.as_database_error())
-                    .and_then(|error| error.code().map(|code| code.into_owned()))
-                    .as_deref()
-                    == Some("23503");
-                if !is_fk_violation {
+                if !is_foreign_key_violation(&error) {
                     return Err(error);
                 }
-                warn!(source = %snapshot.source, "Missing static data; forcing static import before retry");
-                self.static_controller.force_update(snapshot.source).await?;
+                warn!(
+                    name: "trainstatus.realtime.static_recovery",
+                    "missing static data; forcing static import before retry"
+                );
+                if let Some(metrics) = metrics() {
+                    metrics.static_recovery.add(1, metrics.attrs(source_id));
+                }
+                self.static_controller.force_update(source_id).await?;
                 // Deliberately no recursive retry: even a second 23503 escapes.
                 let revision = self
                     .static_controller
                     .network_index()
-                    .get(snapshot.source)
+                    .get(source_id)
                     .ok_or_else(|| anyhow::anyhow!("Network unavailable after refresh"))?;
                 let snapshot = match snapshot.renormalize.as_ref() {
                     Some(normalize) => normalize(revision)?,
@@ -118,9 +147,18 @@ impl RealtimeEngine {
     }
 }
 
+fn is_foreign_key_violation(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<sqlx::Error>()
+        .and_then(|error| error.as_database_error())
+        .and_then(|error| error.code().map(|code| code.into_owned()))
+        .as_deref()
+        == Some("23503")
+}
+
 /// The closure is the derivation operation, not an adapter abstraction. Keeping
 /// scheduling independent from CPU work permits deterministic paused-time tests.
-pub(super) async fn trajectory_worker<F, Fut>(
+pub async fn trajectory_worker<F, Fut>(
     source: Source,
     mut rx: watch::Receiver<Option<Arc<SourceSnapshot>>>,
     trajectories: TrajectoryService,
@@ -133,10 +171,34 @@ pub(super) async fn trajectory_worker<F, Fut>(
         // Drop the watch Ref before any await so the collector can replace the
         // pending value while derivation is in progress.
         let snapshot = { rx.borrow_and_update().clone() };
-        let Some(snapshot) = snapshot else { continue };
-        match derive(snapshot).await {
-            Ok(hot) => trajectories.publish_live(source, hot).await,
-            Err(error) => warn!(%source, %error, "Committed snapshot trajectory derivation failed"),
-        }
+        let Some(snapshot) = snapshot else {
+            continue;
+        };
+        let committed_at = snapshot.committed_at.timestamp_micros();
+        let _ = operation(source, Operation::TrajectoryRefresh, async {
+            Span::current().record("trainstatus.snapshot.committed_at", committed_at);
+            match derive(snapshot).await {
+                Ok(hot) => {
+                    trajectories.publish_live(source, hot).await;
+                    info!(
+                        name: "trainstatus.trajectory.completed",
+                        "trajectory refresh completed"
+                    );
+                    Ok(())
+                }
+                Err(error) => {
+                    error!(
+                        name: "trainstatus.trajectory.failed",
+                        {
+                            error.message = %format_args!("{error:#}"),
+                            error.type = %operation_error_type(&error),
+                        },
+                        "trajectory refresh failed"
+                    );
+                    Err(error)
+                }
+            }
+        })
+        .await;
     }
 }

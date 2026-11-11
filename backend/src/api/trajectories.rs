@@ -1,15 +1,18 @@
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::{StatusCode, header},
     response::Response,
 };
 
-use super::{AppError, query::TimeQuery};
+use super::{
+    error::AppError,
+    extract::{SourcePath, TimeQuery},
+};
 use crate::AppState;
 use crate::source::Source;
-use crate::trajectory::RenderUnit;
-use crate::trajectory::encode_render_units;
+use crate::trajectory::arrow::encode_render_units;
+use crate::trajectory::types::RenderUnit;
 
 #[utoipa::path(
     get,
@@ -37,7 +40,7 @@ use crate::trajectory::encode_render_units;
 )]
 pub async fn trajectories_handler(
     State(state): State<AppState>,
-    Path(source): Path<Source>,
+    SourcePath(source): SourcePath,
     Query(time): Query<TimeQuery>,
 ) -> Result<Response, AppError> {
     let snapshot = state.trajectories.snapshot(source, time.at).await?;
