@@ -43,6 +43,7 @@ function mergeStops(axis: string[], pattern: string[]): string[] {
 	return merged.concat(axis.slice(i), pattern.slice(j));
 }
 
+/** Build deduplicated travel-order edges and incoming counts for each stop. */
 function stopGraph(patterns: string[][]) {
 	const edges = new Map<string, Set<string>>();
 	const indegrees = new Map<string, number>();
@@ -98,6 +99,7 @@ function rankDefiniteStops(patterns: string[][]): Map<string, number> {
 	const groups = new Map<string, string[]>();
 	const groupFor = new Map<string, string>();
 
+	/** Assign a stop and its reachable neighbors to strongly connected groups. */
 	function visit(stop: string) {
 		const index = indices.size;
 		indices.set(stop, index);
@@ -143,7 +145,21 @@ function rankDefiniteStops(patterns: string[][]): Map<string, number> {
 	);
 }
 
-export function buildChartData(inputs: readonly ChartInput[], now: number) {
+/** `[start, end]` in ms: `now ± span`, with the start pulled forward to the earliest recorded visit. */
+export function chartXDomain(
+	trips: readonly Pick<ChartSeries, 'points'>[],
+	now: number,
+	span: number
+): [number, number] {
+	let earliest = now;
+	for (const { points } of trips) {
+		for (const point of points) earliest = Math.min(earliest, point.time.getTime());
+	}
+	return [Math.max(earliest, now - span), now + span];
+}
+
+/** Preserve timed visits and align trip itineraries on a shared stop axis. */
+export function buildChartData(inputs: readonly ChartInput[]) {
 	const names = new Map<string, string>();
 	const series = inputs.map(({ source, route_id, trip, calls, stops }) => ({
 		source,
@@ -229,7 +245,6 @@ export function buildChartData(inputs: readonly ChartInput[], now: number) {
 			for (const point of points) {
 				while (axis[index] !== point.stop_key) index++;
 				const stop_key = axisKeys[index++];
-				if (point.time.getTime() < now) continue;
 				visible.add(stop_key);
 				visits.push({
 					stop_id: point.stop_id,

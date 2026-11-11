@@ -21,8 +21,9 @@
 </script>
 
 {#if current_time_line}
-	<g transform="translate({cake.xScale(new Date())}, 0)">
-		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px">{formatTime(new Date())}</text
+	<g transform="translate({cake.xScale(current_time.ms)}, 0)">
+		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px"
+			>{formatTime(new Date(current_time.ms))}</text
 		>
 		<line y1={0} y2={cake.height} stroke="#e5e5e5" />
 	</g>
@@ -30,16 +31,19 @@
 
 <g transform="translate(0, {cake.height})">
 	<text x={-65} y={20} text-anchor="middle" fill="#e5e5e5" font-size="12px">
-		{formatDate(new Date(current_time.ms))} -
+		{formatDate(cake.xScale.domain()[0])} -
 	</text>
 </g>
 
 <g class="axis x-axis" transform="translate(0, {cake.height})">
-	{#each ticks as tick (tick.getTime())}
+	{#each ticks as tick, i (tick.getTime())}
 		{const x = $derived(cake.xScale(tick))}
 		<g transform="translate({x}, 0)">
 			<text y={20} text-anchor="middle" fill="#e5e5e5" font-size="12px">
 				{formatTime(tick)}
+				{#if formatDate(tick) !== formatDate(i > 0 ? ticks[i - 1] : cake.xScale.domain()[0])}
+					<tspan x="0" dy="14">{formatDate(tick)}</tspan>
+				{/if}
 			</text>
 		</g>
 		<line x1={x} y1={0} x2={x} y2={-cake.height} stroke="#e5e5e5" class="gridline" />

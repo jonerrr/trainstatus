@@ -5,7 +5,7 @@
 
 	import AxisX from '#lib/charts/AxisX.svelte';
 	import AxisY from '#lib/charts/AxisY.svelte';
-	import { buildChartData, type ChartInput } from '#lib/charts/data.js';
+	import { buildChartData, chartXDomain, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { CatalogRoute, Source } from '#lib/client/index.js';
 	import Icon from '#lib/Route/Icon.svelte';
@@ -78,12 +78,23 @@
 				if (calls?.length) inputs.push({ source, route_id: id, trip, calls, stops });
 			}
 		}
-		return buildChartData(inputs, current_time.ms);
+		return buildChartData(inputs);
 	});
+
+	const visible_trips = $derived(
+		data.route_trips.filter(
+			({ points }) =>
+				points[0].time.getTime() <= xDomain[1] &&
+				points[points.length - 1].time.getTime() >= xDomain[0]
+		)
+	);
+
+	const chart_padding = { top: 20, right: 10, left: 160, bottom: 44 };
 
 	// Create a reference to the SVG element
 	let svgContainer = $state<HTMLDivElement>();
 
+	/** Download a standalone chart, expanding its layout bounds to contain rendered labels. */
 	function export_as_svg() {
 		if (!svgContainer) return;
 
@@ -98,13 +109,24 @@
 		svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 		svgClone.setAttribute('version', '1.1');
 
-		// Get SVG dimensions
-		const width = svgClone.getAttribute('width');
-		const height = svgClone.getAttribute('height');
+		// Preserve the layout bounds and expand them for labels outside the fixed margins.
+		const { width, height } = svgElement.getBoundingClientRect();
+		const { top, right, bottom, left } = chart_padding;
+		const labels = svgElement.querySelector<SVGGElement>('.y-axis')!.getBBox();
+		const min_x = Math.min(-left, labels.x);
+		const min_y = Math.min(-top, labels.y);
+		const total_width = Math.max(width + right, labels.x + labels.width) - min_x;
+		const total_height = Math.max(height + bottom, labels.y + labels.height) - min_y;
+		svgClone.setAttribute('viewBox', `${min_x} ${min_y} ${total_width} ${total_height}`);
+		svgClone.setAttribute('width', String(total_width));
+		svgClone.setAttribute('height', String(total_height));
+		svgClone.removeAttribute('style');
 
 		const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		background.setAttribute('width', width || '100%');
-		background.setAttribute('height', height || '100%');
+		background.setAttribute('x', String(min_x));
+		background.setAttribute('y', String(min_y));
+		background.setAttribute('width', String(total_width));
+		background.setAttribute('height', String(total_height));
 		background.setAttribute('fill', '#171717');
 
 		// Insert background as first child so it's behind everything else
@@ -113,11 +135,11 @@
 		// Add watermark
 		const watermark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 		watermark.textContent = 'TrainStat.us';
-		watermark.setAttribute('x', '6');
-		watermark.setAttribute('y', '10');
-		watermark.setAttribute('font-size', '10');
-		watermark.setAttribute('fill', '#666666');
-		watermark.setAttribute('opacity', '0.6');
+		watermark.setAttribute('x', String(min_x + 6));
+		watermark.setAttribute('y', String(min_y + 14));
+		watermark.setAttribute('font-size', '16');
+		watermark.setAttribute('font-weight', '600');
+		watermark.setAttribute('fill', '#e5e5e5');
 
 		// Add watermark to the SVG
 		svgClone.appendChild(watermark);
@@ -295,13 +317,9 @@
 		};
 	});
 
-	const xDomain = $derived.by(() => {
-		const startTime = new Date(current_time.ms);
-		const endTime = new Date(current_time.ms + displayHours * 60 * 60 * 1000);
-		// console.log(xDomain);
-		// Return domain from current time to current time + displayHours
-		return [startTime.getTime(), endTime.getTime()];
-	});
+	const xDomain = $derived(
+		chartXDomain(data.route_trips, current_time.ms, displayHours * 60 * 60 * 1000)
+	);
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;
 	// 	return [0, width];
@@ -464,7 +482,7 @@
 		</div>
 
 		<!-- Stop Points Option -->
-		<div class="flex min-w-24 flex-col justify-end gap-2">
+		<div class="flex min-w-24 flex-col gap-2">
 			<div class="font-bold">Style</div>
 			<div class="flex flex-col gap-2 text-secondary">
 				<div class="flex w-full items-center justify-between gap-2">
@@ -510,10 +528,12 @@
 
 		<!-- Display Hours Slider -->
 		<div class="flex min-w-40 flex-col gap-2">
-			<div class="font-semibold">Number of Hours</div>
+			<label for="display-hours" class="font-semibold">Hours Ahead</label>
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center gap-2">
 					<input
+						id="display-hours"
+						aria-describedby="chart-history-range"
 						type="range"
 						min="1"
 						max="4"
@@ -523,6 +543,10 @@
 					/>
 					<span class="w-8 text-right">{displayHours}h</span>
 				</div>
+				<p id="chart-history-range" class="max-w-48 text-xs text-muted">
+					Also shows recorded history up to {displayHours}
+					{displayHours === 1 ? 'hour' : 'hours'} back.
+				</p>
 			</div>
 		</div>
 
@@ -541,21 +565,21 @@
 
 	<!-- Chart container with proper overflow handling -->
 	<div class="relative flex-1 overflow-hidden">
-		{#if data.route_trips.length && data.yDomain.length}
+		{#if visible_trips.length && data.yDomain.length}
 			<div class="absolute inset-0 overflow-auto">
 				<div bind:this={svgContainer} class="h-full min-h-125 w-full min-w-325">
 					<LayerCake
 						debug={false}
 						ssr
-						padding={{ top: 20, right: 10, left: 160, bottom: 30 }}
+						padding={chart_padding}
 						x="time"
 						y="stop_key"
 						{xDomain}
 						yDomain={data.yDomain}
 						yScale={scalePoint().padding(0)}
 						xScale={scaleTime()}
-						data={data.route_trips}
-						flatData={flatten(data.route_trips, 'points')}
+						data={visible_trips}
+						flatData={flatten(visible_trips, 'points')}
 					>
 						<Svg>
 							<AxisX {current_time_line} interval={xAxisInterval} />
