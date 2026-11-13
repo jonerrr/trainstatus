@@ -26,6 +26,9 @@
 </script>
 
 <!-- Trips can extend past the x domain; keep them out of the axis label margins. -->
+<!-- During dev initialization, LayerCake's 100px default minus the chart's 170px
+     horizontal padding briefly gives this rect width -70 before DOM measurement.
+     This can log an SVG error; the measured dimensions restore the chart. -->
 <clipPath id="chart-plot-area">
 	<rect y={-4} width={cake.width} height={cake.height + 8} />
 </clipPath>

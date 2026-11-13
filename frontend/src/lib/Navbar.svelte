@@ -61,18 +61,18 @@
 	</a>
 {/snippet}
 
-<!-- Mobile: fixed bottom bar (scrollable row). (larger screens) md+  fixed left sidebar (column). -->
+<!-- Mobile: six equal columns. Larger screens, md+: fixed left sidebar. -->
 <nav
-	class="fixed bottom-0 z-30 flex h-16 w-full flex-col bg-surface-1/95 text-center text-sm shadow-lg shadow-black/20 backdrop-blur-lg md:top-0 md:left-0 md:h-full md:w-20 md:shadow-none"
+	class="fixed bottom-0 z-30 flex h-16 w-full flex-col border-t border-border-default bg-surface-1 text-center text-sm md:top-0 md:left-0 md:h-full md:w-20 md:border-t-0 md:border-r"
 >
 	{#if !page.state.modal}<div class="shrink-0 md:hidden"><UpdateIndicator /></div>{/if}
 	<div
-		class="nav-links flex min-h-0 flex-1 items-stretch overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto"
+		class="nav-links grid min-h-0 flex-1 grid-cols-6 items-stretch md:flex md:flex-col md:overflow-x-hidden md:overflow-y-auto"
 	>
 		{#each navItems.slice(0, 5) as item (item.href)}
 			{@render navButton(item)}
 		{/each}
-		<div class="md:mt-auto">
+		<div class="flex min-w-0 md:mt-auto md:block">
 			{#if !page.state.modal}<div class="hidden md:block"><UpdateIndicator /></div>{/if}
 			{@render navButton(navItems[5])}
 		</div>
@@ -80,11 +80,35 @@
 </nav>
 
 <style>
-	@reference "../app.css";
-
 	.nav-button {
-		/* Mobile: fixed-width cells so the bar scrolls rather than squishing */
-		@apply flex min-w-20 flex-none flex-col items-center justify-center gap-1 p-2 transition-all duration-200 hover:bg-hover/50 active:bg-border-default/50;
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+		padding: 0.5rem 0.25rem;
+		font-size: 0.75rem;
+		line-height: 1rem;
+		transition: all 200ms var(--default-transition-timing-function);
+	}
+
+	@media (hover: hover) {
+		.nav-button:hover {
+			background-color: color-mix(in oklab, var(--bg-hover) 50%, transparent);
+		}
+	}
+
+	.nav-button:active {
+		background-color: color-mix(in oklab, var(--border-default) 50%, transparent);
+	}
+
+	.nav-links > div .nav-button {
+		width: 100%;
+	}
+
+	.nav-button :global(.nav-icon) {
+		flex-shrink: 0;
 	}
 
 	.nav-button[aria-current='page'] {
@@ -92,6 +116,14 @@
 	}
 
 	@media (min-width: 768px) {
+		.nav-button {
+			min-width: 5rem;
+			flex: none;
+			padding: 0.5rem;
+			font-size: 0.875rem;
+			line-height: 1.25rem;
+		}
+
 		.nav-button[aria-current='page'] {
 			box-shadow: inset 2px 0 var(--accent);
 		}
@@ -113,13 +145,9 @@
 	/* Desktop sidebar: buttons fill full width and get taller touch targets */
 	@media (min-width: 1024px) {
 		.nav-button {
-			@apply w-full min-w-0 py-4;
+			width: 100%;
+			min-width: 0;
+			padding-block: 1rem;
 		}
-	}
-
-	/* Gradient separator — top edge on mobile, right edge on desktop */
-	nav::before {
-		content: '';
-		@apply absolute top-0 right-0 left-0 h-px bg-linear-to-r from-transparent via-border-default to-transparent md:top-0 md:right-0 md:bottom-0 md:left-auto md:h-full md:w-px md:bg-linear-to-b;
 	}
 </style>

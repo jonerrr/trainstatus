@@ -18,6 +18,13 @@ pressed/selected states, keyboard navigation, and DOM query contracts.
   Transfer preview targets are 44px wide and centered over the thread rail.
 - Train diagrams keep a fixed 54px car pitch and `car_count * 54 + 12` width.
   Narrow viewports scroll horizontally instead of shrinking cars below 50px.
+- Structural dividers are continuous 1px rules, never gradients or shadows.
+  List headers use `--border-subtle`; the navigation boundary uses
+  `--border-default` along the top on mobile and right edge on desktop.
+  Keep these surfaces opaque so scrolling content cannot muddy the boundary.
+- Mobile navigation uses six equal-width columns with 24px icons and 12px labels,
+  keeping every destination visible without horizontal scrolling. The desktop
+  layout remains a left sidebar.
 
 ## Color tokens
 
@@ -77,7 +84,9 @@ selection colors. Respect forced colors and reduced motion preferences.
 
 Prefer Tailwind utilities for layout and ordinary styling. Use scoped CSS for
 SVG styling, pseudo-elements, browser control parts, and complex interactive
-selectors. Keep focus visible and preserve native control semantics.
+selectors. Write declarations in component stylesheets as plain CSS using the
+shared custom properties, without `@apply` or `@reference`, so Svelte can validate
+them directly. Keep focus visible and preserve native control semantics.
 
 Run the frontend checks and existing unit/browser component tests after UI
 changes. Preserve the platform shaft origin, measured car widths, transfer

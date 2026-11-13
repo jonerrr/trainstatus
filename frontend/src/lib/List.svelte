@@ -271,9 +271,7 @@
 <!-- TODO: back to top button in header -->
 <!-- TODO: fix scroll warnings in console -->
 <div class="relative z-30 flex w-full flex-col text-secondary {containerClass ?? ''}">
-	<div
-		class="sticky top-0 z-30 flex w-full items-center justify-between bg-surface-1/95 shadow-lg shadow-black/10 backdrop-blur-xs"
-	>
+	<div class="sticky top-0 z-30 flex w-full items-center justify-between bg-surface-1">
 		<!-- TODO: remove either this header or the main website header -->
 		<!-- it should be possible to combine the logo, tab selection, and settings button in one "row" -->
 		<!-- plus, it already shows in the navbar what section is active (except home page lists) -->
@@ -329,7 +327,7 @@
 		{/if}
 	</div>
 
-	<div class="h-px bg-linear-to-r from-transparent via-border-default/50 to-transparent"></div>
+	<div class="h-px shrink-0 bg-border-subtle"></div>
 
 	<div
 		bind:this={viewportEl}

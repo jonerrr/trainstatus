@@ -600,9 +600,7 @@
 </div>
 
 <style>
-	@reference "../../app.css";
-
 	:global(.layercake-layout-svg) {
-		@apply bg-canvas;
+		background-color: var(--bg-canvas);
 	}
 </style>
