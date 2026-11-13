@@ -63,8 +63,8 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 1. Clone the repository
 2. Run `mise bootstrap --only tools,task` to install the tools and Git hooks.
 3. Copy `dev.pod.yml.example` to `dev.pod.yml`. It includes a Datadog Agent (commented out by default) for [optional telemetry](#optional-telemetry).
-4. Set the environment variables as listed in `backend/README.md` inside a `backend/mise.local.toml` you create.
-   - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`.
+4. Create `fnox.local.toml` in the repository root with your provider secrets as described in [Local secrets](#local-secrets).
+   - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`. Put additional non-sensitive overrides from [backend configuration](backend/README.md#config) in `backend/mise.local.toml`.
 5. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
 6. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
 7. Run `mise //geo:export` to export the Valhalla tile extract.
@@ -72,6 +72,24 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 9. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
 
 `mise containers:down` stops the dev pod and keeps its volumes. `mise reset` deletes that pod and its volumes, then creates them again. Both commands take an optional suffix, `dev` by default: `mise reset demo` targets the `trainstatus-demo` pod from `demo.pod.yml`.
+
+#### Local secrets
+
+Local mise tasks use [fnox](https://fnox.jdx.dev/) through [mise's secrets integration](https://mise.jdx.dev/environments/secrets/fnox.html). fnox is included in the project's mise tools. Create a gitignored `fnox.local.toml` in the repository root with your own values:
+
+```toml
+[secrets]
+MTA_API_URL = { default = "https://your-mta-api-host" }
+MTA_OBA_API_KEY = { default = "your-bustime-api-key" }
+NJT_USERNAME = { default = "your-njt-username" }
+NJT_PASSWORD = { default = "your-njt-password" }
+```
+
+These `default` values are stored in plaintext. You can instead configure an [fnox provider](https://fnox.jdx.dev/) in the same local file for encrypted values or password-manager references.
+
+Each task explicitly lists the secrets it needs. The backend dev tasks and fixture capture receive the provider credentials; tests, SQLx preparation/checks, OpenAPI export, and the container build need `MTA_API_URL` because Rust embeds it at compile time. Dispatcher tasks do not pass secrets to other tasks, and secrets do not appear in your activated shell. Run `mise secrets ls` to inspect the available keys and task grants without printing their values.
+
+Podman kube deployments continue to use `demo.configmap.yml` and, when needed, `dev.configmap.yml`. Fill those in separately using their example files; the mise fnox integration does not populate the configmaps or inject secrets into containers automatically.
 
 #### Optional telemetry
 

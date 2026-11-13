@@ -54,6 +54,10 @@ Feeds → `RealtimeSource` → `CollectedSnapshot` (pinned `NetworkRevision`) �
 
 A successful collection replaces current membership and each alert's owned translations, periods and affected entities transactionally. Empty polls clear; failures preserve. `AlertCollection` is a discriminated enum (MTA variants carry MTA attributes plus `AlertDetails`; NJT carries details only), so source and payload are derived together. The DTO prefers HTML over plain text, English over other languages, and orders route-bearing entities by priority.
 
+## Development checks
+
+Rust embeds `MTA_API_URL` at compile time. The Clippy hook and backend test tasks supply `https://mta.invalid` so checks compile without fnox credentials. Tests read committed provider captures rather than fetching live data. Live development, fixture capture, container builds, SQLx preparation/checks, and OpenAPI export retain their explicit mise secret grants.
+
 ## Database
 
 PostgreSQL with PostGIS. Geometry is WKB decoded by `geozero`. `source_enum` maps to the `Source` Rust enum. Use SQLx compile-time macros where SQL is describable; the metadata workflow is in [backend/TESTING.md](../../backend/TESTING.md). `backend/queries.sql` has schema inspection queries.

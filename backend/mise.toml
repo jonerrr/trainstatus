@@ -4,11 +4,13 @@ SQLX_OFFLINE = "true"
 
 [tasks."sqlx:prepare"]
 description = "Refresh checked-query metadata against the configured migrated database"
+secrets = ["MTA_API_URL"]
 env = { SQLX_OFFLINE = "false" }
 run = "cargo sqlx prepare -- --all-targets --features fixture-capture,integration-tests"
 
 [tasks."sqlx:check"]
 description = "Check committed query metadata against the configured migrated database"
+secrets = ["MTA_API_URL"]
 env = { SQLX_OFFLINE = "false" }
 run = "cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests"
 
@@ -17,19 +19,23 @@ run = "sqlx migrate run"
 
 [tasks.dev]
 depends = ["//backend:migrate"]
+secrets = ["MTA_API_URL", "MTA_OBA_API_KEY", "NJT_USERNAME", "NJT_PASSWORD"]
 run = "cargo run"
 
 [tasks."dev:telemetry"]
 depends = ["//backend:migrate"]
-run = "cargo run"
+secrets = ["MTA_API_URL", "MTA_OBA_API_KEY", "NJT_USERNAME", "NJT_PASSWORD"]
 description = "Run the backend with OTLP export to the local Datadog Agent"
 env = { OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318", OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf", OTEL_SERVICE_NAME = "trainstatus-backend", OTEL_RESOURCE_ATTRIBUTES = "deployment.environment.name=development", OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "Delta" }
+run = "cargo run"
 
 [tasks.build]
-run = "podman build -f Dockerfile --build-arg MTA_API_URL={{env.MTA_API_URL}} -t ghcr.io/jonerrr/trainstatus-backend ."
+secrets = ["MTA_API_URL"]
+run = "podman build -f Dockerfile --build-arg MTA_API_URL=${MTA_API_URL} -t ghcr.io/jonerrr/trainstatus-backend ."
 
 [tasks."fixtures"]
 description = "Capture, list, verify, or update expected fixture outputs; pass --help for command details"
+secrets = ["MTA_API_URL", "MTA_OBA_API_KEY", "NJT_USERNAME", "NJT_PASSWORD"]
 raw_args = true
 run = "cargo run --features fixture-capture --bin fixtures -- $@"
 
@@ -39,6 +45,7 @@ run = "mise run test:services full"
 
 [tasks."test:unit"]
 description = "Run private unit and public behavior tests without services"
+env = { MTA_API_URL = "https://mta.invalid" }
 run = "cargo test --locked --features fixture-capture --lib --test behavior"
 
 [tasks."test:integration"]
@@ -51,7 +58,7 @@ run = "mise run test:services performance"
 
 [tasks."test:services"]
 description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
-env = { SQLX_OFFLINE = "true", RUST_TEST_THREADS = "4" }
+env = { MTA_API_URL = "https://mta.invalid", SQLX_OFFLINE = "true", RUST_TEST_THREADS = "4" }
 usage = """
 arg "<suite>" {
   choices "full" "integration" "performance"
@@ -80,6 +87,7 @@ esac
 
 [tasks.openapi]
 description = "Export the current OpenAPI contract without starting workers or connecting to PostgreSQL"
+secrets = ["MTA_API_URL"]
 run = "cargo run --bin openapi"
 
 # Host deps for compiling the valhalla crate (vendored C++).

@@ -12,7 +12,7 @@ Run commands from `backend/`.
 | `mise run sqlx:check`                       | Verify committed query metadata against that database                                |
 | `mise run test:performance`                 | Opt-in ingestion WAL and static import/restart benchmarks; use an idle machine       |
 
-For a focused service-free test, use `cargo test --features fixture-capture --lib --test behavior <name>`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and require no provider credentials or network requests to transit providers. Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
+For a focused service-free test, use `mise run test:unit <name>`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and make no network requests to transit providers. The test tasks set `MTA_API_URL=https://mta.invalid` because Rust embeds it at compile time; tests need no fnox or provider credentials. The pre-commit Clippy step uses the same placeholder. For direct Cargo commands, supply `MTA_API_URL` explicitly (a placeholder URL suffices for tests). Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
 
 ## Placement and ownership
 

@@ -10,6 +10,7 @@ profile.json
 !.env.example
 !.env.test
 mise.local.toml
+fnox.local.toml
 
 # frontend
 node_modules

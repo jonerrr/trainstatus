@@ -15,7 +15,8 @@ steps {
   }
   ["clippy"] = (Builtins.cargo_clippy) {
     glob = code
-    check = "cargo clippy --locked --all-targets --all-features -- -D warnings"
+    // Clippy compiles provider URLs but never fetches them.
+    check = "MTA_API_URL=https://mta.invalid cargo clippy --locked --all-targets --all-features -- -D warnings"
     fix = check
   }
   ["unit-tests"] {
