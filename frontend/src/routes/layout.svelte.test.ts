@@ -275,8 +275,6 @@ for (const [width, height] of [
 					);
 				})
 				.toBe(true);
-			await view.getByText('Show more', { exact: true }).click();
-			await view.getByText('Later departures', { exact: true }).click();
 			await expect
 				.element(view.getByRole('button', { name: /^X5 to/ }).first())
 				.toBeInTheDocument();

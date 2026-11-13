@@ -54,7 +54,7 @@ function fixtureData(
 	return { ...f, data, requestedRoutes, serviceState };
 }
 
-test('orders by actual boarding stop then arrival through expansion and collapse', async () => {
+test('shows every transfer before later departures and restores the full list after collapse', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = fixtureData((f) => {
 		f.origin.nearby_stops.find((s) => s.stop_id === f.third.id)!.distance_m = 30;
@@ -66,56 +66,25 @@ test('orders by actual boarding stop then arrival through expansion and collapse
 		childProps: { stop: f.origin, incoming: f.incoming, timeFormat: 'countdown' as const }
 	});
 	try {
-		await expect.element(view.getByRole('button', { name: /^A to A North.*5m/ })).toBeVisible();
-		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
-		expect(view.container.querySelectorAll('button[aria-label*=" to "]')).toHaveLength(3);
+		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
+		const later = view.getByRole('group', { name: 'Later departures' });
+		await expect.element(later.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
+		expect(
+			[...view.container.querySelectorAll('.transfer-row > .option')]
+				.filter((button) => !button.closest('[aria-label="Later departures"]'))
+				.map((button) => button.getAttribute('aria-label')?.split(' ')[0])
+		).toEqual(['C', 'B', 'A', 'D']);
 		expect(
 			view.container.querySelector('button[aria-label^="A to"]')?.getAttribute('aria-label')
 		).toContain('Board at far');
-		await view.getByText('Show more', { exact: true }).click();
-		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
-		await expect
-			.element(view.getByRole('button', { name: /^A to A North.*20m/ }))
-			.not.toBeInTheDocument();
-		await view.getByText('Later departures', { exact: true }).click();
-		await expect.element(view.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
-		await view.getByRole('button', { name: 'Collapse later departures', exact: true }).click();
-		await expect
-			.element(view.getByRole('button', { name: /^A to A North.*20m/ }))
-			.not.toBeInTheDocument();
-		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
-		await view.getByText('Later departures', { exact: true }).click();
-		await expect.element(view.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
+		const panel = view.container.querySelector<HTMLElement>('.transfers')!;
+		expect(panel.clientHeight).toBeLessThanOrEqual(Math.min(220, window.innerHeight * 0.28));
+		expect(panel.scrollHeight).toBeGreaterThan(panel.clientHeight);
+		await view.getByRole('button', { name: 'Transfers', exact: true }).click();
+		await expect.element(later).not.toBeInTheDocument();
+		await view.getByRole('button', { name: 'Transfers', exact: true }).click();
+		await expect.element(later.getByRole('button', { name: /^A to A North.*20m/ })).toBeVisible();
 		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
-		await expect
-			.poll(() =>
-				[
-					...view.container.querySelectorAll(
-						'section[aria-label="Transfers after arrival"] .transfer-row > button[aria-label*=" to "]'
-					)
-				]
-					.filter(
-						(b) =>
-							b.getBoundingClientRect().height > 0 && !b.closest('[aria-label="Later departures"]')
-					)
-					.map((b) => b.getAttribute('aria-label')?.split(' ')[0])
-			)
-			.toEqual(['C', 'B', 'A', 'D']);
-		await view.getByText('Show less', { exact: true }).click();
-		expect(
-			[
-				...view.container.querySelectorAll(
-					'section[aria-label="Transfers after arrival"] .transfer-row > button[aria-label*=" to "]'
-				)
-			]
-				.filter(
-					(b) =>
-						b.getBoundingClientRect().height > 0 && !b.closest('[aria-label="Later departures"]')
-				)
-				.map((b) => b.getAttribute('aria-label')?.split(' ')[0])
-		).toEqual(['C', 'B', 'A']);
-		expect(view.container.textContent).not.toContain('Later departures');
-		await view.getByText('Show more', { exact: true }).click();
 		await view.getByRole('button', { name: /^D to/ }).click();
 		expect(page.state.modal).toMatchObject({
 			type: 'trip',
@@ -130,7 +99,7 @@ test('orders by actual boarding stop then arrival through expansion and collapse
 	}
 });
 
-test('fills three rows from available departures beyond empty choices and omits same-stop distances', async () => {
+test('omits empty choices and same-stop distances while preserving predicted route order', async () => {
 	vi.spyOn(Date, 'now').mockReturnValue(chartNow);
 	const f = fixtureData((f) => {
 		f.origin.routes.push(...f.third.routes);
@@ -167,8 +136,6 @@ test('fills three rows from available departures beyond empty choices and omits 
 			expect.stringMatching(/^D to/)
 		]);
 		expect(view.container.querySelector('button[aria-label^="B to"]')).toBeNull();
-		expect(view.container.textContent).not.toContain('No later predictions');
-		await expect.element(view.getByText('Show more', { exact: true })).not.toBeInTheDocument();
 	} finally {
 		await view.unmount();
 		f.data.destroy();
@@ -249,8 +216,26 @@ test('a collapsed transfer section advertises choices without acquiring route se
 	try {
 		await expect.element(view.getByText('Transfers', { exact: true })).toBeVisible();
 		expect(f.requestedRoutes()).toEqual([]);
+		view.container.style.display = 'flex';
+		view.container.style.flexDirection = 'column';
+		view.container.style.height = '37px';
+		for (const width of [320, 1200]) {
+			view.container.style.width = `${width}px`;
+			const panel = view.container.querySelector<HTMLElement>('.transfers')!;
+			const panelBounds = panel.getBoundingClientRect();
+			const toggleBounds = view
+				.getByRole('button', { name: 'Transfers', exact: true })
+				.element()
+				.getBoundingClientRect();
+			expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
+			expect(
+				Math.abs(
+					(toggleBounds.top + toggleBounds.bottom - panelBounds.top - panelBounds.bottom) / 2
+				)
+			).toBeLessThanOrEqual(0.5);
+		}
 		await view.getByText('Transfers', { exact: true }).click();
-		await expect.element(view.getByRole('button', { name: /^A to/ })).toBeVisible();
+		await expect.element(view.getByRole('button', { name: /^A to A North.*5m/ })).toBeVisible();
 		expect(f.requestedRoutes()).toEqual(['A', 'B', 'C', 'D']);
 	} finally {
 		await view.unmount();

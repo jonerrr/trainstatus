@@ -11,7 +11,6 @@
 	let { stop, timeFormat = 'countdown' }: { stop: CatalogStop; timeFormat?: 'time' | 'countdown' } =
 		$props();
 	let open = $state(true);
-	let expanded = $state(false);
 	const currentTime = getCurrentTime();
 	const transfersResource = createTransfers(() => ({
 		stop,
@@ -29,7 +28,7 @@
 	<section class="transfers" aria-label="Nearby routes">
 		<TransferThread label="Nearby routes" bind:open>
 			<div role="region" aria-label="Nearby route options">
-				{#each departures.slice(0, 3) as departure (departure.key)}
+				{#each departures as departure (departure.key)}
 					{@render row(departure)}
 				{:else}
 					{#if transfers.state === 'loading'}<p class="status" role="status">
@@ -38,22 +37,13 @@
 							No nearby predictions to show
 						</p>{/if}
 				{/each}
-				{#if expanded || departures.length > 3}
-					<TransferThread label={expanded ? 'Show less' : 'Show more'} nested bind:open={expanded}>
-						{#if expanded}
-							{#each departures.slice(3) as departure (departure.key)}
-								{@render row(departure)}
-							{/each}
-						{/if}
-					</TransferThread>
-				{/if}
 			</div>
 		</TransferThread>
 	</section>
 {/if}
 
 {#snippet row(departure: DepartureOption)}
-	<div class="transfer-row pl-[22px]">
+	<div class="transfer-row relative pl-11">
 		<Option
 			{departure}
 			{timeFormat}
@@ -71,19 +61,19 @@
 <style>
 	.transfers {
 		flex: 0 1 auto;
-		min-height: 37px;
+		min-height: 45px;
 		max-height: min(220px, 25dvh);
 		overflow: auto;
 		overscroll-behavior-y: contain;
 		scrollbar-width: thin;
 		border-bottom: 1px solid var(--border-default);
-		padding-block: 4px;
+		padding: 4px 8px;
 	}
 	.transfer-row :global(.option) {
 		min-height: 44px;
 	}
 	.status {
-		padding: 6px 8px 6px 22px;
+		padding: 6px 8px 6px 44px;
 		font-size: 11px;
 		color: var(--text-muted);
 	}

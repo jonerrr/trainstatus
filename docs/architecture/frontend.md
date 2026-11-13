@@ -48,6 +48,21 @@ Pinned trip rows reserve 68px of content height in every state (loading, running
 
 Trip-row status descriptions and countdowns share the same target call. An observed stop keeps its own countdown even when its prediction has passed (`Now` while stopped, otherwise `Due`); a missing matching call omits the countdown rather than borrowing another stop's prediction. Unassigned trains use their origin call. Otherwise, without an observed stop, the next upcoming call supplies both.
 
+Opening a trip transfer or stop nearby-route panel shows every available choice
+within its existing height-capped scroll area. Trip panels append later
+departures below a non-interactive labeled divider. Only the main plus/minus
+disclosure remains; there are no secondary expansion controls.
+
+Opening the transfer resource requests service for every candidate route
+discovered from the selected sources' same-stop and nearby-stop catalogs, not
+just routes already in memory. Rows update as catalog and service responses
+arrive, so the list may be partial during loading. Both panels use a consistent
+44px leading lane, including loading and empty-state messages and the
+later-departure group. The trip transfer rail
+aligns with the stop timeline's 22px centerline; nearby-route panels retain their
+outer inset. The later-departure label uses sentence case and a subtle trailing
+rule instead of a full-width section border.
+
 The Stops page searches the selected source. Exact route IDs filter to that route's stops (in stop-sequence order for subway routes). Otherwise, name matches appear first, followed by an exact stop-ID match if it is not already included; an ID never hides matching names.
 
 On initial load and client-side navigation into Stops, the search field receives focus only when the primary pointer supports hover and fine pointing (`(hover: hover) and (pointer: fine)`). Touch-first devices keep normal page focus so visiting Stops does not open the on-screen keyboard.

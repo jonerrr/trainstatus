@@ -138,7 +138,6 @@ test('shows three same-direction subway connections without expanding the transf
 			await expect
 				.element(view.getByRole('button', { name: new RegExp(`^${id} to .*5m`) }))
 				.toBeVisible();
-		await expect.element(view.getByText('Show more', { exact: true })).not.toBeInTheDocument();
 		expect(view.container.querySelectorAll('.transfer-row')).toHaveLength(3);
 		await view.getByRole('button', { name: /^C to/ }).click();
 		expect(page.state.modal).toMatchObject({ type: 'trip', id: 'C-north' });
@@ -355,8 +354,6 @@ for (const missing of [false, true]) {
 						})
 					)
 					.toBeVisible();
-				const disclosure = view.container.querySelector('details')!;
-				expect(disclosure.open).toBe(false);
 				await expect
 					.poll(() => view.getByRole('region', { name: 'Platform exits at arrival' }).all().length)
 					.toBe(1);
@@ -398,6 +395,13 @@ test('transfer car nodes preview matching access points while rows navigate, and
 			platform_edges: [['destination-edge']]
 		}
 	};
+	f.catalog.routes.push({ ...f.route, id: 'Y', short_name: 'Y' });
+	stop.routes.push({ ...stop.routes[0], route_id: 'Y' });
+	f.service.routes.Y = {
+		...f.service.routes.X,
+		trips: [{ ...f.trips[0], id: 'transfer-without-car-guidance' }],
+		calls: { ...f.service.routes.X.calls, platform_edges: [[]] }
+	};
 	const data = fixtureTransitData({
 		catalogs: { mta_subway: f.catalog },
 		services: { mta_subway: f.service }
@@ -417,9 +421,29 @@ test('transfer car nodes preview matching access points while rows navigate, and
 		const preview = view.getByRole('button', { name: /^Preview X to/ });
 		await expect.element(preview).toBeVisible();
 		await expect.element(preview).toHaveTextContent('4');
-		const node = preview.element().querySelector('.car-box')!.getBoundingClientRect();
-		const rail = view.container.querySelector('.rail')!.getBoundingClientRect();
-		expect(Math.abs((node.left + node.right) / 2 - (rail.left + rail.right) / 2)).toBeLessThan(1);
+		await expect.element(view.getByRole('button', { name: /^Y to/ })).toBeVisible();
+		const transferButtons = view.container.querySelectorAll<HTMLElement>('.transfer-row > .option');
+		const previewBounds = preview.element().getBoundingClientRect();
+		const transferBounds = [...transferButtons].map((button) => button.getBoundingClientRect());
+		expect(transferBounds).toHaveLength(2);
+		expect(Math.abs(transferBounds[0].left - transferBounds[1].left)).toBeLessThan(1);
+		expect(previewBounds.width).toBeGreaterThanOrEqual(44);
+		expect(transferBounds.every((bounds) => bounds.left >= previewBounds.right)).toBe(true);
+		const stopBounds = view
+			.getByRole('button', { name: `Preview ${f.stops[0].name}`, exact: true })
+			.first()
+			.element()
+			.getBoundingClientRect();
+		const toggleBounds = view
+			.getByRole('button', { name: 'Transfers', exact: true })
+			.element()
+			.querySelector('.node')!
+			.getBoundingClientRect();
+		const timelineCenter = (stopBounds.left + stopBounds.right) / 2;
+		expect(Math.abs((previewBounds.left + previewBounds.right) / 2 - timelineCenter)).toBeLessThan(
+			1
+		);
+		expect(Math.abs((toggleBounds.left + toggleBounds.right) / 2 - timelineCenter)).toBeLessThan(1);
 		const scroller = view
 			.getByRole('region', { name: 'Train and platform exits; scroll for more' })
 			.element();

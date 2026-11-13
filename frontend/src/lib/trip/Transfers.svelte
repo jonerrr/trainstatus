@@ -27,8 +27,6 @@
 		open?: boolean;
 	} = $props();
 	const currentTime = getCurrentTime();
-	let expanded = $state(false);
-	let laterOpen = $state(false);
 	let selectedKey = $state<string | null>(null);
 	const transfersResource = createTransfers(() => ({
 		stop,
@@ -42,7 +40,6 @@
 	const options = $derived(transfers.options);
 	const ordered = $derived(transfers.state === 'ready' ? transfers.value : []);
 	const later = $derived(ordered.flatMap((o) => (o.next ? [o.next] : [])).sort(compareTransfers));
-	const hasDetails = $derived(expanded || ordered.length > 3 || ordered.some((o) => o.next));
 	const selection = $derived.by(() => {
 		if (!trip) return undefined;
 		const departure = ordered
@@ -66,27 +63,17 @@
 {#if transfers.state !== 'failed' && (options.length || transfers.state === 'loading')}
 	<section class="transfers" aria-label="Transfers after arrival">
 		<TransferThread label="Transfers" bind:open>
-			{#each ordered.slice(0, 3) as departure (key(departure))}{@render row(departure)}
+			{#each ordered as departure (key(departure))}{@render row(departure)}
 			{:else}{#if transfers.state === 'loading'}<p class="status" role="status">
 						Loading predictions…
 					</p>{:else if transfers.state === 'ready'}<p class="status" role="status">
 						No transfer predictions to show
 					</p>{/if}{/each}
-			{#if hasDetails}
-				<TransferThread label={expanded ? 'Show less' : 'Show more'} nested bind:open={expanded}>
-					{#if expanded}
-						{#each ordered.slice(3) as departure (key(departure))}{@render row(departure)}{/each}
-						{#if later.length}
-							<TransferThread label="Later departures" nested bind:open={laterOpen}>
-								{#if laterOpen}
-									<div role="group" aria-label="Later departures">
-										{#each later as departure (key(departure))}{@render row(departure)}{/each}
-									</div>
-								{/if}
-							</TransferThread>
-						{/if}
-					{/if}
-				</TransferThread>
+			{#if later.length}
+				<div role="group" aria-label="Later departures">
+					<h3 class="later-heading">Later departures</h3>
+					{#each later as departure (key(departure))}{@render row(departure)}{/each}
+				</div>
 			{/if}
 		</TransferThread>
 	</section>
@@ -101,11 +88,11 @@
 		transferExits ? [...new Set(transferExits.exits.map((exit) => exit.car))] : []
 	)}
 	{const active = $derived(selected !== undefined && key(departure) === key(selected))}
-	<div class={['transfer-row relative pl-[22px]', { 'active bg-accent-bg': active }]}>
+	<div class={['transfer-row relative pl-11', { 'active bg-accent-bg': active }]}>
 		{#if canPreview}<button
 				type="button"
 				class={[
-					'preview absolute inset-y-0 -left-[22px] z-2 grid w-11 cursor-pointer place-items-center',
+					'preview absolute inset-y-0 left-0 z-2 grid w-11 cursor-pointer place-items-center',
 					{ active }
 				]}
 				aria-label={`Preview ${departure.route.short_name} to ${departure.destination}`}
@@ -113,7 +100,7 @@
 				title="Preview platform guidance"
 				onclick={() => (selectedKey = active ? null : key(departure))}
 				><span
-					class="car-box relative z-1 inline-flex h-[17px] max-w-[38px] min-w-5 items-center justify-center rounded-none border-[1.5px] border-muted bg-surface-1 px-[3px] text-[10px] leading-none font-bold tracking-[-0.03em] whitespace-nowrap text-secondary tabular-nums"
+					class="car-box relative z-1 inline-flex h-4.25 max-w-9.5 min-w-5 items-center justify-center rounded-none border-[1.5px] border-muted bg-surface-1 px-0.75 text-[10px] leading-none font-bold tracking-[-0.03em] whitespace-nowrap text-secondary tabular-nums"
 					>{exitCars.slice(0, 3).join('·')}</span
 				></button
 			>{/if}
@@ -134,13 +121,28 @@
 <style>
 	.transfers {
 		flex: 0 1 auto;
-		min-height: 37px;
+		min-height: 45px;
 		max-height: min(220px, 28dvh);
 		overflow: auto;
 		overscroll-behavior-y: contain;
 		scrollbar-width: thin;
 		border-top: 1px solid var(--border-strong);
-		padding-block: 4px 0;
+		padding: 4px 8px 4px 0;
+	}
+	.later-heading {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 6px 8px 2px 44px;
+		padding-block: 4px;
+		font-size: 12px;
+		font-weight: 400;
+		color: var(--text-muted);
+	}
+	.later-heading::after {
+		content: '';
+		flex: 1;
+		border-top: 1px solid var(--border-subtle);
 	}
 	.preview::before {
 		content: '';
@@ -172,7 +174,7 @@
 		color: var(--accent-fg);
 	}
 	.status {
-		padding: 6px 8px 6px 22px;
+		padding: 6px 8px 6px 44px;
 		font-size: 11px;
 		color: var(--text-muted);
 	}

@@ -10,12 +10,11 @@ pressed/selected states, keyboard navigation, and DOM query contracts.
   radios, range tracks and thumbs, search fields, dropdowns, cards, bus route
   chips, transfer car boxes, and stop timeline nodes.
 - Reserve true circles for official MTA subway route bullets in
-  `frontend/src/lib/route/Icon.svelte` and the (+)/(−) disclosure icons in
-  `frontend/src/lib/trip/TransferThread.svelte`. Preserve official route artwork
-  and provider route colors; bus badges stay rectangular.
+  `frontend/src/lib/route/Icon.svelte` and the (+)/(−) transfer disclosure controls.
+  Preserve official route artwork and provider route colors; bus badges stay rectangular.
 - Keep information compact while retaining existing touch targets and scrolling.
   Stop selectors are at least 44px tall; their timeline nodes are 14×14px squares.
-  Transfer preview targets are 44px wide and centered over the thread rail.
+  Transfer preview targets are 44px wide with car boxes centered in that lane.
 - Train diagrams keep a fixed 54px car pitch and `car_count * 54 + 12` width.
   Narrow viewports scroll horizontally instead of shrinking cars below 50px.
 - Structural dividers are continuous 1px rules, never gradients or shadows.
@@ -74,9 +73,21 @@ selection colors. Respect forced colors and reduced motion preferences.
   position text, and `--accent-hover` fleet text. Exit shafts start at y=25;
   transfer shafts use the accent. Center selected transfer guidance horizontally
   without scrolling the surrounding modal.
-- Transfer rows show up to three unique exit car positions joined by `·` in a
-  sharp rectangular box on the rail. Active rows use the selected background;
-  the active rail and car box use the accent.
+- Transfer rows share a 44px rail lane, whether or not they have platform
+  guidance, so route badges and descriptions stay aligned. Car previews show up
+  to three unique exit positions joined by `·` in a sharp rectangular box centered
+  over the rail. Active rows use the selected background; the active preview
+  indicator and car box use the accent.
+- The trip transfer rail shares the stop timeline's 22px centerline and 44px
+  content column. Nearby-route panels retain an 8px outer inset. A continuous
+  vertical rail connects the main (+)/(−) disclosure control and car previews.
+  Opening the panel shows every available transfer choice in the same bounded
+  scroll area, with no secondary accordions or additional indentation.
+  Later departures use a muted sentence-case caption with a subtle trailing
+  rule, aligned with the route content, rather than a section banner.
+  Collapsed panels retain a 45px minimum border-box height: a 36px toggle, 4px
+  padding above and below, and a 1px border. Flex shrinking must not clip the
+  control or introduce a scrollbar.
 - Subway trip headers show the available vehicle model and car count, such as
   `R142A · 10 cars`, in the same header column used for bus vehicle IDs.
 

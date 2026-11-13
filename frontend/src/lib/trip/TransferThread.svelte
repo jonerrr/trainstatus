@@ -6,101 +6,76 @@
 	let {
 		label,
 		open = $bindable(true),
-		nested = false,
 		children
 	}: {
 		label: string;
 		open?: boolean;
-		nested?: boolean;
 		children: Snippet;
 	} = $props();
 	const id = $props.id();
 </script>
 
-<details class={['thread', { nested }]} bind:open>
-	<summary
-		><span class="toggle"
-			>{#if open}<CircleMinus size={16} />{:else}<CirclePlus size={16} />{/if}</span
-		>{label}</summary
+<div class="thread">
+	<button
+		type="button"
+		class="toggle"
+		aria-expanded={open}
+		aria-controls={id}
+		onclick={() => (open = !open)}
 	>
-	{#if open}<button
-			type="button"
-			class="rail"
-			aria-label={`Collapse ${label.toLowerCase()}`}
-			aria-controls={id}
-			aria-expanded={open}
-			onclick={() => (open = false)}
-		></button>{/if}
-	<div {id}>{@render children()}</div>
-</details>
+		<span class="node">
+			{#if open}<CircleMinus size={16} />{:else}<CirclePlus size={16} />{/if}
+		</span>
+		<span class="label">{label}</span>
+	</button>
+	<div {id} class="content" hidden={!open}>{@render children()}</div>
+</div>
 
 <style>
 	.thread {
 		position: relative;
-		margin-left: 22px;
-	}
-	summary {
 		display: flex;
+		flex-direction: column;
+	}
+	.thread::before {
+		content: '';
+		position: absolute;
+		left: 21px;
+		top: 18px;
+		bottom: 18px;
+		width: 2px;
+		background: var(--border-strong);
+		pointer-events: none;
+	}
+	.toggle {
+		position: relative;
+		display: grid;
+		grid-template-columns: 44px minmax(0, 1fr);
 		align-items: center;
-		gap: 6px;
-		min-height: 32px;
-		margin-left: -8px;
-		list-style: none;
+		min-height: 36px;
+		padding-right: 8px;
 		cursor: pointer;
+		text-align: left;
 		font-size: 12px;
 		color: var(--text-secondary);
 	}
-	summary::-webkit-details-marker {
-		display: none;
-	}
-	summary:hover {
-		color: white;
-	}
-	.toggle {
-		display: grid;
-		place-items: center;
+	.node {
+		position: relative;
+		justify-self: center;
 		background: var(--bg-surface-1);
 	}
-	.rail {
-		position: absolute;
-		left: -12px;
-		top: 24px;
-		bottom: 0;
-		width: 24px;
-		z-index: 1;
-		cursor: pointer;
+	.label {
+		min-width: 0;
 	}
-	.rail::before {
-		content: '';
-		position: absolute;
-		left: 11px;
-		inset-block: 0;
-		width: 2px;
-		background: var(--border-strong);
+	.toggle:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
 	}
-	summary:focus-visible,
-	.rail:focus-visible {
+	.toggle:hover .node {
+		background: var(--bg-hover);
+	}
+	.toggle:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: -2px;
-	}
-	.rail:hover::before,
-	.rail:focus-visible::before {
-		background: var(--text-secondary);
-	}
-	.nested::before {
-		content: '';
-		position: absolute;
-		left: -23px;
-		top: -1px;
-		width: 15px;
-		height: 18px;
-		border-left: 2px solid var(--border-strong);
-		border-bottom: 2px solid var(--border-strong);
-		border-bottom-left-radius: 0;
-		pointer-events: none;
-	}
-	.nested summary {
-		color: var(--text-muted);
-		font-size: 11px;
 	}
 </style>

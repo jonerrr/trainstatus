@@ -60,16 +60,10 @@ test('shows compact predictions in an expandable thread and opens the actual boa
 		expect(sameName.querySelector('.distance')?.textContent).toMatch(/\d/);
 		expect(sameName.getAttribute('aria-label')).not.toContain('undefined');
 		expect(view.container.querySelectorAll('button[aria-label^="A to"]')).toHaveLength(1);
-		expect(view.container.querySelector('button[aria-label^="D to"]')).toBeNull();
-		await view.getByText('Show more', { exact: true }).click();
 		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
 		const panel = view.container.querySelector<HTMLElement>('section[aria-label="Nearby routes"]')!;
 		expect(panel.clientHeight).toBeLessThanOrEqual(Math.min(220, window.innerHeight * 0.25));
 		expect(panel.scrollHeight).toBeGreaterThan(panel.clientHeight);
-		panel.scrollTop = panel.scrollHeight;
-		await view.getByText('Show less', { exact: true }).click();
-		expect(view.container.querySelector('button[aria-label^="D to"]')).toBeNull();
-		await expect.element(view.getByText('Show more', { exact: true })).toBeVisible();
 		expect(f.requests.filter((url) => url.includes('/service/'))).toHaveLength(1);
 		const url = new URL(
 			f.requests.find((url) => url.includes('/service/'))!,
@@ -81,6 +75,7 @@ test('shows compact predictions in an expandable thread and opens the actual boa
 		for (const button of view.container.querySelectorAll('button[aria-label*=" to "]')) {
 			const box = button.getBoundingClientRect();
 			expect(box.height).toBeGreaterThanOrEqual(44);
+			expect(box.left).toBeGreaterThanOrEqual(bounds.left + 8);
 			expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
 		}
 		await view.getByRole('button', { name: /^A to A North/ }).click();
@@ -89,6 +84,24 @@ test('shows compact predictions in an expandable thread and opens the actual boa
 		await expect
 			.element(view.container.querySelector<HTMLElement>('[aria-label="Nearby route options"]')!)
 			.not.toBeVisible();
+		view.container.style.display = 'flex';
+		view.container.style.flexDirection = 'column';
+		view.container.style.height = '37px';
+		const collapsedPanel = panel.getBoundingClientRect();
+		const collapsedToggle = view
+			.getByRole('button', { name: 'Nearby routes', exact: true })
+			.element()
+			.getBoundingClientRect();
+		expect(panel.scrollHeight).toBeLessThanOrEqual(panel.clientHeight);
+		expect(
+			Math.abs(
+				(collapsedToggle.top +
+					collapsedToggle.bottom -
+					collapsedPanel.top -
+					collapsedPanel.bottom) /
+					2
+			)
+		).toBeLessThanOrEqual(0.5);
 		await view.getByText('Nearby routes', { exact: true }).click();
 		await expect.element(view.getByRole('button', { name: /^A to A North/ })).toBeVisible();
 		expect(f.requests.filter((url) => url.includes('/service/'))).toHaveLength(1);
@@ -115,7 +128,6 @@ test('fills the preview with predicted routes and removes routes with only passe
 		await expect.element(view.getByRole('button', { name: /^D to D North.*3m/ })).toBeVisible();
 		expect(view.container.querySelector('button[aria-label^="A to"]')).toBeNull();
 		expect(view.container.querySelector('button[aria-label^="B to"]')).toBeNull();
-		await expect.element(view.getByText('Show more', { exact: true })).not.toBeInTheDocument();
 	} finally {
 		await view.unmount();
 		f.data.destroy();
