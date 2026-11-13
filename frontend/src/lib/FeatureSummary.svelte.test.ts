@@ -23,7 +23,7 @@ for (const label of ['Q114-LTD', 'SIM34', '123X']) {
 			props: {
 				data: fixtureTransitData({ catalogs: {}, services: {} }),
 				component: FeatureSummary as never,
-				child_props: {
+				childProps: {
 					feature: {
 						route,
 						title: 'A long destination with multiple words and a transfer station',

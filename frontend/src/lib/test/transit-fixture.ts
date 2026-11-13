@@ -1,5 +1,5 @@
 import type { Catalog, RouteService, Service, Source } from '#lib/client/index.js';
-import { TransitData } from '#lib/transit/store.svelte.js';
+import { TransitData } from '#lib/data/store.svelte.js';
 
 export interface TransitFixture {
 	catalogs: Partial<Record<Source, Catalog>>;
@@ -44,5 +44,5 @@ export function fixtureFetcher(fixture: TransitFixture): typeof fetch {
 
 export function fixtureTransitData(fixture: TransitFixture) {
 	const sources = Object.keys(fixture.catalogs) as Source[];
-	return new TransitData({ sources, fetcher: fixtureFetcher(fixture), batch_ms: 0 });
+	return new TransitData({ sources, fetcher: fixtureFetcher(fixture), batchMs: 0 });
 }

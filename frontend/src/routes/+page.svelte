@@ -2,73 +2,73 @@
 	import { page } from '$app/state';
 
 	import type { CatalogRoute, CatalogStop, Source } from '#lib/client/index.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
 	import { geolocation } from '#lib/geolocation.svelte.js';
 	import List, { type TripItem } from '#lib/List.svelte';
-	import { parse_trip_pin, route_pins, stop_pins, trip_pins } from '#lib/pins.svelte.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
+	import { parseTripPin, routePins, stopPins, tripPins } from '#lib/pins.svelte.js';
+	import { getCurrentTime } from '#lib/url-params.svelte.js';
 	import {
-		calculate_route_height,
-		calculate_stop_height,
-		calculate_trip_height,
+		calculateRouteHeight,
+		calculateStopHeight,
+		calculateTripHeight,
 		haversine
 	} from '#lib/util.svelte.js';
 
 	import { Locate, LocateFixed, LocateOff } from '@lucide/svelte';
 
 	const transit = getTransitData();
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 
-	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
-	const catalogs_loading = $derived(catalog_resources.current.some((c) => c.state === 'loading'));
+	const catalogResources = transit.catalogs(() => page.data.selectedSources);
+	const catalogs = $derived(catalogResources.current.filter((r) => r.state === 'ready'));
+	const catalogsLoading = $derived(catalogResources.current.some((c) => c.state === 'loading'));
 
-	function by_source<T>(pick: (source: Source) => T[]) {
+	function bySource<T>(pick: (source: Source) => T[]) {
 		const sources = Object.fromEntries(
-			page.data.selected_sources.map((source) => [source, pick(source)])
+			page.data.selectedSources.map((source) => [source, pick(source)])
 		) as Record<Source, T[]>;
 		return { sources, exists: Object.values(sources).some((items) => items.length > 0) };
 	}
 
-	const pinned_trips = $derived(
-		by_source((source) =>
-			(trip_pins.current[source] ?? []).flatMap((id): TripItem[] => {
-				const pin = parse_trip_pin(id);
+	const pinnedTrips = $derived(
+		bySource((source) =>
+			(tripPins.current[source] ?? []).flatMap((id): TripItem[] => {
+				const pin = parseTripPin(id);
 				return pin ? [{ id, source, ...pin }] : [];
 			})
 		)
 	);
-	const pinned_service = transit.trips(() =>
-		current_time.value === undefined ? Object.values(pinned_trips.sources).flat() : []
+	const pinnedService = transit.trips(() =>
+		currentTime.value === undefined ? Object.values(pinnedTrips.sources).flat() : []
 	);
 	$effect(() => {
-		const pins = trip_pins.current;
+		const pins = tripPins.current;
 		let next = pins;
-		for (const read of pinned_service.current) {
+		for (const read of pinnedService.current) {
 			if (read.state !== 'missing') continue;
 			const kept = next[read.source].filter((key) => {
-				const pin = parse_trip_pin(key);
-				return pin?.route_id !== read.route_id || pin.trip_id !== read.trip_id;
+				const pin = parseTripPin(key);
+				return pin?.routeId !== read.routeId || pin.tripId !== read.tripId;
 			});
 			if (kept.length !== next[read.source].length) next = { ...next, [read.source]: kept };
 		}
-		if (next !== pins) trip_pins.current = next;
+		if (next !== pins) tripPins.current = next;
 	});
 
-	const catalog_of = (source: Source) => catalogs.find((c) => c.source === source)?.value;
+	const catalogOf = (source: Source) => catalogs.find((c) => c.source === source)?.value;
 
-	const pinned_stops = $derived(
-		by_source((source) =>
-			(stop_pins.current[source] ?? [])
-				.map((pin) => catalog_of(source)?.stops_by_id.get(pin))
+	const pinnedStops = $derived(
+		bySource((source) =>
+			(stopPins.current[source] ?? [])
+				.map((pin) => catalogOf(source)?.stopsById.get(pin))
 				.filter((s): s is CatalogStop => s !== undefined)
 		)
 	);
 
-	const pinned_routes = $derived(
-		by_source((source) =>
-			(route_pins.current[source] ?? [])
-				.map((pin) => catalog_of(source)?.routes_by_id.get(pin))
+	const pinnedRoutes = $derived(
+		bySource((source) =>
+			(routePins.current[source] ?? [])
+				.map((pin) => catalogOf(source)?.routesById.get(pin))
 				.filter((r): r is CatalogRoute => r !== undefined)
 		)
 	);
@@ -78,18 +78,18 @@
 		distance: number;
 	}
 
-	const nearby_stops = $derived.by(() => {
+	const nearbyStops = $derived.by(() => {
 		const result = {} as Record<Source, StopWithDistance[]>;
 
 		if (!geolocation.position) return result;
-		const current_coords = geolocation.position.coords;
+		const currentCoords = geolocation.position.coords;
 
 		for (const { source, value: catalog } of catalogs) {
 			result[source] = (catalog?.stops ?? [])
 				.map((stop) => {
 					const distance = haversine(
-						current_coords.latitude,
-						current_coords.longitude,
+						currentCoords.latitude,
+						currentCoords.longitude,
 						stop.lat,
 						stop.lon
 					);
@@ -130,41 +130,41 @@
 <div class="flex h-full flex-col overflow-hidden">
 	<!-- Pinned items section - no scroll -->
 	<div class="flex-none overflow-hidden">
-		{#if pinned_trips.exists}
+		{#if pinnedTrips.exists}
 			<List
 				title="Pinned Trips"
-				sources={pinned_trips.sources}
+				sources={pinnedTrips.sources}
 				type="trip"
-				pins={trip_pins}
-				height_calc={calculate_trip_height}
-				items_before_scroll={2}
-				list_class="max-h-[25dvh]"
+				pins={tripPins}
+				heightCalc={calculateTripHeight}
+				itemsBeforeScroll={2}
+				listClass="max-h-[25dvh]"
 			/>
 		{/if}
 
-		{#if pinned_routes.exists}
+		{#if pinnedRoutes.exists}
 			<List
 				title="Pinned Routes"
-				pins={route_pins}
-				sources={pinned_routes.sources}
+				pins={routePins}
+				sources={pinnedRoutes.sources}
 				type="route"
-				height_calc={calculate_route_height}
-				items_before_scroll={2}
-				list_class="max-h-[25dvh]"
+				heightCalc={calculateRouteHeight}
+				itemsBeforeScroll={2}
+				listClass="max-h-[25dvh]"
 			/>
 		{/if}
 
 		<!-- TODO: loading pinned stops in SSR always puts the 1 as the first -->
-		{#if pinned_stops.exists}
+		{#if pinnedStops.exists}
 			<List
 				title="Pinned stops"
-				pins={stop_pins}
-				sources={pinned_stops.sources}
+				pins={stopPins}
+				sources={pinnedStops.sources}
 				type="stop"
-				height_calc={calculate_stop_height}
-				items_before_scroll={2}
-				ssr_min={0}
-				list_class="max-h-[25dvh]"
+				heightCalc={calculateStopHeight}
+				itemsBeforeScroll={2}
+				ssrMin={0}
+				listClass="max-h-[25dvh]"
 			/>
 		{/if}
 	</div>
@@ -176,12 +176,12 @@
 		<List
 			title="Nearby Stops"
 			type="stop"
-			container_class="h-full"
-			sources={nearby_stops}
-			pins={stop_pins}
-			header_slot={locate_button}
-			height_calc={calculate_stop_height}
-			loading={catalogs_loading || (geolocation.status === 'loading' && !geolocation.position)}
+			containerClass="h-full"
+			sources={nearbyStops}
+			pins={stopPins}
+			headerSlot={locate_button}
+			heightCalc={calculateStopHeight}
+			loading={catalogsLoading || (geolocation.status === 'loading' && !geolocation.position)}
 		/>
 		<!-- {:else}
 			<p class="p-4 text-sm text-muted">

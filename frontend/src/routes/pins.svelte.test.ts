@@ -1,7 +1,7 @@
 import { SvelteURL } from 'svelte/reactivity';
 
 import { chartFixture, chartNow } from '#lib/charts/fixtures.js';
-import { route_pins, stop_pins, trip_pin_key, trip_pins } from '#lib/pins.svelte.js';
+import { routePins, stopPins, tripPinKey, tripPins } from '#lib/pins.svelte.js';
 import HomeLayoutHarness from '#lib/test/HomeLayoutHarness.svelte';
 import { page } from '#lib/test/page.svelte.js';
 import { fixtureFetcher } from '#lib/test/transit-fixture.js';
@@ -14,12 +14,12 @@ beforeEach(() => {
 	vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 	vi.spyOn(navigator.geolocation, 'watchPosition').mockReturnValue(1);
 	vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
-	stop_pins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
-	route_pins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
-	trip_pins.current = {
-		mta_subway: [trip_pin_key('4', 'trip-0')],
-		mta_bus: [trip_pin_key('4', 'trip-0')],
-		njt_bus: [trip_pin_key('4', 'trip-0')]
+	stopPins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
+	routePins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
+	tripPins.current = {
+		mta_subway: [tripPinKey('4', 'trip-0')],
+		mta_bus: [tripPinKey('4', 'trip-0')],
+		njt_bus: [tripPinKey('4', 'trip-0')]
 	};
 });
 
@@ -32,17 +32,17 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 	'%s removes absent trip pins after successful live service, preserving pins during loading and failures',
 	async (source) => {
 		const fixture = chartFixture(source);
-		const active = trip_pin_key('4', 'trip-0');
+		const active = tripPinKey('4', 'trip-0');
 		const saved = {
-			...trip_pins.current,
+			...tripPins.current,
 			[source]: [
 				active,
-				...Array.from({ length: 8 }, (_, i) => trip_pin_key('4', `ended-${i}`)),
-				trip_pin_key('9', 'ended')
+				...Array.from({ length: 8 }, (_, i) => tripPinKey('4', `ended-${i}`)),
+				tripPinKey('9', 'ended')
 			]
 		};
-		trip_pins.current = saved;
-		page.data.selected_sources = [source];
+		tripPins.current = saved;
+		page.data.selectedSources = [source];
 		const respond = fixtureFetcher({
 			catalogs: { [source]: fixture.catalog },
 			services: { [source]: fixture.service }
@@ -65,16 +65,16 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 			await expect
 				.poll(() => fetcher.mock.calls.some(([input]) => String(input).includes('/service/')))
 				.toBe(true);
-			expect(trip_pins.current).toEqual(saved);
+			expect(tripPins.current).toEqual(saved);
 			release();
 			const retry = view.getByRole('button', { name: /Retry updates/ });
 			await expect.element(retry).toBeVisible();
-			expect(trip_pins.current).toEqual(saved);
+			expect(tripPins.current).toEqual(saved);
 			fail = false;
 			vi.mocked(Date.now).mockReturnValue(chartNow + 6_000);
 			document.dispatchEvent(new Event('visibilitychange'));
 			const expected = { ...saved, [source]: [active] };
-			await expect.poll(() => trip_pins.current).toEqual(expected);
+			await expect.poll(() => tripPins.current).toEqual(expected);
 			expect(JSON.parse(localStorage.getItem('tripRoutePins')!)).toEqual(expected);
 			await expect.element(view.getByRole('heading', { name: 'Pinned Trips' })).toBeVisible();
 
@@ -83,7 +83,7 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 			vi.mocked(Date.now).mockReturnValue(chartNow + 37_000);
 			document.dispatchEvent(new Event('visibilitychange'));
 			await expect.element(retry).toBeVisible();
-			expect(trip_pins.current).toEqual(expected);
+			expect(tripPins.current).toEqual(expected);
 			fixture.service.routes['4'] = {
 				trips: [],
 				stops: [],
@@ -92,7 +92,7 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 			fail = false;
 			vi.mocked(Date.now).mockReturnValue(chartNow + 43_000);
 			document.dispatchEvent(new Event('visibilitychange'));
-			await expect.poll(() => trip_pins.current).toEqual({ ...saved, [source]: [] });
+			await expect.poll(() => tripPins.current).toEqual({ ...saved, [source]: [] });
 			await expect
 				.element(view.getByRole('heading', { name: 'Pinned Trips' }))
 				.not.toBeInTheDocument();
@@ -106,8 +106,8 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 test('historical service never removes trip pins; returning to live checks them', async () => {
 	const fixture = chartFixture('njt_bus');
 	fixture.service.routes = {};
-	const saved = trip_pins.current;
-	page.data.selected_sources = ['njt_bus'];
+	const saved = tripPins.current;
+	page.data.selectedSources = ['njt_bus'];
 	page.url = new SvelteURL(`http://localhost/?at=${chartNow / 1000 - 3600}`);
 	const fetcher = vi.fn(
 		fixtureFetcher({
@@ -119,14 +119,14 @@ test('historical service never removes trip pins; returning to live checks them'
 	const view = await render(HomeLayoutHarness);
 	try {
 		await expect.element(view.getByRole('button', { name: /Trip not running/ })).toBeVisible();
-		expect(trip_pins.current).toEqual(saved);
+		expect(tripPins.current).toEqual(saved);
 		expect(
 			fetcher.mock.calls
 				.filter(([input]) => String(input).includes('/service/'))
 				.every(([input]) => String(input).includes('at='))
 		).toBe(true);
 		page.url = new SvelteURL('http://localhost/');
-		await expect.poll(() => trip_pins.current).toEqual({ ...saved, njt_bus: [] });
+		await expect.poll(() => tripPins.current).toEqual({ ...saved, njt_bus: [] });
 	} finally {
 		await view.unmount();
 	}
@@ -136,7 +136,7 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 	'%s confirms a cross-tab pin against fresh service, retaining it through a failed refresh',
 	async (source) => {
 		const fixture = chartFixture(source);
-		page.data.selected_sources = [source];
+		page.data.selectedSources = [source];
 		const respond = fixtureFetcher({
 			catalogs: { [source]: fixture.catalog },
 			services: { [source]: fixture.service }
@@ -145,10 +145,10 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 		const gate = new Promise<void>((resolve) => {
 			release = resolve;
 		});
-		let service_requests = 0;
+		let serviceRequests = 0;
 		let fail = true;
 		const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-			if (String(input).includes('/service/') && ++service_requests > 1) {
+			if (String(input).includes('/service/') && ++serviceRequests > 1) {
 				await gate;
 				if (fail) return new Response(null, { status: 503 });
 			}
@@ -158,8 +158,8 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 		const view = await render(HomeLayoutHarness);
 		try {
 			await expect.element(view.getByRole('button', { name: /^4 / }).first()).toBeVisible();
-			const key = trip_pin_key('4', 'new-trip');
-			const saved = { ...trip_pins.current, [source]: [...trip_pins.current[source], key] };
+			const key = tripPinKey('4', 'new-trip');
+			const saved = { ...tripPins.current, [source]: [...tripPins.current[source], key] };
 			localStorage.setItem('tripRoutePins', JSON.stringify(saved));
 			window.dispatchEvent(
 				new StorageEvent('storage', {
@@ -167,12 +167,12 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 					storageArea: localStorage
 				})
 			);
-			await expect.poll(() => service_requests).toBe(2);
-			expect(trip_pins.current).toEqual(saved);
+			await expect.poll(() => serviceRequests).toBe(2);
+			expect(tripPins.current).toEqual(saved);
 			release();
 			const retry = view.getByRole('button', { name: /Retry updates/ });
 			await expect.element(retry).toBeVisible();
-			expect(trip_pins.current).toEqual(saved);
+			expect(tripPins.current).toEqual(saved);
 			expect(JSON.parse(localStorage.getItem('tripRoutePins')!)).toEqual(saved);
 
 			fixture.service.routes['4'].trips.push({
@@ -181,15 +181,15 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 			});
 			fail = false;
 			await retry.click();
-			await expect.poll(() => service_requests).toBe(3);
+			await expect.poll(() => serviceRequests).toBe(3);
 			await expect.element(retry).not.toBeInTheDocument();
-			expect(trip_pins.current).toEqual(saved);
+			expect(tripPins.current).toEqual(saved);
 
 			fixture.service.routes['4'].trips.pop();
 			vi.mocked(Date.now).mockReturnValue(chartNow + 31_000);
 			document.dispatchEvent(new Event('visibilitychange'));
 			const expected = { ...saved, [source]: saved[source].filter((pin) => pin !== key) };
-			await expect.poll(() => trip_pins.current).toEqual(expected);
+			await expect.poll(() => tripPins.current).toEqual(expected);
 			expect(JSON.parse(localStorage.getItem('tripRoutePins')!)).toEqual(expected);
 		} finally {
 			release();

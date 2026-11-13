@@ -3,12 +3,12 @@
 
 	import { page } from '$app/state';
 
-	import { source_icons } from '#lib/source_icons.js';
-	import { source_config } from '#lib/sources.js';
+	import { sourceIcons } from '#lib/source-icons.js';
+	import { sourceConfig } from '#lib/sources.js';
 
 	import { Layers, RotateCcw, SlidersHorizontal, X } from '@lucide/svelte';
 
-	import { layer_data, type MapFilters } from './filters.svelte';
+	import { layerData, type MapFilters } from './filters.svelte';
 	import SourceFilterGroup from './SourceFilterGroup.svelte';
 
 	interface Props {
@@ -16,7 +16,7 @@
 	}
 
 	type LayerKey = keyof MapFilters['layers'];
-	const layerEntries = Object.entries(layer_data) as [LayerKey, (typeof layer_data)[LayerKey]][];
+	const layerEntries = Object.entries(layerData) as [LayerKey, (typeof layerData)[LayerKey]][];
 
 	let { filters }: Props = $props();
 
@@ -79,8 +79,8 @@
 
 		<div class="h-5 w-px shrink-0 bg-border-default"></div>
 		<div class="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Data sources">
-			{#each page.data.selected_sources as source (source)}
-				{const info = $derived(source_config[source])}
+			{#each page.data.selectedSources as source (source)}
+				{const info = $derived(sourceConfig[source])}
 				{const enabled = $derived(filters.isSourceEnabled(source))}
 				<button
 					type="button"
@@ -90,7 +90,7 @@
 					onclick={() => filters.toggleSource(source)}
 				>
 					<enhanced:img
-						src={source_icons[source]}
+						src={sourceIcons[source]}
 						sizes="20px"
 						alt=""
 						class="size-5 rounded-none object-contain"
@@ -157,9 +157,9 @@
 						</h3>
 						{#each filters.sources as source (source)}
 							{#if layer === 'stop'}
-								<SourceFilterGroup {layer} {source} bind:filters={filters.stop_filters[source]} />
+								<SourceFilterGroup {layer} {source} bind:filters={filters.stopFilters[source]} />
 							{:else}
-								<SourceFilterGroup {layer} {source} bind:filters={filters.route_filters[source]} />
+								<SourceFilterGroup {layer} {source} bind:filters={filters.routeFilters[source]} />
 							{/if}
 						{/each}
 					</section>

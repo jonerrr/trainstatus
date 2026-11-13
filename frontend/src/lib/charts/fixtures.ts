@@ -86,10 +86,10 @@ export function chartFixture(
 					? { source, headsign: '' }
 					: { source }
 	}));
-	const stop_ids = stops.map((stop) => stop.id);
+	const stopIds = stops.map((stop) => stop.id);
 	// API column order must not define the polyline, so each trip's calls are reversed.
 	const visits = patterns.flatMap((pattern, trip) =>
-		pattern.map((stop_id, sequence) => ({ trip, stop_id, sequence })).reverse()
+		pattern.map((stopId, sequence) => ({ trip, stop_id: stopId, sequence })).reverse()
 	);
 	const at = (sequence: number) => chartNow / 1000 + (sequence + 1) * 60;
 	const service: Service = {
@@ -97,10 +97,10 @@ export function chartFixture(
 		routes: {
 			[route.id]: {
 				trips,
-				stops: stop_ids,
+				stops: stopIds,
 				calls: {
 					trip: visits.map((v) => v.trip),
-					stop: visits.map((v) => stop_ids.indexOf(v.stop_id)),
+					stop: visits.map((v) => stopIds.indexOf(v.stop_id)),
 					sequence: visits.map((v) => v.sequence),
 					arrival: visits.map((v) => at(v.sequence)),
 					departure: visits.map((v) => at(v.sequence))

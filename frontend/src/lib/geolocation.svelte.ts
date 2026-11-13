@@ -13,7 +13,7 @@ export type GeolocationStatus = 'loading' | 'active' | 'denied';
 export class Geolocation {
 	#status = $state<GeolocationStatus>('loading');
 	#position = $state.raw<GeolocationPosition>();
-	#watch_id: number | undefined;
+	#watchId: number | undefined;
 	#active = false;
 
 	#subscribe = createSubscriber(() => {
@@ -33,7 +33,7 @@ export class Geolocation {
 		}
 		this.#stop();
 		this.#status = 'loading';
-		this.#watch_id = navigator.geolocation.watchPosition(
+		this.#watchId = navigator.geolocation.watchPosition(
 			(position) => {
 				this.#position = position;
 				this.#status = 'active';
@@ -49,9 +49,9 @@ export class Geolocation {
 	}
 
 	#stop(): void {
-		if (this.#watch_id !== undefined) {
-			navigator.geolocation?.clearWatch(this.#watch_id);
-			this.#watch_id = undefined;
+		if (this.#watchId !== undefined) {
+			navigator.geolocation?.clearWatch(this.#watchId);
+			this.#watchId = undefined;
 		}
 	}
 

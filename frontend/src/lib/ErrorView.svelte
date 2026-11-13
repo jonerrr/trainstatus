@@ -4,16 +4,16 @@
 
 	let { error, onretry }: { error: App.Error; onretry: () => void | Promise<void> } = $props();
 	let retrying = $state(false);
-	let retry_failed = $state(false);
+	let retryFailed = $state(false);
 	const title = $derived(error.status === 404 ? 'Page not found' : 'Something went wrong');
 
 	async function retry() {
 		retrying = true;
-		retry_failed = false;
+		retryFailed = false;
 		try {
 			await onretry();
 		} catch {
-			retry_failed = true;
+			retryFailed = true;
 		} finally {
 			retrying = false;
 		}
@@ -29,7 +29,7 @@
 		<p class="text-sm font-medium text-muted">Error {error.status}</p>
 		<h1 class="text-2xl font-semibold">{title}</h1>
 		<p class="text-secondary">{error.message}</p>
-		{#if retry_failed}
+		{#if retryFailed}
 			<p role="alert" class="text-amber-300">Couldn’t reopen this page. Try reloading it.</p>
 		{/if}
 		<div class="flex flex-wrap items-center gap-4">

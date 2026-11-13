@@ -12,7 +12,7 @@ Run from `frontend/`. These tasks do not start or stop the API or Martin.
 
 `test:integration` and `test:e2e` fail closed when `:3055` refuses the connection. Martin is assumed at `http://127.0.0.1:3000`; preview proxies `/martin` there, and map E2E needs `/martin/style/dark-matter.json`. E2E runs desktop Chromium, desktop Firefox and Chromium mobile touch. Install browsers with `pnpm test:install`.
 
-For map E2E on a machine with a GPU, run `pnpm test:e2e --headed --workers=1`. Headless Chromium uses SwiftShader, which can make the animated map exceed the 90-second limit.
+For map E2E on a machine with a GPU, run `pnpm test:e2e --headed --workers=1`. Headless Chromium uses SwiftShader; short mouse/touch drag sequences retain real gesture coverage without spending the test budget on interpolated frames. Map initialization has its own 30-second readiness deadline. The Firefox map project enables `webgl.force-enabled` so GPU-less runners can create the WebGL2 context required by MapLibre.
 
 ## Principles
 
@@ -42,4 +42,6 @@ For map E2E on a machine with a GPU, run `pnpm test:e2e --headed --workers=1`. H
 
 - Failures follow the two-UI error policy in [architecture/frontend.md](../docs/architecture/frontend.md): tests cover the shared indicator with Retry, retained values on refresh failure, and the shared error screen, not per-view variants.
 - When shared links cold-load, assert modal content and the home readers together so Vitest's unhandled-error reporting catches `effect_update_depth_exceeded`.
+- Stop-ID searches can include name matches before the exact stop; route IDs take precedence. The stop list is virtualized, so mounted-row counts are not result counts. E2E navigation/pinning flows discover a uniquely searchable name prefix, and ID-search coverage scrolls to the appended exact match.
+- A valid-source shared link to a missing entity keeps its URL and opens the missing-entity message in the modal; it does not silently dismiss or navigate away.
 - Trajectory motion policy is tested in backend fixtures; the frontend tests decoded geometry and the real marker renderer. See [trajectories](../docs/architecture/trajectories.md).

@@ -1,5 +1,5 @@
 import type { Source } from '#lib/client/index.js';
-import { decodeCatalog, decodeRoute } from '#lib/transit/decode.js';
+import { decodeCatalog, decodeRoute } from '#lib/data/decode.js';
 
 import { describe, expect, it } from 'vitest';
 
@@ -10,27 +10,27 @@ import { chartFixture, chartNow } from './fixtures.js';
 function inputs(source: Source, patterns?: string[][]): ChartInput[] {
 	const fixture = chartFixture(source, 0, patterns);
 	const route = decodeRoute(source, '4', fixture.service.routes['4']);
-	const { stops_by_id } = decodeCatalog(fixture.catalog);
+	const { stopsById } = decodeCatalog(fixture.catalog);
 	return fixture.trips.map((trip) => ({
 		source,
-		route_id: '4',
+		routeId: '4',
 		trip,
-		calls: [...route.calls_by_trip.get(trip.id)!].reverse(),
-		stops: stops_by_id
+		calls: [...route.callsByTrip.get(trip.id)!].reverse(),
+		stops: stopsById
 	}));
 }
 
 function checkItineraries(input: ChartInput[]) {
 	const chart = buildChartData(input);
-	expect(chart.route_trips).toHaveLength(input.length);
+	expect(chart.routeTrips).toHaveLength(input.length);
 	for (let i = 0; i < input.length; i++) {
-		const points = chart.route_trips[i].points;
+		const points = chart.routeTrips[i].points;
 		// Preserve the actual itinerary, rather than sorting points into axis order
 		// or silently discarding visits to satisfy the monotonicity assertion.
 		const timedStops = [...input[i].calls].sort((a, b) => a.arrival - b.arrival);
-		expect(points.map((p) => p.stop_id)).toEqual(timedStops.map((st) => st.stop_id));
+		expect(points.map((p) => p.stopId)).toEqual(timedStops.map((st) => st.stopId));
 		expect(points.map((p) => p.time)).toEqual(timedStops.map((st) => new Date(st.arrival)));
-		const rows = points.map((p) => chart.yDomain.indexOf(p.stop_key));
+		const rows = points.map((p) => chart.yDomain.indexOf(p.stopKey));
 		expect(rows.every((row, j) => row >= 0 && (j === 0 || row > rows[j - 1]))).toBe(true);
 	}
 	return chart;
@@ -99,16 +99,16 @@ describe('chart stop ordering', () => {
 		const input = inputs('njt_bus', [['a', 'b', 'c']]);
 		const past = chartNow - 60_000;
 		input[0].calls = input[0].calls.map((call) =>
-			call.stop_id === 'a' ? { ...call, arrival: past, departure: past } : call
+			call.stopId === 'a' ? { ...call, arrival: past, departure: past } : call
 		);
 		input[0].calls = [
 			...input[0].calls,
-			{ ...input[0].calls[0], stop_id: 'missing' },
+			{ ...input[0].calls[0], stopId: 'missing' },
 			{ ...input[0].calls[0], arrival: NaN }
 		];
 		const chart = buildChartData(input);
-		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b', 'c']);
-		expect(chart.route_trips[0].points[0].time.getTime()).toBe(past);
+		expect(chart.routeTrips[0].points.map((p) => p.stopId)).toEqual(['a', 'b', 'c']);
+		expect(chart.routeTrips[0].points[0].time.getTime()).toBe(past);
 		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['a', 'b', 'c']);
 		expect(buildChartData([]).yDomain).toEqual([]);
 	});
@@ -121,7 +121,7 @@ describe('chart stop ordering', () => {
 			departure: chartNow
 		}));
 		const chart = buildChartData(input);
-		expect(chart.route_trips[0].points.map((p) => p.stop_id)).toEqual(['a', 'b']);
+		expect(chart.routeTrips[0].points.map((p) => p.stopId)).toEqual(['a', 'b']);
 		expect(chart.yDomain).toHaveLength(2);
 	});
 
@@ -131,11 +131,11 @@ describe('chart stop ordering', () => {
 			['b', 'a', 'c']
 		]);
 		input[1].calls = input[1].calls.map((st) =>
-			st.stop_id === 'a' ? { ...st, arrival: chartNow + 60_000, departure: chartNow + 60_000 } : st
+			st.stopId === 'a' ? { ...st, arrival: chartNow + 60_000, departure: chartNow + 60_000 } : st
 		);
 		const chart = buildChartData(input);
 		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['b', 'a', 'c']);
-		expect(chart.route_trips.map((series) => series.points.map((point) => point.stop_id))).toEqual([
+		expect(chart.routeTrips.map((series) => series.points.map((point) => point.stopId))).toEqual([
 			['b', 'a', 'c'],
 			['b', 'a', 'c']
 		]);
@@ -161,13 +161,11 @@ describe('chart stop ordering', () => {
 			['d', 'e', 'd']
 		]);
 		input[1].calls = input[1].calls.map((st) =>
-			st.stop_id === 'a'
-				? { ...st, arrival: chartNow + 120_000, departure: chartNow + 120_000 }
-				: st
+			st.stopId === 'a' ? { ...st, arrival: chartNow + 120_000, departure: chartNow + 120_000 } : st
 		);
 		const chart = buildChartData(input);
 		expect(
-			chart.route_trips.slice(0, 2).map((series) => series.points.map((point) => point.stop_id))
+			chart.routeTrips.slice(0, 2).map((series) => series.points.map((point) => point.stopId))
 		).toEqual([
 			['b', 'c', 'a'],
 			['b', 'c', 'a']

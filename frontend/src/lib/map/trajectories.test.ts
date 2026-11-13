@@ -1,4 +1,4 @@
-import type { TrackedUpdate } from '#lib/transit/store.svelte.js';
+import type { TrackedUpdate } from '#lib/data/store.svelte.js';
 
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -13,7 +13,7 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 	vi.useFakeTimers();
 	const deadline = new AbortController();
 	const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(deadline.signal);
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	let requests = 0;
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
 	let tracked: TrackedUpdate | undefined;
@@ -48,7 +48,7 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 
 test('a failed historical Arrow update retries until network recovery', async () => {
 	vi.useFakeTimers();
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	let calls = 0;
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
 	let tracked: TrackedUpdate | undefined;
@@ -79,7 +79,7 @@ test('a failed historical Arrow update retries until network recovery', async ()
 });
 
 test('Retry clears fatal Arrow errors synchronously and subsequent failures restore them', async () => {
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	let malformed = true;
 	let tracked: TrackedUpdate | undefined;
 	const stop = watchTrajectories(
@@ -132,9 +132,9 @@ test('historical failures retry at the selected time', async () => {
 
 test('successful historical trajectories ignore live commit age and do not poll again', async () => {
 	vi.useFakeTimers();
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	let requests = 0;
-	let tracked: import('#lib/transit/store.svelte.js').TrackedUpdate | undefined;
+	let tracked: import('#lib/data/store.svelte.js').TrackedUpdate | undefined;
 	const stop = watchTrajectories(
 		{ sources: ['mta_bus'], at: 0 },
 		() => {},
@@ -150,7 +150,7 @@ test('successful historical trajectories ignore live commit age and do not poll 
 	try {
 		await stop.refresh();
 		await vi.advanceTimersByTimeAsync(91_000);
-		expect(tracked?.source_updated_at).toBeNull();
+		expect(tracked?.sourceUpdatedAt).toBeNull();
 		expect(tracked?.error).toBeNull();
 		expect(requests).toBe(1);
 	} finally {
@@ -206,7 +206,7 @@ test('live polling reports a source failure and stops after disposal', async () 
 
 test('a successful empty snapshot clears vehicles but a failed refresh preserves them', async () => {
 	vi.useFakeTimers();
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	let requests = 0;
 	const counts: number[] = [];
 	const stop = watchTrajectories(
@@ -235,7 +235,7 @@ test('a successful empty snapshot clears vehicles but a failed refresh preserves
 });
 
 test('source changes retain unchanged tables and requests, while time changes discard old data', async () => {
-	const { trajectoryFixture } = await import('./trajectoryFixture');
+	const { trajectoryFixture } = await import('./trajectory-fixture');
 	const requests: { url: string; signal: AbortSignal; finish: (response: Response) => void }[] = [];
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
 	const watcher = watchTrajectories(

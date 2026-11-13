@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
+	import { getTransitData } from '#lib/data/store.svelte.js';
 	import ErrorView from '#lib/ErrorView.svelte';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
 
 	let { children }: { children: Snippet } = $props();
 	const transit = getTransitData();

@@ -1,6 +1,6 @@
 import { chartFixture, chartNow } from '#lib/charts/fixtures.js';
 import type { CatalogRoute, CatalogStop, RouteService } from '#lib/client/index.js';
-import type { IncomingTrip } from '#lib/transit/nearby.js';
+import type { IncomingTrip } from '#lib/data/nearby.js';
 
 /** Synthetic shared stops, duplicate services, and a farther stop with a unique route. */
 export function nearbyFixture() {
@@ -29,8 +29,8 @@ export function nearbyFixture() {
 			name: `Board at ${id}`,
 			nearby_stops: [],
 			data: { source: 'mta_bus', direction: 'n', is_boardable: boardable },
-			routes: ids.map((route_id) => ({
-				route_id,
+			routes: ids.map((routeId) => ({
+				route_id: routeId,
 				stop_sequence: 0,
 				data: { source: 'mta_bus', direction_ids: [0] }
 			}))
@@ -55,18 +55,18 @@ export function nearbyFixture() {
 	};
 	const incoming: IncomingTrip = {
 		source: 'mta_bus',
-		route_id: 'IN',
+		routeId: 'IN',
 		direction: 0,
 		arrival: chartNow + 60_000
 	};
-	function serviceFor(route_id: string, visits: [string, number, number][]): RouteService {
+	function serviceFor(routeId: string, visits: [string, number, number][]): RouteService {
 		return {
 			trips: visits.map(([, , direction], i) => ({
 				...base.trips[0],
-				id: `${route_id}-${i}`,
+				id: `${routeId}-${i}`,
 				direction
 			})),
-			stops: visits.map(([stop_id]) => stop_id),
+			stops: visits.map(([stopId]) => stopId),
 			calls: {
 				trip: visits.map((_, i) => i),
 				stop: visits.map((_, i) => i),
@@ -78,16 +78,19 @@ export function nearbyFixture() {
 	}
 	const service = {
 		source: 'mta_bus' as const,
-		routes: {
-			IN: serviceFor('IN', [['origin', 4, 0]]),
-			A: serviceFor('A', [
-				['near', 20, 0],
-				['far', 5, 0]
-			]),
-			B: serviceFor('B', [['far', 10, 0]]),
-			C: serviceFor('C', [['third', 8, 0]]),
-			D: serviceFor('D', [['fourth', 3, 0]])
-		}
+		routes: Object.fromEntries([
+			['IN', serviceFor('IN', [['origin', 4, 0]])],
+			[
+				'A',
+				serviceFor('A', [
+					['near', 20, 0],
+					['far', 5, 0]
+				])
+			],
+			['B', serviceFor('B', [['far', 10, 0]])],
+			['C', serviceFor('C', [['third', 8, 0]])],
+			['D', serviceFor('D', [['fourth', 3, 0]])]
+		])
 	};
 	return { catalog, service, origin, near, far, third, fourth, routes, incoming, serviceFor };
 }

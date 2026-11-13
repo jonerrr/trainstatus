@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { chart_context } from '#lib/charts/context.js';
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
+	import { chartContext } from '#lib/charts/context.js';
+	import { getCurrentTime } from '#lib/url-params.svelte.js';
 
 	import { timeMinute } from 'd3-time';
 	import dayjs from 'dayjs';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 
-	const cake = chart_context();
+	const cake = chartContext();
 
 	const formatDate = (time: Date) => dayjs(time).format('YYYY-MM-DD');
 	const formatTime = (time: Date) => dayjs(time).format('h:mm A');
 
-	const { interval = 15, current_time_line = true } = $props();
+	const { interval = 15, currentTimeLine = true } = $props();
 
 	// not sure if this could be undefined
 	const ticks = $derived(
@@ -20,10 +20,10 @@
 	);
 </script>
 
-{#if current_time_line}
-	<g transform="translate({cake.xScale(current_time.ms)}, 0)">
+{#if currentTimeLine}
+	<g transform="translate({cake.xScale(currentTime.ms)}, 0)">
 		<text y={-6} text-anchor="middle" fill="#e5e5e5" font-size="12px"
-			>{formatTime(new Date(current_time.ms))}</text
+			>{formatTime(new Date(currentTime.ms))}</text
 		>
 		<line y1={0} y2={cake.height} stroke="#e5e5e5" />
 	</g>

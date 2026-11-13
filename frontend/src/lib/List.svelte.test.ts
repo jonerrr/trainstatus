@@ -3,12 +3,12 @@ import type { ComponentProps } from 'svelte';
 import '../app.css';
 
 import { chartFixture, chartNow } from '#lib/charts/fixtures.js';
+import { TransitData } from '#lib/data/store.svelte.js';
 import List, { type TripItem } from '#lib/List.svelte';
 import { page } from '#lib/test/page.svelte.js';
 import { fixtureFetcher } from '#lib/test/transit-fixture.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
-import { TransitData } from '#lib/transit/store.svelte.js';
-import { calculate_trip_height } from '#lib/util.svelte.js';
+import { calculateTripHeight } from '#lib/util.svelte.js';
 
 import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
@@ -18,7 +18,7 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] as const) {
 		`${source} trip rows match virtual offsets at %ipx through loading and scrolling`,
 		async (width) => {
 			vi.spyOn(Date, 'now').mockReturnValue(chartNow);
-			page.data.selected_sources = [source];
+			page.data.selectedSources = [source];
 			const fixture = chartFixture(
 				source,
 				0,
@@ -49,21 +49,21 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] as const) {
 			const items: TripItem[] = fixture.trips.map((trip, i) => ({
 				id: trip.id,
 				source,
-				route_id: '4',
-				trip_id: i % 3 === 0 ? 'missing-trip' : trip.id
+				routeId: '4',
+				tripId: i % 3 === 0 ? 'missing-trip' : trip.id
 			}));
 			const respond = fixtureFetcher({
 				catalogs: { [source]: fixture.catalog },
 				services: { [source]: fixture.service }
 			});
 			const { promise: gate, resolve: release } = Promise.withResolvers<void>();
-			let service_requested = false;
+			let serviceRequested = false;
 			const data = new TransitData({
 				sources: [source],
-				batch_ms: 0,
+				batchMs: 0,
 				fetcher: async (input, init) => {
 					if (String(input).includes('/service/')) {
-						service_requested = true;
+						serviceRequested = true;
 						await gate;
 					}
 					return respond(input, init);
@@ -72,34 +72,34 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] as const) {
 			const view = await render(TransitProvider<ComponentProps<typeof List<TripItem>>>, {
 				data,
 				component: List<TripItem>,
-				child_props: {
+				childProps: {
 					title: 'Trips',
 					type: 'trip',
 					sources: { [source]: items },
-					height_calc: calculate_trip_height,
-					container_class: 'h-[240px]',
+					heightCalc: calculateTripHeight,
+					containerClass: 'h-[240px]',
 					overscan: 1
 				}
 			});
 			view.container.style.width = `${width}px`;
 			const viewport = view.container.querySelector<HTMLElement>('.overflow-y-auto')!;
 			const rows = () => [...view.container.querySelectorAll<HTMLElement>('.list-item')];
-			const assert_row_geometry = () => {
+			const assertRowGeometry = () => {
 				const boxes = rows().map((row) => row.getBoundingClientRect());
 				for (const [i, box] of boxes.entries()) {
-					expect(box.height).toBeCloseTo(calculate_trip_height(), 5);
-					if (i > 0) expect(box.top - boxes[i - 1].top).toBeCloseTo(calculate_trip_height(), 5);
+					expect(box.height).toBeCloseTo(calculateTripHeight(), 5);
+					if (i > 0) expect(box.top - boxes[i - 1].top).toBeCloseTo(calculateTripHeight(), 5);
 					for (const content of rows()[i].querySelectorAll('span, svg')) {
 						const bounds = content.getBoundingClientRect();
 						expect(bounds.top).toBeGreaterThanOrEqual(box.top);
 						expect(bounds.bottom).toBeLessThanOrEqual(box.bottom);
 					}
 				}
-				expect(viewport.scrollHeight).toBeCloseTo(items.length * calculate_trip_height(), 0);
+				expect(viewport.scrollHeight).toBeCloseTo(items.length * calculateTripHeight(), 0);
 			};
 			try {
-				await expect.poll(() => service_requested).toBe(true);
-				assert_row_geometry();
+				await expect.poll(() => serviceRequested).toBe(true);
+				assertRowGeometry();
 				release();
 				await expect.element(view.getByText('Trip not running').first()).toBeVisible();
 				if (source === 'mta_subway') {
@@ -111,14 +111,14 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] as const) {
 						.element(view.getByRole('img', { name: 'Standing room' }).first())
 						.toBeVisible();
 				}
-				assert_row_geometry();
+				assertRowGeometry();
 
-				viewport.scrollTop = calculate_trip_height() * 12.5;
+				viewport.scrollTop = calculateTripHeight() * 12.5;
 				viewport.dispatchEvent(new Event('scroll'));
 				await expect
 					.poll(() => rows()[0].getBoundingClientRect().bottom)
-					.toBeGreaterThan(viewport.getBoundingClientRect().top - calculate_trip_height() * 2);
-				assert_row_geometry();
+					.toBeGreaterThan(viewport.getBoundingClientRect().top - calculateTripHeight() * 2);
+				assertRowGeometry();
 				const boxes = rows().map((row) => row.getBoundingClientRect());
 				expect(boxes[0].top).toBeLessThanOrEqual(viewport.getBoundingClientRect().top);
 				expect(boxes.at(-1)!.bottom).toBeGreaterThanOrEqual(

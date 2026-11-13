@@ -1,5 +1,5 @@
 import { chartFixture } from '#lib/charts/fixtures.js';
-import { stop_pins } from '#lib/pins.svelte.js';
+import { stopPins } from '#lib/pins.svelte.js';
 import { page } from '#lib/test/page.svelte.js';
 import { fixtureTransitData } from '#lib/test/transit-fixture.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
@@ -20,8 +20,8 @@ test.each(['mta_subway', 'mta_bus', 'njt_bus'] as const)(
 	async (source) => {
 		vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 		localStorage.removeItem('stopsTab');
-		stop_pins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
-		page.data.selected_sources = [source];
+		stopPins.current = { mta_subway: [], mta_bus: [], njt_bus: [] };
+		page.data.selectedSources = [source];
 		const { catalog, route } = chartFixture(source);
 		catalog.routes.push({ ...route, id: '9', short_name: '9' });
 		catalog.stops = catalog.stops.slice(0, 3).map((stop, i) => ({

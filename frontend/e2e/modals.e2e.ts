@@ -1,19 +1,18 @@
-import type { Catalog, Service } from '../src/lib/client/index.js';
-import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 
-const dialog = (page: import('@playwright/test').Page) =>
-	page.getByRole('dialog', { name: 'Transit details' });
+import type { Catalog, Service } from '../src/lib/client/index.js';
+import { expect, searchableStop, test } from './fixtures';
+
+const dialog = (page: Page) => page.getByRole('dialog', { name: 'Transit details' });
 
 test('opening a stop from the list can be restored with Back', async ({ page }) => {
 	const catalog = (await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog;
-	// Route IDs take precedence when a stop shares the same ID.
-	const stop = catalog.stops.find((stop) => !catalog.routes.some((route) => route.id === stop.id));
-	if (!stop) throw new Error('expected a stop ID distinct from every route ID');
+	const { stop, query } = searchableStop(catalog);
 	await page.goto('/stops');
-	await page.getByRole('searchbox').fill(stop.id);
+	await page.getByRole('searchbox').fill(query);
 	const row = page.locator('main .list-item').filter({ hasText: stop.name });
 	await expect(row).toHaveCount(1);
-	await row.locator('button').first().click();
+	await row.getByRole('button').first().click();
 
 	await expect.poll(() => new URL(page.url()).searchParams.get('s')).toBe(stop.id);
 	await expect.poll(() => new URL(page.url()).searchParams.get('src')).toBe('mta_subway');
@@ -44,29 +43,32 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	expect(stop).toBeTruthy();
 	expect(route).toBeTruthy();
 	const trip = Object.entries(service.routes)
-		.flatMap(([route_id, { trips, calls }]) => {
+		.flatMap(([routeId, { trips, calls }]) => {
 			const trip = trips.find((_, index) =>
 				calls.trip.some((trip, call) => trip === index && calls.arrival[call] > Date.now() / 1000)
 			);
-			return trip ? [{ route_id, trip }] : [];
+			return trip ? [{ routeId, trip }] : [];
 		})
 		.at(0);
 	await page.addInitScript(
-		({ stop_id, trip }) => {
+		({ stopId, trip }) => {
 			localStorage.setItem(
 				'stopPins',
-				JSON.stringify({ mta_subway: [stop_id], mta_bus: [], njt_bus: [] })
+				JSON.stringify({ mta_subway: [stopId], mta_bus: [], njt_bus: [] })
 			);
 			localStorage.setItem(
 				'tripRoutePins',
 				JSON.stringify({
-					mta_subway: trip ? [JSON.stringify([trip.route_id, trip.id])] : [],
+					mta_subway: trip ? [JSON.stringify([trip.routeId, trip.id])] : [],
 					mta_bus: [],
 					njt_bus: []
 				})
 			);
 		},
-		{ stop_id: stop.id, trip: trip ? { route_id: trip.route_id, id: trip.trip.id } : null }
+		{
+			stopId: stop.id,
+			trip: trip ? { routeId: trip.routeId, id: trip.trip.id } : null
+		}
 	);
 
 	await page.goto(`/?s=${encodeURIComponent(stop.id)}&src=mta_subway`);
@@ -82,10 +84,10 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	if (trip) {
 		const id = trip.trip.id;
 		await page.goto(
-			`/?t=${encodeURIComponent(id)}&r=${encodeURIComponent(trip.route_id)}&src=mta_subway`
+			`/?t=${encodeURIComponent(id)}&r=${encodeURIComponent(trip.routeId)}&src=mta_subway`
 		);
 		await expect.poll(() => new URL(page.url()).searchParams.get('t')).toBe(id);
-		await expect.poll(() => new URL(page.url()).searchParams.get('r')).toBe(trip.route_id);
+		await expect.poll(() => new URL(page.url()).searchParams.get('r')).toBe(trip.routeId);
 		await expect.poll(() => new URL(page.url()).searchParams.get('src')).toBe('mta_subway');
 		await expect(dialog(page)).toBeVisible();
 		await expect(
@@ -99,7 +101,9 @@ test('cold-load modals for subway stops, routes, and trips', async ({ page }) =>
 	await expect(dialog(page)).toBeHidden();
 
 	await page.goto('/?s=not-a-real-stop&src=mta_subway');
-	await expect.poll(() => new URL(page.url()).searchParams.get('s')).toBeNull();
-	await expect(dialog(page)).toBeHidden();
+	await expect.poll(() => new URL(page.url()).searchParams.get('s')).toBe('not-a-real-stop');
+	await expect.poll(() => new URL(page.url()).searchParams.get('src')).toBe('mta_subway');
+	await expect(dialog(page)).toBeVisible();
+	await expect(dialog(page)).toContainText('Stop not found');
 	expect(errors).toEqual([]);
 });

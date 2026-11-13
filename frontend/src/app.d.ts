@@ -7,7 +7,7 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		interface PageData {
-			selected_sources: Source[];
+			selectedSources: Source[];
 			at?: string;
 		}
 		interface PageState {
@@ -16,7 +16,7 @@ declare global {
 				| null
 				| { type: 'stop'; source: Source; id: string }
 				| { type: 'route'; source: Source; id: string }
-				| { type: 'trip'; source: Source; route_id: string; id: string };
+				| { type: 'trip'; source: Source; routeId: string; id: string };
 			// used to determine if page.state update was forward or backwards
 			index?: number;
 		}

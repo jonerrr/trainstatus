@@ -1,0 +1,113 @@
+<script lang="ts">
+	import type { CatalogRoute } from '#lib/client/index.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
+	import icons from '#lib/icons.js';
+	import { getCurrentTime, openModal } from '#lib/url-params.svelte.js';
+
+	let {
+		route,
+		link,
+		class: className,
+		width = 16,
+		height = 16,
+		showAlerts = false
+	}: {
+		route: CatalogRoute;
+		link: boolean;
+		class?: string;
+		width?: number;
+		height?: number;
+		showAlerts?: boolean;
+	} = $props();
+	const transit = getTransitData();
+	const currentTime = getCurrentTime();
+	const alertsResource = transit.alerts(() =>
+		showAlerts && route ? { source: route.data.source, at: currentTime.value } : null
+	);
+	const hasAlert = $derived(
+		showAlerts &&
+			!!route &&
+			alertsResource.current.state === 'ready' &&
+			alertsResource.current.value.byRoute.has(route.id)
+	);
+	const size = $derived(Math.max(width, height));
+	const icon = $derived(
+		route?.data.source === 'mta_subway' ? icons.find((item) => item.name === route.id) : undefined
+	);
+	const classes = $derived([
+		'inline-flex shrink-0 items-center',
+		icon ? 'rounded-full' : 'rounded-none',
+		hasAlert && 'ring-2 ring-orange-400',
+		className
+	]);
+	const label = $derived(route?.short_name ?? '');
+	const parts = $derived(
+		route?.data.source === 'mta_bus' ? label.match(/^([A-Za-z]+)(.*)$/) : null
+	);
+</script>
+
+{#snippet badge()}
+	{#if icon}
+		<svg
+			class="route-badge shrink-0"
+			width={size}
+			height={size}
+			viewBox="0 0 90 90"
+			role="img"
+			aria-label={label}
+		>
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -- Trusted static subway artwork. -->
+			{@html icon.svg}
+		</svg>
+	{:else}
+		<span
+			class="route-badge bus-badge"
+			style:--badge-size={`${size}px`}
+			style:background-color={route?.color || '#526173'}
+			style:color={route?.text_color || 'white'}
+			aria-label={label}
+		>
+			{#if parts?.[2]}<span class="prefix">{parts[1]}</span>{parts[2]}{:else}{label}{/if}
+		</span>
+	{/if}
+{/snippet}
+
+{#if link}
+	<button
+		type="button"
+		class={[classes, 'focus-visible:outline-2 focus-visible:outline-accent']}
+		aria-label={`Open route ${label}`}
+		onclick={() => openModal({ type: 'route', source: route.data.source, id: route.id })}
+	>
+		{@render badge()}
+	</button>
+{:else}
+	<span class={classes}>{@render badge()}</span>
+{/if}
+
+<style>
+	.route-badge {
+		flex-shrink: 0;
+	}
+	svg {
+		transform: translateZ(0);
+	}
+	.bus-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1px;
+		min-width: var(--badge-size);
+		height: var(--badge-size);
+		padding: 0 0.45em;
+		border-radius: 0;
+		font-size: calc(var(--badge-size) * 0.52);
+		line-height: 1.4;
+		font-weight: 750;
+		white-space: nowrap;
+		text-shadow: 0 1px 2px #0009;
+	}
+	.prefix {
+		font-size: 0.78em;
+	}
+</style>

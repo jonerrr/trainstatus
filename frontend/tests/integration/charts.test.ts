@@ -1,5 +1,5 @@
 import type { Catalog, Service, Source } from '#lib/client/index.js';
-import { decodeCatalog, decodeService } from '#lib/transit/decode.js';
+import { decodeCatalog, decodeService } from '#lib/data/decode.js';
 
 import { expect, test } from 'vitest';
 
@@ -19,14 +19,14 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 				? ''
 				: `?${new URLSearchParams({ route_ids: catalog.routes.map((route) => route.id).join(',') })}`;
 		const service = await readJson<Service>(`/api/v1/service/${source}${query}`);
-		const stopsById = decodeCatalog(catalog).stops_by_id;
+		const stopsById = decodeCatalog(catalog).stopsById;
 		const graphs = new Map<string, ChartInput[]>();
-		for (const [route_id, route] of decodeService(service, now)) {
+		for (const [routeId, route] of decodeService(service, now)) {
 			for (const trip of route.trips.values()) {
-				const key = `${route_id}:${trip.direction}`;
+				const key = `${routeId}:${trip.direction}`;
 				const input = graphs.get(key) ?? [];
-				const calls = route.calls_by_trip.get(trip.id) ?? [];
-				input.push({ source, route_id, trip, calls, stops: stopsById });
+				const calls = route.callsByTrip.get(trip.id) ?? [];
+				input.push({ source, routeId, trip, calls, stops: stopsById });
 				graphs.set(key, input);
 			}
 		}
@@ -36,28 +36,28 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 			for (const { trip, calls } of inputs) {
 				const valid = calls.filter((st) => Number.isFinite(st.arrival));
 				expect(
-					valid.filter((st) => !stopsById.has(st.stop_id)),
+					valid.filter((st) => !stopsById.has(st.stopId)),
 					`${source} ${key} ${trip.id}: stop visits cannot be resolved`
 				).toEqual([]);
 				if (valid.length) {
-					expectedVisits.set(trip.id, valid.map((st) => `${st.stop_id}:${st.arrival}`).sort());
+					expectedVisits.set(trip.id, valid.map((st) => `${st.stopId}:${st.arrival}`).sort());
 				}
 			}
 			const chart = buildChartData(inputs);
 			expect(
-				chart.route_trips.map((series) => series.trip.id).sort(),
+				chart.routeTrips.map((series) => series.trip.id).sort(),
 				`${source} ${key}: lost or unexpected trips`
 			).toEqual([...expectedVisits.keys()].sort());
-			if (!chart.route_trips.length) continue;
+			if (!chart.routeTrips.length) continue;
 			checked++;
-			for (const series of chart.route_trips) {
-				const rows = series.points.map((point) => chart.yDomain.indexOf(point.stop_key));
+			for (const series of chart.routeTrips) {
+				const rows = series.points.map((point) => chart.yDomain.indexOf(point.stopKey));
 				expect(
 					rows.every((row, i) => row >= 0 && (i === 0 || row > rows[i - 1])),
 					`${source} ${key} ${series.trip.id}: stop axis reverses`
 				).toBe(true);
 				expect(
-					series.points.map((point) => `${point.stop_id}:${point.time.getTime()}`).sort(),
+					series.points.map((point) => `${point.stopId}:${point.time.getTime()}`).sort(),
 					`${source} ${key}: lost stop visits`
 				).toEqual(expectedVisits.get(series.trip.id));
 				expect(

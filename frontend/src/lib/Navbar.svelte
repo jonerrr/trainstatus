@@ -3,53 +3,56 @@
 	import { page } from '$app/state';
 	import type { RouteId } from '$app/types';
 
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url-params.svelte.js';
 
 	import { ChartLine, CircleAlert, Clock, House, Map, Settings } from '@lucide/svelte';
 
 	import UpdateIndicator from './UpdateIndicator.svelte';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 
-	interface Routes {
-		[key: string]: [
-			Icon:
-				| typeof House
-				| typeof Clock
-				| typeof CircleAlert
-				| typeof ChartLine
-				| typeof Settings
-				| typeof Map,
-			href: RouteId
-		];
+	type NavIcon =
+		| typeof House
+		| typeof Clock
+		| typeof CircleAlert
+		| typeof ChartLine
+		| typeof Settings
+		| typeof Map;
+
+	interface NavItem {
+		label: string;
+		icon: NavIcon;
+		href: RouteId;
 	}
 
-	const routes: Routes = {
-		Home: [House, '/'],
-		Alerts: [CircleAlert, '/alerts'],
-		Stops: [Clock, '/stops'],
-		Charts: [ChartLine, '/charts'],
-		Settings: [Settings, '/settings'],
-		Map: [Map, '/map']
-	} as const;
+	const navItems: readonly NavItem[] = [
+		{ label: 'Home', icon: House, href: '/' },
+		{ label: 'Alerts', icon: CircleAlert, href: '/alerts' },
+		{ label: 'Stops', icon: Clock, href: '/stops' },
+		{ label: 'Charts', icon: ChartLine, href: '/charts' },
+		{ label: 'Map', icon: Map, href: '/map' },
+		{ label: 'Settings', icon: Settings, href: '/settings' }
+	];
 </script>
 
-{#snippet nav_button(label: string)}
-	{const [Icon, href] = $derived(routes[label])}
+{#snippet navButton(item: NavItem)}
+	{const Icon = $derived(item.icon)}
+	{const href = $derived(item.href)}
+	{const label = $derived(item.label)}
 	<!-- use state.eager to ensure visual feedback is instant -->
-	{const is_active = $derived(
+	{const isActive = $derived(
 		new URL(resolve(href), page.url.href).pathname === $state.eager(page.url.pathname)
 	)}
 	<a
 		aria-label={label}
-		aria-current={is_active ? 'page' : undefined}
+		aria-current={isActive ? 'page' : undefined}
 		title={label}
-		href="{resolve(href)}{current_time.value !== undefined ? `?at=${current_time.value}` : ''}"
+		href="{resolve(href)}{currentTime.value !== undefined ? `?at=${currentTime.value}` : ''}"
 		class={[
 			'nav-button',
 			{
-				'bg-accent-bg font-medium text-accent': is_active,
-				'text-muted': !is_active
+				'bg-accent-bg font-medium text-accent': isActive,
+				'text-muted': !isActive
 			}
 		]}
 	>
@@ -66,14 +69,12 @@
 	<div
 		class="nav-links flex min-h-0 flex-1 items-stretch overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto"
 	>
-		{@render nav_button('Home')}
-		{@render nav_button('Alerts')}
-		{@render nav_button('Stops')}
-		{@render nav_button('Charts')}
-		{@render nav_button('Map')}
+		{#each navItems.slice(0, 5) as item (item.href)}
+			{@render navButton(item)}
+		{/each}
 		<div class="md:mt-auto">
 			{#if !page.state.modal}<div class="hidden md:block"><UpdateIndicator /></div>{/if}
-			{@render nav_button('Settings')}
+			{@render navButton(navItems[5])}
 		</div>
 	</div>
 </nav>

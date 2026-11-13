@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CatalogRoute, CatalogStopRoute, MtaBusDirection } from './client';
-import { bus_headsign, debounce, main_route_stops, throttle } from './util.svelte';
+import { busHeadsign, debounce, mainRouteStops, throttle } from './util.svelte';
 
 it('throttles continuous input to the latest value each interval and cancels pending work', () => {
 	vi.useFakeTimers();
@@ -52,26 +52,26 @@ it('debounces rapid calls to the latest target and cancels pending work', () => 
 	}
 });
 
-describe('main_route_stops', () => {
-	const routes: CatalogStopRoute[] = ['6', '6X', '7', '7X', 'FX'].map((route_id) => ({
-		route_id,
+describe('mainRouteStops', () => {
+	const routes: CatalogStopRoute[] = ['6', '6X', '7', '7X', 'FX'].map((routeId) => ({
+		route_id: routeId,
 		stop_sequence: 1,
 		data: { source: 'mta_subway', stop_type: 'full_time' }
 	}));
 
 	it('omits express variants without trips while keeping ordinary routes', () => {
-		expect(main_route_stops(routes, new Set()).map((r) => r.route_id)).toEqual(['6', '7']);
+		expect(mainRouteStops(routes, new Set()).map((r) => r.route_id)).toEqual(['6', '7']);
 	});
 
 	it('shows only express variants with actual trips, then hides them when service clears', () => {
 		const active = new Set(['7X', 'FX']);
-		expect(main_route_stops(routes, active).map((r) => r.route_id)).toEqual(['6', '7', '7X', 'FX']);
+		expect(mainRouteStops(routes, active).map((r) => r.route_id)).toEqual(['6', '7', '7X', 'FX']);
 		active.clear();
-		expect(main_route_stops(routes, active).map((r) => r.route_id)).toEqual(['6', '7']);
+		expect(mainRouteStops(routes, active).map((r) => r.route_id)).toEqual(['6', '7']);
 	});
 });
 
-function bus_route(directions: MtaBusDirection[]): CatalogRoute {
+function busRoute(directions: MtaBusDirection[]): CatalogRoute {
 	return {
 		id: 'B1',
 		short_name: 'B1',
@@ -91,44 +91,44 @@ function bus_route(directions: MtaBusDirection[]): CatalogRoute {
 	};
 }
 
-describe('bus_headsign', () => {
+describe('busHeadsign', () => {
 	it('resolves the destination for each direction', () => {
-		const route = bus_route([
+		const route = busRoute([
 			{ direction_id: 0, headsign: 'Bay Ridge 4 Av' },
 			{ direction_id: 1, headsign: 'Manhattan Beach Kingsboro CC' }
 		]);
 
-		expect(bus_headsign(route, 0)).toBe('Bay Ridge 4 Av');
-		expect(bus_headsign(route, 1)).toBe('Manhattan Beach Kingsboro CC');
+		expect(busHeadsign(route, 0)).toBe('Bay Ridge 4 Av');
+		expect(busHeadsign(route, 1)).toBe('Manhattan Beach Kingsboro CC');
 	});
 
 	it('preserves OBA service flags and via formatting', () => {
-		const route = bus_route([
+		const route = busRoute([
 			{ direction_id: 0, headsign: 'LIMITED BERGEN BEACH E 71 ST via AV U' },
 			{ direction_id: 1, headsign: 'BED-STUY BWAY-HALSEY via KINGS HWY via UTICA' }
 		]);
 
-		expect(bus_headsign(route, 0)).toBe('LIMITED BERGEN BEACH E 71 ST via AV U');
-		expect(bus_headsign(route, 1)).toBe('BED-STUY BWAY-HALSEY via KINGS HWY via UTICA');
+		expect(busHeadsign(route, 0)).toBe('LIMITED BERGEN BEACH E 71 ST via AV U');
+		expect(busHeadsign(route, 1)).toBe('BED-STUY BWAY-HALSEY via KINGS HWY via UTICA');
 	});
 
 	it('returns undefined for a direction the route does not publish', () => {
 		// Routes such as B74, S81 and Q70-SBS only publish one direction, and the
 		// one they publish is not always direction 0.
-		const route = bus_route([{ direction_id: 1, headsign: 'Stillwell Av' }]);
+		const route = busRoute([{ direction_id: 1, headsign: 'Stillwell Av' }]);
 
-		expect(bus_headsign(route, 1)).toBe('Stillwell Av');
-		expect(bus_headsign(route, 0)).toBeUndefined();
+		expect(busHeadsign(route, 1)).toBe('Stillwell Av');
+		expect(busHeadsign(route, 0)).toBeUndefined();
 	});
 
 	it('returns undefined for a missing route or a non-bus route', () => {
-		expect(bus_headsign(undefined, 0)).toBeUndefined();
+		expect(busHeadsign(undefined, 0)).toBeUndefined();
 		expect(
-			bus_headsign({ id: '1', data: { source: 'mta_subway' } } as unknown as CatalogRoute, 0)
+			busHeadsign({ id: '1', data: { source: 'mta_subway' } } as unknown as CatalogRoute, 0)
 		).toBeUndefined();
 	});
 
 	it('returns undefined for an empty direction list', () => {
-		expect(bus_headsign(bus_route([]), 0)).toBeUndefined();
+		expect(busHeadsign(busRoute([]), 0)).toBeUndefined();
 	});
 });

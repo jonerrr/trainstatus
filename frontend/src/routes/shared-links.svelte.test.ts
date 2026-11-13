@@ -3,12 +3,12 @@ import { tick } from 'svelte';
 import { SvelteURL } from 'svelte/reactivity';
 
 import { chartFixture, chartNow } from '#lib/charts/fixtures.js';
-import { stop_pins, trip_pin_key, trip_pins } from '#lib/pins.svelte.js';
-import { layout_sources } from '#lib/source_preferences.svelte.js';
+import { stopPins, tripPinKey, tripPins } from '#lib/pins.svelte.js';
+import { layoutSources } from '#lib/source-preferences.svelte.js';
 import HomeLayoutHarness from '#lib/test/HomeLayoutHarness.svelte';
 import { page } from '#lib/test/page.svelte.js';
 import { fixtureFetcher } from '#lib/test/transit-fixture.js';
-import { open_modal } from '#lib/url_params.svelte.js';
+import { openModal } from '#lib/url-params.svelte.js';
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
@@ -21,11 +21,11 @@ beforeEach(() => {
 		return 1;
 	});
 	vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
-	stop_pins.current = { mta_subway: ['a'], mta_bus: ['a'], njt_bus: ['a'] };
-	trip_pins.current = {
-		mta_subway: [trip_pin_key('4', 'trip-0')],
-		mta_bus: [trip_pin_key('4', 'trip-0')],
-		njt_bus: [trip_pin_key('4', 'trip-0')]
+	stopPins.current = { mta_subway: ['a'], mta_bus: ['a'], njt_bus: ['a'] };
+	tripPins.current = {
+		mta_subway: [tripPinKey('4', 'trip-0')],
+		mta_bus: [tripPinKey('4', 'trip-0')],
+		njt_bus: [tripPinKey('4', 'trip-0')]
 	};
 });
 
@@ -66,7 +66,7 @@ test.each([
 	});
 	vi.stubGlobal('fetch', fetcher);
 	// Bus links must add a source absent from the saved preferences.
-	page.data.selected_sources = layout_sources(
+	page.data.selectedSources = layoutSources(
 		source === 'njt_bus' ? 'mta_subway' : 'mta_subway,njt_bus',
 		source
 	);
@@ -99,8 +99,8 @@ test.each([
 		).toHaveLength(1);
 		await dialog.getByRole('button', { name: 'Close modal' }).click();
 		await expect.element(dialog).not.toBeInTheDocument();
-		if (kind === 'stop') open_modal({ type: 'stop', source, id: 'a' });
-		else open_modal({ type: 'trip', source, route_id: '4', id: 'trip-0' });
+		if (kind === 'stop') openModal({ type: 'stop', source, id: 'a' });
+		else openModal({ type: 'trip', source, routeId: '4', id: 'trip-0' });
 		await expect.element(dialog).toBeVisible();
 		expect(
 			fetcher.mock.calls.filter(([input]) => String(input).startsWith(`/api/v1/service/${source}`))

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 
-	import { createCurrentTime, setCurrentTime } from '../url_params.svelte';
+	import { createCurrentTime, setCurrentTime } from '../url-params.svelte';
 	import CurrentTimeValue from './CurrentTimeValue.svelte';
 
 	const { at }: { at?: number } = $props();

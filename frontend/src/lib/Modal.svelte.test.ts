@@ -5,6 +5,7 @@ import { render } from 'vitest-browser-svelte';
 import { userEvent } from 'vitest/browser';
 
 import { chartFixture } from './charts/fixtures';
+import { TransitData } from './data/store.svelte';
 import Modal from './Modal.svelte';
 import ModalFocusHarness from './test/ModalFocusHarness.svelte';
 import ModalHarness from './test/ModalHarness.svelte';
@@ -12,7 +13,6 @@ import { page } from './test/page.svelte';
 import { fixtureFetcher } from './test/transit-fixture';
 import TransitDataHarness from './test/TransitDataHarness.svelte';
 import TransitProvider from './test/TransitProvider.svelte';
-import { TransitData } from './transit/store.svelte';
 
 function state(id: string, index: number): App.PageState {
 	return {
@@ -208,7 +208,7 @@ for (const type of ['route', 'stop'] as const) {
 				catalogs: { njt_bus: fixture.catalog },
 				services: { njt_bus: fixture.service }
 			}),
-			batch_ms: 0
+			batchMs: 0
 		});
 		try {
 			page.state = { modal: { type, source: 'njt_bus', id: 'unknown' } };
@@ -227,16 +227,16 @@ for (const type of ['route', 'stop'] as const) {
 	});
 }
 
-for (const { age, present, fail_first = false, missing_route = false } of [
+for (const { age, present, failFirst = false, missingRoute = false } of [
 	{ age: 10_000, present: true },
 	{ age: 31_000, present: true },
 	{ age: 31_000, present: false },
-	{ age: 10_000, present: true, fail_first: true },
-	{ age: 10_000, present: false, fail_first: true },
-	{ age: 10_000, present: true, fail_first: true, missing_route: true },
-	{ age: 10_000, present: false, missing_route: true }
+	{ age: 10_000, present: true, failFirst: true },
+	{ age: 10_000, present: false, failFirst: true },
+	{ age: 10_000, present: true, failFirst: true, missingRoute: true },
+	{ age: 10_000, present: false, missingRoute: true }
 ]) {
-	test(`a trip missing from ${age}ms cached service waits for refreshed membership (${present}, failed refresh ${fail_first}, missing route ${missing_route})`, async () => {
+	test(`a trip missing from ${age}ms cached service waits for refreshed membership (${present}, failed refresh ${failFirst}, missing route ${missingRoute})`, async () => {
 		const fixture = chartFixture('njt_bus', 0);
 		const empty = {
 			...fixture.service,
@@ -264,24 +264,24 @@ for (const { age, present, fail_first = false, missing_route = false } of [
 		const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
 			if (String(input).includes('/service/')) {
 				requests++;
-				if (requests === 1 && missing_route)
+				if (requests === 1 && missingRoute)
 					return new Response(JSON.stringify({ unknown_route_ids: ['4'] }), { status: 404 });
 				if (requests > 1) {
 					await gate;
-					if (fail_first && requests === 2) return new Response('', { status: 503 });
+					if (failFirst && requests === 2) return new Response('', { status: 503 });
 					return refreshed(input, init);
 				}
 			}
 			return initial(input, init);
 		}) as typeof fetch;
-		const data = new TransitData({ sources: ['njt_bus'], fetcher, batch_ms: 0 });
+		const data = new TransitData({ sources: ['njt_bus'], fetcher, batchMs: 0 });
 		try {
 			const reader = await render(TransitDataHarness, {
 				data,
 				source: 'njt_bus',
 				readers: [{ id: 'old', route: '4' }]
 			});
-			if (missing_route) await expect.element(reader.getByText('Not found')).toBeVisible();
+			if (missingRoute) await expect.element(reader.getByText('Not found')).toBeVisible();
 			else
 				await expect
 					.poll(() =>
@@ -290,13 +290,13 @@ for (const { age, present, fail_first = false, missing_route = false } of [
 					.toBe(true);
 			await reader.unmount();
 			clock += age;
-			page.data.selected_sources = ['njt_bus'];
-			page.state = { modal: { type: 'trip', source: 'njt_bus', route_id: '4', id: 'trip-0' } };
+			page.data.selectedSources = ['njt_bus'];
+			page.state = { modal: { type: 'trip', source: 'njt_bus', routeId: '4', id: 'trip-0' } };
 			const view = await render(TransitProvider<Record<string, never>>, { data, component: Modal });
 			await expect.poll(() => requests).toBe(2);
 			expect(page.state.modal?.id).toBe('trip-0');
 			release();
-			if (fail_first) {
+			if (failFirst) {
 				await expect.element(view.getByRole('button', { name: /Retry updates/ })).toBeVisible();
 				expect(view.getByRole('dialog').element().querySelector('.animate-pulse')).toBeNull();
 				expect(page.state.modal?.id).toBe('trip-0');
@@ -311,7 +311,7 @@ for (const { age, present, fail_first = false, missing_route = false } of [
 				expect(page.state.modal?.id).toBe('trip-0');
 			}
 			await settle();
-			expect(requests).toBe(fail_first ? 3 : 2);
+			expect(requests).toBe(failFirst ? 3 : 2);
 			await view.unmount();
 		} finally {
 			release();

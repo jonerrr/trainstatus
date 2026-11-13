@@ -7,16 +7,16 @@
 	import { page } from '$app/state';
 
 	import type { Source } from '#lib/client/index.js';
-	import { contain_modal_focus } from '#lib/modal_focus.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
+	import { containModalFocus } from '#lib/modal-focus.js';
 	import Pin from '#lib/Pin.svelte';
-	import { route_pins, stop_pins, trip_pin_key, trip_pins, type Pins } from '#lib/pins.svelte.js';
-	import RouteModal from '#lib/Route/Modal.svelte';
-	import StopModal from '#lib/Stop/Modal.svelte';
+	import { routePins, stopPins, tripPinKey, tripPins, type Pins } from '#lib/pins.svelte.js';
+	import RouteModal from '#lib/route/Modal.svelte';
+	import StopModal from '#lib/stop/Modal.svelte';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import TripModal from '#lib/Trip/Modal.svelte';
+	import TripModal from '#lib/trip/Modal.svelte';
 	import UpdateIndicator from '#lib/UpdateIndicator.svelte';
-	import { close_modal, getCurrentTime } from '#lib/url_params.svelte.js';
+	import { closeModal, getCurrentTime } from '#lib/url-params.svelte.js';
 
 	import {
 		AlarmClock,
@@ -27,30 +27,30 @@
 		Timer
 	} from '@lucide/svelte';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 	const transit = getTransitData();
 
-	function catalog_of(source: Source) {
+	function catalogOf(source: Source) {
 		return transit.peekCatalog(source);
 	}
 
 	// by reassigning the page.state locally, we can ensure the dialog transitions run before the DOM updates.
 	// Otherwise, the sliding animation looks like it runs twice.
-	let current_page_state = $state.raw(page.state);
-	const selected_modal = $derived(current_page_state.modal);
-	const has_modal = $derived(!!current_page_state.modal);
+	let currentPageState = $state.raw(page.state);
+	const selectedModal = $derived(currentPageState.modal);
+	const hasModal = $derived(!!currentPageState.modal);
 
 	// Raw state preserves modal identity across shallow navigation and animation snapshots.
 
-	let modal_transition: ViewTransition | undefined;
+	let modalTransition: ViewTransition | undefined;
 
-	function slide_to(forward: boolean) {
+	function slideTo(forward: boolean) {
 		document.documentElement.dataset.modalDirection = forward ? 'forward' : 'backward';
 
 		const apply = () => {
 			// Catalog validation or another navigation can change the selection while
 			// the transition waits to capture its old view. Apply the latest selection.
-			current_page_state = page.state;
+			currentPageState = page.state;
 		};
 
 		// experimental.async makes tick() wait for a frame, which a view transition
@@ -66,12 +66,12 @@
 						});
 					})
 			);
-			modal_transition = transition;
+			modalTransition = transition;
 			transition.ready.catch(() => {});
-			const clear_transition = () => {
-				if (modal_transition === transition) modal_transition = undefined;
+			const clearTransition = () => {
+				if (modalTransition === transition) modalTransition = undefined;
 			};
-			transition.finished.then(clear_transition, clear_transition);
+			transition.finished.then(clearTransition, clearTransition);
 		} else {
 			apply();
 		}
@@ -79,10 +79,10 @@
 
 	$effect(() => {
 		// $inspect.trace('modal state transition effect');
-		const next_state = page.state;
-		if (untrack(() => next_state.modal !== current_page_state.modal)) {
-			const forward = untrack(() => (next_state.index ?? 0) > (current_page_state?.index ?? 0));
-			slide_to(forward);
+		const nextState = page.state;
+		if (untrack(() => nextState.modal !== currentPageState.modal)) {
+			const forward = untrack(() => (nextState.index ?? 0) > (currentPageState?.index ?? 0));
+			slideTo(forward);
 		}
 	});
 
@@ -97,39 +97,39 @@
 
 		// The focus attachment owns opening/restoration. Only refocus here when
 		// replacing an already-open modal removes its focused content.
-		let was_open = false;
+		let wasOpen = false;
 		$effect(() => {
-			void current_page_state.modal;
-			if (was_open && has_modal && !node.contains(document.activeElement)) node.focus();
-			was_open = has_modal;
+			void currentPageState.modal;
+			if (wasOpen && hasModal && !node.contains(document.activeElement)) node.focus();
+			wasOpen = hasModal;
 		});
 
 		// Add keyboard handler for Escape key
-		function handle_keydown(event: KeyboardEvent) {
-			if (has_modal && event.key === 'Escape') {
+		function handleKeydown(event: KeyboardEvent) {
+			if (hasModal && event.key === 'Escape') {
 				event.preventDefault();
-				close_modal(current_time.value);
+				closeModal(currentTime.value);
 			}
 		}
 
 		// Dismiss only a tap that starts and ends on the backdrop, not a drag.
 		const delta = 6;
-		let pointer_start: { id: number; x: number; y: number } | undefined;
+		let pointerStart: { id: number; x: number; y: number } | undefined;
 
-		function handle_pointer_down(event: PointerEvent) {
+		function handlePointerDown(event: PointerEvent) {
 			// The animated sheet is a snapshot with pointer events disabled, so a
 			// rapid tap on it can hit the live backdrop underneath.
-			pointer_start =
-				!modal_transition && event.target === node.parentElement && event.button === 0
+			pointerStart =
+				!modalTransition && event.target === node.parentElement && event.button === 0
 					? { id: event.pointerId, x: event.pageX, y: event.pageY }
 					: undefined;
 		}
 
-		function handle_pointer_up(event: PointerEvent) {
-			const start = pointer_start;
-			pointer_start = undefined;
+		function handlePointerUp(event: PointerEvent) {
+			const start = pointerStart;
+			pointerStart = undefined;
 			if (
-				modal_transition ||
+				modalTransition ||
 				!start ||
 				start.id !== event.pointerId ||
 				event.target !== node.parentElement
@@ -139,23 +139,23 @@
 			const diffY = Math.abs(event.pageY - start.y);
 
 			if (diffX < delta && diffY < delta) {
-				close_modal(current_time.value);
+				closeModal(currentTime.value);
 			}
 		}
 
-		const listeners_to_remove: Array<() => void> = [];
+		const listenersToRemove: Array<() => void> = [];
 
-		listeners_to_remove.push(on(node.parentElement!, 'pointerdown', handle_pointer_down));
-		listeners_to_remove.push(on(node.parentElement!, 'pointerup', handle_pointer_up));
-		listeners_to_remove.push(
+		listenersToRemove.push(on(node.parentElement!, 'pointerdown', handlePointerDown));
+		listenersToRemove.push(on(node.parentElement!, 'pointerup', handlePointerUp));
+		listenersToRemove.push(
 			on(node.parentElement!, 'pointercancel', () => {
-				pointer_start = undefined;
+				pointerStart = undefined;
 			})
 		);
-		listeners_to_remove.push(on(document, 'keydown', handle_keydown));
+		listenersToRemove.push(on(document, 'keydown', handleKeydown));
 
 		return () => {
-			listeners_to_remove.forEach((off) => off());
+			listenersToRemove.forEach((off) => off());
 		};
 	};
 
@@ -165,9 +165,9 @@
 	// });
 	let copied = $state(false);
 	// show stops/trips before current datetime TODO: maybe persist this preference in local storage
-	let show_previous = $state(false);
+	let showPrevious = $state(false);
 	// e.g. 3m or 12:45.
-	let time_format = new LocalStorage<'countdown' | 'time'>('time_format', 'countdown');
+	let timeFormat = new LocalStorage<'countdown' | 'time'>('timeFormat', 'countdown');
 </script>
 
 <!-- TODO: refactor actions now that we have sources -->
@@ -182,7 +182,7 @@
 	<div class="flex h-16 shrink-0 items-center justify-between gap-1 px-1">
 		<button
 			onclick={() => {
-				close_modal(current_time.value);
+				closeModal(currentTime.value);
 			}}
 			aria-label="Close modal"
 			title="Close modal"
@@ -193,10 +193,10 @@
 		<div class="flex items-center gap-1 text-xs">
 			{#if history}
 				<button
-					class={{ 'text-muted': !show_previous, 'text-primary': show_previous }}
+					class={{ 'text-muted': !showPrevious, 'text-primary': showPrevious }}
 					aria-label="Show previous"
 					onclick={() => {
-						show_previous = !show_previous;
+						showPrevious = !showPrevious;
 					}}
 				>
 					<RotateCcwClock size="2rem" />
@@ -236,10 +236,10 @@
 				aria-label="Change time formatting"
 				title="Change time formatting"
 				onclick={() => {
-					time_format.current = time_format.current === 'countdown' ? 'time' : 'countdown';
+					timeFormat.current = timeFormat.current === 'countdown' ? 'time' : 'countdown';
 				}}
 			>
-				{#if time_format.current === 'countdown'}
+				{#if timeFormat.current === 'countdown'}
 					<AlarmClock size="2rem" />
 				{:else}
 					<Timer size="2rem" />
@@ -283,58 +283,58 @@
 	</div>
 {/snippet}
 <!-- fixed bottom-0 left-0 right-0 -->
-<div class="modal-backdrop fixed inset-0 z-100 bg-backdrop" data-open={has_modal}>
+<div class="modal-backdrop fixed inset-0 z-100 bg-backdrop" data-open={hasModal}>
 	<div
 		role="dialog"
 		aria-modal="true"
 		aria-label="Transit details"
 		tabindex="-1"
-		{@attach has_modal && contain_modal_focus}
+		{@attach hasModal && containModalFocus}
 		{@attach modal}
 		class="modal-sheet absolute inset-x-0 bottom-0 m-auto flex max-h-[95dvh] w-full max-w-200 flex-col overflow-auto rounded-none bg-surface-1 text-white focus:ring-2 focus:ring-border-default focus:outline-hidden"
 	>
-		{#if has_modal}<UpdateIndicator compact />{/if}
-		{#if selected_modal?.type === 'stop'}
+		{#if hasModal}<UpdateIndicator compact />{/if}
+		{#if selectedModal?.type === 'stop'}
 			<StopModal
-				source={selected_modal.source}
-				stop_id={selected_modal.id}
-				{show_previous}
-				time_format={time_format.current}
+				source={selectedModal.source}
+				stopId={selectedModal.id}
+				{showPrevious}
+				timeFormat={timeFormat.current}
 			/>
 			{@render actions(
 				true,
-				selected_modal.id,
-				`Arrivals at ${catalog_of(selected_modal.source)?.stops_by_id.get(selected_modal.id)?.name ?? selected_modal.id}`,
-				selected_modal.source,
-				stop_pins
+				selectedModal.id,
+				`Arrivals at ${catalogOf(selectedModal.source)?.stopsById.get(selectedModal.id)?.name ?? selectedModal.id}`,
+				selectedModal.source,
+				stopPins
 			)}
-		{:else if selected_modal?.type === 'route'}
+		{:else if selectedModal?.type === 'route'}
 			<RouteModal
-				source={selected_modal.source}
-				route_id={selected_modal.id}
-				time_format={time_format.current}
+				source={selectedModal.source}
+				routeId={selectedModal.id}
+				timeFormat={timeFormat.current}
 			/>
 			{@render actions(
 				false,
-				selected_modal.id,
-				`Alerts for ${catalog_of(selected_modal.source)?.routes_by_id.get(selected_modal.id)?.short_name ?? selected_modal.id}`,
-				selected_modal.source,
-				route_pins
+				selectedModal.id,
+				`Alerts for ${catalogOf(selectedModal.source)?.routesById.get(selectedModal.id)?.short_name ?? selectedModal.id}`,
+				selectedModal.source,
+				routePins
 			)}
-		{:else if selected_modal?.type === 'trip'}
+		{:else if selectedModal?.type === 'trip'}
 			<TripModal
-				source={selected_modal.source}
-				route_id={selected_modal.route_id}
-				trip_id={selected_modal.id}
-				{show_previous}
-				time_format={time_format.current}
+				source={selectedModal.source}
+				routeId={selectedModal.routeId}
+				tripId={selectedModal.id}
+				{showPrevious}
+				timeFormat={timeFormat.current}
 			/>
 			{@render actions(
 				true,
-				trip_pin_key(selected_modal.route_id, selected_modal.id),
-				`${selected_modal.route_id} Trip`,
-				selected_modal.source,
-				trip_pins
+				tripPinKey(selectedModal.routeId, selectedModal.id),
+				`${selectedModal.routeId} Trip`,
+				selectedModal.source,
+				tripPins
 			)}
 		{/if}
 	</div>

@@ -6,6 +6,11 @@ import { defineConfig, includeIgnoreFile } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import { namingConventionRules, trainstatusPlugin } from './eslint-rules/index.mjs';
+
+const generatedClient = 'src/lib/client/**';
+const lintedSource = ['**/*.{js,mjs,ts,svelte}'];
+
 export default defineConfig(
 	includeIgnoreFile(path.resolve(import.meta.dirname, '../.gitignore')),
 	eslint.configs.recommended,
@@ -33,6 +38,15 @@ export default defineConfig(
 		}
 	},
 	{
-		ignores: ['build/', '.svelte-kit/', 'dist/', 'src/lib/client/']
+		files: lintedSource,
+		ignores: [generatedClient],
+		plugins: { trainstatus: trainstatusPlugin },
+		rules: {
+			'@typescript-eslint/naming-convention': ['error', ...namingConventionRules],
+			'trainstatus/path-naming': 'error'
+		}
+	},
+	{
+		ignores: ['build/', '.svelte-kit/', 'dist/', generatedClient]
 	}
 );

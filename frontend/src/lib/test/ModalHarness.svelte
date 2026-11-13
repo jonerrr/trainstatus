@@ -4,9 +4,9 @@
 	import { onDestroy } from 'svelte';
 
 	import { chartFixture } from '../charts/fixtures';
+	import { setTransitData } from '../data/store.svelte';
 	import Modal from '../Modal.svelte';
-	import { setTransitData } from '../transit/store.svelte';
-	import { createCurrentTime, setCurrentTime } from '../url_params.svelte';
+	import { createCurrentTime, setCurrentTime } from '../url-params.svelte';
 	import { fixtureTransitData } from './transit-fixture';
 
 	setCurrentTime(createCurrentTime());

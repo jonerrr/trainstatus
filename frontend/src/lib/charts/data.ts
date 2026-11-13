@@ -1,11 +1,11 @@
 import type { CatalogStop, ServiceTrip, Source } from '#lib/client/index.js';
-import type { Call } from '#lib/transit/decode.js';
+import type { Call } from '#lib/data/decode.js';
 
 import type { ChartPoint, ChartSeries } from './context.js';
 
 export type ChartInput = {
 	source: Source;
-	route_id: string;
+	routeId: string;
 	trip: ServiceTrip;
 	calls: readonly Call[];
 	stops: ReadonlyMap<string, CatalogStop>;
@@ -161,24 +161,24 @@ export function chartXDomain(
 /** Preserve timed visits and align trip itineraries on a shared stop axis. */
 export function buildChartData(inputs: readonly ChartInput[]) {
 	const names = new Map<string, string>();
-	const series = inputs.map(({ source, route_id, trip, calls, stops }) => ({
+	const series = inputs.map(({ source, routeId, trip, calls, stops }) => ({
 		source,
-		route_id,
+		routeId,
 		trip,
 		points: [...calls]
-			.filter((call) => stops.has(call.stop_id) && Number.isFinite(call.arrival))
+			.filter((call) => stops.has(call.stopId) && Number.isFinite(call.arrival))
 			.sort(
 				(a, b) =>
-					a.arrival - b.arrival || a.departure - b.departure || a.stop_id.localeCompare(b.stop_id)
+					a.arrival - b.arrival || a.departure - b.departure || a.stopId.localeCompare(b.stopId)
 			)
 			.map((call) => {
-				const stop = stops.get(call.stop_id)!;
-				const stop_key = JSON.stringify([source, stop.id]);
-				names.set(stop_key, stop.name);
+				const stop = stops.get(call.stopId)!;
+				const stopKey = JSON.stringify([source, stop.id]);
+				names.set(stopKey, stop.name);
 				return {
-					stop_id: stop.id,
-					stop_key,
-					stop_name: stop.name,
+					stopId: stop.id,
+					stopKey,
+					stopName: stop.name,
 					time: new Date(call.arrival),
 					departure: call.departure
 				};
@@ -200,7 +200,7 @@ export function buildChartData(inputs: readonly ChartInput[]) {
 			for (let i = 0; i < points.length;) {
 				let end = i + 1;
 				while (end < points.length && samePrediction(points[i], points[end])) end++;
-				const group = points.slice(i, end).map((point) => point.stop_key);
+				const group = points.slice(i, end).map((point) => point.stopKey);
 				for (const stop of group) {
 					definite.push([stop]);
 					for (const before of previous) definite.push([before, stop]);
@@ -216,14 +216,14 @@ export function buildChartData(inputs: readonly ChartInput[]) {
 				(a, b) =>
 					a.time.getTime() - b.time.getTime() ||
 					a.departure - b.departure ||
-					rank.get(a.stop_key)! - rank.get(b.stop_key)!
+					rank.get(a.stopKey)! - rank.get(b.stopKey)!
 			);
 		}
 	}
 
 	// Input iteration order must not change the axis. Prefer the most complete
 	// itinerary, then merge each distinct short turn, express or branch pattern.
-	const patterns = [...new Set(series.map((s) => JSON.stringify(s.points.map((p) => p.stop_key))))]
+	const patterns = [...new Set(series.map((s) => JSON.stringify(s.points.map((p) => p.stopKey))))]
 		.map((encoded) => ({ encoded, stops: JSON.parse(encoded) as string[] }))
 		.sort((a, b) => b.stops.length - a.stops.length || a.encoded.localeCompare(b.encoded));
 	const axis = orderStops(patterns.map((pattern) => pattern.stops));
@@ -238,23 +238,23 @@ export function buildChartData(inputs: readonly ChartInput[]) {
 	});
 
 	const visible = new Set<string>();
-	const route_trips = series
-		.map(({ source, route_id, trip, points }): ChartSeries => {
+	const routeTrips = series
+		.map(({ source, routeId, trip, points }): ChartSeries => {
 			let index = 0;
 			const visits: ChartPoint[] = [];
 			for (const point of points) {
-				while (axis[index] !== point.stop_key) index++;
-				const stop_key = axisKeys[index++];
-				visible.add(stop_key);
+				while (axis[index] !== point.stopKey) index++;
+				const stopKey = axisKeys[index++];
+				visible.add(stopKey);
 				visits.push({
-					stop_id: point.stop_id,
-					stop_key,
-					stop_name: point.stop_name,
+					stopId: point.stopId,
+					stopKey,
+					stopName: point.stopName,
 					time: point.time
 				});
 			}
-			return { source, route_id, trip, points: visits };
+			return { source, routeId, trip, points: visits };
 		})
 		.filter((s) => s.points.length);
-	return { route_trips, yDomain: axisKeys.filter((key) => visible.has(key)), stopNames };
+	return { routeTrips, yDomain: axisKeys.filter((key) => visible.has(key)), stopNames };
 }

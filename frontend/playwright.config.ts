@@ -14,8 +14,17 @@ export default defineConfig({
 		serviceWorkers: 'block'
 	},
 	projects: [
+		// TODO: setup gpu accel for playwright so map tests work properly.
 		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-		{ name: 'map-firefox', testMatch: '**/map.e2e.ts', use: { ...devices['Desktop Firefox'] } },
+		{
+			name: 'map-firefox',
+			testMatch: '**/map.e2e.ts',
+			use: {
+				...devices['Desktop Firefox'],
+				// GPU-less runners otherwise block the WebGL2 context required by MapLibre.
+				launchOptions: { firefoxUserPrefs: { 'webgl.force-enabled': true } }
+			}
+		},
 		{ name: 'map-touch', testMatch: '**/map.e2e.ts', use: { ...devices['Pixel 7'] } }
 	],
 	webServer: {

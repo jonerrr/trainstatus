@@ -5,11 +5,11 @@ import type {
 	ServiceTrip,
 	Source
 } from '#lib/client/index.js';
-import { calculateTextHeight } from '#lib/text_measurement.js';
-import type { Call } from '#lib/transit/decode.js';
+import type { Call } from '#lib/data/decode.js';
+import { calculateTextHeight } from '#lib/text-measurement.js';
 
 /** Shared direction headsign for a trip or a static stop membership. */
-export function bus_headsign(
+export function busHeadsign(
 	route: CatalogRoute | undefined,
 	direction: number
 ): string | undefined {
@@ -19,14 +19,14 @@ export function bus_headsign(
 }
 
 /** Resolve destinations identically in trip cards and stop arrivals. */
-export function trip_headsign(
+export function tripHeadsign(
 	trip: ServiceTrip,
 	route: CatalogRoute | undefined,
 	calls: readonly Call[] = [],
 	stops?: ReadonlyMap<string, CatalogStop>
 ): string {
 	if (trip.data.source === 'mta_bus') {
-		return bus_headsign(route, trip.direction) || 'Unknown';
+		return busHeadsign(route, trip.direction) || 'Unknown';
 	}
 
 	if (trip.data.source === 'njt_bus') {
@@ -36,16 +36,16 @@ export function trip_headsign(
 		// Static route-stop labels may describe the opposite direction or a
 		// different branch. Only use labels on this trip in its own direction.
 		for (const call of calls) {
-			const route_stop = stops
-				?.get(call.stop_id)
+			const routeStop = stops
+				?.get(call.stopId)
 				?.routes.find(
 					(rs) =>
-						rs.route_id === call.route_id &&
+						rs.route_id === call.routeId &&
 						rs.data.source === 'njt_bus' &&
 						rs.data.directions.some((d) => d.direction_id === trip.direction && d.headsign)
 				);
-			if (route_stop?.data.source === 'njt_bus') {
-				const headsign = route_stop.data.directions.find(
+			if (routeStop?.data.source === 'njt_bus') {
+				const headsign = routeStop.data.directions.find(
 					(d) => d.direction_id === trip.direction
 				)?.headsign;
 				if (headsign) return headsign;
@@ -53,12 +53,12 @@ export function trip_headsign(
 		}
 	}
 
-	const last_stop = calls[calls.length - 1];
-	return (last_stop && stops?.get(last_stop.stop_id)?.name) || 'Unknown';
+	const lastStop = calls[calls.length - 1];
+	return (lastStop && stops?.get(lastStop.stopId)?.name) || 'Unknown';
 }
 
 /** Title shared by trip modals and map cards when a headsign is missing. */
-export function trip_destination_title(
+export function tripDestinationTitle(
 	destination: string | undefined,
 	route?: CatalogRoute
 ): string {
@@ -88,7 +88,7 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
 
 /** Run immediately, then at most once per interval using the latest arguments. */
 export function throttle<T extends (...args: never[]) => void>(func: T, wait: number) {
-	let last_call = -Infinity;
+	let lastCall = -Infinity;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	let pending: Parameters<T> | undefined;
 	const cancel = () => {
@@ -99,12 +99,12 @@ export function throttle<T extends (...args: never[]) => void>(func: T, wait: nu
 	const invoke = () => {
 		const args = pending!;
 		cancel();
-		last_call = Date.now();
+		lastCall = Date.now();
 		func(...args);
 	};
 	const throttled = (...args: Parameters<T>) => {
 		pending = args;
-		const remaining = last_call + wait - Date.now();
+		const remaining = lastCall + wait - Date.now();
 		if (remaining <= 0) invoke();
 		else if (timeout === undefined) timeout = setTimeout(invoke, remaining);
 	};
@@ -149,15 +149,15 @@ export function debounce<T extends (...args: never[]) => void>(func: T, wait: nu
 }
 
 // Get main routes for a stop, optionally hiding express variants without service.
-export const main_route_stops = (
-	route_stops: readonly CatalogStopRoute[],
-	active_routes?: ReadonlySet<string>
+export const mainRouteStops = (
+	routeStops: readonly CatalogStopRoute[],
+	activeRoutes?: ReadonlySet<string>
 ): CatalogStopRoute[] => {
-	return route_stops.filter(
+	return routeStops.filter(
 		(route) =>
 			route.data.source !== 'mta_subway' ||
 			(['full_time', 'part_time'].includes(route.data.stop_type) &&
-				(!route.route_id.endsWith('X') || !active_routes || active_routes.has(route.route_id)))
+				(!route.route_id.endsWith('X') || !activeRoutes || activeRoutes.has(route.route_id)))
 	);
 };
 
@@ -172,7 +172,7 @@ const BUS_EXTRA_LABEL_HEIGHT = 24;
 // One arrival row (route icon + ETA chips)
 const SUBWAY_ARRIVAL_ROW_HEIGHT = 24;
 
-export const calculate_route_height = () => ROUTE_ROW_HEIGHT;
+export const calculateRouteHeight = () => ROUTE_ROW_HEIGHT;
 
 // Fonts matching the Tailwind classes used in Stop/Button.svelte
 // text-lg font-medium → 500 18px/28px Inter
@@ -191,7 +191,7 @@ const STOP_NAME_MAX_WIDTH = 300;
 // Headsigns inside the 2-column grid get roughly half the container width
 const HEADSIGN_MAX_WIDTH = 140;
 
-export function calculate_stop_height(item: CatalogStop) {
+export function calculateStopHeight(item: CatalogStop) {
 	// 16px total padding (p-2 = 8px top + 8px bottom)
 	let height = STOP_ROW_PADDING;
 
@@ -216,37 +216,37 @@ export function calculate_stop_height(item: CatalogStop) {
 		}, 0);
 	} else if (item.data.source === 'mta_subway') {
 		// Two direction columns — measure the taller headsign
-		const north_h = calculateTextHeight(
+		const northH = calculateTextHeight(
 			item.data.north_headsign,
 			HEADSIGN_FONT,
 			HEADSIGN_MAX_WIDTH,
 			HEADSIGN_LINE_HEIGHT
 		);
-		const south_h = calculateTextHeight(
+		const southH = calculateTextHeight(
 			item.data.south_headsign,
 			HEADSIGN_FONT,
 			HEADSIGN_MAX_WIDTH,
 			HEADSIGN_LINE_HEIGHT
 		);
-		height += Math.max(north_h, south_h);
+		height += Math.max(northH, southH);
 
 		// Route arrival rows (24px each)
-		const main_routes = main_route_stops(item.routes);
-		height += main_routes.length * SUBWAY_ARRIVAL_ROW_HEIGHT;
+		const mainRoutes = mainRouteStops(item.routes);
+		height += mainRoutes.length * SUBWAY_ARRIVAL_ROW_HEIGHT;
 	}
 
 	return height;
 }
 
-export const calculate_trip_height = () => TRIP_ROW_HEIGHT;
+export const calculateTripHeight = () => TRIP_ROW_HEIGHT;
 
 /**
  * Height of a list row skeleton: the same constants as the calculators above, for the
  * smallest real row (one headsign line, one route), so skeletons can't drift from them.
  */
-export function skeleton_row_height(type: 'stop' | 'route' | 'trip', source?: Source) {
-	if (type === 'route') return calculate_route_height();
-	if (type === 'trip') return calculate_trip_height();
+export function skeletonRowHeight(type: 'stop' | 'route' | 'trip', source?: Source) {
+	if (type === 'route') return calculateRouteHeight();
+	if (type === 'trip') return calculateTripHeight();
 	const base = STOP_ROW_PADDING + STOP_NAME_LINE_HEIGHT;
 	return source === 'mta_subway'
 		? base + HEADSIGN_LINE_HEIGHT + SUBWAY_ARRIVAL_ROW_HEIGHT

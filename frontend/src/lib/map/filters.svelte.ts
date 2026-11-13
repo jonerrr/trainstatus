@@ -1,13 +1,13 @@
 import { page } from '$app/state';
 
 import type { Source } from '#lib/client/index.js';
-import { COMPASS_DIRECTION_OPTIONS } from '#lib/compassDirections.js';
-import { all_sources } from '#lib/sources.js';
+import { COMPASS_DIRECTION_OPTIONS } from '#lib/compass-directions.js';
+import { allSources } from '#lib/sources.js';
 
 import type * as maplibregl from 'maplibre-gl';
 
 // Layer metadata
-export const layer_data = {
+export const layerData = {
 	route: {
 		name: 'Routes'
 	},
@@ -19,7 +19,7 @@ export const layer_data = {
 	}
 } as const;
 
-export type LayerKey = keyof typeof layer_data;
+export type LayerKey = keyof typeof layerData;
 
 export type PropertyLayerKey = Exclude<LayerKey, 'trip'>;
 
@@ -28,7 +28,7 @@ export type FilterFieldDef =
 	| { type: 'enum'; label: string; options: readonly string[] };
 
 // Stop filter definitions by source
-const stop_filter_defs = {
+const stopFilterDefs = {
 	mta_subway: {
 		north_headsign: {
 			type: 'string',
@@ -52,7 +52,7 @@ const stop_filter_defs = {
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
 // Route filter definitions by source
-const route_filter_defs = {
+const routeFilterDefs = {
 	mta_subway: {} as const,
 	mta_bus: {
 		shuttle: {
@@ -64,15 +64,15 @@ const route_filter_defs = {
 } satisfies Record<Source, Record<string, FilterFieldDef>>;
 
 // All layer filter definitions combined
-const layer_filter_defs = {
-	route: route_filter_defs,
-	stop: stop_filter_defs
+const layerFilterDefs = {
+	route: routeFilterDefs,
+	stop: stopFilterDefs
 } as const;
 
 export function getFilterDefsForLayer(
 	layer: PropertyLayerKey
 ): Record<Source, Record<string, FilterFieldDef>> {
-	return layer_filter_defs[layer];
+	return layerFilterDefs[layer];
 }
 
 // ============================================================================
@@ -125,22 +125,22 @@ export function countActiveFilters({
 }
 
 function emptyPropertyFilters(): Record<Source, Record<string, FilterValue>> {
-	return Object.fromEntries(all_sources.map((source) => [source, {}])) as Record<
+	return Object.fromEntries(allSources.map((source) => [source, {}])) as Record<
 		Source,
 		Record<string, FilterValue>
 	>;
 }
 
 export class MapFilters {
-	readonly initialSources = [...page.data.selected_sources];
+	readonly initialSources = [...page.data.selectedSources];
 
 	// Source selection state
 	sources = $state<Source[]>([...this.initialSources]);
 
 	// Property filter state: Record<Source, Record<PropertyName, FilterValue>>
-	stop_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
+	stopFilters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
-	route_filters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
+	routeFilters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
 
 	// Layers enabled/disabled
 	layers = $state({ route: true, stop: true, trip: true });
@@ -220,9 +220,9 @@ export class MapFilters {
 	}
 
 	// Final filter expressions for each layer, automatically updated when sources or property filters change
-	route = $derived(this.#buildLayerFilter('route', this.route_filters));
+	route = $derived(this.#buildLayerFilter('route', this.routeFilters));
 
-	stop = $derived(this.#buildLayerFilter('stop', this.stop_filters));
+	stop = $derived(this.#buildLayerFilter('stop', this.stopFilters));
 
 	activeFilterCount = $derived(
 		countActiveFilters({
@@ -230,8 +230,8 @@ export class MapFilters {
 			sources: this.sources,
 			layers: this.layers,
 			propertyFilters: [
-				{ layer: 'stop', filters: this.stop_filters },
-				{ layer: 'route', filters: this.route_filters }
+				{ layer: 'stop', filters: this.stopFilters },
+				{ layer: 'route', filters: this.routeFilters }
 			]
 		})
 	);
@@ -249,7 +249,7 @@ export class MapFilters {
 	reset() {
 		this.sources = [...this.initialSources];
 		this.layers = { route: true, stop: true, trip: true };
-		this.stop_filters = emptyPropertyFilters();
-		this.route_filters = emptyPropertyFilters();
+		this.stopFilters = emptyPropertyFilters();
+		this.routeFilters = emptyPropertyFilters();
 	}
 }

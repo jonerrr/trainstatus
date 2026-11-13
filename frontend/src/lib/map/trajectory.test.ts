@@ -9,7 +9,7 @@ import {
 	positionAtDistance,
 	renderUnitTableFromIPC
 } from './trajectory';
-import { trajectoryFixture } from './trajectoryFixture';
+import { trajectoryFixture } from './trajectory-fixture';
 
 test('decodes shared geometry and renders expected positions through a corner', () => {
 	const table = renderUnitTableFromIPC(trajectoryFixture());

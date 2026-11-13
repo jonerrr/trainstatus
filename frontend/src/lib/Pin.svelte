@@ -10,7 +10,7 @@
 		pins = $bindable(),
 		id,
 		source,
-		class: class_name,
+		class: className,
 		size
 	}: {
 		pins: LocalStorage<Pins>;
@@ -20,13 +20,13 @@
 		size?: string;
 	} = $props();
 
-	const is_pinned = $derived(pins.current[source].includes(id));
+	const isPinned = $derived(pins.current[source].includes(id));
 
-	function toggle_pin() {
-		if (is_pinned) {
+	function togglePin() {
+		if (isPinned) {
 			pins.current = {
 				...pins.current,
-				[source]: pins.current[source].filter((p_id) => p_id !== id)
+				[source]: pins.current[source].filter((pId) => pId !== id)
 			};
 		} else {
 			pins.current = {
@@ -37,8 +37,8 @@
 	}
 </script>
 
-<button onclick={toggle_pin} aria-label="Pin to home screen" class={class_name}>
-	{#if is_pinned}
+<button onclick={togglePin} aria-label="Pin to home screen" class={className}>
+	{#if isPinned}
 		<Pin {size} fill="#fff" />
 	{:else}
 		<Pin {size} />

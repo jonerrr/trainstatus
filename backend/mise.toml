@@ -1,5 +1,5 @@
 [env]
-VALHALLA_TILE_EXTRACT = "../geo/data/valhalla_tiles.tar"
+VALHALLA_TILE_EXTRACT = "../geo/artifacts/valhalla_tiles.tar"
 SQLX_OFFLINE = "true"
 
 [tasks."sqlx:prepare"]

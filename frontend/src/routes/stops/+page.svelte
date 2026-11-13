@@ -3,52 +3,52 @@
 	import { page } from '$app/state';
 
 	import type { CatalogStop, Source } from '#lib/client/index.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
 	import List from '#lib/List.svelte';
-	import { stop_pins } from '#lib/pins.svelte.js';
-	import { search_stops } from '#lib/search.js';
+	import { stopPins } from '#lib/pins.svelte.js';
+	import { searchStops } from '#lib/search.js';
 	import { LocalStorage } from '#lib/storage.svelte.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { calculate_stop_height, createThrottled } from '#lib/util.svelte.js';
+	import { calculateStopHeight, createThrottled } from '#lib/util.svelte.js';
 
 	import { CircleX, Search } from '@lucide/svelte';
 
-	let selected_source = $state(
-		new LocalStorage<Source>('stopsTab', page.data.selected_sources[0] ?? 'mta_subway')
+	let selectedSource = $state(
+		new LocalStorage<Source>('stopsTab', page.data.selectedSources[0] ?? 'mta_subway')
 	);
 
 	// Ensure selected source is still enabled
 	$effect(() => {
-		if (!page.data.selected_sources.includes(selected_source.current)) {
-			selected_source.current = page.data.selected_sources[0] ?? 'mta_subway';
+		if (!page.data.selectedSources.includes(selectedSource.current)) {
+			selectedSource.current = page.data.selectedSources[0] ?? 'mta_subway';
 		}
 	});
 
 	const transit = getTransitData();
-	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
-	const all_stops = $derived(
+	const catalogResources = transit.catalogs(() => page.data.selectedSources);
+	const catalogs = $derived(catalogResources.current.filter((r) => r.state === 'ready'));
+	const allStops = $derived(
 		Object.fromEntries(catalogs.map(({ source, value }) => [source, value.stops])) as Partial<
 			Record<Source, readonly CatalogStop[]>
 		>
 	);
 
-	const search_input = createThrottled('', 150);
-	let search_element: HTMLInputElement | undefined;
+	const searchInput = createThrottled('', 150);
+	let searchElement: HTMLInputElement | undefined;
 
 	afterNavigate(() => {
 		// Avoid opening an on-screen keyboard on touch-first devices.
 		if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-			search_element?.focus({ preventScroll: true });
+			searchElement?.focus({ preventScroll: true });
 		}
 	});
 
-	function matching_stops(term: string): readonly CatalogStop[] | undefined {
-		const catalog = catalogs.find((c) => c.source === selected_source.current)?.value;
+	function matchingStops(term: string): readonly CatalogStop[] | undefined {
+		const catalog = catalogs.find((c) => c.source === selectedSource.current)?.value;
 		if (!catalog || term === '') return undefined;
 
 		// Route IDs take precedence when a stop shares the same ID.
-		const id_check = term.toUpperCase();
-		const route = catalog.routes_by_id.get(id_check);
+		const idCheck = term.toUpperCase();
+		const route = catalog.routesById.get(idCheck);
 		if (route) {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const sequences = new Map<string, number>();
@@ -67,42 +67,42 @@
 				? stops.sort((a, b) => sequences.get(a.id)! - sequences.get(b.id)!)
 				: stops;
 		}
-		const stop = catalog.stops_by_id.get(id_check);
+		const stop = catalog.stopsById.get(idCheck);
 
 		// TODO: no-match fallback is unfinished; see frontend/TESTING.md
-		const results = search_stops(catalog, term);
+		const results = searchStops(catalog, term);
 		// An exact ID must not hide name matches such as "49 St".
 		if (stop && !results.some((match) => match.id === stop.id)) return [...results, stop];
 		return results.length ? results : undefined;
 	}
 
-	const visible_stops = $derived.by(() => {
-		const matches = matching_stops(search_input.current);
-		return (matches ? { ...all_stops, [selected_source.current]: matches } : all_stops) as Partial<
+	const visibleStops = $derived.by(() => {
+		const matches = matchingStops(searchInput.current);
+		return (matches ? { ...allStops, [selectedSource.current]: matches } : allStops) as Partial<
 			Record<Source, CatalogStop[]>
 		>;
 	});
-	// $inspect(visible_stops);
+	// $inspect(visibleStops);
 
-	function clear_search() {
-		search_input.set('');
+	function clearSearch() {
+		searchInput.set('');
 	}
 </script>
 
 <!-- TODO: fix space between navbar and search bar -->
-<!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating total_height before dom updates or something) -->
+<!-- TODO: fix searching and when items are shorter than viewport, a scrollbar shows up when it shouldn't (issue with calculating totalHeight before dom updates or something) -->
 <!-- TODO: maybe show indicator when filtered for specific route / stop -->
 <!-- TODO: maybe integrate the search with the List component (using attachments or something).-->
 <div class="flex h-full flex-col">
 	<List
 		title="Stops"
 		type="stop"
-		sources={visible_stops}
-		pins={stop_pins}
-		auto_scroll
-		container_class="flex-1 min-h-0"
-		bind:selected_source
-		height_calc={calculate_stop_height}
+		sources={visibleStops}
+		pins={stopPins}
+		autoScroll
+		containerClass="flex-1 min-h-0"
+		bind:selectedSource
+		heightCalc={calculateStopHeight}
 	/>
 
 	<div class="w-full">
@@ -113,8 +113,8 @@
 			<!-- TODO: maybe add autocomplete="off" -->
 			<input
 				name="search"
-				bind:this={search_element}
-				bind:value={search_input.get, search_input.set}
+				bind:this={searchElement}
+				bind:value={searchInput.get, searchInput.set}
 				type="search"
 				placeholder="Search stops by name, ID, or route..."
 				class="h-12 w-full rounded-none border
@@ -140,7 +140,7 @@
 			   transition-all
 			   duration-200
 			   hover:text-secondary active:scale-95"
-				onclick={clear_search}
+				onclick={clearSearch}
 			>
 				<CircleX />
 			</button>

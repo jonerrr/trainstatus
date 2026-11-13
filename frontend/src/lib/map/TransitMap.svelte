@@ -2,8 +2,8 @@
 	import { page } from '$app/state';
 
 	import type { Source } from '#lib/client/index.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { getCurrentTime, open_modal } from '#lib/url_params.svelte.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
+	import { getCurrentTime, openModal } from '#lib/url-params.svelte.js';
 
 	import type { Map as MapInstance, MapMouseEvent } from 'maplibre-gl';
 	import { AttributionControl, GeolocateControl, MapLibre } from 'svelte-maplibre-gl';
@@ -21,14 +21,14 @@
 		type MapTarget,
 		type ScreenPoint
 	} from './interactions';
+	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './map-theme';
 	import MapFeatureSummary from './MapFeatureSummary.svelte';
-	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './mapTheme';
 	import RouteLayers from './RouteLayers.svelte';
 	import StopLayers from './StopLayers.svelte';
 	import { createTrajectories } from './trajectories.svelte.js';
 	import TripMarkers from './TripMarkers.svelte';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 
 	type MapOverlay =
 		| { kind: 'hover'; target: MapTarget; point: ScreenPoint }
@@ -49,7 +49,7 @@
 	const transit = getTransitData();
 	const trajectories = createTrajectories(() => ({
 		sources: filters.layers.trip ? filters.sources : [],
-		at: current_time.value
+		at: currentTime.value
 	}));
 	// Reset any active overlay whenever the visible network or the selected time changes.
 	let overlay = $derived.by<MapOverlay>(() => {
@@ -58,7 +58,7 @@
 		void filters.layers.route;
 		void filters.layers.stop;
 		void filters.layers.trip;
-		void current_time.value;
+		void currentTime.value;
 		return null;
 	});
 	const hoveredTarget = $derived(overlay?.kind === 'hover' ? overlay.target : null);
@@ -99,7 +99,7 @@
 						if (!id || !filters.sources.includes(source)) return [];
 						const kind = feature.layer.id.startsWith('stop-') ? 'stop' : 'route';
 						const catalog = transit.peekCatalog(source);
-						if (kind === 'stop' ? !catalog?.stops_by_id.has(id) : !catalog?.routes_by_id.has(id))
+						if (kind === 'stop' ? !catalog?.stopsById.has(id) : !catalog?.routesById.has(id))
 							return [];
 						return [{ kind, id, source }];
 					})
@@ -115,13 +115,13 @@
 	function openTarget(target: MapTarget) {
 		overlay = null;
 		if (target.kind !== 'trip') {
-			open_modal({ type: target.kind, source: target.source, id: target.id });
+			openModal({ type: target.kind, source: target.source, id: target.id });
 		} else {
 			// The trip modal loads the vehicle's route service when it opens.
-			open_modal({
+			openModal({
 				type: 'trip',
 				source: target.source,
-				route_id: target.routeId,
+				routeId: target.routeId,
 				id: target.id
 			});
 		}
@@ -155,7 +155,7 @@
 		transformRequest={(url, resourceType) => {
 			// TODO: Remove once Martin 2.0 is released and deployed (MLT detection fix: maplibre/martin#3486).
 			if (resourceType === 'Tile' && new URL(url).pathname.startsWith('/martin/basemap/')) {
-				return { url, headers: { Accept: '*/*' } };
+				return { url, headers: { ['Accept']: '*/*' } };
 			}
 			return { url };
 		}}
@@ -196,7 +196,7 @@
 		{#if filters.layers.trip && filters.sources.length}
 			<TripMarkers
 				tables={trajectories.current.tables}
-				at={current_time.value}
+				at={currentTime.value}
 				railDetail={settledZoom >= RAIL_DETAIL_ZOOM}
 				busDetail={settledZoom >= BUS_DETAIL_ZOOM}
 				{selectedTrip}

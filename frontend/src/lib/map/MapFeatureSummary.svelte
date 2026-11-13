@@ -1,33 +1,33 @@
 <script lang="ts">
+	import { getTransitData } from '#lib/data/store.svelte.js';
 	import FeatureSummary from '#lib/FeatureSummary.svelte';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url-params.svelte.js';
 
 	import type { MapTarget } from './interactions';
 	import { presentFeature } from './presentation';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 	const transit = getTransitData();
 
 	let { target }: { target: MapTarget } = $props();
 	const catalog = $derived(transit.peekCatalog(target.source));
-	const route_id = $derived(
+	const routeId = $derived(
 		target.kind === 'route' ? target.id : target.kind === 'trip' ? target.routeId : undefined
 	);
 	// Hover summaries use loaded service only; opening the trip loads its route.
 	const read = $derived(
 		target.kind === 'trip'
-			? transit.loadedTrip(target.source, target.routeId, target.id, current_time.value)
+			? transit.loadedTrip(target.source, target.routeId, target.id, currentTime.value)
 			: undefined
 	);
 	const feature = $derived(
 		presentFeature(target, {
-			route: route_id ? catalog?.routes_by_id.get(route_id) : undefined,
+			route: routeId ? catalog?.routesById.get(routeId) : undefined,
 			trip: read?.trip,
-			stop: catalog?.stops_by_id.get(target.id),
+			stop: catalog?.stopsById.get(target.id),
 			calls: read?.calls,
-			stops: catalog?.stops_by_id,
-			at: current_time.ms
+			stops: catalog?.stopsById,
+			at: currentTime.ms
 		})
 	);
 </script>

@@ -8,7 +8,7 @@ function loadFrom(search: string, cookie?: string) {
 	const event = {
 		url,
 		cookies: {
-			get: (name: string) => (name === 'selected_sources' ? cookie : undefined)
+			get: (name: string) => (name === 'selectedSources' ? cookie : undefined)
 		},
 		parent: async () => ({}),
 		depends: () => {},
@@ -20,26 +20,26 @@ function loadFrom(search: string, cookie?: string) {
 describe('layout source deep link', () => {
 	it('leaves the cookie list when src is missing', async () => {
 		await expect(loadFrom('', 'mta_subway')).resolves.toMatchObject({
-			selected_sources: ['mta_subway'],
+			selectedSources: ['mta_subway'],
 			at: undefined
 		});
 	});
 
 	it('ignores an invalid src', async () => {
 		await expect(loadFrom('?src=not-a-source', 'mta_subway')).resolves.toMatchObject({
-			selected_sources: ['mta_subway']
+			selectedSources: ['mta_subway']
 		});
 	});
 
 	it('does not duplicate an already selected src', async () => {
 		await expect(loadFrom('?src=mta_subway', 'mta_subway,mta_bus')).resolves.toMatchObject({
-			selected_sources: ['mta_subway', 'mta_bus']
+			selectedSources: ['mta_subway', 'mta_bus']
 		});
 	});
 
 	it('appends a new valid src and passes at through', async () => {
 		await expect(loadFrom('?src=njt_bus&at=123', 'mta_subway')).resolves.toEqual({
-			selected_sources: ['mta_subway', 'njt_bus'],
+			selectedSources: ['mta_subway', 'njt_bus'],
 			at: '123'
 		});
 	});

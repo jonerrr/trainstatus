@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { chart_context } from '#lib/charts/context.js';
+	import { chartContext } from '#lib/charts/context.js';
 
-	const cake = chart_context();
+	const cake = chartContext();
 	const { stopNames }: { stopNames: ReadonlyMap<string, string> } = $props();
 
 	const ticks = $derived(cake.yScale.domain());

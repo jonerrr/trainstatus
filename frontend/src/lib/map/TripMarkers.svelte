@@ -10,7 +10,7 @@
 		type ActiveVehicle,
 		type RenderUnitTable
 	} from './trajectory';
-	import { isRailVehicle, vehicleLayers } from './vehicleLayers';
+	import { isRailVehicle, vehicleLayers } from './vehicle-layers';
 
 	let {
 		tables,

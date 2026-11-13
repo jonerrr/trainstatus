@@ -39,7 +39,8 @@ demo.configmap.yml
 dev.configmap.yml
 
 # science
-data/
+/science/datasets/
+/geo/artifacts/
 pgadmin.yaml
 .venv/
 

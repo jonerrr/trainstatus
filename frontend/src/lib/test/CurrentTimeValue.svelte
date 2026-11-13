@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getCurrentTime } from '../url_params.svelte';
+	import { getCurrentTime } from '../url-params.svelte';
 
 	const time = getCurrentTime();
 </script>

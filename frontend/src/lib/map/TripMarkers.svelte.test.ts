@@ -8,7 +8,7 @@ import { page } from 'vitest/browser';
 
 import MapHarness from '../test/MapHarness.svelte';
 import { renderUnitTableFromIPC } from './trajectory';
-import { trajectoryFixture } from './trajectoryFixture';
+import { trajectoryFixture } from './trajectory-fixture';
 
 afterEach(() => vi.restoreAllMocks());
 

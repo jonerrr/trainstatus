@@ -17,7 +17,7 @@
 		STOP_FILL,
 		STOP_HIT_RADIUS,
 		SUBWAY_SOURCE_FILTER
-	} from './mapTheme';
+	} from './map-theme';
 
 	let { filter }: { filter: FilterSpecification } = $props();
 	const subwayStopFilter: FilterSpecification = $derived([

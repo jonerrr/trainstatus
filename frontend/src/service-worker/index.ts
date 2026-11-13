@@ -12,19 +12,19 @@ const CATALOGS = 'catalogs-v3';
 
 // Manifest paths are relative to the base path, not app route IDs.
 // `resolve` prefixes the base so they match `url.pathname`.
-function to_pathname(path: string) {
+function toPathname(path: string) {
 	return resolve(path as PathnameWithSearchOrHash);
 }
 
 const SHELL_FILES = new Set<string>([
-	...immutable.map((file) => to_pathname(file.path)),
-	...assets.map((file) => to_pathname(file.path)),
-	...prerendered.map((file) => to_pathname(file.path))
+	...immutable.map((file) => toPathname(file.path)),
+	...assets.map((file) => toPathname(file.path)),
+	...prerendered.map((file) => toPathname(file.path))
 ]);
-const OFFLINE_PAGE = to_pathname('/offline');
-const OFFLINE_DATA = to_pathname('/offline/__data.json');
-const API = to_pathname('/api/');
-const CATALOG_API = to_pathname('/api/v1/catalog/');
+const OFFLINE_PAGE = toPathname('/offline');
+const OFFLINE_DATA = toPathname('/offline/__data.json');
+const API = toPathname('/api/');
+const CATALOG_API = toPathname('/api/v1/catalog/');
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll([...SHELL_FILES])));
@@ -78,7 +78,7 @@ async function revalidate(cache: Cache, request: Request, saved: Response) {
 }
 
 /** Navigations and route data use the network, falling back to the offline shell. */
-async function network_or(event: FetchEvent, fallback: string): Promise<Response> {
+async function networkOr(event: FetchEvent, fallback: string): Promise<Response> {
 	try {
 		return await fetch(event.request);
 	} catch (error) {
@@ -101,8 +101,8 @@ self.addEventListener('fetch', (event) => {
 		// Realtime data is never persisted; the app retains it in memory.
 		return;
 	} else if (event.request.mode === 'navigate') {
-		event.respondWith(network_or(event, OFFLINE_PAGE));
+		event.respondWith(networkOr(event, OFFLINE_PAGE));
 	} else if (url.pathname.endsWith('/__data.json')) {
-		event.respondWith(network_or(event, OFFLINE_DATA));
+		event.respondWith(networkOr(event, OFFLINE_DATA));
 	}
 });

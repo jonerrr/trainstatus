@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { countActiveFilters, MapFilters } from './filters.svelte';
 
 vi.mock('$app/state', () => ({
-	page: { data: { selected_sources: ['mta_subway', 'mta_bus'] } }
+	page: { data: { selectedSources: ['mta_subway', 'mta_bus'] } }
 }));
 
 describe('countActiveFilters', () => {
@@ -50,19 +50,19 @@ describe('countActiveFilters', () => {
 		const filters = new MapFilters();
 		filters.sources = ['mta_bus'];
 		filters.layers.stop = false;
-		filters.stop_filters.mta_bus.direction = ['n'];
+		filters.stopFilters.mta_bus.direction = ['n'];
 
 		filters.reset();
 
 		expect(filters.sources).toEqual(['mta_subway', 'mta_bus']);
 		expect(filters.layers).toEqual({ route: true, stop: true, trip: true });
-		expect(filters.stop_filters).toEqual({ mta_subway: {}, mta_bus: {}, njt_bus: {} });
+		expect(filters.stopFilters).toEqual({ mta_subway: {}, mta_bus: {}, njt_bus: {} });
 		expect(filters.activeFilterCount).toBe(0);
 	});
 
 	it('applies a property filter only to the source that defines it', () => {
 		const filters = new MapFilters();
-		filters.stop_filters.mta_subway.north_headsign = 'Uptown';
+		filters.stopFilters.mta_subway.north_headsign = 'Uptown';
 
 		expect(filters.stop).toEqual([
 			'any',
@@ -74,7 +74,7 @@ describe('countActiveFilters', () => {
 	it('keeps an unfiltered source when another source has a property filter', () => {
 		const filters = new MapFilters();
 		filters.sources = ['mta_subway', 'mta_bus'];
-		filters.stop_filters.mta_bus.direction = ['n'];
+		filters.stopFilters.mta_bus.direction = ['n'];
 
 		expect(filters.stop).toEqual([
 			'any',

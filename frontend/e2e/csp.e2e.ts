@@ -2,11 +2,11 @@ import { expect, test } from './fixtures';
 
 test('serves a CSP and renders representative routes without violations', async ({ page }) => {
 	await page.addInitScript(() => {
-		const storage_key = 'csp-violations';
-		const violations = JSON.parse(sessionStorage.getItem(storage_key) ?? '[]') as string[];
+		const storageKey = 'csp-violations';
+		const violations = JSON.parse(sessionStorage.getItem(storageKey) ?? '[]') as string[];
 		window.addEventListener('securitypolicyviolation', (event) => {
 			violations.push(`${event.violatedDirective}: ${event.blockedURI}`);
-			sessionStorage.setItem(storage_key, JSON.stringify(violations));
+			sessionStorage.setItem(storageKey, JSON.stringify(violations));
 		});
 	});
 

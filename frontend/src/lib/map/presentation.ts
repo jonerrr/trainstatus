@@ -1,6 +1,6 @@
 import type { CatalogRoute, CatalogStop, ServiceTrip } from '#lib/client/index.js';
-import type { Call } from '#lib/transit/decode.js';
-import { trip_destination_title, trip_headsign } from '#lib/util.svelte.js';
+import type { Call } from '#lib/data/decode.js';
+import { tripDestinationTitle, tripHeadsign } from '#lib/util.svelte.js';
 
 import type { MapTarget } from './interactions';
 
@@ -40,13 +40,13 @@ export function presentFeature(
 	if (target.kind === 'stop') return { title: stop?.name ?? 'Stop unavailable', subtitle };
 	if (target.kind === 'route')
 		return { route, title: route?.long_name || route?.short_name || 'Route unavailable', subtitle };
-	const destination = trip ? trip_headsign(trip, route, calls, stops) : undefined;
+	const destination = trip ? tripHeadsign(trip, route, calls, stops) : undefined;
 	const next = calls.find((call) => call.arrival > at);
-	const next_stop = next && stops.get(next.stop_id);
+	const nextStop = next && stops.get(next.stopId);
 	return {
 		route,
-		title: trip_destination_title(destination, route),
+		title: tripDestinationTitle(destination, route),
 		subtitle,
-		detail: !trip ? 'Trip details unavailable' : next_stop ? `Next: ${next_stop.name}` : undefined
+		detail: !trip ? 'Trip details unavailable' : nextStop ? `Next: ${nextStop.name}` : undefined
 	};
 }

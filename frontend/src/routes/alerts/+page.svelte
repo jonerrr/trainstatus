@@ -2,19 +2,19 @@
 	import { page } from '$app/state';
 
 	import type { CatalogRoute, Source } from '#lib/client/index.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
 	import List from '#lib/List.svelte';
-	import { route_pins } from '#lib/pins.svelte.js';
-	import { alert_routes } from '#lib/Route/alerts.js';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { calculate_route_height } from '#lib/util.svelte.js';
+	import { routePins } from '#lib/pins.svelte.js';
+	import { alertRoutes } from '#lib/route/alerts.js';
+	import { calculateRouteHeight } from '#lib/util.svelte.js';
 
 	const transit = getTransitData();
-	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
+	const catalogResources = transit.catalogs(() => page.data.selectedSources);
+	const catalogs = $derived(catalogResources.current.filter((r) => r.state === 'ready'));
 
 	const sources = $derived(
 		Object.fromEntries(
-			catalogs.map(({ source, value }) => [source, alert_routes(value)])
+			catalogs.map(({ source, value }) => [source, alertRoutes(value)])
 		) as Partial<Record<Source, CatalogRoute[]>>
 	);
 </script>
@@ -23,8 +23,8 @@
 	title="Route Alerts"
 	{sources}
 	type="route"
-	pins={route_pins}
-	container_class="h-full"
-	height_calc={calculate_route_height}
-	ssr_min={20}
+	pins={routePins}
+	containerClass="h-full"
+	heightCalc={calculateRouteHeight}
+	ssrMin={20}
 />

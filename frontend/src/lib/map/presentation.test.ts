@@ -1,5 +1,5 @@
 import type { CatalogRoute, ServiceTrip } from '#lib/client/index.js';
-import { trip_destination_title } from '#lib/util.svelte.js';
+import { tripDestinationTitle } from '#lib/util.svelte.js';
 
 import { expect, test } from 'vitest';
 
@@ -38,9 +38,9 @@ test('vehicle summaries show route and destination rather than internal IDs', ()
 	expect(result.subtitle).not.toContain('1234');
 });
 test('unknown headsigns use the same route-name fallback as trip details', () => {
-	expect(trip_destination_title('Unknown', route)).toBe('East Side');
-	expect(trip_destination_title(undefined, route)).toBe('East Side');
-	expect(trip_destination_title('South Ferry', route)).toBe('South Ferry');
+	expect(tripDestinationTitle('Unknown', route)).toBe('East Side');
+	expect(tripDestinationTitle(undefined, route)).toBe('East Side');
+	expect(tripDestinationTitle('South Ferry', route)).toBe('South Ferry');
 });
 test('missing trips keep a useful route label without inventing a destination', () => {
 	const result = presentFeature(

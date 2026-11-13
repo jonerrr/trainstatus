@@ -2,9 +2,9 @@
 	import type { Snippet } from 'svelte';
 
 	import Pin from '#lib/Pin.svelte';
-	import { trip_pin_key, type Pins } from '#lib/pins.svelte.js';
+	import { tripPinKey, type Pins } from '#lib/pins.svelte.js';
 	import type { LocalStorage } from '#lib/storage.svelte.js';
-	import { open_modal, type ModalData } from '#lib/url_params.svelte.js';
+	import { openModal, type ModalData } from '#lib/url-params.svelte.js';
 
 	interface Props {
 		state: ModalData;
@@ -14,8 +14,8 @@
 
 	let { state: pState, pins = $bindable(), children }: Props = $props();
 
-	const pin_id = $derived(
-		pState.type === 'trip' && pState.route_id ? trip_pin_key(pState.route_id, pState.id) : pState.id
+	const pinId = $derived(
+		pState.type === 'trip' && pState.routeId ? tripPinKey(pState.routeId, pState.id) : pState.id
 	);
 </script>
 
@@ -24,7 +24,7 @@
 	<button
 		class="flex w-full items-center justify-between border-b border-border-subtle p-1 text-white transition-colors duration-200 last:border-b-0 hover:bg-surface-1 active:bg-surface-1"
 		onclick={() => {
-			open_modal(pState);
+			openModal(pState);
 		}}
 	>
 		{@render children()}
@@ -33,7 +33,7 @@
 	{#if pins}
 		<Pin
 			bind:pins
-			id={pin_id}
+			id={pinId}
 			source={pState.source}
 			class="absolute top-[50%] right-0 z-20 -translate-y-1/2 transform rounded-none px-2 py-1 text-secondary hover:text-muted"
 		/>

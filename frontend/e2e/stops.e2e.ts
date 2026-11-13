@@ -1,5 +1,5 @@
 import type { Catalog, CatalogStop } from '../src/lib/client/index.js';
-import { expect, test } from './fixtures';
+import { expect, searchableStop, test } from './fixtures';
 
 const qualifying = ['full_time', 'part_time', 'rush_hour'];
 
@@ -24,18 +24,9 @@ for (const mobile of [false, true]) {
 }
 
 test('subway stop search filters by name, stop id, and route id', async ({ page }) => {
-	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
-		.stops;
-	const counts = new Map<string, number>();
-	for (const stop of stops) {
-		for (const word of stop.name.toLowerCase().split(/[^a-z0-9]+/)) {
-			if (word.length < 5) continue;
-			counts.set(word, (counts.get(word) ?? 0) + 1);
-		}
-	}
-	const word = [...counts.entries()].find(([, count]) => count === 1)?.[0];
-	expect(word).toBeTruthy();
-	const named = stops.filter((stop) => stop.name.toLowerCase().includes(word!));
+	const catalog = (await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog;
+	const stops = catalog.stops;
+	const { stop: namedStop, query } = searchableStop(catalog);
 
 	const byRoute = new Map<string, CatalogStop[]>();
 	for (const stop of stops) {
@@ -61,23 +52,44 @@ test('subway stop search filters by name, stop id, and route id', async ({ page 
 	await page.goto('/stops');
 	const items = page.locator('main .list-item');
 	await expect.poll(() => items.count()).toBeGreaterThan(1);
-	const restored = await items.count();
+	const viewport = page.locator('main .overflow-y-auto');
+	const names = items.locator('.text-lg');
+	await expect(names.first()).toHaveText(stops[0].name);
 
-	await page.getByRole('searchbox').fill(word!);
-	await expect.poll(() => items.count()).toBe(named.length);
-	await expect(items.first()).toContainText(named[0].name);
+	await page.getByRole('searchbox').fill(query);
+	await expect(items).toHaveCount(1);
+	await expect(items.first()).toContainText(namedStop.name);
 
 	await page.getByRole('button', { name: 'Clear search' }).click();
-	await expect.poll(() => items.count()).toBeGreaterThan(named.length);
-	expect(await items.count()).toBe(restored);
+	await expect.poll(() => items.count()).toBeGreaterThan(1);
+	await expect(names.first()).toHaveText(stops[0].name);
 
-	const stop = stops[0];
+	const stop = stops.find(
+		(candidate) =>
+			!catalog.routes.some((route) => route.id === candidate.id) &&
+			!candidate.name.toLowerCase().includes(candidate.id.toLowerCase())
+	);
+	if (!stop) throw new Error('expected a stop ID distinct from route IDs and its own name');
+
 	await page.getByRole('searchbox').fill(stop.id);
-	await expect.poll(() => items.count()).toBe(1);
-	await expect(items).toContainText(stop.name);
+	await expect.poll(() => items.count()).toBeGreaterThan(0);
+	if ((await items.count()) > 1) await expect(names.first()).not.toHaveText(stop.name);
+	await expect
+		.poll(async () => {
+			await viewport.evaluate((element) => {
+				element.scrollTo({ top: element.scrollHeight, behavior: 'instant' });
+			});
+			return (await names.last().textContent())?.trim();
+		})
+		.toBe(stop.name);
+	await items.last().locator('button').first().click();
+	await expect.poll(() => new URL(page.url()).searchParams.get('s')).toBe(stop.id);
+	await page.getByRole('button', { name: 'Close modal' }).click();
+	await page.getByRole('button', { name: 'Clear search' }).click();
+	await viewport.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
+	await expect(names.first()).toHaveText(stops[0].name);
 
 	await page.getByRole('searchbox').fill(route[0]);
-	const names = items.locator('.text-lg');
 	await expect(names.first()).toHaveText(routeStops[0].name);
 	const expectedNames = new Set(routeStops.map((stop) => stop.name));
 	for (const name of await names.allTextContents()) {
@@ -85,7 +97,6 @@ test('subway stop search filters by name, stop id, and route id', async ({ page 
 	}
 
 	// Only viewport rows plus overscan are mounted. Reach the final stop by scrolling.
-	const viewport = page.locator('main .overflow-y-auto');
 	await expect
 		.poll(async () => {
 			await viewport.evaluate((element) => {

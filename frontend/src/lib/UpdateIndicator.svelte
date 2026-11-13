@@ -2,7 +2,7 @@
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { slide } from 'svelte/transition';
 
-	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
 
 	import { CircleAlert } from '@lucide/svelte';
 

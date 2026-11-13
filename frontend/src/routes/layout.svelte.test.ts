@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 async function coldLoad() {
-	page.data.selected_sources = ['njt_bus'];
+	page.data.selectedSources = ['njt_bus'];
 	page.url = new SvelteURL('http://localhost/?t=trip-0&r=4&src=njt_bus');
 	return render(Layout, {
 		children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
@@ -48,7 +48,7 @@ test('a direct trip URL opens at once and recovers through the shared Retry', as
 		.toEqual({
 			type: 'trip',
 			source: 'njt_bus',
-			route_id: '4',
+			routeId: '4',
 			id: 'trip-0'
 		});
 	const retry = view.getByRole('button', { name: 'Try again' });
@@ -251,7 +251,7 @@ for (const [width, height] of [
 			String(input).includes('/alerts/')
 				? Promise.reject(new TypeError('Connection failed'))
 				: respond(input, init)) as typeof fetch);
-		page.data.selected_sources = ['mta_subway'];
+		page.data.selectedSources = ['mta_subway'];
 		page.url = new SvelteURL('http://localhost/?t=trip-0&r=4&src=mta_subway');
 		const view = await render(Layout, {
 			children: createRawSnippet(() => ({ render: () => '<div>Page content</div>' }))
@@ -379,7 +379,7 @@ for (const source of ['njt_bus', 'mta_subway'] as const) {
 			requests.push(String(input));
 			return respond(input, init);
 		}) as typeof fetch);
-		page.data.selected_sources = [source];
+		page.data.selectedSources = [source];
 		page.url = new SvelteURL(`http://localhost/map?r=4&src=${source}`);
 		const view = await render(Layout, {
 			children: createRawSnippet(() => ({ render: () => '<div>Map content</div>' }))
@@ -414,7 +414,7 @@ test('historical layouts load background data at the URL time and follow URL cha
 		requests.push(new URL(String(input), location.origin));
 		return respond(input, init);
 	}) as typeof fetch);
-	page.data.selected_sources = ['mta_subway'];
+	page.data.selectedSources = ['mta_subway'];
 	page.data.at = '100';
 	page.url = new SvelteURL('http://localhost/?at=100');
 	const view = await render(Layout, {
@@ -460,7 +460,7 @@ for (const [query, message] of [
 ]) {
 	test(`keeps a missing entity URL open with an explanation ${query}`, async () => {
 		fail = false;
-		page.data.selected_sources = ['njt_bus'];
+		page.data.selectedSources = ['njt_bus'];
 		page.data.at = '0';
 		const url = `http://localhost/${query}&at=0&keep=value`;
 		page.url = new SvelteURL(url);
@@ -478,7 +478,7 @@ for (const [query, message] of [
 for (const query of ['?t=trip-0&src=njt_bus', '?r=4&src=invalid']) {
 	test(`silently dismisses invalid modal URL ${query}`, async () => {
 		fail = false;
-		page.data.selected_sources = ['njt_bus'];
+		page.data.selectedSources = ['njt_bus'];
 		page.data.at = '0';
 		page.url = new SvelteURL(`http://localhost/${query}&at=0&keep=value`);
 		const view = await render(Layout, {

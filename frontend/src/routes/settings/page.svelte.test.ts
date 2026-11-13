@@ -26,3 +26,22 @@ test('editing time waits for Apply, and returning to live clears the URL time', 
 	await expect.element(field).toHaveValue('');
 	await view.unmount();
 });
+
+test('saved source selections load and persist through settings', async () => {
+	const saved = localStorage.getItem('selectedSources');
+	const cookie = document.cookie.split('; ').find((part) => part.startsWith('selectedSources='));
+	localStorage.setItem('selectedSources', JSON.stringify(['njt_bus']));
+	const view = await render(SettingsHarness);
+	try {
+		await expect.element(view.getByRole('checkbox', { name: 'NJT Bus' })).toBeChecked();
+		await expect.element(view.getByRole('checkbox', { name: 'MTA Subway' })).not.toBeChecked();
+		await view.getByRole('checkbox', { name: 'MTA Subway' }).click();
+		expect(JSON.parse(localStorage.getItem('selectedSources')!)).toEqual(['njt_bus', 'mta_subway']);
+		expect(document.cookie.split('; ')).toContain('selectedSources=njt_bus,mta_subway');
+	} finally {
+		await view.unmount();
+		if (saved === null) localStorage.removeItem('selectedSources');
+		else localStorage.setItem('selectedSources', saved);
+		document.cookie = cookie ? `${cookie}; path=/` : 'selectedSources=; Max-Age=0; path=/';
+	}
+});

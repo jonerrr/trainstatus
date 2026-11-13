@@ -1,5 +1,5 @@
 import type { CatalogStop } from '#lib/client/index.js';
-import type { CatalogData } from '#lib/transit/decode.js';
+import type { CatalogData } from '#lib/data/decode.js';
 
 import { Index } from 'flexsearch';
 
@@ -7,7 +7,7 @@ import { Index } from 'flexsearch';
 const indexes = new WeakMap<CatalogData, Index>();
 
 /** Stops whose names match the term; every stop when the term is blank. */
-export function search_stops(catalog: CatalogData, term: string): readonly CatalogStop[] {
+export function searchStops(catalog: CatalogData, term: string): readonly CatalogStop[] {
 	if (!term.trim()) return catalog.stops;
 	let index = indexes.get(catalog);
 	if (!index) {

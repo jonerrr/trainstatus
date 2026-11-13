@@ -20,7 +20,7 @@ run = '''
 set -euo pipefail
 
 image="$GEO_DATA_IMAGE"
-out_dir="${MISE_CONFIG_ROOT}/data"
+out_dir="${MISE_CONFIG_ROOT}/artifacts"
 container_id="$(podman create "$image")"
 mounted=0
 

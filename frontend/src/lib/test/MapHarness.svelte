@@ -15,7 +15,7 @@
 	import { MapFilters } from '../map/filters.svelte';
 	import type { VehiclePicker } from '../map/interactions';
 	import { renderUnitTableFromIPC, type RenderUnitTable } from '../map/trajectory';
-	import { trajectoryFixture } from '../map/trajectoryFixture';
+	import { trajectoryFixture } from '../map/trajectory-fixture';
 	import TripMarkers from '../map/TripMarkers.svelte';
 
 	// Vitest's module instrumentation runs in the window, not worker globals.

@@ -1,18 +1,15 @@
 import { browser } from '$app/env';
 
-import { layout_sources, sources_cookie } from '#lib/source_preferences.svelte.js';
+import { layoutSources, sourcesCookie } from '#lib/source-preferences.svelte.js';
 
 import type { LayoutLoad } from './$types';
 
 // Normal loads receive parsed server data. Offline boots reuse the shell's build-time layout data, so the browser reads the cookie itself.
 export const load: LayoutLoad = ({ data, url }) =>
-	browser && data.offline_shell
+	browser && data.offlineShell
 		? {
 				...data,
-				selected_sources: layout_sources(
-					sources_cookie(document.cookie),
-					url.searchParams.get('src')
-				),
+				selectedSources: layoutSources(sourcesCookie(document.cookie), url.searchParams.get('src')),
 				at: url.searchParams.get('at') ?? undefined
 			}
 		: data;

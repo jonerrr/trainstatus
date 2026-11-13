@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { chart_context, type ChartPoint, type ChartSeries } from '#lib/charts/context.js';
+	import { chartContext, type ChartPoint, type ChartSeries } from '#lib/charts/context.js';
 	import type { CatalogRoute } from '#lib/client/index.js';
-	import { open_modal } from '#lib/url_params.svelte.js';
+	import { openModal } from '#lib/url-params.svelte.js';
 
 	import { line } from 'd3-shape';
 
-	const cake = chart_context();
+	const cake = chartContext();
 
 	interface Props {
 		routes?: CatalogRoute[];
-		stop_points?: boolean;
+		stopPoints?: boolean;
 	}
 
-	const { routes = [], stop_points = $bindable(false) }: Props = $props();
+	const { routes = [], stopPoints = $bindable(false) }: Props = $props();
 
 	const path = $derived(
 		line<ChartPoint>()
@@ -20,8 +20,8 @@
 			.y((point) => cake.yGet(point))
 	);
 
-	function open_trip(group: ChartSeries) {
-		open_modal({ type: 'trip', source: group.source, route_id: group.route_id, id: group.trip.id });
+	function openTrip(group: ChartSeries) {
+		openModal({ type: 'trip', source: group.source, routeId: group.routeId, id: group.trip.id });
 	}
 </script>
 
@@ -34,7 +34,7 @@
 	<!-- Draw a path for each train trip -->
 	{#each cake.data as group (`${group.source}:${group.trip.id}`)}
 		{const tripColor = $derived(
-			routes.find((r) => r.id === group.route_id && r.data.source === group.source)?.color
+			routes.find((r) => r.id === group.routeId && r.data.source === group.source)?.color
 		)}
 
 		{const tripPath = $derived(path(group.points))}
@@ -50,8 +50,8 @@
 			role="button"
 			tabindex="0"
 			aria-label="View details for trip {group.trip.id}"
-			onclick={() => open_trip(group)}
-			onkeydown={(e) => e.key === 'Enter' && open_trip(group)}
+			onclick={() => openTrip(group)}
+			onkeydown={(e) => e.key === 'Enter' && openTrip(group)}
 		/>
 
 		<!-- Visible path for display only -->
@@ -64,8 +64,8 @@
 			opacity="1"
 			pointer-events="none"
 		/>
-		{#if stop_points}
-			{#each group.points as point (point.stop_key)}
+		{#if stopPoints}
+			{#each group.points as point (point.stopKey)}
 				<circle
 					cx={cake.xGet(point)}
 					cy={cake.yGet(point)}
@@ -80,19 +80,13 @@
 </g>
 
 <style>
-	.path-line:hover {
-		stroke-width: 4;
-		opacity: 1;
-	}
-
-	/* Style for the hit area - cursor pointer but invisible */
 	.path-hitarea {
 		cursor: pointer;
 	}
 
-	/* This ensures the visible path still gets highlighted when hovering on the hit area */
-	.path-hitarea:hover + .path-line {
-		stroke-width: 4;
-		opacity: 1;
+	@media (hover: hover) and (pointer: fine) {
+		.path-hitarea:hover + .path-line {
+			stroke-width: 3;
+		}
 	}
 </style>

@@ -8,59 +8,59 @@
 	import { buildChartData, chartXDomain, type ChartInput } from '#lib/charts/data.js';
 	import Lines from '#lib/charts/Lines.svelte';
 	import type { CatalogRoute, Source } from '#lib/client/index.js';
-	import Icon from '#lib/Route/Icon.svelte';
+	import { getTransitData } from '#lib/data/store.svelte.js';
+	import Icon from '#lib/route/Icon.svelte';
 	import Skeleton from '#lib/Skeleton.svelte';
-	import { getTransitData } from '#lib/transit/store.svelte.js';
-	import { getCurrentTime } from '#lib/url_params.svelte.js';
+	import { getCurrentTime } from '#lib/url-params.svelte.js';
 
 	import { Check, ChevronDown, Download, Search, X } from '@lucide/svelte';
 	import { scalePoint, scaleTime } from 'd3-scale';
 	import { flatten, LayerCake, Svg } from 'layercake';
 
-	const current_time = getCurrentTime();
+	const currentTime = getCurrentTime();
 	const transit = getTransitData();
 
 	// TODO: maybe somehow include the linecharts in the stop/trip/route modals
 
-	const catalog_resources = transit.catalogs(() => page.data.selected_sources);
-	const catalogs = $derived(catalog_resources.current.filter((r) => r.state === 'ready'));
+	const catalogResources = transit.catalogs(() => page.data.selectedSources);
+	const catalogs = $derived(catalogResources.current.filter((r) => r.state === 'ready'));
 
 	type RouteKey = { source: Source; id: string };
 	let selected = $state<RouteKey[]>(
-		page.data.selected_sources.includes('mta_subway') ? [{ source: 'mta_subway', id: '4' }] : []
+		page.data.selectedSources.includes('mta_subway') ? [{ source: 'mta_subway', id: '4' }] : []
 	);
 
 	// 0 = first direction (subway northbound / bus dir 0)
 	// 1 = second direction (subway southbound / bus dir 1)
-	let direction_index = $state(0);
+	let directionIndex = $state(0);
 
 	// Per-source direction values: subway uses 1 (north) / 3 (south), bus uses 0 / 1
-	const direction_of = (source: Source) =>
-		source === 'mta_subway' ? (direction_index === 0 ? 1 : 3) : direction_index;
+	const directionOf = (source: Source) =>
+		source === 'mta_subway' ? (directionIndex === 0 ? 1 : 3) : directionIndex;
 
 	// Selected routes present in their source catalogs (for Lines, export filename, etc.)
-	const selected_routes_flat = $derived(
+	const selectedRoutesFlat = $derived(
 		selected.flatMap(({ source, id }) => {
-			const route = catalogs.find((c) => c.source === source)?.value?.routes_by_id.get(id);
+			const route = catalogs.find((c) => c.source === source)?.value?.routesById.get(id);
 			return route ? [route] : [];
 		})
 	);
 
-	const route_resources = transit.routes(() =>
+	const routeResources = transit.routes(() =>
 		selected.map((key) => ({
 			source: key.source,
-			route_id: key.id,
-			at: current_time.value
+			routeId: key.id,
+			at: currentTime.value
 		}))
 	);
-	const reads = $derived(route_resources.current);
-	const trips_loading = $derived(
-		catalog_resources.current.some((c) => c.state === 'loading') ||
+	const reads = $derived(routeResources.current);
+	const tripsLoading = $derived(
+		catalogResources.current.some((c) => c.state === 'loading') ||
 			reads.some((r) => r.state === 'loading')
 	);
 
-	let stop_points = $state<boolean>(false);
-	let current_time_line = $state<boolean>(true);
+	let stopPoints = $state<boolean>(false);
+	let currentTimeLine = $state<boolean>(true);
 	// TODO: fix x axis interval causing page to freeze
 	let xAxisInterval = $state<number>(15);
 	let displayHours = $state<number>(3);
@@ -69,33 +69,33 @@
 		const inputs: ChartInput[] = [];
 		for (const read of reads) {
 			if (read.state !== 'ready') continue;
-			const { source, route_id: id, value: route } = read;
-			const stops = catalogs.find((c) => c.source === source)?.value?.stops_by_id;
+			const { source, routeId: id, value: route } = read;
+			const stops = catalogs.find((c) => c.source === source)?.value?.stopsById;
 			if (!route || !stops) continue;
 			for (const trip of route.trips.values()) {
-				if (trip.direction !== direction_of(source)) continue;
-				const calls = route.calls_by_trip.get(trip.id);
-				if (calls?.length) inputs.push({ source, route_id: id, trip, calls, stops });
+				if (trip.direction !== directionOf(source)) continue;
+				const calls = route.callsByTrip.get(trip.id);
+				if (calls?.length) inputs.push({ source, routeId: id, trip, calls, stops });
 			}
 		}
 		return buildChartData(inputs);
 	});
 
-	const visible_trips = $derived(
-		data.route_trips.filter(
+	const visibleTrips = $derived(
+		data.routeTrips.filter(
 			({ points }) =>
 				points[0].time.getTime() <= xDomain[1] &&
 				points[points.length - 1].time.getTime() >= xDomain[0]
 		)
 	);
 
-	const chart_padding = { top: 20, right: 10, left: 160, bottom: 44 };
+	const chartPadding = { top: 20, right: 10, left: 160, bottom: 44 };
 
 	// Create a reference to the SVG element
 	let svgContainer = $state<HTMLDivElement>();
 
 	/** Download a standalone chart, expanding its layout bounds to contain rendered labels. */
-	function export_as_svg() {
+	function exportAsSvg() {
 		if (!svgContainer) return;
 
 		// Find the SVG element inside the container
@@ -111,22 +111,22 @@
 
 		// Preserve the layout bounds and expand them for labels outside the fixed margins.
 		const { width, height } = svgElement.getBoundingClientRect();
-		const { top, right, bottom, left } = chart_padding;
+		const { top, right, bottom, left } = chartPadding;
 		const labels = svgElement.querySelector<SVGGElement>('.y-axis')!.getBBox();
-		const min_x = Math.min(-left, labels.x);
-		const min_y = Math.min(-top, labels.y);
-		const total_width = Math.max(width + right, labels.x + labels.width) - min_x;
-		const total_height = Math.max(height + bottom, labels.y + labels.height) - min_y;
-		svgClone.setAttribute('viewBox', `${min_x} ${min_y} ${total_width} ${total_height}`);
-		svgClone.setAttribute('width', String(total_width));
-		svgClone.setAttribute('height', String(total_height));
+		const minX = Math.min(-left, labels.x);
+		const minY = Math.min(-top, labels.y);
+		const totalWidth = Math.max(width + right, labels.x + labels.width) - minX;
+		const totalHeight = Math.max(height + bottom, labels.y + labels.height) - minY;
+		svgClone.setAttribute('viewBox', `${minX} ${minY} ${totalWidth} ${totalHeight}`);
+		svgClone.setAttribute('width', String(totalWidth));
+		svgClone.setAttribute('height', String(totalHeight));
 		svgClone.removeAttribute('style');
 
 		const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		background.setAttribute('x', String(min_x));
-		background.setAttribute('y', String(min_y));
-		background.setAttribute('width', String(total_width));
-		background.setAttribute('height', String(total_height));
+		background.setAttribute('x', String(minX));
+		background.setAttribute('y', String(minY));
+		background.setAttribute('width', String(totalWidth));
+		background.setAttribute('height', String(totalHeight));
 		background.setAttribute('fill', '#171717');
 
 		// Insert background as first child so it's behind everything else
@@ -135,8 +135,8 @@
 		// Add watermark
 		const watermark = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 		watermark.textContent = 'TrainStat.us';
-		watermark.setAttribute('x', String(min_x + 6));
-		watermark.setAttribute('y', String(min_y + 14));
+		watermark.setAttribute('x', String(minX + 6));
+		watermark.setAttribute('y', String(minY + 14));
 		watermark.setAttribute('font-size', '16');
 		watermark.setAttribute('font-weight', '600');
 		watermark.setAttribute('fill', '#e5e5e5');
@@ -154,7 +154,7 @@
 		const url = URL.createObjectURL(blob);
 
 		// Create a filename with all route short names
-		const filename = `${selected_routes_flat.map((r) => r.short_name).join('_')}_${direction_index === 0 ? 'northbound' : 'southbound'}_chart.svg`;
+		const filename = `${selectedRoutesFlat.map((r) => r.short_name).join('_')}_${directionIndex === 0 ? 'northbound' : 'southbound'}_chart.svg`;
 
 		// Create a download link and click it
 		const downloadLink = document.createElement('a');
@@ -301,24 +301,24 @@
 		}
 	}
 
-	// let last_at = current_time.value;
+	// let last_at = currentTime.value;
 	// TODO: convert this to an attachment
 	onMount(() => {
 		document.addEventListener('click', handleClickOutside);
 		// set current time to 2 hours ago
-		// current_time.value = Math.floor((current_time.ms - 4 * 60 * 60 * 1000) / 1000);
+		// currentTime.value = Math.floor((currentTime.ms - 4 * 60 * 60 * 1000) / 1000);
 
 		return () => {
 			document.removeEventListener('click', handleClickOutside);
 			// if (last_at) {
 			// 	console.log('setting to old current time', last_at);
-			// 	current_time.value = last_at;
+			// 	currentTime.value = last_at;
 			// }
 		};
 	});
 
 	const xDomain = $derived(
-		chartXDomain(data.route_trips, current_time.ms, displayHours * 60 * 60 * 1000)
+		chartXDomain(data.routeTrips, currentTime.ms, displayHours * 60 * 60 * 1000)
 	);
 	// const xRange = $derived(() => {
 	// 	const width = svgContainer?.clientWidth || 0;
@@ -350,15 +350,15 @@
 					aria-label="Add routes"
 				>
 					<div class="flex flex-1 flex-wrap items-center gap-2">
-						{#if selected_routes_flat.length === 0}
+						{#if selectedRoutesFlat.length === 0}
 							<span>Select routes</span>
 						{:else}
-							{#each selected_routes_flat as selectedRoute (`${selectedRoute.data.source}:${selectedRoute.id}`)}
+							{#each selectedRoutesFlat as selectedRoute (`${selectedRoute.data.source}:${selectedRoute.id}`)}
 								<div
 									class="flex items-center rounded-none border border-border-default bg-surface-2 px-2 py-1"
 								>
 									<Icon height={20} width={20} route={selectedRoute} link={false} />
-									{#if selected_routes_flat.length > 1}
+									{#if selectedRoutesFlat.length > 1}
 										<div
 											role="button"
 											tabindex="0"
@@ -459,7 +459,7 @@
 				<div class="flex items-center justify-between gap-2">
 					<label for="northbound" class="cursor-pointer">Northbound</label>
 					<input
-						bind:group={direction_index}
+						bind:group={directionIndex}
 						type="radio"
 						id="northbound"
 						name="direction"
@@ -470,7 +470,7 @@
 				<div class="flex items-center justify-between gap-2">
 					<label for="southbound" class="cursor-pointer">Southbound</label>
 					<input
-						bind:group={direction_index}
+						bind:group={directionIndex}
 						type="radio"
 						id="southbound"
 						name="direction"
@@ -491,7 +491,7 @@
 						id="stop_points"
 						type="checkbox"
 						name="stop_points"
-						bind:checked={stop_points}
+						bind:checked={stopPoints}
 						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
 				</div>
@@ -501,7 +501,7 @@
 						id="time_line"
 						type="checkbox"
 						name="time_line"
-						bind:checked={current_time_line}
+						bind:checked={currentTimeLine}
 						class="size-5 cursor-pointer transition-transform hover:scale-110"
 					/>
 				</div>
@@ -553,7 +553,7 @@
 		<!-- Export Button -->
 		<div class="flex min-w-30 flex-col justify-center">
 			<button
-				onclick={export_as_svg}
+				onclick={exportAsSvg}
 				class="flex h-fit items-center justify-center gap-2 rounded-none bg-surface-1 px-4 py-2 transition-colors hover:bg-hover"
 				aria-label="Export chart as SVG"
 			>
@@ -565,35 +565,35 @@
 
 	<!-- Chart container with proper overflow handling -->
 	<div class="relative flex-1 overflow-hidden">
-		{#if visible_trips.length && data.yDomain.length}
+		{#if visibleTrips.length && data.yDomain.length}
 			<div class="absolute inset-0 overflow-auto">
 				<div bind:this={svgContainer} class="h-full min-h-125 w-full min-w-325">
 					<LayerCake
 						debug={false}
 						ssr
-						padding={chart_padding}
+						padding={chartPadding}
 						x="time"
-						y="stop_key"
+						y="stopKey"
 						{xDomain}
 						yDomain={data.yDomain}
 						yScale={scalePoint().padding(0)}
 						xScale={scaleTime()}
-						data={visible_trips}
-						flatData={flatten(visible_trips, 'points')}
+						data={visibleTrips}
+						flatData={flatten(visibleTrips, 'points')}
 					>
 						<Svg>
-							<AxisX {current_time_line} interval={xAxisInterval} />
+							<AxisX {currentTimeLine} interval={xAxisInterval} />
 							<AxisY stopNames={data.stopNames} />
-							<Lines routes={selected_routes_flat} bind:stop_points />
+							<Lines routes={selectedRoutesFlat} bind:stopPoints />
 						</Svg>
 					</LayerCake>
 				</div>
 			</div>
-		{:else if trips_loading}
+		{:else if tripsLoading}
 			<div class="flex h-full items-center justify-center">
 				<Skeleton lines={8} class="w-3/4" />
 			</div>
-		{:else if !reads.some((r) => r.state === 'failed') && !catalog_resources.current.some((r) => r.state === 'failed')}
+		{:else if !reads.some((r) => r.state === 'failed') && !catalogResources.current.some((r) => r.state === 'failed')}
 			<div class="flex h-full items-center justify-center text-muted">No data available</div>
 		{/if}
 	</div>

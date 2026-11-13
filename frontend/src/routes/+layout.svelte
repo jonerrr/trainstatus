@@ -5,42 +5,42 @@
 	import { page } from '$app/state';
 
 	import type { Catalog } from '#lib/client/index.js';
+	import { setTransitData, TransitData } from '#lib/data/store.svelte.js';
 	import DataBoundary from '#lib/DataBoundary.svelte';
 	import Modal from '#lib/Modal.svelte';
 	import Navbar from '#lib/Navbar.svelte';
 	import SEO from '#lib/SEO.svelte';
-	import { setTransitData, TransitData } from '#lib/transit/store.svelte.js';
 	import {
 		atParamToUnixSeconds,
-		close_modal,
+		closeModal,
 		createCurrentTime,
-		modal_from_url,
+		modalFromUrl,
 		setCurrentTime
-	} from '#lib/url_params.svelte.js';
+	} from '#lib/url-params.svelte.js';
 
 	import '@fontsource/inter';
 	import '../app.css';
 
 	let { children } = $props();
 
-	const current_time = setCurrentTime(
+	const currentTime = setCurrentTime(
 		createCurrentTime(atParamToUnixSeconds(page.url.searchParams.get('at')))
 	);
 
 	// One owner per layout instance; on the server it never fetches.
 	const transit = setTransitData(
 		new TransitData({
-			sources: page.data.selected_sources,
-			at: current_time.value,
-			eager_service: page.url.pathname !== '/map'
+			sources: page.data.selectedSources,
+			at: currentTime.value,
+			eagerService: page.url.pathname !== '/map'
 		})
 	);
 	$effect(() => {
-		const sources = page.data.selected_sources;
+		const sources = page.data.selectedSources;
 		const eager = page.url.pathname !== '/map';
 		const at = atParamToUnixSeconds(page.url.searchParams.get('at'));
 		untrack(() => {
-			current_time.value = at;
+			currentTime.value = at;
 			transit.setTime(at);
 			transit.setEagerService(eager);
 			transit.setSources(sources);
@@ -50,14 +50,14 @@
 
 	// Open the modal a direct link identifies; the modal loads its own data.
 	onMount(() => {
-		const modal = modal_from_url(page.url);
+		const modal = modalFromUrl(page.url);
 		if (modal)
 			void tick().then(() => {
 				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Preserve the current shared URL while initializing its shallow modal state.
 				return goto(page.url.href, { shallow: true, replace: true, state: { modal } });
 			});
 		else if (['s', 'r', 't'].some((key) => page.url.searchParams.has(key)))
-			close_modal(current_time.value, true);
+			closeModal(currentTime.value, true);
 	});
 
 	// CacheStorage does not perform HTTP-cache validation. The worker serves saved data

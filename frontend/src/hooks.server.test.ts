@@ -6,13 +6,13 @@ import { handleFetch } from './hooks.server';
 
 const event = { url: new URL('https://trainstat.us/') } as RequestEvent;
 
-const private_env = vi.hoisted((): { API_ORIGIN: string | undefined } => ({
-	API_ORIGIN: undefined
+const privateEnv = vi.hoisted((): Record<'API_ORIGIN', string | undefined> => ({
+	['API_ORIGIN']: undefined
 }));
-vi.mock('$app/env/private', () => private_env);
+vi.mock('$app/env/private', () => privateEnv);
 
 // Echo the request at the transport boundary to check what the hook actually sends.
-const echo_fetch: typeof fetch = async (input, init) => {
+const echoFetch: typeof fetch = async (input, init) => {
 	const request = new Request(input, init);
 	return Response.json({
 		url: request.url,
@@ -23,12 +23,12 @@ const echo_fetch: typeof fetch = async (input, init) => {
 };
 
 afterEach(() => {
-	private_env.API_ORIGIN = undefined;
+	privateEnv.API_ORIGIN = undefined;
 });
 
 describe('internal API routing', () => {
 	it('routes same-origin API requests internally while preserving the request', async () => {
-		private_env.API_ORIGIN = 'http://trainstatus-backend:3055';
+		privateEnv.API_ORIGIN = 'http://trainstatus-backend:3055';
 		const response = await handleFetch({
 			event,
 			request: new Request('https://trainstat.us/api/v1/catalog/mta_subway?at=123', {
@@ -36,7 +36,7 @@ describe('internal API routing', () => {
 				headers: { 'x-test': 'preserved' },
 				body: 'payload'
 			}),
-			fetch: echo_fetch
+			fetch: echoFetch
 		});
 		expect(await response.json()).toEqual({
 			url: 'http://trainstatus-backend:3055/api/v1/catalog/mta_subway?at=123',
@@ -51,15 +51,15 @@ describe('internal API routing', () => {
 		'https://trainstat.us/martin/tiles',
 		'https://trainstat.us/apiary'
 	])('leaves unrelated requests unchanged: %s', async (url) => {
-		private_env.API_ORIGIN = 'http://trainstatus-backend:3055';
-		const response = await handleFetch({ event, request: new Request(url), fetch: echo_fetch });
+		privateEnv.API_ORIGIN = 'http://trainstatus-backend:3055';
+		const response = await handleFetch({ event, request: new Request(url), fetch: echoFetch });
 		expect((await response.json()).url).toBe(url);
 	});
 
-	it('uses the existing route when API_ORIGIN is unset', async () => {
-		private_env.API_ORIGIN = undefined;
+	it('uses the existing route when APIORIGIN is unset', async () => {
+		privateEnv.API_ORIGIN = undefined;
 		const url = 'https://trainstat.us/api/v1/alerts/mta_subway';
-		const response = await handleFetch({ event, request: new Request(url), fetch: echo_fetch });
+		const response = await handleFetch({ event, request: new Request(url), fetch: echoFetch });
 		expect((await response.json()).url).toBe(url);
 	});
 });

@@ -1,13 +1,13 @@
 <script lang="ts">
-	import Icon from '#lib/Route/Icon.svelte';
+	import Icon from '#lib/route/Icon.svelte';
 
 	import type { FeaturePresentation } from './map/presentation';
 
 	let {
 		feature,
 		link = false,
-		show_alerts = false
-	}: { feature: FeaturePresentation; link?: boolean; show_alerts?: boolean } = $props();
+		showAlerts = false
+	}: { feature: FeaturePresentation; link?: boolean; showAlerts?: boolean } = $props();
 </script>
 
 <div
@@ -18,7 +18,7 @@
 	data-feature-summary
 >
 	{#if feature.route}
-		<Icon route={feature.route} width={28} height={28} {link} {show_alerts} />
+		<Icon route={feature.route} width={28} height={28} {link} {showAlerts} />
 	{/if}
 	<div class="min-w-0 flex-1">
 		<div class="text-sm leading-snug font-semibold wrap-anywhere text-primary">

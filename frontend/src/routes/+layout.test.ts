@@ -15,18 +15,18 @@ function read(data: Parameters<LayoutLoad>[0]['data'], search = '') {
 }
 
 test('normal browser loads use the server-parsed preferences and time', () => {
-	const selected: Parameters<LayoutLoad>[0]['data'] = { selected_sources: ['mta_bus'], at: '123' };
+	const selected: Parameters<LayoutLoad>[0]['data'] = { selectedSources: ['mta_bus'], at: '123' };
 	// A normal load can use server data without reading document.cookie.
 	expect(read(selected)).toBe(selected);
 });
 
 test('offline shell data restores the saved sources, deep link source and zero time', () => {
-	vi.stubGlobal('document', { cookie: 'selected_sources=mta_subway' });
+	vi.stubGlobal('document', { cookie: 'selectedSources=mta_subway' });
 	expect(
-		read({ selected_sources: ['mta_bus'], offline_shell: true, at: undefined }, '?src=njt_bus&at=0')
+		read({ selectedSources: ['mta_bus'], offlineShell: true, at: undefined }, '?src=njt_bus&at=0')
 	).toEqual({
-		selected_sources: ['mta_subway', 'njt_bus'],
-		offline_shell: true,
+		selectedSources: ['mta_subway', 'njt_bus'],
+		offlineShell: true,
 		at: '0'
 	});
 });

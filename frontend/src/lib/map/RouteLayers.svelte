@@ -15,7 +15,7 @@
 		ROUTE_WIDTH,
 		SLOT,
 		SUBWAY_SOURCE_FILTER
-	} from './mapTheme';
+	} from './map-theme';
 
 	let { filter, activeRoute }: { filter: FilterSpecification; activeRoute: MapFeatureKey | null } =
 		$props();

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	import { getTransitData } from '#lib/transit/store.svelte.js';
+	import { getTransitData } from '#lib/data/store.svelte.js';
 
 	const transit = getTransitData();
 
-	const url_mappings = {
+	const urlMappings = {
 		'/': 'Home',
 		'/stops': 'Stops',
 		'/routes': 'Routes',
@@ -20,17 +20,17 @@
 		const catalog = modal ? transit.peekCatalog(modal.source) : undefined;
 		switch (modal?.type) {
 			case 'stop':
-				return `Stop: ${catalog?.stops_by_id.get(modal.id)?.name ?? modal.id}`;
+				return `Stop: ${catalog?.stopsById.get(modal.id)?.name ?? modal.id}`;
 			case 'route':
-				return `Route: ${catalog?.routes_by_id.get(modal.id)?.short_name ?? modal.id}`;
+				return `Route: ${catalog?.routesById.get(modal.id)?.short_name ?? modal.id}`;
 			case 'trip':
-				return modal.route_id ? `${modal.route_id} Trip` : 'Trip';
+				return modal.routeId ? `${modal.routeId} Trip` : 'Trip';
 			// TODO: settings
 		}
 
 		const title =
-			page.url.pathname in url_mappings
-				? url_mappings[page.url.pathname as keyof typeof url_mappings]
+			page.url.pathname in urlMappings
+				? urlMappings[page.url.pathname as keyof typeof urlMappings]
 				: '???'; // shouldn't happen since we don't have any other routes, but just in case
 
 		return `${title} | Train Status`;

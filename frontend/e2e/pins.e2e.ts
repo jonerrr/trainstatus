@@ -1,15 +1,12 @@
 import type { Catalog } from '../src/lib/client/index.js';
-import { expect, test } from './fixtures';
+import { expect, searchableStop, test } from './fixtures';
 
 test('a pinned stop shows on the home page until it is unpinned', async ({ page }) => {
-	const stops = ((await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog)
-		.stops;
-	// Stop id "1" is the default subway pin, so pinning it would toggle it off.
-	const stop = stops.find((candidate) => candidate.id !== '1');
-	if (!stop) throw new Error('expected a subway stop other than the default pin');
+	const catalog = (await (await page.request.get('/api/v1/catalog/mta_subway')).json()) as Catalog;
+	const { stop, query } = searchableStop(catalog, ['1']);
 
 	await page.goto('/stops');
-	await page.getByRole('searchbox').fill(stop.id);
+	await page.getByRole('searchbox').fill(query);
 	const row = page.locator('main .list-item').filter({ hasText: stop.name });
 	await expect(row).toHaveCount(1);
 	await row.getByRole('button', { name: 'Pin to home screen' }).click();

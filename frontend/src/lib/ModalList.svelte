@@ -6,7 +6,7 @@
 
 	let {
 		children,
-		class: class_name
+		class: className
 	}: {
 		children: Snippet<[]>;
 		class?: string;
@@ -15,7 +15,7 @@
 
 <!-- transition:slide={{ easing: quintOut, axis: 'y', duration: 200, delay: 200 }} -->
 <div
-	class={`flex max-h-[60dvh] flex-col divide-y divide-border-subtle overflow-auto border-y border-border-subtle bg-canvas text-base ${class_name ?? ''}`}
+	class={`flex max-h-[60dvh] flex-col divide-y divide-border-subtle overflow-auto border-y border-border-subtle bg-canvas text-base ${className ?? ''}`}
 >
 	{@render children()}
 </div>

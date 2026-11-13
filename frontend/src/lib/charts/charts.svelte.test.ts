@@ -2,6 +2,7 @@ import type { Source } from '#lib/client/index.js';
 
 import '../../app.css';
 
+import { TransitData } from '#lib/data/store.svelte.js';
 import { page } from '#lib/test/page.svelte.js';
 import {
 	fixtureFetcher,
@@ -9,7 +10,6 @@ import {
 	type TransitFixture
 } from '#lib/test/transit-fixture.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
-import { TransitData } from '#lib/transit/store.svelte.js';
 
 import { afterEach, expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
@@ -20,10 +20,10 @@ import { chartFixture, chartNow } from './fixtures.js';
 
 const clock = vi.hoisted(() => ({ ms: 0 }));
 
-vi.mock('#lib/url_params.svelte.js', async (original) => ({
-	...(await original<typeof import('#lib/url_params.svelte.js')>()),
+vi.mock('#lib/url-params.svelte.js', async (original) => ({
+	...(await original<typeof import('#lib/url-params.svelte.js')>()),
 	getCurrentTime: () => ({ value: undefined, ms: clock.ms }),
-	open_modal: () => {}
+	openModal: () => {}
 }));
 
 let fixture: TransitFixture = { catalogs: {}, services: {} };
@@ -33,7 +33,7 @@ function setFixture(source: Source, direction: number, patterns?: string[][]) {
 	clock.ms = chartNow;
 	const built = chartFixture(source, direction, patterns);
 	fixture = { catalogs: { [source]: built.catalog }, services: { [source]: built.service } };
-	page.data = { selected_sources: [source] };
+	page.data = { selectedSources: [source] };
 	return built;
 }
 
@@ -48,7 +48,7 @@ async function renderChart(provided?: TransitData) {
 		props: {
 			data,
 			component: ChartsPage as never,
-			child_props: {}
+			childProps: {}
 		}
 	});
 	container.style.width = '1400px';
@@ -139,7 +139,7 @@ test('multiple sources keep colliding trip/stop/route IDs separate and use their
 		catalogs: Object.fromEntries(built.map((b, i) => [sources[i], b.catalog])),
 		services: Object.fromEntries(built.map((b, i) => [sources[i], b.service]))
 	};
-	page.data = { selected_sources: sources };
+	page.data = { selectedSources: sources };
 	await renderChart();
 	for (const source of ['mta_bus', 'njt_bus']) {
 		// Activate the trigger itself, not a removable chip at its geometric center.

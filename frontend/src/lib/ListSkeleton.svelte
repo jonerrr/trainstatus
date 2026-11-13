@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Source } from '#lib/client/index.js';
-	import { skeleton_row_height } from '#lib/util.svelte.js';
+	import { skeletonRowHeight } from '#lib/util.svelte.js';
 
 	interface Props {
 		type: 'stop' | 'route' | 'trip';
@@ -11,11 +11,11 @@
 	let { type, source, count }: Props = $props();
 
 	// Same constants as the virtual list's height calculators, so rows don't shift on load.
-	const height = $derived(skeleton_row_height(type, source));
+	const height = $derived(skeletonRowHeight(type, source));
 </script>
 
-{#snippet bar(class_name: string)}
-	<div class="animate-pulse rounded-none bg-surface-2 {class_name}"></div>
+{#snippet bar(className: string)}
+	<div class="animate-pulse rounded-none bg-surface-2 {className}"></div>
 {/snippet}
 
 <div aria-hidden="true">

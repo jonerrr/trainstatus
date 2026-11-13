@@ -10,8 +10,8 @@ pressed/selected states, keyboard navigation, and DOM query contracts.
   radios, range tracks and thumbs, search fields, dropdowns, cards, bus route
   chips, transfer car boxes, and stop timeline nodes.
 - Reserve true circles for official MTA subway route bullets in
-  `frontend/src/lib/Route/Icon.svelte` and the (+)/(−) disclosure icons in
-  `frontend/src/lib/Trip/TransferThread.svelte`. Preserve official route artwork
+  `frontend/src/lib/route/Icon.svelte` and the (+)/(−) disclosure icons in
+  `frontend/src/lib/trip/TransferThread.svelte`. Preserve official route artwork
   and provider route colors; bus badges stay rectangular.
 - Keep information compact while retaining existing touch targets and scrolling.
   Stop selectors are at least 44px tall; their timeline nodes are 14×14px squares.
