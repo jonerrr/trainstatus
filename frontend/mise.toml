@@ -41,6 +41,3 @@ run = "pnpm test:integration"
 description = "Run Playwright against preview. Requires the API on :3055."
 depends = ["pnpm-install"]
 run = "pnpm test:e2e"
-
-[env]
-# VITE_ALLOWED_HOSTS = ""
