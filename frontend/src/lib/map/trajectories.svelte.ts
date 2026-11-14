@@ -111,7 +111,10 @@ function watchSource(
 		let decoding = false;
 		try {
 			const response = await fetcher(url, {
-				signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+				signal: AbortSignal.any([
+					controller.signal,
+					AbortSignal.timeout(at === undefined ? 15_000 : 60_000)
+				]),
 				cache: 'no-store'
 			});
 			if (!response.ok) throw new Error(`Trajectory service returned ${response.status}`);
@@ -133,7 +136,8 @@ function watchSource(
 			failures++;
 			update.error = toError(error);
 			update.fatal = decoding;
-			schedule(Math.min(refreshMs, FIRST_RETRY_MS * 2 ** (failures - 1)));
+			// A failed historical read (often database overload) waits for the shared Retry control.
+			if (at === undefined) schedule(Math.min(refreshMs, FIRST_RETRY_MS * 2 ** (failures - 1)));
 		}
 	}
 	function load() {

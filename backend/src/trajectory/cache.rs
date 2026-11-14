@@ -4,6 +4,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use moka::future::Cache;
 
+use crate::operations::history::HistoryOverloaded;
 use crate::source::Source;
 
 use super::geometry::{ShapeGeometry, build_shape_geometry};
@@ -73,7 +74,14 @@ impl TrajectoryCache {
         self.historical
             .try_get_with(key, init)
             .await
-            .map_err(|error| anyhow::anyhow!(error))
+            .map_err(|error| {
+                // Keep the typed overload error; `anyhow!` would flatten it to a string.
+                if error.downcast_ref::<HistoryOverloaded>().is_some() {
+                    anyhow::Error::new(HistoryOverloaded)
+                } else {
+                    anyhow::anyhow!(error)
+                }
+            })
     }
 
     pub async fn get_shape_geometry(

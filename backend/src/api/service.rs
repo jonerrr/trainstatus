@@ -40,7 +40,7 @@ pub struct UnknownRoutes {
         (status = 200, description = "Service for the requested routes", body = Service),
         (status = 400, description = "Missing, empty or malformed `route_ids`, `route_ids` on `mta_subway`, or an invalid `at`"),
         (status = 404, description = "One or more requested routes do not exist", body = UnknownRoutes),
-        (status = 503, description = "The source has not committed a realtime snapshot since startup"),
+        (status = 503, description = "The source is not ready or historical database reads are saturated"),
         (status = 500, description = "Database or internal service error")
     )
 )]

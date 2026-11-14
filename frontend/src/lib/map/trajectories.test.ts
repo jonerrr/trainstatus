@@ -46,20 +46,20 @@ test('a stalled trajectory request times out and refresh recovers', async () => 
 	}
 });
 
-test('a failed historical Arrow update retries until network recovery', async () => {
+test('a failed historical update waits for manual Retry', async () => {
 	vi.useFakeTimers();
 	const { trajectoryFixture } = await import('./trajectory-fixture');
-	let calls = 0;
+	const urls: string[] = [];
 	let latest: import('./trajectories.svelte.js').TrajectorySnapshot | undefined;
 	let tracked: TrackedUpdate | undefined;
 	const stop = watchTrajectories(
-		{ sources: ['mta_bus'], at: 0, refreshInterval: 100 },
+		{ sources: ['mta_bus'], at: 123, refreshInterval: 100 },
 		(snapshot) => {
 			latest = snapshot;
 		},
-		async () => {
-			calls++;
-			return new Response(trajectoryFixture(), calls === 1 ? { status: 503 } : {});
+		async (url) => {
+			urls.push(String(url));
+			return new Response(trajectoryFixture(), urls.length === 1 ? { status: 503 } : {});
 		},
 		(update) => {
 			tracked = update;
@@ -69,12 +69,13 @@ test('a failed historical Arrow update retries until network recovery', async ()
 	await vi.advanceTimersByTimeAsync(0);
 	expect(latest?.tables.size).toBe(0);
 	expect(tracked?.error).toBeInstanceOf(Error);
-	await vi.advanceTimersByTimeAsync(1000);
-	expect(calls).toBe(2);
+	await vi.advanceTimersByTimeAsync(10_000);
+	expect(urls).toEqual(['/api/v1/trajectories/mta_bus?at=123']);
+	tracked!.retry();
+	await vi.advanceTimersByTimeAsync(0);
+	expect(urls).toHaveLength(2);
 	expect(latest?.tables.get('mta_bus')?.units.length).toBe(1);
 	expect(tracked?.error).toBeNull();
-	await stop.refresh();
-	expect(calls).toBe(3);
 	stop.destroy();
 });
 
@@ -111,23 +112,6 @@ test('Retry clears fatal Arrow errors synchronously and subsequent failures rest
 	} finally {
 		stop.destroy();
 	}
-});
-
-test('historical failures retry at the selected time', async () => {
-	vi.useFakeTimers();
-	const urls: string[] = [];
-	const stop = watchTrajectories(
-		{ sources: ['mta_bus'], at: 123, refreshInterval: 100 },
-		() => {},
-		async (url) => {
-			urls.push(String(url));
-			return new Response('unavailable', { status: 503 });
-		}
-	);
-	await vi.advanceTimersByTimeAsync(1000);
-	expect(urls.length).toBeGreaterThan(1);
-	expect(new Set(urls)).toEqual(new Set(['/api/v1/trajectories/mta_bus?at=123']));
-	stop.destroy();
 });
 
 test('successful historical trajectories ignore live commit age and do not poll again', async () => {

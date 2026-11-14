@@ -628,7 +628,7 @@ export class TransitData {
 		try {
 			const response = await this.#fetcher(url, {
 				...init,
-				signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)])
+				signal: AbortSignal.any([signal, AbortSignal.timeout(entry.at === undefined ? 15_000 : 60_000)])
 			});
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
 			const body = (await response.json()) as B;

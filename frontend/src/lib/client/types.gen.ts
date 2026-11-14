@@ -706,7 +706,7 @@ export type ServiceHandlerErrors = {
 	 */
 	500: unknown;
 	/**
-	 * The source has not committed a realtime snapshot since startup
+	 * The source is not ready or historical database reads are saturated
 	 */
 	503: unknown;
 };
@@ -748,6 +748,10 @@ export type TrajectoriesHandlerErrors = {
 	 * Trajectory calculation, database, or internal service error
 	 */
 	500: unknown;
+	/**
+	 * Historical database reads are saturated
+	 */
+	503: unknown;
 };
 
 export type TrajectoriesHandlerResponses = {

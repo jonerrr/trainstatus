@@ -117,9 +117,16 @@ pub async fn build() -> anyhow::Result<Application> {
         .context("DATABASE_URL must be a valid PostgreSQL connection URL")?;
     let pg_pool = PgPoolOptions::new()
         .max_connections(100)
-        .connect_with(pg_connect_option)
+        .connect_with(pg_connect_option.clone())
         .await?;
     sqlx::migrate!().run(&pg_pool).await?;
+    // Historical reads are expensive and unbounded in number; a tiny dedicated pool with a
+    // statement deadline keeps them from starving ingestion. Remove with PostgreSQL.
+    let history_pool = PgPoolOptions::new()
+        .max_connections(2)
+        .acquire_timeout(Duration::from_secs(5))
+        .connect_with(pg_connect_option.options([("statement_timeout", "30s")]))
+        .await?;
 
     let live_snapshots = LiveSnapshots::default();
     let alerts = crate::alerts::store::Alerts::new(pg_pool.clone());
@@ -133,7 +140,7 @@ pub async fn build() -> anyhow::Result<Application> {
     }
     let catalog = crate::network::catalog::CatalogReader::new(index.clone());
     let operations = crate::operations::service::Operations::new(
-        pg_pool.clone(),
+        history_pool.clone(),
         live_snapshots.clone(),
         index.clone(),
         crate::api::dto::service::ENCODER,
@@ -162,7 +169,7 @@ pub async fn build() -> anyhow::Result<Application> {
         Arc::new(NjtBusRealtime),
     ];
 
-    let trajectories = crate::trajectory::service::TrajectoryService::new(pg_pool.clone());
+    let trajectories = crate::trajectory::service::TrajectoryService::new(history_pool);
 
     let mut workers = RealtimeEngine::new(
         OperationsIngestor::new(

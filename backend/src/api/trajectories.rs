@@ -35,6 +35,7 @@ use crate::trajectory::types::RenderUnit;
             )
         ),
         (status = 400, description = "Invalid source path or query parameter"),
+        (status = 503, description = "Historical database reads are saturated"),
         (status = 500, description = "Trajectory calculation, database, or internal service error")
     )
 )]

@@ -59,6 +59,32 @@ pub struct RetainedTrajectories {
     pub network: Option<RetainedGeometry>,
     pub anchors: HashMap<uuid::Uuid, GpsSample>,
 }
+/// The dedicated history pool has no room or time left; surfaced as `503`.
+#[derive(Debug)]
+pub struct HistoryOverloaded;
+
+impl std::fmt::Display for HistoryOverloaded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("historical reads are overloaded")
+    }
+}
+
+impl std::error::Error for HistoryOverloaded {}
+
+fn classify(error: anyhow::Error) -> anyhow::Error {
+    let overloaded = match error.downcast_ref::<sqlx::Error>() {
+        Some(sqlx::Error::PoolTimedOut) => true,
+        // 57014: statement_timeout (or cancellation).
+        Some(sqlx::Error::Database(error)) => error.code().as_deref() == Some("57014"),
+        _ => false,
+    };
+    if overloaded {
+        anyhow::Error::new(HistoryOverloaded).context(error)
+    } else {
+        error
+    }
+}
+
 #[derive(Clone)]
 pub struct History {
     pg_pool: PgPool,
@@ -68,6 +94,17 @@ impl History {
         Self { pg_pool }
     }
     pub async fn load(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+        route_ids: Option<&[String]>,
+    ) -> anyhow::Result<RetainedService> {
+        self.load_service(source, at, route_ids)
+            .await
+            .map_err(classify)
+    }
+
+    async fn load_service(
         &self,
         source: Source,
         at: DateTime<Utc>,
@@ -144,6 +181,16 @@ impl History {
     }
 
     pub async fn load_trajectories(
+        &self,
+        source: Source,
+        at: DateTime<Utc>,
+    ) -> anyhow::Result<RetainedTrajectories> {
+        self.load_trajectory_inputs(source, at)
+            .await
+            .map_err(classify)
+    }
+
+    async fn load_trajectory_inputs(
         &self,
         source: Source,
         at: DateTime<Utc>,
@@ -286,3 +333,7 @@ impl History {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/history.rs"]
+mod tests;
