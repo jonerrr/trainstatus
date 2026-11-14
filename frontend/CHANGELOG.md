@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.2](https://github.com/jonerrr/trainstatus/compare/frontend-v2.3.1...frontend-v2.3.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* improve trip button and add list tests ([3bcaf65](https://github.com/jonerrr/trainstatus/commit/3bcaf65d9b68084713b5934b5e261a6ac402a4b5)), closes [#305](https://github.com/jonerrr/trainstatus/issues/305)
+* update chart rendering logic and improve x domain calculations ([#495](https://github.com/jonerrr/trainstatus/issues/495)) ([aaac909](https://github.com/jonerrr/trainstatus/commit/aaac909e446b7e0541bb48cba800cd2738213116))
+* use integrated vite allowed host vars instead of custom parsing ([d8bc332](https://github.com/jonerrr/trainstatus/commit/d8bc332b4e5613432c08cb0ed917313571ebb764))
+
 ## [2.3.1](https://github.com/jonerrr/trainstatus/compare/frontend-v2.3.0...frontend-v2.3.1) (2026-11-11)
 
 
