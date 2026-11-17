@@ -11,6 +11,7 @@
 //!   the observation time. Coordinates and bearing belong to the map transport.
 //! - Calls: trip, stop, visit sequence, arrival and departure. Subway tracks and platform
 //!   edges are not rendered and are omitted.
+use super::identity::RunId;
 use super::{
     history::History,
     ingestor::SourceSnapshot,
@@ -24,13 +25,11 @@ use crate::network::index::NetworkIndex;
 use crate::source::Source;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Range,
     sync::{Arc, Mutex, OnceLock},
 };
-use uuid::Uuid;
 
 /// Which routes a service request covers.
 pub enum RouteSelection {
@@ -108,9 +107,9 @@ pub struct RouteInputs<'a> {
     pub visits: &'a [StopVisit],
     pub positions: &'a [VehicleObservation],
     pub trip_indexes: &'a [usize],
-    pub call_ranges: &'a HashMap<Uuid, Range<usize>>,
+    pub call_ranges: &'a HashMap<RunId, Range<usize>>,
     pub ordered_calls: &'a [usize],
-    pub statuses: &'a HashMap<Uuid, usize>,
+    pub statuses: &'a HashMap<RunId, usize>,
     pub vehicle_statuses: &'a HashMap<String, usize>,
 }
 pub struct ServiceInputs<'a> {
@@ -134,10 +133,10 @@ pub struct ServiceSnapshot {
     // Stable route order keeps cached whole-source response bytes deterministic.
     routes: BTreeMap<String, RouteEntry>,
     /// Ranges into `ordered_calls` by trip ID.
-    call_ranges: HashMap<Uuid, Range<usize>>,
+    call_ranges: HashMap<RunId, Range<usize>>,
     /// Stop-time indexes ordered by trip ID then sequence.
     ordered_calls: Vec<usize>,
-    statuses: HashMap<Uuid, usize>,
+    statuses: HashMap<RunId, usize>,
     vehicle_statuses: HashMap<String, usize>,
     // Assemble and cache the whole-source subway response once per generation.
     whole: OnceLock<Bytes>,
@@ -286,7 +285,7 @@ impl ServiceSnapshot {
 #[derive(Clone)]
 pub struct Operations {
     encoder: ServiceEncoder,
-    pg_pool: PgPool,
+    history: History,
     live_snapshots: LiveSnapshots,
     network: NetworkIndex,
     current: Arc<[Mutex<Option<Arc<ServiceSnapshot>>>; Source::ALL.len()]>,
@@ -294,14 +293,14 @@ pub struct Operations {
 
 impl Operations {
     pub fn new(
-        pg_pool: PgPool,
+        history: History,
         live_snapshots: LiveSnapshots,
         network: NetworkIndex,
         encoder: ServiceEncoder,
     ) -> Self {
         Self {
             encoder,
-            pg_pool,
+            history,
             live_snapshots,
             network,
             current: Arc::new(std::array::from_fn(|_| Mutex::new(None))),
@@ -362,7 +361,8 @@ impl Operations {
                 ids.clone()
             }
         };
-        let retained = History::new(self.pg_pool.clone())
+        let retained = self
+            .history
             .load(
                 source,
                 at,

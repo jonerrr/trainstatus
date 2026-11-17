@@ -1,32 +1,49 @@
 use super::*;
 use crate::network::dataset::NetworkDataset;
-use crate::network::schedule::{ScheduledStopTime, ScheduledTrip, ScheduledTripEntry};
+use crate::network::schedule::{
+    ScheduledStopTime, ScheduledTrip, ScheduledTripEntry, TripTemplate,
+};
 
 fn time(value: &str) -> DateTime<Utc> {
     value.parse().unwrap()
 }
 
 fn scheduled(date: &str, start: &str, end: &str) -> ScheduledTrip {
+    let date = NaiveDate::parse_from_str(date, "%Y%m%d").unwrap();
+    let origin = crate::network::expansion::gtfs_datetime(date, 0).unwrap();
+    let elapsed = |value: &str| u32::try_from((time(value) - origin).num_seconds()).unwrap();
     ScheduledTrip {
-        trip_id: "overnight".into(),
-        route_id: "553".into(),
-        headsign: "Atlantic City".into(),
-        direction_id: 1,
-        start_date: date.into(),
-        start_time: time(start),
-        stop_times: vec![ScheduledStopTime {
-            stop_id: "31717".into(),
-            stop_sequence: 1,
-            arrival: time(end),
-            departure: time(end),
-        }],
+        template: std::sync::Arc::new(TripTemplate {
+            trip_id: "overnight".into(),
+            route_id: "553".into(),
+            headsign: "Atlantic City".into(),
+            direction_id: 1,
+            start_seconds: elapsed(start),
+            stop_times: vec![ScheduledStopTime {
+                stop_id: "31717".into(),
+                stop_sequence: 1,
+                arrival: elapsed(end),
+                departure: elapsed(end),
+            }],
+        }),
+        start_date: date,
     }
 }
 
 fn revision(trips: Vec<ScheduledTrip>) -> NetworkRevision {
     let mut dataset = NetworkDataset::new(Source::NjtBus);
     dataset.scheduled_trips = trips;
-    NetworkRevision::from_dataset(&dataset)
+    let mut revision = NetworkRevision::from_dataset(&dataset);
+    revision.set_schedules(
+        dataset
+            .scheduled_trips
+            .into_iter()
+            .map(|trip| ScheduledTripEntry {
+                trip,
+                expires_at: time("2026-10-16T00:00:00Z"),
+            }),
+    );
+    revision
 }
 
 fn update() -> TripUpdate {
@@ -107,7 +124,59 @@ fn missing_or_expired_schedules_do_not_infer_a_service_date() {
     assert_eq!(infer_service_date(&revision, "overnight", observed), None);
     revision.set_schedules([ScheduledTripEntry {
         trip: scheduled("20261013", "2026-10-14T03:50:00Z", "2026-10-14T04:30:00Z"),
-        expires_at: Utc::now() - chrono::Duration::seconds(1),
+        expires_at: observed - chrono::Duration::seconds(1),
     }]);
     assert_eq!(infer_service_date(&revision, "overnight", observed), None);
+}
+
+#[test]
+fn capture_clock_controls_expiry_and_update_timestamp_can_supply_it() {
+    let observed = time("2026-10-14T04:25:00Z");
+    let mut revision = revision(vec![]);
+    revision.set_schedules([ScheduledTripEntry {
+        trip: scheduled("20261013", "2026-10-14T03:50:00Z", "2026-10-14T04:30:00Z"),
+        expires_at: observed + chrono::Duration::seconds(1),
+    }]);
+    let mut update = update();
+    update.timestamp = Some(observed.timestamp() as u64);
+    let run = NjtBusRealtime::process_trip(update, &revision, None)
+        .0
+        .unwrap();
+    assert_eq!(
+        run.id,
+        RunId::scheduled_bus(
+            Source::NjtBus,
+            "overnight",
+            NaiveDate::from_ymd_opt(2026, 10, 13).unwrap()
+        )
+    );
+    assert_eq!(run.original_id, "overnight");
+    assert_eq!(run.vehicle_id, "17113");
+    assert_eq!(run.created_at, time("2026-10-14T03:50:00Z"));
+    assert_eq!(
+        infer_service_date(&revision, "overnight", observed),
+        Some("20261013".into())
+    );
+    assert_eq!(
+        infer_service_date(
+            &revision,
+            "overnight",
+            observed + chrono::Duration::seconds(1)
+        ),
+        None
+    );
+}
+
+#[test]
+fn missing_observation_and_date_never_invent_a_polling_identity() {
+    let revision = revision(vec![scheduled(
+        "20261013",
+        "2026-10-14T03:50:00Z",
+        "2026-10-14T04:30:00Z",
+    )]);
+    assert!(
+        NjtBusRealtime::process_trip(update(), &revision, None)
+            .0
+            .is_none()
+    );
 }

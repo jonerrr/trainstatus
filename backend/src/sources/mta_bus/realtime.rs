@@ -1,13 +1,13 @@
-use super::super::mta_subway::realtime::parse_origin_time;
 use super::AGENCIES;
 use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
 use crate::integrations::{gtfs_realtime, oba};
 use crate::mta_oba_api_key;
 use crate::operations::{
+    identity::{RunId, RunRef},
     normalize::gtfs_start,
     source::{
         CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
-        RealtimeSourceConfig, RunKey,
+        RealtimeSourceConfig,
     },
     types::{
         position::{MtaBusPositionData, PositionData},
@@ -16,7 +16,7 @@ use crate::operations::{
 };
 use crate::source::Source;
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use geo::Point;
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
@@ -162,38 +162,36 @@ impl MtaBusRealtime {
             Err(_) => return (None, vec![]),
         };
 
-        // Parse start time from trip ID (e.g. QV_A6-Weekday-SDon-070500_Q45_552 -> 070500 -> 07:05:00)
-        // Format: {prefix}_{schedule}-{day}-{type}-{HHMMSS}_{route}_{block}
-        // Fallback to midnight if unparseable - this is deterministic and ensures the same trip
-        // always gets the same created_at (required for the unique constraint to work correctly).
-        // Some MTA Bus Co trips use a different format that doesn't include the origin time.
-        let start_time = parse_bus_origin_time(&mta_id).unwrap_or_else(|| {
+        // Provider origin tokens are elapsed centiminutes, including values beyond 24h.
+        // Nonstandard IDs without an origin retain only a service-day anchor;
+        // this timestamp is neither run identity nor a claimed physical departure.
+        let elapsed = parse_bus_origin_time(&mta_id).unwrap_or_else(|| {
             debug!(
                 trainstatus.source = Source::MtaBus.as_str(),
                 trainstatus.trip.id = %mta_id,
-                "Failed to parse origin time from trip ID, falling back to midnight",
+                "Missing origin token; using service-day anchor",
             );
-            // TODO: it might be possible for there to be multiple trips with the same trip_id but different start times, although hopefully the vehicle_id uniqueness helps avoid conflicts
-            NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+            0
         });
 
         let created_at = match trip_desc
             .start_time
             .as_deref()
             .and_then(|time| gtfs_start(start_date, time))
-            .or_else(|| CollectedTrip::created_at(start_date, start_time))
+            .or_else(|| crate::network::expansion::gtfs_datetime(start_date, elapsed))
         {
             Some(ca) => ca,
             None => return (None, vec![]),
         };
 
         let trip = CollectedTrip {
-            id: RunKey::new(Source::MtaBus, &mta_id, created_at, direction),
+            id: RunId::scheduled_bus(Source::MtaBus, &mta_id, start_date),
             original_id: mta_id,
             route_id,
             shape_ids: vec![],
             direction,
             created_at,
+            partition_date: start_date,
             vehicle_id,
             updated_at: update
                 .timestamp
@@ -341,7 +339,7 @@ impl MtaBusRealtime {
         }
         let vehicle_to_trip: HashMap<_, _> = trips
             .iter()
-            .map(|(trip, _)| (trip.vehicle_id.as_str(), trip.id))
+            .map(|(trip, _)| (trip.vehicle_id.as_str(), RunRef::from(trip)))
             .collect();
         for position in &mut positions {
             position.trip_id = vehicle_to_trip.get(position.vehicle_id.as_str()).copied();
@@ -364,29 +362,18 @@ fn parse_prefixed_id(id: String) -> String {
         .map(|(_, suffix)| suffix.to_string())
         .unwrap_or(id)
 }
-// TODO: test and confirm timestamp format matches subway trip id time format
-/// Parse the origin time from a bus trip ID.
-/// Example: QV_A6-Weekday-SDon-070500_Q45_552 -> 070500 -> 11:45:00
-/// This works for most MTA bus trips, however MTA Bus Co trips have a completely different format that doesn't include the origin time
-fn parse_bus_origin_time(trip_id: &str) -> Option<NaiveTime> {
-    // Split by underscores: ["QV", "A6-Weekday-SDon-070500", "Q45", "552"]
-    let parts: Vec<&str> = trip_id.split('_').collect();
-    if parts.len() < 2 {
-        return None;
-    }
-
-    // The second part contains the schedule info with time at the end
-    // e.g., "A6-Weekday-SDon-070500"
-    let schedule_part = parts[1];
-    let schedule_segments: Vec<&str> = schedule_part.split('-').collect();
-
-    let time_str = schedule_segments.last()?;
-    // it doesn't always have to be 6 chars
-    // if time_str.len() != 6 {
-    //     return None;
-    // }
-
-    let time_num = time_str.parse::<i32>().ok()? / 100;
-
-    parse_origin_time(time_num)
+/// Parse elapsed seconds from the provider's centiminute origin token.
+/// Example: QV_A6-Weekday-SDon-070500_Q45_552 -> 705 minutes -> 11:45:00.
+/// Nonstandard MTA Bus Co IDs may not contain an origin token.
+fn parse_bus_origin_time(trip_id: &str) -> Option<u32> {
+    let schedule = trip_id.split('_').nth(1)?;
+    let centiminutes = schedule.rsplit('-').next()?.parse::<u32>().ok()?;
+    // Divide first to preserve the full u32 seconds range without intermediate overflow.
+    (centiminutes / 100)
+        .checked_mul(60)?
+        .checked_add((centiminutes % 100) * 60 / 100)
 }
+
+#[cfg(test)]
+#[path = "tests/realtime.rs"]
+mod tests;

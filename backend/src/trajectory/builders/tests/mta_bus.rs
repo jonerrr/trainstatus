@@ -33,7 +33,7 @@ fn make_trip(stops: Vec<TrajectoryStop>, shape_length_m: f64) -> TripSnapshot {
     ];
     TripSnapshot {
         started_at: chrono::DateTime::from_timestamp(900, 0).unwrap(),
-        trip_id: uuid::Uuid::nil(),
+        trip_id: crate::operations::identity::RunId::ZERO,
         route_id: "M15".to_string(),
         route_color: "FF0000".to_string(),
         direction: 0,

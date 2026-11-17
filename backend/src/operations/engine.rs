@@ -5,6 +5,7 @@ use tracing::{Span, error, info, warn};
 
 use super::{
     ingestor::{OperationsIngestor, SourceSnapshot},
+    owner::StaticReferenceMissing,
     source::{CollectedSnapshot, RealtimeSource},
 };
 use crate::network::controller::NetworkController;
@@ -81,11 +82,9 @@ impl RealtimeEngine {
             let result = self.collect_once_body(source, source_id).await;
             if let Err(error) = &result {
                 error!(
-                    name: "trainstatus.realtime.failed",
-                    {
-                        error.message = %format_args!("{error:#}"),
-                        error.type = %operation_error_type(error),
-                    },
+                    name = "trainstatus.realtime.failed",
+                    error.message = %format_args!("{error:#}"),
+                    error.type = %operation_error_type(error),
                     "realtime poll failed"
                 );
             }
@@ -111,24 +110,21 @@ impl RealtimeEngine {
             source.collect(revision.clone()),
         )
         .await?;
-        // The engine pins the requested revision for every source. Ingestion checks
-        // its source against the collection once, before touching the database.
         snapshot.network_revision = Some(revision);
         match self.ingestor.ingest(snapshot.clone()).await {
             Ok(committed) => Ok(committed),
             Err(error) => {
-                if !is_foreign_key_violation(&error) {
+                if !error.downcast_ref::<StaticReferenceMissing>().is_some() {
                     return Err(error);
                 }
                 warn!(
-                    name: "trainstatus.realtime.static_recovery",
+                    name = "trainstatus.realtime.static_recovery",
                     "missing static data; forcing static import before retry"
                 );
                 if let Some(metrics) = metrics() {
                     metrics.static_recovery.add(1, metrics.attrs(source_id));
                 }
                 self.static_controller.force_update(source_id).await?;
-                // Deliberately no recursive retry: even a second 23503 escapes.
                 let revision = self
                     .static_controller
                     .network_index()
@@ -147,15 +143,6 @@ impl RealtimeEngine {
     }
 }
 
-fn is_foreign_key_violation(error: &anyhow::Error) -> bool {
-    error
-        .downcast_ref::<sqlx::Error>()
-        .and_then(|error| error.as_database_error())
-        .and_then(|error| error.code().map(|code| code.into_owned()))
-        .as_deref()
-        == Some("23503")
-}
-
 /// The closure is the derivation operation, not an adapter abstraction. Keeping
 /// scheduling independent from CPU work permits deterministic paused-time tests.
 pub async fn trajectory_worker<F, Fut>(
@@ -168,8 +155,6 @@ pub async fn trajectory_worker<F, Fut>(
     Fut: Future<Output = anyhow::Result<HotSnapshot>>,
 {
     while rx.changed().await.is_ok() {
-        // Drop the watch Ref before any await so the collector can replace the
-        // pending value while derivation is in progress.
         let snapshot = { rx.borrow_and_update().clone() };
         let Some(snapshot) = snapshot else {
             continue;
@@ -181,18 +166,16 @@ pub async fn trajectory_worker<F, Fut>(
                 Ok(hot) => {
                     trajectories.publish_live(source, hot).await;
                     info!(
-                        name: "trainstatus.trajectory.completed",
+                        name = "trainstatus.trajectory.completed",
                         "trajectory refresh completed"
                     );
                     Ok(())
                 }
                 Err(error) => {
                     error!(
-                        name: "trainstatus.trajectory.failed",
-                        {
-                            error.message = %format_args!("{error:#}"),
-                            error.type = %operation_error_type(&error),
-                        },
+                        name = "trainstatus.trajectory.failed",
+                        error.message = %format_args!("{error:#}"),
+                        error.type = %operation_error_type(&error),
                         "trajectory refresh failed"
                     );
                     Err(error)

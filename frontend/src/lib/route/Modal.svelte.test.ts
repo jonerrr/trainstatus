@@ -4,11 +4,65 @@ import { chartFixture } from '#lib/charts/fixtures.js';
 import type { ApiAlert } from '#lib/client/index.js';
 import { TransitData } from '#lib/data/store.svelte.js';
 import TransitProvider from '#lib/test/TransitProvider.svelte';
+import type * as urlParams from '#lib/url-params.svelte.js';
 
 import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import Modal from './Modal.svelte';
+
+const historicalTime = vi.hoisted(() => ({ value: undefined as number | undefined, ms: 0 }));
+vi.mock('#lib/url-params.svelte.js', async (importOriginal) => {
+	const original = await importOriginal<typeof urlParams>();
+	return {
+		...original,
+		getCurrentTime: () =>
+			historicalTime.value === undefined ? original.getCurrentTime() : historicalTime
+	};
+});
+
+test('alert timestamps use the historical clock for countdown and same-day display', async () => {
+	const now = new Date(2020, 0, 15, 12).getTime();
+	historicalTime.value = now / 1000;
+	historicalTime.ms = now;
+	const catalog = chartFixture('mta_bus').catalog;
+	const alert: ApiAlert = {
+		id: 'historical',
+		original_id: 'historical',
+		data: { source: 'mta_bus', alert_type: 'Alert', display_before_active: 0 },
+		created_at: now / 1000 - 3600,
+		updated_at: now / 1000 - 3600,
+		start_time: now / 1000 - 3600,
+		entities: [{ route_id: catalog.routes[0].id, sort_order: 0 }],
+		translations: [{ section: 'header', format: 'html', language: 'en', text: 'Historical alert' }]
+	};
+	const data = new TransitData({
+		sources: ['mta_bus'],
+		fetcher: (async (input) =>
+			new Response(
+				JSON.stringify(String(input).includes('/alerts/') ? [alert] : catalog)
+			)) as typeof fetch
+	});
+	try {
+		const childProps = {
+			source: 'mta_bus' as const,
+			routeId: catalog.routes[0].id,
+			timeFormat: 'countdown' as const
+		};
+		const view = await render(TransitProvider<ComponentProps<typeof Modal>>, {
+			props: { data, component: Modal, childProps }
+		});
+		await expect.element(view.getByText('Historical alert')).toBeVisible();
+		expect(view.container.textContent).toContain('an hour ago');
+		await view.rerender({ childProps: { ...childProps, timeFormat: 'time' } });
+		await expect.poll(() => view.container.textContent).toContain('11:00 AM');
+		expect(view.container.textContent).not.toContain('1/15');
+		await view.unmount();
+	} finally {
+		data.destroy();
+		historicalTime.value = undefined;
+	}
+});
 
 test('asynchronously loaded and replaced alert cards are observed and update navigation', async () => {
 	const observers: {

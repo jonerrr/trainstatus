@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/state';
-
 	import type { ExpressionSpecification, FilterSpecification } from 'maplibre-gl';
-	import { LineLayer, VectorTileSource } from 'svelte-maplibre-gl';
+	import { GeoJSONSource, LineLayer } from 'svelte-maplibre-gl';
 
 	import type { MapFeatureKey } from './interactions';
 	import {
@@ -16,9 +14,17 @@
 		SLOT,
 		SUBWAY_SOURCE_FILTER
 	} from './map-theme';
+	import type { RoutesGeoJSON } from './routes-geojson.js';
 
-	let { filter, activeRoute }: { filter: FilterSpecification; activeRoute: MapFeatureKey | null } =
-		$props();
+	let {
+		data,
+		filter,
+		activeRoute
+	}: {
+		data: RoutesGeoJSON;
+		filter: FilterSpecification;
+		activeRoute: MapFeatureKey | null;
+	} = $props();
 	const match: ExpressionSpecification = $derived([
 		'all',
 		['==', ['get', 'id'], activeRoute?.id ?? ''],
@@ -45,10 +51,9 @@
 	]);
 </script>
 
-<VectorTileSource promoteId="id" id="route" url={`${page.url.origin}/martin/active_route_shapes`}>
+<GeoJSONSource promoteId="id" id="route" {data}>
 	<LineLayer
 		id="route-casing-layer"
-		sourceLayer="active_route_shapes"
 		beforeId={SLOT.routes}
 		layout={{ 'line-cap': 'round', 'line-join': 'round' }}
 		{filter}
@@ -60,7 +65,6 @@
 	/>
 	<LineLayer
 		id="route-layer"
-		sourceLayer="active_route_shapes"
 		beforeId={SLOT.routes}
 		layout={{ 'line-cap': 'round', 'line-join': 'round' }}
 		{filter}
@@ -72,7 +76,6 @@
 	/>
 	<LineLayer
 		id="route-highlight-layer"
-		sourceLayer="active_route_shapes"
 		beforeId={SLOT.routes}
 		layout={{ 'line-cap': 'round', 'line-join': 'round' }}
 		filter={highlightFilter}
@@ -84,7 +87,6 @@
 	/>
 	<LineLayer
 		id="route-hit-layer"
-		sourceLayer="active_route_shapes"
 		beforeId={SLOT.routes}
 		layout={{ 'line-cap': 'round', 'line-join': 'round' }}
 		{filter}
@@ -94,4 +96,4 @@
 			'line-opacity': 0
 		}}
 	/>
-</VectorTileSource>
+</GeoJSONSource>

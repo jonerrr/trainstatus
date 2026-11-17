@@ -34,6 +34,10 @@ const MAX_BATCH_ROUTES = 40;
 const FIRST_RETRY_MS = 5_000;
 const TICK_MS = 1_000;
 
+function requestSignal(signal: AbortSignal, at: number | undefined) {
+	return AbortSignal.any([signal, AbortSignal.timeout(at === undefined ? 15_000 : 60_000)]);
+}
+
 export interface TransitDataOptions {
 	sources: readonly Source[];
 	at?: number;
@@ -628,7 +632,7 @@ export class TransitData {
 		try {
 			const response = await this.#fetcher(url, {
 				...init,
-				signal: AbortSignal.any([signal, AbortSignal.timeout(entry.at === undefined ? 15_000 : 60_000)])
+				signal: requestSignal(signal, entry.at)
 			});
 			if (!response.ok) throw new Error(`${url} returned ${response.status}`);
 			const body = (await response.json()) as B;
@@ -700,7 +704,7 @@ export class TransitData {
 		let decoding = false;
 		try {
 			const response = await this.#fetcher(serviceUrl(source, routes, at), {
-				signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+				signal: requestSignal(signal, at),
 				cache: 'no-store'
 			});
 			if (signal.aborted || this.#destroyed) return;

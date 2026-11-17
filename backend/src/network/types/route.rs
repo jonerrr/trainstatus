@@ -3,7 +3,7 @@ use utoipa::ToSchema;
 
 use crate::network::types::stop::Borough;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Route {
     pub id: String,
     // pub source: Source,
@@ -47,7 +47,7 @@ pub struct MtaBusRouteData {
 }
 
 /// Stop data changes based on the `Source`
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum RouteData {
     MtaBus(MtaBusRouteData),

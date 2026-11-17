@@ -1,10 +1,8 @@
-use chrono::Utc;
-use uuid::Uuid;
-
-use crate::support::njt_bus_dataset;
+use crate::support::{eastern_service_date, fixed_time, njt_bus_dataset};
 use backend::{
     integrations::gtfs_realtime::remap_realtime_stop_ids,
     network::index::{NetworkIndex, NetworkRevision},
+    operations::identity::RunId,
     operations::types::{
         position::{NjtBusPositionData, OccupancyStatus, PositionData, VehicleObservation},
         trip::{NjtBusData, StopTimeData, StopVisit, TripData, TripRun},
@@ -13,9 +11,10 @@ use backend::{
 };
 
 fn trip() -> TripRun {
-    let now = Utc::now();
+    let now = fixed_time();
+    let id = RunId::arbitrary("fixture-trip");
     TripRun {
-        id: Uuid::now_v7(),
+        id,
         original_id: "fixture_trip".into(),
         vehicle_id: "fixture_vehicle".into(),
         route_id: "1".into(),
@@ -23,6 +22,7 @@ fn trip() -> TripRun {
         direction: 0,
         created_at: now,
         updated_at: now,
+        partition_date: eastern_service_date(now),
         data: TripData::NjtBus(NjtBusData {
             deviation: None,
             headsign: "Fixture".to_string(),
@@ -30,10 +30,10 @@ fn trip() -> TripRun {
     }
 }
 
-fn stop_time(stop_id: &str) -> StopVisit {
-    let now = Utc::now();
+fn stop_time(stop_id: &str, trip_id: RunId) -> StopVisit {
+    let now = fixed_time();
     StopVisit {
-        trip_id: Uuid::now_v7(),
+        trip_id,
         stop_sequence: 1,
         stop_id: stop_id.into(),
         arrival: now,
@@ -47,7 +47,7 @@ fn vehicle(stop_id: Option<&str>) -> VehicleObservation {
         vehicle_id: "fixture_vehicle".into(),
         trip_id: None,
         stop_id: stop_id.map(Into::into),
-        updated_at: Utc::now(),
+        updated_at: fixed_time(),
         data: PositionData::NjtBus(NjtBusPositionData {
             occupancy_status: OccupancyStatus::default(),
         }),
@@ -77,7 +77,11 @@ fn remaps_child_stop_ids_to_canonical() {
 
     // 16758 is a gate child collapsed into representative 6509; 500 is a plain
     // 1:1 stop with no remap entry.
-    let mut data = vec![(trip(), vec![stop_time("16758"), stop_time("500")])];
+    let trip = trip();
+    let mut data = vec![(
+        trip.clone(),
+        vec![stop_time("16758", trip.id), stop_time("500", trip.id)],
+    )];
     let mut positions = vec![vehicle(Some("16758")), vehicle(Some("500")), vehicle(None)];
 
     remap_realtime_stop_ids(&revision, &mut data, &mut positions);

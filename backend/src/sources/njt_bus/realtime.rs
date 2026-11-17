@@ -11,10 +11,11 @@ use crate::feed::{FeedMessage, TripUpdate, VehiclePosition};
 use crate::integrations::gtfs_realtime;
 use crate::network::index::NetworkRevision;
 use crate::operations::{
+    identity::{RunId, RunRef},
     normalize::{gtfs_start, visit_sequence},
     source::{
         CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
-        RealtimeSourceConfig, RunKey,
+        RealtimeSourceConfig,
     },
     types::{
         position::{NjtBusPositionData, OccupancyStatus, PositionData},
@@ -92,7 +93,7 @@ impl NjtBusRealtime {
         gtfs_realtime::remap_realtime_stop_ids(&revision, &mut trips, &mut positions);
         let vehicle_to_trip: std::collections::HashMap<_, _> = trips
             .iter()
-            .map(|(trip, _)| (trip.vehicle_id.as_str(), trip.id))
+            .map(|(trip, _)| (trip.vehicle_id.as_str(), RunRef::from(trip)))
             .collect();
         for position in &mut positions {
             position.trip_id = vehicle_to_trip.get(position.vehicle_id.as_str()).copied();
@@ -138,14 +139,13 @@ impl NjtBusRealtime {
         };
 
         // Identity requires a provider service date; a polling date can split an overnight run.
-        let inferred_date = observed_at
-            .or_else(|| {
-                update
-                    .timestamp
-                    .and_then(|value| i64::try_from(value).ok())
-                    .and_then(|value| DateTime::from_timestamp(value, 0))
-            })
-            .and_then(|observed| infer_service_date(revision, &trip_id, observed));
+        let observed = observed_at.or_else(|| {
+            update
+                .timestamp
+                .and_then(|value| i64::try_from(value).ok())
+                .and_then(|value| DateTime::from_timestamp(value, 0))
+        });
+        let inferred_date = observed.and_then(|at| infer_service_date(revision, &trip_id, at));
         let Some(start_date_str) = trip_desc.start_date.clone().or(inferred_date) else {
             warn!(
                 trainstatus.source = Source::NjtBus.as_str(),
@@ -155,11 +155,12 @@ impl NjtBusRealtime {
             return (None, vec![]);
         };
 
-        let cached_trip = revision.scheduled_trip(&trip_id, &start_date_str);
+        let cached_trip =
+            observed.and_then(|at| revision.scheduled_trip(&trip_id, &start_date_str, at));
 
         let route_id = trip_desc
             .route_id
-            .or_else(|| cached_trip.as_ref().map(|ct| ct.route_id.clone()))
+            .or_else(|| cached_trip.as_ref().map(|ct| ct.template.route_id.clone()))
             .or_else(|| pattern.as_ref().map(|p| p.route_id.clone()))
             .unwrap_or_else(|| {
                 debug!(
@@ -177,7 +178,7 @@ impl NjtBusRealtime {
         let direction = trip_desc
             .direction_id
             .map(|d| d as i16)
-            .or_else(|| cached_trip.as_ref().map(|ct| ct.direction_id))
+            .or_else(|| cached_trip.as_ref().map(|ct| ct.template.direction_id))
             .or_else(|| pattern.as_ref().map(|p| p.direction))
             .unwrap_or(0);
 
@@ -190,14 +191,14 @@ impl NjtBusRealtime {
             .start_time
             .as_deref()
             .and_then(|time| gtfs_start(start_date, time))
-            .or_else(|| cached_trip.as_ref().map(|trip| trip.start_time));
+            .or_else(|| cached_trip.as_ref().and_then(|trip| trip.start_time()));
         let Some(created_at) = created_at else {
             return (None, vec![]);
         };
 
         let headsign = cached_trip
             .as_ref()
-            .map(|ct| ct.headsign.clone())
+            .map(|ct| ct.template.headsign.clone())
             .unwrap_or_default();
 
         let shape_ids = pattern
@@ -207,12 +208,13 @@ impl NjtBusRealtime {
             .unwrap_or_default();
 
         let trip = CollectedTrip {
-            id: RunKey::new(Source::NjtBus, &trip_id, created_at, direction),
+            id: RunId::scheduled_bus(Source::NjtBus, &trip_id, start_date),
             original_id: trip_id,
             route_id,
             shape_ids,
             direction,
             created_at,
+            partition_date: start_date,
             vehicle_id,
             updated_at: update
                 .timestamp
@@ -236,7 +238,7 @@ impl NjtBusRealtime {
                     &stop_id,
                     cached_trip
                         .as_ref()
-                        .map_or(&[], |trip| trip.stop_times.as_slice()),
+                        .map_or(&[], |trip| trip.template.stop_times.as_slice()),
                 )?;
 
                 let (arrival, departure) =
@@ -315,24 +317,28 @@ fn infer_service_date(
 ) -> Option<String> {
     let dates = revision.scheduled_trips.get(trip_id)?;
     let mut candidates = dates.values().filter(|entry| {
-        if entry.expires_at <= Utc::now() {
+        if entry.expires_at <= observed {
             return false;
         }
-        let trip = &entry.trip;
+        let trip = entry.trip.occurrence();
+        let Some(start) = trip.start_time() else {
+            return false;
+        };
         let end = trip
+            .template
             .stop_times
             .iter()
-            .map(|visit| visit.departure)
+            .filter_map(|visit| trip.departure(visit))
             .max()
-            .unwrap_or(trip.start_time);
-        observed >= trip.start_time - chrono::Duration::hours(1)
+            .unwrap_or(start);
+        observed >= start - chrono::Duration::hours(1)
             && observed <= end + chrono::Duration::hours(6)
     });
     let candidate = candidates.next()?;
     if candidates.next().is_some() {
         return None;
     }
-    Some(candidate.trip.start_date.clone())
+    Some(candidate.trip.start_date.format("%Y%m%d").to_string())
 }
 
 #[cfg(test)]

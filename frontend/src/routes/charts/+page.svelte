@@ -260,7 +260,7 @@
 			if (firstOption) firstOption.focus();
 		} else if (event.key === 'Enter') {
 			event.preventDefault();
-			selectRoute(filteredRoutes[0]);
+			if (filteredRoutes[0]) selectRoute(filteredRoutes[0]);
 		} else if (event.key === 'Tab' && isComboboxOpen) {
 			// Prevent default tab behavior
 			event.preventDefault();

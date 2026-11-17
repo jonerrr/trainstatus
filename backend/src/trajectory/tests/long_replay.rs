@@ -49,7 +49,7 @@ fn trip() -> (TripSnapshot, super::super::geometry::ShapeGeometry) {
     (
         TripSnapshot {
             started_at: at(0),
-            trip_id: uuid::Uuid::nil(),
+            trip_id: crate::operations::identity::RunId::ZERO,
             route_id: "replay".into(),
             route_color: "000000".into(),
             direction: 0,

@@ -19,13 +19,13 @@ pub fn assert_static_dataset_contract(dataset: &NetworkDataset) {
 pub async fn assert_static_persistence_contract(dataset: &NetworkDataset, stores: &TestOwners) {
     stores
         .network
-        .persist(dataset)
+        .persist(dataset.clone())
         .await
         .expect("first static import should persist");
 
     stores
         .network
-        .persist(dataset)
+        .persist(dataset.clone())
         .await
         .expect("second static import should be idempotent");
 
@@ -65,7 +65,7 @@ pub async fn assert_static_persistence_contract(dataset: &NetworkDataset, stores
     assert_eq!(revision.shapes.len(), dataset.shapes.len());
     for expected in &dataset.shapes {
         assert_eq!(
-            serde_json::to_value(&revision.shapes[&expected.id]).unwrap(),
+            serde_json::to_value(revision.shape(&expected.id).unwrap().unwrap().as_ref()).unwrap(),
             serde_json::to_value(&expected.geom).unwrap()
         );
     }

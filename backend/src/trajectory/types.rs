@@ -1,8 +1,8 @@
+use crate::operations::identity::RunId;
 use chrono::{DateTime, Utc};
 use geo::LineString;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::network::types::stop::StopData;
 use crate::operations::types::position::VehicleObservation;
@@ -116,7 +116,7 @@ pub struct TrajectoryStop {
 #[derive(Clone)]
 pub struct TripSnapshot {
     pub started_at: DateTime<Utc>,
-    pub trip_id: Uuid,
+    pub trip_id: RunId,
     pub route_id: String,
     pub route_color: String,
     pub direction: i16,
@@ -171,8 +171,8 @@ pub struct HotSnapshot {
     /// Source commit behind live geometry; absent for startup and historical reads.
     pub committed_at: Option<DateTime<Utc>>,
     pub render_units: std::collections::HashMap<String, RenderUnit>,
-    pub plans: std::collections::HashMap<Uuid, std::sync::Arc<Trajectory>>,
-    pub gps_history: std::collections::HashMap<Uuid, Vec<VehicleObservation>>,
+    pub plans: std::collections::HashMap<RunId, std::sync::Arc<Trajectory>>,
+    pub gps_history: std::collections::HashMap<RunId, Vec<VehicleObservation>>,
 }
 
 impl HotSnapshot {

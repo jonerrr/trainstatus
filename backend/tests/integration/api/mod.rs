@@ -8,11 +8,11 @@ mod passenger;
 mod realtime;
 mod static_data;
 
-#[sqlx::test]
-async fn api_endpoints_cover_alerts_for_every_source(pool: sqlx::PgPool) {
-    static_data::persist_static_fixtures(&pool).await;
+#[tokio::test]
+async fn api_endpoints_cover_alerts_for_every_source() {
+    let ctx = static_data::persist_static_fixtures_isolated().await;
 
-    let state = app_state(pool);
+    let state = app_state(ctx.storage());
     let (router, _) = backend::api::router(state).split_for_parts();
     let server = TestServer::new(router);
 

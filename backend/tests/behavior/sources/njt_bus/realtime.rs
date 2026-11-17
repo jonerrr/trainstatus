@@ -1,5 +1,3 @@
-use chrono::TimeZone;
-
 use crate::support::fixture_root;
 use backend::{
     fixtures::{self, FixtureKind},
@@ -41,11 +39,6 @@ async fn realtime_infers_missing_service_date_from_schedule() {
         .and_then(gtfs_structures::Gtfs::try_from)
         .unwrap();
     let service_date = chrono::NaiveDate::from_ymd_opt(2026, 10, 13).unwrap();
-    let midnight = chrono_tz::America::New_York
-        .from_local_datetime(&service_date.and_hms_opt(0, 0, 0).unwrap())
-        .single()
-        .unwrap()
-        .with_timezone(&chrono::Utc);
     let scheduled_trips = fixture
         .entity
         .iter()
@@ -55,26 +48,26 @@ async fn realtime_infers_missing_service_date_from_schedule() {
             let trip = gtfs.trips.get(trip_id)?;
             let start_seconds = trip.stop_times.first()?.arrival_time?;
             Some(ScheduledTrip {
-                trip_id: trip_id.clone(),
-                route_id: trip.route_id.clone(),
-                direction_id: trip.direction_id.map(|d| d as i16).unwrap_or(0),
-                headsign: trip.trip_headsign.clone().unwrap_or_default(),
-                start_date: "20261013".into(),
-                start_time: midnight + chrono::Duration::seconds(i64::from(start_seconds)),
-                stop_times: trip
-                    .stop_times
-                    .iter()
-                    .filter_map(|stop| {
-                        Some(backend::network::schedule::ScheduledStopTime {
-                            stop_id: stop.stop.id.clone(),
-                            stop_sequence: stop.stop_sequence as u16,
-                            arrival: midnight
-                                + chrono::Duration::seconds(i64::from(stop.arrival_time?)),
-                            departure: midnight
-                                + chrono::Duration::seconds(i64::from(stop.departure_time?)),
+                template: std::sync::Arc::new(backend::network::schedule::TripTemplate {
+                    trip_id: trip_id.clone(),
+                    route_id: trip.route_id.clone(),
+                    direction_id: trip.direction_id.map(|d| d as i16).unwrap_or(0),
+                    headsign: trip.trip_headsign.clone().unwrap_or_default(),
+                    start_seconds,
+                    stop_times: trip
+                        .stop_times
+                        .iter()
+                        .filter_map(|stop| {
+                            Some(backend::network::schedule::ScheduledStopTime {
+                                stop_id: stop.stop.id.clone(),
+                                stop_sequence: stop.stop_sequence as u16,
+                                arrival: stop.arrival_time?,
+                                departure: stop.departure_time?,
+                            })
                         })
-                    })
-                    .collect(),
+                        .collect(),
+                }),
+                start_date: service_date,
             })
         })
         .collect::<Vec<_>>();
@@ -94,7 +87,8 @@ async fn realtime_infers_missing_service_date_from_schedule() {
         .find(|(trip, times)| {
             !times.is_empty()
                 && snapshot.positions.iter().any(|position| {
-                    position.trip_id == Some(trip.id) && position.vehicle_id == trip.vehicle_id
+                    position.trip_id == Some(backend::operations::identity::RunRef::from(trip))
+                        && position.vehicle_id == trip.vehicle_id
                 })
         })
         .expect("fixture should contain a trip with predictions and a position");
@@ -105,11 +99,11 @@ async fn realtime_infers_missing_service_date_from_schedule() {
     let scheduled = dataset
         .scheduled_trips
         .iter()
-        .find(|scheduled| scheduled.trip_id == trip.original_id)
+        .find(|scheduled| scheduled.template.trip_id == trip.original_id)
         .unwrap();
-    assert_eq!(trip.created_at, scheduled.start_time);
-    assert_eq!(trip.route_id, scheduled.route_id);
-    assert_eq!(trip.direction, scheduled.direction_id);
+    assert_eq!(Some(trip.created_at), scheduled.occurrence().start_time());
+    assert_eq!(trip.route_id, scheduled.template.route_id);
+    assert_eq!(trip.direction, scheduled.template.direction_id);
     let prediction = &times[0];
     assert_eq!(prediction.stop_id, "31717");
     assert_eq!(prediction.arrival.timestamp(), 1_791_896_115);
@@ -117,9 +111,14 @@ async fn realtime_infers_missing_service_date_from_schedule() {
     let position = snapshot
         .positions
         .iter()
-        .find(|position| position.trip_id == Some(trip.id))
+        .find(|position| {
+            position.trip_id == Some(backend::operations::identity::RunRef::from(trip))
+        })
         .expect("captured bus position");
-    assert_eq!(position.trip_id, Some(trip.id));
+    assert_eq!(
+        position.trip_id,
+        Some(backend::operations::identity::RunRef::from(trip))
+    );
     let geo::Geometry::Point(point) = position.geom.as_ref().unwrap().0 else {
         panic!("bus point")
     };
@@ -135,12 +134,9 @@ async fn realtime_infers_missing_service_date_from_schedule() {
     );
     for position in &snapshot.positions {
         if let Some(trip_id) = position.trip_id {
-            assert!(
-                snapshot
-                    .trips
-                    .iter()
-                    .any(|(trip, _)| trip.id == trip_id && trip.vehicle_id == position.vehicle_id)
-            );
+            assert!(snapshot.trips.iter().any(|(trip, _)| trip.id == trip_id.id
+                && trip.partition_date == trip_id.partition_date
+                && trip.vehicle_id == position.vehicle_id));
         }
     }
     for (trip, stop_times) in &snapshot.trips {

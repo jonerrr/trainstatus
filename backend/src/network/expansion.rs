@@ -1,61 +1,60 @@
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use chrono_tz::America::New_York;
 use gtfs_structures::Exception;
 
-use crate::network::schedule::ScheduledStopTime;
-use crate::network::schedule::ScheduledTrip;
-use crate::source::Source;
+use crate::network::schedule::{ScheduledStopTime, ScheduledTrip, TripTemplate};
+use std::sync::Arc;
 
-pub fn expand_gtfs(_source: Source, gtfs: &gtfs_structures::Gtfs) -> Vec<ScheduledTrip> {
-    // TODO: don't hardcode timezone
-    let now = Utc::now().with_timezone(&New_York);
-    let today = now.date_naive();
-    let tomorrow = today.succ_opt().unwrap();
-    let dates = vec![today, tomorrow];
+pub fn expand_gtfs(
+    gtfs: &gtfs_structures::Gtfs,
+    at: DateTime<Utc>,
+    mut prepare: impl FnMut(&mut TripTemplate),
+) -> Vec<ScheduledTrip> {
+    let today = at.with_timezone(&New_York).date_naive();
+    let dates = [today.pred_opt(), Some(today), today.succ_opt()];
 
     let mut scheduled_trips = Vec::new();
 
     for trip in gtfs.trips.values() {
-        for &date in &dates {
-            if runs_on_date(&trip.service_id, date, gtfs) {
-                let Some(first_stop_time) = trip.stop_times.first() else {
-                    continue;
-                };
-
-                // Calculate start_time for this specific day
-                let Some(start_time_seconds) = first_stop_time.arrival_time else {
-                    continue;
-                };
-                let Some(start_time) = calculate_datetime(date, start_time_seconds) else {
-                    continue;
-                };
-
-                let stop_times = trip
-                    .stop_times
-                    .iter()
-                    .filter_map(|st| {
-                        let arrival = calculate_datetime(date, st.arrival_time?)?;
-                        let departure = calculate_datetime(date, st.departure_time?)?;
-
-                        Some(ScheduledStopTime {
-                            stop_id: st.stop.id.clone(),
-                            arrival,
-                            departure,
-                            stop_sequence: st.stop_sequence as u16,
-                        })
-                    })
-                    .collect();
-
-                scheduled_trips.push(ScheduledTrip {
-                    trip_id: trip.id.clone(),
-                    route_id: trip.route_id.clone(),
-                    headsign: trip.trip_headsign.clone().unwrap_or_default(),
-                    direction_id: trip.direction_id.map(|d| d as i16).unwrap_or(0),
-                    start_date: date.format("%Y%m%d").to_string(),
-                    start_time,
-                    stop_times,
-                });
-            }
+        let Some(start_seconds) = trip.stop_times.first().and_then(|stop| stop.arrival_time) else {
+            continue;
+        };
+        let eligible = dates.map(|date| {
+            date.filter(|date| {
+                runs_on_date(&trip.service_id, *date, gtfs)
+                    && gtfs_datetime(*date, start_seconds).is_some()
+            })
+        });
+        if eligible.iter().all(Option::is_none) {
+            continue;
+        }
+        let stop_times = trip
+            .stop_times
+            .iter()
+            .filter_map(|st| {
+                Some(ScheduledStopTime {
+                    stop_id: st.stop.id.clone(),
+                    arrival: st.arrival_time?,
+                    departure: st.departure_time?,
+                    stop_sequence: st.stop_sequence as u16,
+                })
+            })
+            .collect();
+        let mut template = TripTemplate {
+            trip_id: trip.id.clone(),
+            route_id: trip.route_id.clone(),
+            headsign: trip.trip_headsign.clone().unwrap_or_default(),
+            direction_id: trip.direction_id.map(|d| d as i16).unwrap_or(0),
+            start_seconds,
+            stop_times,
+        };
+        prepare(&mut template);
+        let template = Arc::new(template);
+        for date in eligible.into_iter().flatten() {
+            scheduled_trips.push(ScheduledTrip {
+                template: Arc::clone(&template),
+                start_date: date,
+            });
         }
     }
 
@@ -95,23 +94,17 @@ fn runs_on_date(service_id: &str, date: NaiveDate, gtfs: &gtfs_structures::Gtfs)
     runs
 }
 
-fn calculate_datetime(date: NaiveDate, seconds_since_midnight: u32) -> Option<DateTime<Utc>> {
-    let hours = seconds_since_midnight / 3600;
-    let minutes = (seconds_since_midnight % 3600) / 60;
-    let seconds = seconds_since_midnight % 60;
-
-    // Handle times > 24:00:00 (GTFS allows this)
-    let (extra_days, hours) = (hours / 24, hours % 24);
-    let actual_date = date.checked_add_signed(chrono::Duration::days(extra_days as i64))?;
-
-    let naive_dt = NaiveDateTime::new(
-        actual_date,
-        chrono::NaiveTime::from_hms_opt(hours, minutes, seconds)?,
-    );
-
-    match New_York.from_local_datetime(&naive_dt) {
-        chrono::LocalResult::Single(dt) => Some(dt.with_timezone(&Utc)),
-        chrono::LocalResult::Ambiguous(dt1, _) => Some(dt1.with_timezone(&Utc)),
-        chrono::LocalResult::None => None,
-    }
+/// GTFS elapsed seconds are measured from service-day noon minus twelve hours.
+pub fn gtfs_datetime(date: NaiveDate, elapsed_seconds: u32) -> Option<DateTime<Utc>> {
+    let noon = New_York
+        .from_local_datetime(&date.and_hms_opt(12, 0, 0)?)
+        .single()?
+        .with_timezone(&Utc);
+    noon.checked_add_signed(chrono::Duration::seconds(
+        i64::from(elapsed_seconds) - 43_200,
+    ))
 }
+
+#[cfg(test)]
+#[path = "tests/expansion.rs"]
+mod tests;

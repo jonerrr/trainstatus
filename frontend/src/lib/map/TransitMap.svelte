@@ -24,7 +24,9 @@
 	import { BUS_DETAIL_ZOOM, RAIL_DETAIL_ZOOM } from './map-theme';
 	import MapFeatureSummary from './MapFeatureSummary.svelte';
 	import RouteLayers from './RouteLayers.svelte';
+	import { buildActiveRouteShapesGeoJSON } from './routes-geojson.js';
 	import StopLayers from './StopLayers.svelte';
+	import { buildStopsGeoJSON } from './stops-geojson.js';
 	import { createTrajectories } from './trajectories.svelte.js';
 	import TripMarkers from './TripMarkers.svelte';
 
@@ -48,9 +50,22 @@
 	const interactions = new MapInteractionController();
 	const transit = getTransitData();
 	const trajectories = createTrajectories(() => ({
-		sources: filters.layers.trip ? filters.sources : [],
+		sources: filters.layers.trip || filters.layers.route ? filters.sources : [],
 		at: currentTime.value
 	}));
+	const routeTables = $derived(
+		new Map(
+			filters.layers.route
+				? [...trajectories.current.tables].filter(([source]) => filters.sources.includes(source))
+				: []
+		)
+	);
+	const stopsGeoJson = $derived(
+		buildStopsGeoJSON(filters.sources, (source) => transit.peekCatalog(source))
+	);
+	const routesGeoJson = $derived(
+		buildActiveRouteShapesGeoJSON(routeTables, (source) => transit.peekCatalog(source))
+	);
 	// Reset any active overlay whenever the visible network or the selected time changes.
 	let overlay = $derived.by<MapOverlay>(() => {
 		void filters.route;
@@ -191,8 +206,12 @@
 			showUserLocation
 			fitBoundsOptions={{ maxZoom: 15 }}
 		/>
-		{#if filters.layers.route}<RouteLayers filter={filters.route} {activeRoute} />{/if}
-		{#if filters.layers.stop}<StopLayers filter={filters.stop} />{/if}
+		{#if filters.layers.route}<RouteLayers
+				data={routesGeoJson}
+				filter={filters.route}
+				{activeRoute}
+			/>{/if}
+		{#if filters.layers.stop}<StopLayers data={stopsGeoJson} filter={filters.stop} />{/if}
 		{#if filters.layers.trip && filters.sources.length}
 			<TripMarkers
 				tables={trajectories.current.tables}

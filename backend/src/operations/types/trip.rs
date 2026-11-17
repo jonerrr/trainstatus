@@ -3,10 +3,11 @@ use chrono_tz::America::New_York;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 use utoipa::ToSchema;
-use uuid::Uuid;
+
+use crate::operations::identity::RunId;
 
 #[derive(Clone, Serialize, PartialEq, Debug, Deserialize)]
-pub struct TripRun<I = Uuid> {
+pub struct TripRun<I = RunId> {
     pub id: I,
     /// Original trip identifier from the data source
     pub original_id: String,
@@ -19,6 +20,8 @@ pub struct TripRun<I = Uuid> {
     /// Provider run start, including its service-date offset. Never the polling time.
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Eastern service date assigned on first acceptance; drives archive head placement.
+    pub partition_date: NaiveDate,
     pub data: TripData,
 }
 
@@ -90,8 +93,8 @@ impl<I> TripRun<I> {
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
-pub struct StopVisit<I = Uuid> {
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
+pub struct StopVisit<I = RunId> {
     pub trip_id: I,
     /// Visit order within the trip. Provider GTFS-RT `stop_sequence` when present,
     /// otherwise recovered from a unique scheduled occurrence. A repeated stop
@@ -103,7 +106,7 @@ pub struct StopVisit<I = Uuid> {
     pub data: StopTimeData,
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
 pub struct MtaSubwayStopTimeData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduled_track: Option<String>,
@@ -113,7 +116,7 @@ pub struct MtaSubwayStopTimeData {
     pub platform_edges: Vec<String>,
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum StopTimeData {
     MtaSubway(MtaSubwayStopTimeData),
@@ -132,6 +135,7 @@ impl<I> TripRun<I> {
             direction: self.direction,
             created_at: self.created_at,
             updated_at: self.updated_at,
+            partition_date: self.partition_date,
             data: self.data,
         }
     }

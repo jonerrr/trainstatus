@@ -55,6 +55,7 @@ async fn exchange(
     let provider = SdkTracerProvider::builder()
         .with_span_processor(SimpleSpanProcessor::new(exporter.clone()))
         .build();
+    super::providers::retain_trace_provider(&provider);
     let dispatch = otel_subscriber(&provider);
     let response = app
         .oneshot(request)

@@ -1,9 +1,10 @@
-use crate::support::app_state;
+use crate::support::{TestContext, app_state};
 use axum_test::TestServer;
 
-#[sqlx::test]
-async fn readiness_route_returns_ok_when_database_is_available(pool: sqlx::PgPool) {
-    let state = app_state(pool);
+#[tokio::test]
+async fn readiness_route_returns_ok_when_storage_is_available() {
+    let ctx = TestContext::new();
+    let state = app_state(ctx.storage());
     let (router, _) = backend::api::router(state).split_for_parts();
     let server = TestServer::new(router);
 

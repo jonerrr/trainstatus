@@ -33,7 +33,7 @@ impl LiveSnapshots {
         self.sources[&source].subscribe()
     }
 
-    // Only ingestion can publish, and only after its transaction commits.
+    // Only ingestion can publish, and only after durable commit completes.
     pub fn publish(&self, snapshot: Arc<SourceSnapshot>) {
         self.sources[&snapshot.source].send_replace(Some(snapshot));
     }

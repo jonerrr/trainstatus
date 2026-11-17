@@ -1,14 +1,15 @@
 use axum_test::TestServer;
+use backend::operations::identity::RunId;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use http::{
     StatusCode,
     header::{CACHE_CONTROL, ETAG, IF_NONE_MATCH},
 };
 use serde_json::{Value, json};
-use uuid::Uuid;
 
 use crate::support::{
-    TestOwners, app_state_from_owners, mta_bus_dataset, mta_subway_dataset, test_owners,
+    TestContext, TestOwners, app_state_from_owners, eastern_service_date, mta_bus_dataset,
+    mta_subway_dataset,
 };
 use backend::{
     operations::{
@@ -21,9 +22,8 @@ use backend::{
     source::Source,
 };
 
-async fn server_with(pool: &sqlx::PgPool, stores: TestOwners) -> TestServer {
-    let (router, _) =
-        backend::api::router(app_state_from_owners(pool.clone(), stores)).split_for_parts();
+fn server_with(stores: TestOwners) -> TestServer {
+    let (router, _) = backend::api::router(app_state_from_owners(stores)).split_for_parts();
     TestServer::new(router)
 }
 
@@ -32,7 +32,7 @@ fn subway_trip(
     offsets: &[(&str, Duration)],
 ) -> (CollectedTrip, Vec<CollectedVisit>) {
     let trip = CollectedTrip {
-        id: Uuid::now_v7().into(),
+        id: RunId::arbitrary("service-trip"),
         original_id: "service-trip".into(),
         vehicle_id: "service-vehicle".into(),
         route_id: "A".into(),
@@ -40,6 +40,7 @@ fn subway_trip(
         direction: 1,
         created_at: at,
         updated_at: at,
+        partition_date: eastern_service_date(at),
         data: TripData::MtaSubway(MtaSubwayTripData {
             consist: None,
             consist_cars: vec![],
@@ -67,7 +68,7 @@ fn subway_trip(
 fn subway_position(trip: &CollectedTrip, at: DateTime<Utc>) -> CollectedObservation {
     CollectedObservation {
         vehicle_id: trip.vehicle_id.clone(),
-        trip_id: Some(trip.id),
+        trip_id: Some(trip.into()),
         stop_id: Some("102".into()),
         updated_at: at,
         data: PositionData::MtaSubway(MtaSubwayPositionData {
@@ -78,13 +79,14 @@ fn subway_position(trip: &CollectedTrip, at: DateTime<Utc>) -> CollectedObservat
     }
 }
 
-#[sqlx::test]
-async fn catalog_preserves_static_detail_and_validates_with_etag(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
+#[tokio::test]
+async fn catalog_preserves_static_detail_and_validates_with_etag() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
     for dataset in [mta_subway_dataset(), mta_bus_dataset()] {
-        stores.network.persist(&dataset).await.unwrap();
+        stores.network.persist(dataset).await.unwrap();
     }
-    let server = server_with(&pool, stores).await;
+    let server = server_with(stores);
 
     let response = server.get("/catalog/mta_subway").await;
     response.assert_status_ok();
@@ -134,11 +136,12 @@ async fn catalog_preserves_static_detail_and_validates_with_etag(pool: sqlx::PgP
     assert!(bus_route_stop["data"].get("shape_ids").is_none());
 }
 
-#[sqlx::test]
-async fn service_rejects_invalid_requests_and_reports_startup_unavailability(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_subway_dataset()).await.unwrap();
-    let server = server_with(&pool, stores).await;
+#[tokio::test]
+async fn service_rejects_invalid_requests_and_reports_startup_unavailability() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
+    stores.network.persist(mta_subway_dataset()).await.unwrap();
+    let server = server_with(stores);
 
     for path in [
         "/service/mta_bus",
@@ -163,10 +166,11 @@ async fn service_rejects_invalid_requests_and_reports_startup_unavailability(poo
         .assert_status(StatusCode::SERVICE_UNAVAILABLE);
 }
 
-#[sqlx::test]
-async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_subway_dataset()).await.unwrap();
+#[tokio::test]
+async fn live_subway_service_joins_status_and_lists_every_route() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
+    stores.network.persist(mta_subway_dataset()).await.unwrap();
     let now = Utc::now();
     let (trip, stops) = subway_trip(
         now,
@@ -188,7 +192,7 @@ async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPo
         })
         .await
         .unwrap();
-    let server = server_with(&pool, stores).await;
+    let server = server_with(stores);
 
     let response = server.get("/service/mta_subway").await;
     response.assert_status_ok();
@@ -220,10 +224,11 @@ async fn live_subway_service_joins_status_and_lists_every_route(pool: sqlx::PgPo
     );
 }
 
-#[sqlx::test]
-async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_subway_dataset()).await.unwrap();
+#[tokio::test]
+async fn historical_service_returns_whole_trips_without_today_status() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
+    stores.network.persist(mta_subway_dataset()).await.unwrap();
     let at = Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap();
     let (inside, inside_stops) = subway_trip(
         at,
@@ -247,7 +252,7 @@ async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx:
         })
         .await
         .unwrap();
-    let server = server_with(&pool, stores).await;
+    let server = server_with(stores);
 
     let body: Value = server
         .get(&format!("/service/mta_subway?at={}", at.timestamp()))
@@ -277,12 +282,11 @@ async fn historical_service_returns_whole_trips_without_today_status(pool: sqlx:
     );
 }
 
-#[sqlx::test]
-async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_window(
-    pool: sqlx::PgPool,
-) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_subway_dataset()).await.unwrap();
+#[tokio::test]
+async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_window() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
+    stores.network.persist(mta_subway_dataset()).await.unwrap();
     let at = Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap();
     // Removing departure relevance, either inclusive boundary, or restoring an
     // updated_at predicate must break these retained-data assertions.
@@ -298,6 +302,7 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
         let (trip, mut stops) = subway_trip(at, &[("101", Duration::minutes(arrival))]);
         stops[0].departure = at + Duration::minutes(departure);
         let trip = CollectedTrip {
+            id: RunId::arbitrary(name),
             original_id: name.into(),
             vehicle_id: name.into(),
             created_at: at - Duration::hours(9),
@@ -319,7 +324,7 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
         })
         .await
         .unwrap();
-    let server = server_with(&pool, stores).await;
+    let server = server_with(stores);
 
     let body: Value = server
         .get(&format!("/service/mta_subway?at={}", at.timestamp()))
@@ -335,10 +340,11 @@ async fn historical_service_selects_by_arrival_or_departure_in_an_inclusive_wind
     assert_eq!(names, ["arrival-end", "arrival-start", "departure-only"]);
 }
 
-#[sqlx::test]
-async fn bus_service_returns_exactly_the_requested_known_routes(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_bus_dataset()).await.unwrap();
+#[tokio::test]
+async fn bus_service_returns_exactly_the_requested_known_routes() {
+    let ctx = TestContext::new();
+    let stores = ctx.owners();
+    stores.network.persist(mta_bus_dataset()).await.unwrap();
     stores
         .ingestor
         .ingest(CollectedSnapshot {
@@ -350,7 +356,7 @@ async fn bus_service_returns_exactly_the_requested_known_routes(pool: sqlx::PgPo
         })
         .await
         .unwrap();
-    let server = server_with(&pool, stores).await;
+    let server = server_with(stores);
     let catalog: Value = server.get("/catalog/mta_bus").await.json();
     let first = catalog["routes"][0]["id"].as_str().unwrap();
     let second = catalog["routes"][1]["id"].as_str().unwrap();

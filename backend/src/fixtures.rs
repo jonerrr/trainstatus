@@ -317,12 +317,12 @@ pub fn static_dataset_expected_value(dataset: &NetworkDataset) -> serde_json::Va
         .iter()
         .map(|trip| {
             json!({
-                "trip_id": trip.trip_id,
-                "route_id": trip.route_id,
-                "headsign": trip.headsign,
-                "direction_id": trip.direction_id,
-                "start_date": trip.start_date,
-                "stop_time_count": trip.stop_times.len(),
+                "trip_id": trip.template.trip_id,
+                "route_id": trip.template.route_id,
+                "headsign": trip.template.headsign,
+                "direction_id": trip.template.direction_id,
+                "start_date": trip.start_date.format("%Y%m%d").to_string(),
+                "stop_time_count": trip.template.stop_times.len(),
             })
         })
         .collect::<Vec<_>>();

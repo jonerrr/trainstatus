@@ -1,5 +1,13 @@
-#[cfg(feature = "integration-tests")]
+mod accepted_poll;
+mod archive_regressions;
+mod checkpoint;
+mod dedup_run;
 mod engine;
-mod worker;
-
+mod gps;
+mod hot_retirement;
 mod normalize;
+mod partition_date;
+mod store;
+pub mod support;
+mod time_index;
+mod worker;

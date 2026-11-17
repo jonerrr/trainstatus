@@ -32,7 +32,8 @@ fn realtime_fixture_maps_trips_and_positions() {
         .iter()
         .find(|(trip, _)| {
             snapshot.positions.iter().any(|position| {
-                position.trip_id == Some(trip.id) && position.vehicle_id == trip.vehicle_id
+                position.trip_id == Some(backend::operations::identity::RunRef::from(trip))
+                    && position.vehicle_id == trip.vehicle_id
             })
         })
         .expect("fixture should link a trip to a position");
@@ -44,13 +45,19 @@ fn realtime_fixture_maps_trips_and_positions() {
     let position = snapshot
         .positions
         .iter()
-        .find(|position| position.trip_id == Some(trip.id))
+        .find(|position| {
+            position.trip_id == Some(backend::operations::identity::RunRef::from(trip))
+        })
         .expect("fixture train has a position");
-    assert_eq!(position.trip_id, Some(trip.id));
+    assert_eq!(
+        position.trip_id,
+        Some(backend::operations::identity::RunRef::from(trip))
+    );
     assert!(position.stop_id.is_some());
     assert!(position.geom.is_some());
     assert!(!position.vehicle_id.is_empty());
-    assert!(snapshot.trips.iter().any(
-        |(trip, _)| Some(trip.id) == position.trip_id && trip.vehicle_id == position.vehicle_id
-    ));
+    assert!(snapshot.trips.iter().any(|(trip, _)| Some(
+        backend::operations::identity::RunRef::from(trip)
+    ) == position.trip_id
+        && trip.vehicle_id == position.vehicle_id));
 }

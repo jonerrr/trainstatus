@@ -1,9 +1,9 @@
+use crate::operations::identity::RunId;
 use crate::operations::types::position::{PositionData, VehicleObservation};
 use crate::source::Source;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 pub const ENCODER: crate::operations::service::ServiceEncoder =
     crate::operations::service::ServiceEncoder {
@@ -59,7 +59,7 @@ pub struct ServiceCalls {
 
 #[derive(Serialize, ToSchema)]
 pub struct ServiceTrip {
-    pub id: Uuid,
+    pub id: RunId,
     #[schema(example = "01 1615+ 242/SFT")]
     pub vehicle_id: String,
     /// Subway: 1 northbound, 3 southbound. Buses: GTFS direction ID matching catalog

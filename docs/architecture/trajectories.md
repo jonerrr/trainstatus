@@ -14,6 +14,8 @@ Motion validity belongs to the backend, which builds and reconciles trajectory p
 - Bus sources use the newest accepted observation, age and cross-track checks, directed branch candidates and recent distinct fixes. A fix contradicting a previous synthetic target is accepted immediately.
 - Stop geometry follows `stop_sequence`, including repeats and colocated stops. Ambiguous projections are omitted.
 - GPS estimates compensate observation latency before bounded speed decay. A sole fix remains a valid stationary plan.
+- Live and historical builders use the same lazy immutable `ShapeIndex` binding view. A run keeps its accepted asset when a provider reuses a shape name; another run may accept the replacement. Unresolved chains expose no stale/partial geometry. Historical route/stop descriptions remain latest retained descriptions.
+- Persisted GPS history is full fidelity in indexed immutable pages. The bounded recent-fix window below belongs only to the motion estimator, not storage retention.
 
 ## Frontend display
 
@@ -23,20 +25,20 @@ Motion validity belongs to the backend, which builds and reconciles trajectory p
 
 Conservative defaults validated on synthetic cases only. They have **not** been tuned from production captures or a ride-along.
 
-| Policy                                         | Default                                                                                      |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Accepted live GPS age / cross-track offset     | 120 s / 100 m                                                                                |
-| Projection alternatives / corner consolidation | 5 m / 5 m                                                                                    |
-| Motion speed cap (bus / subway)                | 30 m/s / 25 m/s                                                                              |
-| GPS extrapolation                              | Pair: at most 120 s / 1,000 m. Single-fix fallback: 30 s / 300 m                             |
-| Retained live report history                   | At most 8 observations per run within 240 s                                                  |
-| GPS correction rejoin                          | `continuity::reconcile` derivation time + 10 s; other intervals if that bridge is infeasible |
+| Policy                                                  | Default                                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Accepted live GPS age / cross-track offset              | 120 s / 100 m                                                                                |
+| Projection alternatives / corner consolidation          | 5 m / 5 m                                                                                    |
+| Motion speed cap (bus / subway)                         | 30 m/s / 25 m/s                                                                              |
+| GPS extrapolation                                       | Pair: at most 120 s / 1,000 m. Single-fix fallback: 30 s / 300 m                             |
+| Motion estimator's recent fixes (not storage retention) | At most 8 observations per run within 240 s                                                  |
+| GPS correction rejoin                                   | `continuity::reconcile` derivation time + 10 s; other intervals if that bridge is infeasible |
 
 The subway ceiling rounds the 55 mph not-to-exceed speed from the [MTA speed and capacity review](https://www.mta.info/document/13046). Before treating limits as tuned, replay consecutive provider captures, profile full-network geometry and mobile frames, and compare GPS targets with later observations and a bus ride-along. Full-network heap/RSS and mobile frame cost remain unmeasured.
 
 ## Where it is tested
 
-Backend, from `backend/`: `SQLX_OFFLINE=true cargo test --locked --features fixture-capture --lib trajectory::`
+Backend, from `backend/`: `MTA_API_URL=https://mta.invalid cargo test --locked --features fixture-capture --lib trajectory::`
 
 - [Long replays](../../backend/src/trajectory/tests/long_replay.rs) (inputs in [long-replays.json](../../backend/tests/fixtures/trajectory/long-replays.json)): handoff continuity, forward motion, speed bounds, prediction-only NJT progress.
 - [GPS replays](../../backend/src/trajectory/tests/gps.rs) and [continuity tests](../../backend/src/trajectory/tests/continuity.rs): delayed and sparse fixes, holds, delayed arrivals.

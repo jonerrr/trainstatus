@@ -131,6 +131,19 @@ for (const source of ['mta_subway', 'mta_bus', 'njt_bus'] satisfies Source[]) {
 	}
 }
 
+test('Enter with no matching route leaves the search usable', async () => {
+	setFixture('mta_bus', 0);
+	await renderChart();
+	await userEvent.click(document.querySelector('[aria-label="Add routes"]')!);
+	const search = document.querySelector<HTMLInputElement>('input[placeholder="Search routes..."]')!;
+	await userEvent.fill(search, 'no matching route');
+	await userEvent.keyboard('{Enter}');
+	expect(document.body.textContent).toContain('No routes found');
+	await userEvent.fill(search, '4');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => document.querySelectorAll('.path-line').length).toBe(3);
+});
+
 test('multiple sources keep colliding trip/stop/route IDs separate and use their own route colors', async () => {
 	const sources: Source[] = ['mta_subway', 'mta_bus', 'njt_bus'];
 	const built = sources.map((source) => chartFixture(source, 0));

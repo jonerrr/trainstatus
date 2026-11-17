@@ -61,22 +61,13 @@ impl StaticAdapter for NjtBusStatic {
         .context("GTFS parse task panicked")?
         .context("Failed to parse NJT GTFS")?;
 
-        let mut scheduled_trips = expand_gtfs(Source::NjtBus, &gtfs);
-
         // Collapse parent/child gate stops that share a public `stop_code` into a
         // single canonical stop, and build the `child_stop_id -> canonical_id`
         // remap used to rewrite route_stops, cached trips, and realtime feeds.
         let (stops, stop_remap) = collapse_stops(&gtfs);
-
-        // Rewrite cached trip stop ids so any consumer joining to `static.stop`
-        // resolves to the canonical (collapsed) stop.
-        for trip in scheduled_trips.iter_mut() {
-            for st in trip.stop_times.iter_mut() {
-                if let Some(canonical) = stop_remap.get(&st.stop_id) {
-                    st.stop_id = canonical.clone();
-                }
-            }
-        }
+        let scheduled_trips = expand_gtfs(&gtfs, chrono::Utc::now(), |template| {
+            prepare_schedule_template(template, &stop_remap);
+        });
 
         let features = patterns::fetch_patterns()
             .await
@@ -182,17 +173,25 @@ fn build_routes(gtfs: &gtfs_structures::Gtfs) -> Vec<Route> {
         .collect()
 }
 
+pub fn prepare_schedule_template(
+    template: &mut crate::network::schedule::TripTemplate,
+    stop_remap: &HashMap<String, String>,
+) {
+    template.headsign = normalize_headsign(&template.route_id, &template.headsign);
+    for stop in &mut template.stop_times {
+        if let Some(canonical) = stop_remap.get(&stop.stop_id) {
+            stop.stop_id.clone_from(canonical);
+        }
+    }
+}
+
 fn build_static_dataset(
     gtfs: &gtfs_structures::Gtfs,
     patterns: PatternDataset,
-    mut scheduled_trips: Vec<crate::network::schedule::ScheduledTrip>,
+    scheduled_trips: Vec<crate::network::schedule::ScheduledTrip>,
     stops: Vec<Stop>,
     stop_remap: &HashMap<String, String>,
 ) -> NetworkDataset {
-    for trip in &mut scheduled_trips {
-        trip.headsign = normalize_headsign(&trip.route_id, &trip.headsign);
-    }
-
     let PatternDataset { shapes, trips } = patterns;
 
     NetworkDataset {

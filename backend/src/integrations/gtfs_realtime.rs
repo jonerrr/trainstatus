@@ -99,10 +99,10 @@ mod tests;
 /// source resolves to identity at no cost. This keeps the
 /// `stop_id -> static.stop` foreign keys satisfied when child stops have been
 /// collapsed away.
-pub fn remap_realtime_stop_ids<I>(
+pub fn remap_realtime_stop_ids<I, P>(
     revision: &NetworkRevision,
     data: &mut [(TripRun<I>, Vec<StopVisit<I>>)],
-    positions: &mut [VehicleObservation<I>],
+    positions: &mut [VehicleObservation<P>],
 ) {
     for (_trip, stop_times) in data.iter_mut() {
         for st in stop_times.iter_mut() {

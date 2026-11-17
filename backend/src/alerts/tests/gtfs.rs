@@ -50,6 +50,15 @@ fn mta_translation_language_and_format_are_shared_across_sections() {
 }
 
 #[test]
+fn empty_gtfs_active_period_yields_no_declared_windows() {
+    let alert = Alert {
+        active_period: vec![],
+        ..Default::default()
+    };
+    assert!(active_periods(&alert).is_empty());
+}
+
+#[test]
 fn periods_require_a_valid_start_and_preserve_open_ends() {
     let alert = Alert {
         active_period: vec![

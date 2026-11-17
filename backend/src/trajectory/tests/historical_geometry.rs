@@ -17,7 +17,7 @@ use crate::{
 async fn relocated_stop_cannot_anchor_a_retained_shape() {
     let at = chrono::DateTime::from_timestamp(1_780_000_000, 0).unwrap();
     let trip = TripRun {
-        id: uuid::Uuid::nil(),
+        id: crate::operations::identity::RunId::ZERO,
         original_id: "retained-run".into(),
         vehicle_id: "vehicle".into(),
         route_id: "route".into(),
@@ -25,6 +25,7 @@ async fn relocated_stop_cannot_anchor_a_retained_shape() {
         direction: 0,
         created_at: at,
         updated_at: at,
+        partition_date: at.date_naive(),
         data: TripData::MtaBus(MtaBusData { deviation: None }),
     };
     let calls = vec![StopVisit {
@@ -50,6 +51,7 @@ async fn relocated_stop_cannot_anchor_a_retained_shape() {
         "asset".into(),
         geo::LineString::from(vec![(-73.9, 40.7), (-73.9, 40.8)]).into(),
     )]);
+    let shapes = crate::network::shape_index::ShapeIndex::from_prepared(shapes);
     let cache = TrajectoryCache::new();
     let inputs = GeometryInputs {
         source: Source::MtaBus,
@@ -83,7 +85,7 @@ async fn relocated_stop_cannot_anchor_a_retained_shape() {
 async fn live_and_history_resolve_loop_visits_by_sequence_instead_of_arrival_order() {
     let at = chrono::DateTime::from_timestamp(1_780_000_000, 0).unwrap();
     let trip = TripRun {
-        id: uuid::Uuid::nil(),
+        id: crate::operations::identity::RunId::ZERO,
         original_id: "loop".into(),
         vehicle_id: "bus".into(),
         route_id: "route".into(),
@@ -91,6 +93,7 @@ async fn live_and_history_resolve_loop_visits_by_sequence_instead_of_arrival_ord
         direction: 0,
         created_at: at,
         updated_at: at,
+        partition_date: at.date_naive(),
         data: TripData::MtaBus(MtaBusData { deviation: None }),
     };
     let stop_data = StopData::MtaBus(MtaBusStopData {
@@ -131,6 +134,7 @@ async fn live_and_history_resolve_loop_visits_by_sequence_instead_of_arrival_ord
         ])
         .into(),
     )]);
+    let shapes = crate::network::shape_index::ShapeIndex::from_prepared(shapes);
     let calls: Vec<_> = [("A", 0, 0), ("B", 1, 120), ("A", 2, 60), ("C", 3, 180)]
         .into_iter()
         .map(|(id, seq, seconds)| StopVisit {

@@ -10,11 +10,16 @@ use crate::operations::{
 use crate::source::Source;
 use crate::trajectory::{service::TrajectoryService, types::HotSnapshot};
 
-fn trajectories() -> TrajectoryService {
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect_lazy("postgres://unused:unused@127.0.0.1:1/unused")
-        .unwrap();
-    TrajectoryService::new(pool)
+fn trajectories() -> (TrajectoryService, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("ops-worker-{}", uuid::Uuid::new_v4()));
+    let storage = crate::storage::store::Storage::open(&dir).unwrap();
+    let ingestor = crate::operations::ingestor::OperationsIngestor::new(
+        storage,
+        crate::operations::live::LiveSnapshots::default(),
+        crate::network::index::NetworkIndex::new(),
+    )
+    .unwrap();
+    (TrajectoryService::new(ingestor.history()), dir)
 }
 
 fn persisted(generation: usize) -> Arc<SourceSnapshot> {
@@ -39,7 +44,7 @@ async fn busy_trajectory_worker_collapses_pending_snapshots_without_blocking_sen
     let (tx, rx) = watch::channel(None);
     let (started, mut observed) = mpsc::unbounded_channel();
     let release = Arc::new(Semaphore::new(0));
-    let cache = trajectories();
+    let (cache, dir) = trajectories();
     let task = tokio::spawn(trajectory_worker(Source::NjtBus, rx, cache, {
         let release = release.clone();
         move |snapshot| {
@@ -69,11 +74,12 @@ async fn busy_trajectory_worker_collapses_pending_snapshots_without_blocking_sen
     );
     drop(tx);
     task.await.unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[tokio::test(start_paused = true)]
 async fn derivation_error_keeps_hot_generation_and_empty_snapshot_clears_it() {
-    let cache = trajectories();
+    let (cache, dir) = trajectories();
     let mut previous = HotSnapshot::empty();
     previous.generated_at = chrono::DateTime::from_timestamp(1, 0).unwrap();
     cache.publish_live(Source::NjtBus, previous).await;
@@ -119,4 +125,6 @@ async fn derivation_error_keeps_hot_generation_and_empty_snapshot_clears_it() {
     );
     drop(tx);
     task.await.unwrap();
+    drop(cache);
+    std::fs::remove_dir_all(dir).unwrap();
 }

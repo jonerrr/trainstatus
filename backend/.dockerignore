@@ -2,5 +2,4 @@ target/
 tests/
 Dockerfile
 mise.toml
-queries.sql
 debug_data/

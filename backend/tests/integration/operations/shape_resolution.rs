@@ -1,17 +1,13 @@
-use uuid::Uuid;
-
-use crate::support::{mta_bus_dataset, test_owners};
+use crate::support::{TestContext, mta_bus_dataset, test_owners};
 use backend::{
     operations::{
-        source::{CollectedSnapshot, RunKey},
+        identity::RunId,
+        source::CollectedSnapshot,
         types::trip::{MtaBusData, StopTimeData, StopVisit, TripData, TripRun},
     },
     source::Source,
 };
 
-/// Real B94 stops (from the checked-in Helium fixture) all served by shape
-/// `B940017`. Used to build a synthetic realtime trip whose stop sequence
-/// unambiguously belongs to that shape.
 const B94_STOP_IDS: [&str; 5] = ["504409", "901701", "904218", "904219", "904979"];
 const B94_STOP_COORDS: [(f64, f64); 5] = [
     (-73.948151, 40.744723),
@@ -24,17 +20,18 @@ const B94_REAL_SHAPE: &str = "B940017";
 const DECOY_SHAPE: &str = "TEST_DECOY_SHAPE";
 
 fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
-    let id: RunKey = Uuid::now_v7().into();
+    let id = RunId::arbitrary("shape-resolution-trip");
     let now = crate::support::fixtures::fixed_time();
     let trip = TripRun {
         id,
-        original_id: format!("test-trip-{}", Uuid::now_v7()),
-        vehicle_id: format!("test-vehicle-{}", Uuid::now_v7()),
+        original_id: "shape-resolution-trip".into(),
+        vehicle_id: "shape-resolution-vehicle".into(),
         route_id: route_id.into(),
         shape_ids: vec![],
         direction: 0,
         created_at: now,
         updated_at: now,
+        partition_date: crate::support::fixtures::eastern_service_date(now),
         data: TripData::MtaBus(MtaBusData { deviation: None }),
     };
     let stops = stop_ids
@@ -61,27 +58,26 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
     }
 }
 
-/// A candidate shape can be geometrically closer to a trip's stops than the
-/// real shape (e.g. a coincidence, or here — deliberately — a decoy built
-/// exactly through the stop points) while having zero confirmed stop-membership
-/// hits. Ingestion must prefer the hit-rich real shape over the
-/// distance-closer decoy.
-#[sqlx::test]
-async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-
-    let dataset = mta_bus_dataset();
-    stores
-        .network
-        .persist(&dataset)
-        .await
-        .expect("fixture should persist");
-
+#[tokio::test]
+async fn resolves_shape_by_stop_hits_over_raw_distance() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
+    let mut dataset = mta_bus_dataset();
+    let expected = dataset
+        .shapes
+        .iter()
+        .find(|shape| shape.id == B94_REAL_SHAPE)
+        .expect("real B94 shape")
+        .geom
+        .clone();
+    stores.network.persist(dataset.clone()).await.unwrap();
+    dataset.shapes.push(backend::network::types::shape::Shape {
+        id: DECOY_SHAPE.into(),
+        source: Source::MtaBus,
+        geom: backend::geometry::Geom::from(geo::LineString::from(B94_STOP_COORDS.to_vec())),
+    });
     let mut revision = backend::network::index::NetworkRevision::from_dataset(&dataset);
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
-        DECOY_SHAPE.into(),
-        backend::geometry::Geom::from(geo::LineString::from(B94_STOP_COORDS.to_vec())),
-    );
     std::sync::Arc::make_mut(&mut revision.routes)
         .get_mut("B94")
         .unwrap()
@@ -96,29 +92,24 @@ async fn resolves_shape_by_stop_hits_over_raw_distance(pool: sqlx::PgPool) {
         .ingest(collected_trip("B94", &B94_STOP_IDS))
         .await
         .unwrap();
-    assert_eq!(
-        committed.trips[0].shape_ids,
-        [B94_REAL_SHAPE],
-        "membership must beat the geometrically closer decoy"
-    );
+    assert_eq!(committed.trips[0].shape_ids.len(), 1);
+    let selected = committed
+        .network_revision
+        .shape(&committed.trips[0].shape_ids[0])
+        .unwrap()
+        .unwrap();
+    assert_eq!(selected.as_ref(), &expected);
     assert_eq!(committed.changes.resolved_shapes, 1);
 }
 
-/// Before a fresh static import populates `route_stop.data->'shape_ids'`, every
-/// candidate has zero hits. Resolution must still fall back to the old average-
-/// distance ranking rather than erroring or dropping the trip.
-#[sqlx::test]
-async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-
+#[tokio::test]
+async fn falls_back_to_distance_when_no_hit_data_exists() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
     let dataset = mta_bus_dataset();
-    stores
-        .network
-        .persist(&dataset)
-        .await
-        .expect("fixture should persist");
-
     let mut revision = backend::network::index::NetworkRevision::from_dataset(&dataset);
+    stores.network.persist(dataset).await.unwrap();
     std::sync::Arc::make_mut(&mut revision.route_stop_shapes).clear();
     stores
         .network
@@ -130,8 +121,12 @@ async fn falls_back_to_distance_when_no_hit_data_exists(pool: sqlx::PgPool) {
         .await
         .unwrap();
     assert!(
-        !committed.trips[0].shape_ids.is_empty(),
-        "zero membership hits still resolve a shape through distance"
+        committed.trips[0].shape_ids.iter().all(|id| committed
+            .network_revision
+            .shape(id)
+            .unwrap()
+            .is_some())
     );
+    assert!(!committed.trips[0].shape_ids.is_empty());
     assert_eq!(committed.changes.resolved_shapes, 1);
 }

@@ -152,7 +152,7 @@ async fn run_source_handler(
                                 dataset.source == adapter.source(),
                                 "Static adapter returned another source"
                             );
-                            network.persist(&dataset).await
+                            network.persist(dataset).await
                         }
                         .await;
                         match &result {

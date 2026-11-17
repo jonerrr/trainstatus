@@ -1,3 +1,5 @@
+import { SvelteSet } from 'svelte/reactivity';
+
 import type {
 	CatalogRoute,
 	CatalogStop,
@@ -164,8 +166,8 @@ export const mainRouteStops = (
 const ROUTE_ROW_HEIGHT = 54;
 // Trip/Button reserves 68px including the occupancy meter; List adds p-2 and two 1px borders.
 const TRIP_ROW_HEIGHT = 68 + 16 + 2;
-// p-2 on the stop row (8px top + 8px bottom)
-const STOP_ROW_PADDING = 16;
+// List row padding and its two 1px borders.
+const STOP_ROW_PADDING = 18;
 // One bus route: icon row plus its first direction label and ETA row
 const BUS_ROUTE_HEIGHT = 56;
 const BUS_EXTRA_LABEL_HEIGHT = 24;
@@ -192,7 +194,7 @@ const STOP_NAME_MAX_WIDTH = 300;
 const HEADSIGN_MAX_WIDTH = 140;
 
 export function calculateStopHeight(item: CatalogStop) {
-	// 16px total padding (p-2 = 8px top + 8px bottom)
+	// List padding and borders.
 	let height = STOP_ROW_PADDING;
 
 	// Stop name — may wrap on narrow screens
@@ -230,9 +232,11 @@ export function calculateStopHeight(item: CatalogStop) {
 		);
 		height += Math.max(northH, southH);
 
-		// Route arrival rows (24px each)
-		const mainRoutes = mainRouteStops(item.routes);
-		height += mainRoutes.length * SUBWAY_ARRIVAL_ROW_HEIGHT;
+		// Each direction renders the same unique static routes; predictions can add more.
+		const routeCount = new SvelteSet(
+			mainRouteStops(item.routes, new SvelteSet()).map((route) => route.route_id)
+		).size;
+		height += 4 + routeCount * SUBWAY_ARRIVAL_ROW_HEIGHT + Math.max(0, routeCount - 1) * 4;
 	}
 
 	return height;
@@ -249,6 +253,6 @@ export function skeletonRowHeight(type: 'stop' | 'route' | 'trip', source?: Sour
 	if (type === 'trip') return calculateTripHeight();
 	const base = STOP_ROW_PADDING + STOP_NAME_LINE_HEIGHT;
 	return source === 'mta_subway'
-		? base + HEADSIGN_LINE_HEIGHT + SUBWAY_ARRIVAL_ROW_HEIGHT
+		? base + 4 + HEADSIGN_LINE_HEIGHT + SUBWAY_ARRIVAL_ROW_HEIGHT
 		: base + BUS_ROUTE_HEIGHT;
 }

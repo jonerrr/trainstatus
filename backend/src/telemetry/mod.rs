@@ -336,13 +336,6 @@ pub fn operation_error_type(error: &anyhow::Error) -> std::borrow::Cow<'static, 
         if let Some(error) = cause.downcast_ref::<reqwest::Error>() {
             return crate::integrations::http::error_type(error);
         }
-        if let Some(error) = cause.downcast_ref::<sqlx::Error>() {
-            return error
-                .as_database_error()
-                .and_then(|error| error.code())
-                .map(|code| std::borrow::Cow::Owned(code.into_owned()))
-                .unwrap_or(std::borrow::Cow::Borrowed("database"));
-        }
     }
     "operation_failed".into()
 }

@@ -5,44 +5,42 @@ Run commands from `backend/`.
 | Task                                        | Purpose                                                                              |
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `mise run test:unit`                        | Private unit and public behavior tests; no running services or tile extract required |
-| `mise run test`                             | Ordinary suite on existing PostgreSQL, including integration tests and doctests      |
-| `mise run test:integration`                 | SQL, HTTP persistence and private engine tests                                       |
+| `mise run test`                             | Full suite including integration tests and doctests                                  |
+| `mise run test:integration`                 | Filesystem-backed persistence, ingestion, and engine tests                           |
 | `mise run test:services integration <name>` | Focused integration filter                                                           |
-| `mise run sqlx:prepare`                     | Refresh compile-time query metadata against the configured migrated database         |
-| `mise run sqlx:check`                       | Verify committed query metadata against that database                                |
-| `mise run test:performance`                 | Opt-in ingestion WAL and static import/restart benchmarks; use an idle machine       |
+| `mise run test:performance`                 | Opt-in ingestion and static import/restart benchmarks; use an idle machine           |
+| `mise run smoke:storage`                    | End-to-end storage smoke (HTTP, all sources, restart recovery); see root task        |
 
-For a focused service-free test, use `mise run test:unit <name>`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and make no network requests to transit providers. The test tasks set `MTA_API_URL=https://mta.invalid` because Rust embeds it at compile time; tests need no fnox or provider credentials. The pre-commit Clippy step uses the same placeholder. For direct Cargo commands, supply `MTA_API_URL` explicitly (a placeholder URL suffices for tests). Service-backed tests need the development PostgreSQL/PostGIS server running. Tests use local Rust caches; no cache containers are needed.
+`smoke:storage` selects the ignored `storage_cutover` integration test in `tests/storage_smoke.rs`. It allocates an isolated temporary root, invokes the same test executable for bootstrap/recovery/HTTP phases, kills the writer after durable acknowledgement, exercises the production TCP router, then cleans the root. Private child-phase environment variables are an internal test protocol, not a CLI. There are no `build-catalog` or `storage-smoke` binaries. Do not rebuild the selected test executable while its supervisor is spawning children.
+
+Bus smoke replay includes both TripUpdates and VehiclePositions; MTA also includes OBA enrichment. Recovery compares independently selected unambiguous captured GPS reports with stored anchors and rejects a report queried immediately before its observation time. It does not substitute polling time for provider evidence.
+
+For a focused service-free test, use `mise run test:unit <name>`. Native Valhalla build dependencies still apply; see `mise.toml`. Normal tests use committed fixtures and make no network requests to transit providers. The test tasks set `MTA_API_URL=https://mta.invalid` because Rust embeds it at compile time; tests need no fnox or provider credentials. The pre-commit Clippy step uses the same placeholder. For direct Cargo commands, supply `MTA_API_URL` explicitly (a placeholder URL suffices for tests). Integration and smoke tests use isolated directories under the filesystem store only.
 
 ## Placement and ownership
 
-Private tests live in an owning module's `tests/` directory and are registered with `#[cfg(test)]` in that module. This preserves access to private functions without test bodies in production files. The five private realtime engine tests additionally require `integration-tests` because they use services.
+Private tests live in an owning module's `tests/` directory and are registered with `#[cfg(test)]` in that module. This preserves access to private functions without test bodies in production files. Realtime engine persistence coverage additionally requires `integration-tests`; service-free derivation tests do not.
 
-Cargo has three explicit public test targets:
+Cargo has four explicit public test targets:
 
 - `tests/behavior/`: source normalization, static validation, live trajectory derivation, and service-free HTTP behavior.
-- `tests/integration/`: ingestion transactions, historical stores, static import lifecycle and persistence, service-backed source scenarios, and HTTP/geometry output.
+- `tests/integration/`: ingestion, historical stores, static import lifecycle/persistence, source scenarios and HTTP/geometry output.
 - `tests/performance/`: opt-in benchmarks, never part of the ordinary suite.
+- `tests/storage_smoke.rs`: the opt-in all-source crash/TCP smoke; private helpers live in `tests/support/storage_smoke.rs`.
 
-For captured NJT schedule import/restart memory, run `mise run test:services performance njt_static_import_and_restart_memory` on an idle PostgreSQL server. This reports expanded trip count, import/restart timing, RSS during overlapping pinned revisions, and peak RSS with the executable's jemalloc allocator. The capture's calendar must include today; the test fails explicitly when it has expired. It uses the full captured GTFS but a small captured GIS pattern set, so it does not measure the complete production workload.
+For captured NJT schedule import/restart memory, run `mise run test:services performance njt_static_import_and_restart_memory` on an idle machine. This reports expanded trip count, import/restart timing, RSS during overlapping pinned revisions and peak RSS with jemalloc. Expansion uses the explicit captured service clock, not the machine's current date. The full captured GTFS uses a smaller GIS pattern set, so this is not a complete production workload measurement.
 
 The large captured NJT GTFS import remains an ignored library test. Run it explicitly by its name with `--ignored` when checking the full import; the ordinary suite uses smaller committed cases.
 
 Only target entrypoints live at the root of `tests/`. Nested modules must be registered in their owner's `mod.rs`; helpers belong in `tests/support/`. Name files after the behavior, not an ambiguous `trajectory` or `snapshot` bucket. Live trajectory derivation is `behavior/trajectory/live`; historical inputs are `integration/operations/history`; ingestion shape selection is `integration/operations/shape_resolution`.
 
-## Services and clocks
+## Storage layout and isolation
 
-`test:services` selects a suite and supplies its test environment; it does not start or stop PostgreSQL. By default it connects to `postgres://trains:trains@localhost:5432/postgres` on the existing development server. Override this connection with `TEST_DATABASE_URL` when using another server. The `postgres` maintenance database holds SQLx's `_sqlx_test` bookkeeping; test migrations and data go into SQLx-created databases, never the development `trains` database.
+`test:services` selects a suite and supplies its test environment; it does not start or stop Podman pods. Each test constructs fresh store owners in a temporary directory (or uses helpers in `tests/support/`). Set `TRAINSTATUS_DATA_DIR` only when you intentionally share a directory across commands. Normal Rust test parallelism is supported; helpers allocate distinct roots per case where needed.
 
-Tests accepting `PgPool` through `#[sqlx::test]` get a fresh database with migrations applied automatically. Successful test databases are deleted; failed ones remain for debugging and SQLx cleans old test databases on a later run. The connection role needs permission to create databases and install the migration extensions (the local `trains` image role is a superuser). SQLx manages databases, not the PostgreSQL server. Normal Rust test parallelism is supported. Avoid overlapping independent suite invocations on this same server: SQLx's cleanup/database names can collide across runs; use separate servers if that is needed.
+Each owner shares its intended caches and root pins across readers; construct fresh owners for independent test roots. Never delete a development or production data directory for tests. Test helpers own and remove their temporary directories.
 
-Use `query!`, `query_as!` or `query_scalar!` for SQL that SQLx can describe. Complex nested JSON/spatial projections and PostgreSQL utility commands remain runtime queries and are covered by integration tests. Private persistence rows stay separate from domain and API types. `backend/sqlx.toml` maps geometry and source enum types to their Rust representations.
-
-Normal backend mise builds/tests use `SQLX_OFFLINE=true` and committed `.sqlx/` metadata; `test:services` still executes real SQL in isolated databases. After changing checked SQL or migrations, use the configured, migrated development database to run `mise run sqlx:prepare`, then `mise run sqlx:check`. These tasks set `SQLX_OFFLINE=false` and include all targets plus fixture/engine features. They describe queries without ingesting data or initializing a database. Commit the regenerated metadata with the SQL changes.
-
-Each store/service owns its in-memory caches. Construct fresh stores for test isolation; no external cache or container cleanup is required. Never reset the development pod for tests.
-
-Use fixed historical timestamps and explicit fixture service dates. Live derivation reads the real clock, so its inputs remain relative to that clock; tile activity uses PostgreSQL's five-minute `NOW()` window. Do not add a public test-only clock API just to relocate tests.
+Use fixed historical timestamps and explicit fixture service dates. Live derivation reads the real clock, so its inputs remain relative to that clock. Do not add a public test-only clock API just to relocate tests.
 
 ## Choosing assertions
 

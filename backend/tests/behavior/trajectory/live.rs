@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{Duration, Utc};
 
@@ -6,8 +6,9 @@ use crate::support;
 use backend::{
     fixtures::{FixtureKind, load_manifest_for, read_json_payload},
     geometry::Geom,
-    network::{index::NetworkRevision, types::stop::StopData},
+    network::{index::NetworkRevision, shape_index::ShapeIndex, types::stop::StopData},
     operations::{
+        identity::RunId,
         ingestor::{IngestionChanges, SourceSnapshot},
         types::{
             position::{MtaBusPositionData, PositionData, VehicleObservation},
@@ -30,7 +31,7 @@ use backend::{
 
 fn fixture() -> SourceSnapshot {
     let now = Utc::now();
-    let id = uuid::Uuid::now_v7();
+    let id = RunId::arbitrary("live-fixture-trip");
     let mut revision = NetworkRevision::from_dataset(&support::mta_bus_dataset());
     let stop_ids = ["504409", "901701"];
     for (i, stop) in stop_ids.iter().enumerate() {
@@ -39,10 +40,10 @@ fn fixture() -> SourceSnapshot {
             .unwrap()
             .geom = Geom::from(geo::Point::new(-74.0 + i as f64 * 0.01, 40.7));
     }
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
+    revision.shapes = ShapeIndex::from_prepared(HashMap::from([(
         "committed-shape".into(),
         Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
-    );
+    )]));
     SourceSnapshot {
         source: Source::MtaBus,
         committed_at: chrono::Utc::now(),
@@ -55,6 +56,7 @@ fn fixture() -> SourceSnapshot {
             direction: 0,
             created_at: now,
             updated_at: now,
+            partition_date: support::fixtures::eastern_service_date(now),
             data: TripData::MtaBus(MtaBusData { deviation: None }),
         }],
         stop_times: stop_ids
@@ -188,13 +190,17 @@ async fn trajectory_bad_trip_isolated_and_empty_snapshot_clears_source() {
     let mut snapshot = fixture();
     let valid_id = snapshot.trips[0].id;
     let mut malformed = snapshot.trips[0].clone();
-    malformed.id = uuid::Uuid::now_v7();
+    malformed.id = RunId::arbitrary("malformed-trip");
     malformed.shape_ids = vec!["nonfinite".into()];
     let mut revision = (*snapshot.network_revision).clone();
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
-        "nonfinite".into(),
-        Geom::from(geo::LineString::from(vec![(f64::NAN, 40.7), (-73.9, 40.7)])),
-    );
+    let committed = revision.shape("committed-shape").unwrap().unwrap();
+    revision.shapes = ShapeIndex::from_prepared(HashMap::from([
+        ("committed-shape".into(), (*committed).clone()),
+        (
+            "nonfinite".into(),
+            Geom::from(geo::LineString::from(vec![(f64::NAN, 40.7), (-73.9, 40.7)])),
+        ),
+    ]));
     snapshot.network_revision = Arc::new(revision);
     snapshot.trips.push(malformed);
     let cache = Arc::new(TrajectoryCache::new());
@@ -283,14 +289,16 @@ async fn trajectory_subway_connected_segments_preserve_consist_and_platform_data
     let b = (-73.99, 40.7);
     let c = (-73.98, 40.7);
     let d = (-73.97, 40.7);
-    for (id, coords) in [
-        ("first", vec![b, a]),
-        ("second", vec![c, b]),
-        ("third", vec![c, d]),
-    ] {
-        std::sync::Arc::make_mut(&mut revision.shapes)
-            .insert(id.into(), Geom::from(geo::LineString::from(coords)));
-    }
+    revision.shapes = ShapeIndex::from_prepared(
+        [
+            ("first", vec![b, a]),
+            ("second", vec![c, b]),
+            ("third", vec![c, d]),
+        ]
+        .into_iter()
+        .map(|(id, coords)| (id.into(), Geom::from(geo::LineString::from(coords))))
+        .collect(),
+    );
     std::sync::Arc::make_mut(&mut revision.stops)
         .get_mut("101")
         .unwrap()
@@ -362,10 +370,14 @@ async fn trajectory_disconnected_subway_segments_are_rejected() {
     let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids.push("disconnected".into());
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
-        "disconnected".into(),
-        Geom::from(geo::LineString::from(vec![(-73.9, 40.7), (-73.89, 40.7)])),
-    );
+    let committed = revision.shape("committed-shape").unwrap().unwrap();
+    revision.shapes = ShapeIndex::from_prepared(HashMap::from([
+        ("committed-shape".into(), (*committed).clone()),
+        (
+            "disconnected".into(),
+            Geom::from(geo::LineString::from(vec![(-73.9, 40.7), (-73.89, 40.7)])),
+        ),
+    ]));
     let error = snapshot_from_persisted_trip(
         &trip,
         snapshot.stop_times,
@@ -403,7 +415,7 @@ async fn trajectory_nonfinite_position_does_not_hide_other_trips() {
     let mut snapshot = fixture();
     let id = snapshot.trips[0].id;
     let mut broken = snapshot.trips[0].clone();
-    broken.id = uuid::Uuid::now_v7();
+    broken.id = RunId::arbitrary("broken-trip");
     let mut position = snapshot.positions[0].clone();
     position.trip_id = Some(broken.id);
     position.geom = Some(Geom::from(geo::Point::new(f64::INFINITY, 40.7)));
@@ -439,7 +451,8 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
         // node when it exactly repeats the preceding segment's final node.
         let mut expected = Vec::new();
         for id in &trip.shape_ids {
-            let geo::Geometry::LineString(line) = &revision.shapes[id].0 else {
+            let shape = revision.shape(id).unwrap().unwrap();
+            let geo::Geometry::LineString(line) = &shape.0 else {
                 panic!("fixture shape must be a line")
             };
             let shared = expected.last() == line.0.first();
@@ -448,7 +461,7 @@ async fn trajectory_real_subway_fixture_preserves_ordered_segment_junctions() {
             }
             expected.extend(line.0.iter().skip(usize::from(shared)).copied());
         }
-        let id = uuid::Uuid::now_v7();
+        let id = RunId::arbitrary("live-fixture-trip");
         let trip = trip.with_id(id);
         let stops = stops
             .into_iter()
@@ -482,14 +495,16 @@ async fn trajectory_subway_rejects_unrelated_topological_legs_even_with_shared_c
     let mut revision = (*snapshot.network_revision).clone();
     revision.source = Source::MtaSubway;
     trip.shape_ids = vec!["76-75".into(), "254-255".into()];
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
-        "76-75".into(),
-        Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
-    );
-    std::sync::Arc::make_mut(&mut revision.shapes).insert(
-        "254-255".into(),
-        Geom::from(geo::LineString::from(vec![(-73.99, 40.7), (-73.98, 40.7)])),
-    );
+    revision.shapes = ShapeIndex::from_prepared(HashMap::from([
+        (
+            "76-75".into(),
+            Geom::from(geo::LineString::from(vec![(-74.0, 40.7), (-73.99, 40.7)])),
+        ),
+        (
+            "254-255".into(),
+            Geom::from(geo::LineString::from(vec![(-73.99, 40.7), (-73.98, 40.7)])),
+        ),
+    ]));
     let result = snapshot_from_persisted_trip(
         &trip,
         snapshot.stop_times,
@@ -520,7 +535,7 @@ async fn captured_subway_trajectories_stay_below_speed_limit_over_ten_minutes() 
     let mut worst = (0.0_f64, String::new(), 0.0);
     let mut frames = 0;
     for (trip, stops) in collected.trips {
-        let id = uuid::Uuid::now_v7();
+        let id = RunId::arbitrary("live-fixture-trip");
         let trip = trip.with_id(id);
         let stops = stops.into_iter().map(|s| s.with_trip_id(id)).collect();
         let input = snapshot_from_persisted_trip(&trip, stops, vec![], &revision, &cache, at)

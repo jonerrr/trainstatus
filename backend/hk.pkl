@@ -1,7 +1,7 @@
 amends "package://github.com/jdx/hk/releases/download/v2.11.1/hk@2.11.1#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.11.1/hk@2.11.1#/Builtins.pkl"
 
-local code = List("**/*.rs", "Cargo.toml", "Cargo.lock", "mise.toml", "migrations/**", ".sqlx/**", "protos/**", "tests/**")
+local code = List("**/*.rs", "Cargo.toml", "Cargo.lock", "mise.toml", "protos/**", "tests/**")
 
 steps {
   ["rustfmt"] = (Builtins.rustfmt) {

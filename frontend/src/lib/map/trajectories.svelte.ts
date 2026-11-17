@@ -136,7 +136,7 @@ function watchSource(
 			failures++;
 			update.error = toError(error);
 			update.fatal = decoding;
-			// A failed historical read (often database overload) waits for the shared Retry control.
+			// A failed historical read waits for the shared Retry control.
 			if (at === undefined) schedule(Math.min(refreshMs, FIRST_RETRY_MS * 2 ** (failures - 1)));
 		}
 	}

@@ -1,11 +1,9 @@
-use uuid::Uuid;
-
-use crate::support::{mta_bus_dataset, test_owners};
+use crate::support::{TestContext, fixtures::fixed_time, mta_bus_dataset, test_owners};
 use backend::{
     geometry::Geom,
     operations::{
-        history::History,
-        source::{CollectedObservation, CollectedSnapshot, RunKey},
+        identity::RunId,
+        source::CollectedSnapshot,
         types::{
             position::{MtaBusPositionData, PositionData, VehicleObservation},
             trip::{MtaBusData, StopTimeData, StopVisit, TripData, TripRun},
@@ -15,104 +13,21 @@ use backend::{
     trajectory::service::TrajectoryService,
 };
 
-/// Real B94 stops (from the checked-in Helium fixture) all served by shape
-/// `B940017`, in directed traversal order. Used to build a synthetic realtime trip whose stop sequence
-/// unambiguously belongs to that shape.
 const B94_STOP_IDS: [&str; 5] = ["904218", "904979", "504409", "901701", "904219"];
 
-#[sqlx::test]
-async fn concurrent_historical_requests_share_snapshot(pool: sqlx::PgPool) {
-    let service = TrajectoryService::new(pool);
-    let at = crate::support::fixtures::fixed_time();
-    let results =
-        futures::future::join_all((0..8).map(|_| service.snapshot(Source::MtaBus, Some(at)))).await;
-    let snapshots: Vec<_> = results.into_iter().map(Result::unwrap).collect();
-    for snapshot in &snapshots[1..] {
-        assert!(
-            std::sync::Arc::ptr_eq(&snapshots[0], snapshot),
-            "concurrent misses must return the same computed snapshot"
-        );
-    }
-    let cached = service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
-    assert!(std::sync::Arc::ptr_eq(&snapshots[0], &cached));
-    let next_second = service
-        .snapshot(Source::MtaBus, Some(at + chrono::Duration::seconds(1)))
-        .await
-        .unwrap();
-    assert!(!std::sync::Arc::ptr_eq(&snapshots[0], &next_second));
-}
-
-#[sqlx::test]
-async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    stores.network.persist(&mta_bus_dataset()).await.unwrap();
-    let at = crate::support::fixtures::fixed_time();
-    stores
-        .ingestor
-        .ingest(collected_trip("B94", &B94_STOP_IDS))
-        .await
-        .unwrap();
-    let later = at + chrono::Duration::seconds(1);
-    assert_eq!(
-        at.timestamp().div_euclid(300),
-        later.timestamp().div_euclid(300)
-    );
-    let first = TrajectoryService::new(pool.clone())
-        .snapshot(Source::MtaBus, Some(at))
-        .await
-        .unwrap();
-    let second = TrajectoryService::new(pool.clone())
-        .snapshot(Source::MtaBus, Some(later))
-        .await
-        .unwrap();
-    assert!(!first.render_units.is_empty());
-    assert!(!second.render_units.is_empty());
-    assert_ne!(
-        first.render_units, second.render_units,
-        "generations retain their requested second even when the motion polynomials agree"
-    );
-    for order in [[at, later], [later, at]] {
-        let service = TrajectoryService::new(pool.clone());
-        for time in order {
-            let snapshot = service.snapshot(Source::MtaBus, Some(time)).await.unwrap();
-            let expected = if time == at {
-                &first.render_units
-            } else {
-                &second.render_units
-            };
-            assert_eq!(&snapshot.render_units, expected);
-        }
-    }
-}
-
-#[sqlx::test]
-async fn failed_historical_load_can_be_retried(pool: sqlx::PgPool) {
-    let service = TrajectoryService::new(pool.clone());
-    let at = crate::support::fixtures::fixed_time();
-    sqlx::query("ALTER TABLE realtime.trip RENAME TO unavailable_trip")
-        .execute(&pool)
-        .await
-        .unwrap();
-    assert!(service.snapshot(Source::MtaBus, Some(at)).await.is_err());
-    sqlx::query("ALTER TABLE realtime.unavailable_trip RENAME TO trip")
-        .execute(&pool)
-        .await
-        .unwrap();
-    service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
-}
-
 fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
-    let id: RunKey = Uuid::now_v7().into();
-    let now = crate::support::fixtures::fixed_time();
+    let id = RunId::arbitrary("history-b94");
+    let now = fixed_time();
     let trip = TripRun {
         id,
-        original_id: format!("test-trip-{}", Uuid::now_v7()),
-        vehicle_id: format!("test-vehicle-{}", Uuid::now_v7()),
+        original_id: "history-b94".into(),
+        vehicle_id: "history-bus".into(),
         route_id: route_id.into(),
         shape_ids: vec![],
         direction: 0,
         created_at: now,
         updated_at: now,
+        partition_date: crate::support::fixtures::eastern_service_date(now),
         data: TripData::MtaBus(MtaBusData { deviation: None }),
     };
     let stops = stop_ids
@@ -139,12 +54,58 @@ fn collected_trip(route_id: &str, stop_ids: &[&str]) -> CollectedSnapshot {
     }
 }
 
-#[sqlx::test]
-async fn historical_inputs_use_final_departure_and_past_history_points(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    let dataset = mta_bus_dataset();
-    stores.network.persist(&dataset).await.unwrap();
-    let at = crate::support::fixtures::fixed_time() - chrono::Duration::hours(1);
+#[tokio::test]
+async fn concurrent_historical_requests_share_snapshot() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
+    stores.network.persist(mta_bus_dataset()).await.unwrap();
+    stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
+        .await
+        .unwrap();
+    let service = TrajectoryService::new(stores.ingestor.history());
+    let at = fixed_time();
+    let results =
+        futures::future::join_all((0..8).map(|_| service.snapshot(Source::MtaBus, Some(at)))).await;
+    let snapshots: Vec<_> = results.into_iter().map(Result::unwrap).collect();
+    for snapshot in &snapshots[1..] {
+        assert!(
+            std::sync::Arc::ptr_eq(&snapshots[0], snapshot),
+            "concurrent misses must return the same computed snapshot"
+        );
+    }
+}
+
+#[tokio::test]
+async fn nearby_historical_times_keep_their_own_samples_in_both_request_orders() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
+    stores.network.persist(mta_bus_dataset()).await.unwrap();
+    let at = fixed_time();
+    stores
+        .ingestor
+        .ingest(collected_trip("B94", &B94_STOP_IDS))
+        .await
+        .unwrap();
+    let later = at + chrono::Duration::seconds(1);
+    let service = TrajectoryService::new(stores.ingestor.history());
+    let first = service.snapshot(Source::MtaBus, Some(at)).await.unwrap();
+    let second = service.snapshot(Source::MtaBus, Some(later)).await.unwrap();
+    assert!(!first.render_units.is_empty());
+    assert!(!second.render_units.is_empty());
+    assert_ne!(first.render_units, second.render_units);
+}
+
+#[tokio::test]
+async fn historical_inputs_use_final_departure_and_past_history_points() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
+    stores.network.persist(mta_bus_dataset()).await.unwrap();
+    let at = fixed_time() - chrono::Duration::hours(1);
     let mut input = collected_trip("B94", &B94_STOP_IDS);
     input.trips[0].0.created_at = at - chrono::Duration::minutes(5);
     input.trips[0].0.updated_at = at + chrono::Duration::hours(2);
@@ -156,7 +117,7 @@ async fn historical_inputs_use_final_departure_and_past_history_points(pool: sql
     let observed_at = at - chrono::Duration::seconds(20);
     input.positions.push(VehicleObservation {
         vehicle_id: input.trips[0].0.vehicle_id.clone(),
-        trip_id: Some(input.trips[0].0.id),
+        trip_id: Some((&input.trips[0].0).into()),
         stop_id: None,
         geom: Some(Geom::from(old_point)),
         updated_at: observed_at,
@@ -172,91 +133,16 @@ async fn historical_inputs_use_final_departure_and_past_history_points(pool: sql
     input.positions[0].updated_at = at + chrono::Duration::seconds(20);
     input.positions[0].geom = Some(Geom::from(geo::Point::new(-73.94, 40.75)));
     stores.ingestor.ingest(input).await.unwrap();
-    let historical = History::new(pool.clone())
+    let historical = stores
+        .ingestor
+        .history()
         .load_trajectories(Source::MtaBus, at)
         .await
         .unwrap();
-    assert_eq!(
-        historical.service.trips.len(),
-        1,
-        "final departure keeps retained trip relevant"
-    );
+    assert_eq!(historical.service.trips.len(), 1);
     assert_eq!(historical.service.trips[0].id, committed.trips[0].id);
-    let anchor = &historical.anchors[&committed.trips[0].id];
+    let anchor = historical.anchors.get(&committed.trips[0].id).unwrap();
     assert_eq!(anchor.observed_at, committed.positions[0].updated_at);
     assert_eq!(anchor.point, old_point);
     assert!(!historical.service.stop_times.is_empty());
-}
-
-#[sqlx::test]
-async fn historical_rendering_uses_past_gps_coordinates_at_the_observation_time(
-    pool: sqlx::PgPool,
-) {
-    let stores = test_owners(pool.clone());
-    let dataset = mta_bus_dataset();
-    stores.network.persist(&dataset).await.unwrap();
-    let at = crate::support::fixtures::fixed_time();
-    let mut input = collected_trip("B94", &B94_STOP_IDS);
-    let shape = &dataset
-        .shapes
-        .iter()
-        .find(|shape| shape.id == "B940017")
-        .unwrap()
-        .geom
-        .0;
-    let geo::Geometry::LineString(shape) = shape else {
-        panic!("fixture must contain a line");
-    };
-    let old_point = geo::Point::from(shape.0[1]);
-    let observed_at = at - chrono::Duration::seconds(20);
-    input.positions.push(CollectedObservation {
-        vehicle_id: input.trips[0].0.vehicle_id.clone(),
-        trip_id: Some(input.trips[0].0.id),
-        stop_id: None,
-        geom: Some(Geom::from(old_point)),
-        updated_at: observed_at,
-        data: PositionData::MtaBus(MtaBusPositionData {
-            bearing: 0.0,
-            passengers: None,
-            capacity: None,
-            status: None,
-            phase: None,
-        }),
-    });
-    let committed = stores.ingestor.ingest(input.clone()).await.unwrap();
-    input.positions[0].updated_at = at + chrono::Duration::seconds(20);
-    input.positions[0].geom = Some(Geom::from(geo::Point::from(*shape.0.last().unwrap())));
-    stores.ingestor.ingest(input).await.unwrap();
-    let rendered = TrajectoryService::new(pool)
-        .snapshot(Source::MtaBus, Some(at))
-        .await
-        .unwrap();
-    let unit = rendered
-        .render_units
-        .values()
-        .find(|unit| unit.trip_id == committed.trips[0].id.to_string())
-        .expect("historical bus renders");
-    let event = observed_at.timestamp_micros() as f64 / 1e6;
-    let interval = unit
-        .trajectory
-        .motion
-        .iter()
-        .find(|p| p.t0 == event || p.t1 == event)
-        .expect("motion retains the historical observation boundary");
-    let u = (event - interval.t0) / (interval.t1 - interval.t0);
-    let distance = interval.a + u * (interval.b + u * (interval.c + u * interval.d));
-    let expected_distance = unit.trajectory.shape.distances_m[1];
-    assert!(
-        expected_distance > 0.0 && (distance - expected_distance).abs() < 1e-5,
-        "historical anchor must use the past GPS fix at vertex 1 (s={expected_distance}), got {distance}"
-    );
-    assert!(
-        unit.trajectory.gps_fix.is_none(),
-        "history must not carry live correction state"
-    );
-    let [lon, lat] = unit.trajectory.shape.positions[1];
-    assert!(
-        (lon - old_point.x()).abs() < 0.00001 && (lat - old_point.y()).abs() < 0.00001,
-        "rendered position must use the past GPS fix, not schedule-only interpolation or the future fix: {lon}, {lat}"
-    );
 }

@@ -88,63 +88,6 @@ function orderStops(patterns: string[][]): string[] {
 	return patterns.reduce((axis, pattern) => mergeStops(axis, pattern), [] as string[]);
 }
 
-/** Collapse strongly connected stops before ranking equal predictions. Order
- * within a loop is ambiguous, but it must not disturb definite order elsewhere. */
-function rankDefiniteStops(patterns: string[][]): Map<string, number> {
-	const { edges } = stopGraph(patterns);
-	const indices = new Map<string, number>();
-	const lows = new Map<string, number>();
-	const stack: string[] = [];
-	const pending = new Set<string>();
-	const groups = new Map<string, string[]>();
-	const groupFor = new Map<string, string>();
-
-	/** Assign a stop and its reachable neighbors to strongly connected groups. */
-	function visit(stop: string) {
-		const index = indices.size;
-		indices.set(stop, index);
-		lows.set(stop, index);
-		stack.push(stop);
-		pending.add(stop);
-		for (const next of edges.get(stop)!) {
-			if (!indices.has(next)) {
-				visit(next);
-				lows.set(stop, Math.min(lows.get(stop)!, lows.get(next)!));
-			} else if (pending.has(next)) {
-				lows.set(stop, Math.min(lows.get(stop)!, indices.get(next)!));
-			}
-		}
-		if (lows.get(stop) !== index) return;
-		const members: string[] = [];
-		let member: string;
-		do {
-			member = stack.pop()!;
-			pending.delete(member);
-			members.push(member);
-		} while (member !== stop);
-		members.sort();
-		const id = members[0];
-		groups.set(id, members);
-		for (const member of members) groupFor.set(member, id);
-	}
-	for (const stop of [...edges.keys()].sort()) {
-		if (!indices.has(stop)) visit(stop);
-	}
-	const condensed = [...groups.keys()].map((group) => [group]);
-	for (const [stop, nextStops] of edges) {
-		for (const next of nextStops) {
-			const from = groupFor.get(stop)!;
-			const to = groupFor.get(next)!;
-			if (from !== to) condensed.push([from, to]);
-		}
-	}
-	return new Map(
-		orderStops(condensed)
-			.flatMap((group) => groups.get(group)!)
-			.map((stop, index) => [stop, index])
-	);
-}
-
 /** `[start, end]` in ms: `now ± span`, with the start pulled forward to the earliest recorded visit. */
 export function chartXDomain(
 	trips: readonly Pick<ChartSeries, 'points'>[],
@@ -167,10 +110,7 @@ export function buildChartData(inputs: readonly ChartInput[]) {
 		trip,
 		points: [...calls]
 			.filter((call) => stops.has(call.stopId) && Number.isFinite(call.arrival))
-			.sort(
-				(a, b) =>
-					a.arrival - b.arrival || a.departure - b.departure || a.stopId.localeCompare(b.stopId)
-			)
+			.sort((a, b) => a.sequence - b.sequence)
 			.map((call) => {
 				const stop = stops.get(call.stopId)!;
 				const stopKey = JSON.stringify([source, stop.id]);
@@ -179,47 +119,10 @@ export function buildChartData(inputs: readonly ChartInput[]) {
 					stopId: stop.id,
 					stopKey,
 					stopName: stop.name,
-					time: new Date(call.arrival),
-					departure: call.departure
+					time: new Date(call.arrival)
 				};
 			})
 	}));
-
-	const samePrediction = (
-		a: (typeof series)[number]['points'][number],
-		b: (typeof series)[number]['points'][number]
-	) => a.time.getTime() === b.time.getTime() && a.departure === b.departure;
-	if (
-		series.some((s) => s.points.some((point, i) => i > 0 && samePrediction(point, s.points[i - 1])))
-	) {
-		// Equal predictions supply no order evidence. Only connect different time
-		// groups, then let definite observations from other trips resolve the ties.
-		const definite: string[][] = [];
-		for (const { points } of series) {
-			let previous: string[] = [];
-			for (let i = 0; i < points.length;) {
-				let end = i + 1;
-				while (end < points.length && samePrediction(points[i], points[end])) end++;
-				const group = points.slice(i, end).map((point) => point.stopKey);
-				for (const stop of group) {
-					definite.push([stop]);
-					for (const before of previous) definite.push([before, stop]);
-				}
-				previous = group;
-				i = end;
-			}
-		}
-		definite.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-		const rank = rankDefiniteStops(definite);
-		for (const { points } of series) {
-			points.sort(
-				(a, b) =>
-					a.time.getTime() - b.time.getTime() ||
-					a.departure - b.departure ||
-					rank.get(a.stopKey)! - rank.get(b.stopKey)!
-			);
-		}
-	}
 
 	// Input iteration order must not change the axis. Prefer the most complete
 	// itinerary, then merge each distinct short turn, express or branch pattern.
