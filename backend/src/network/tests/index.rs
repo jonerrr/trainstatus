@@ -6,6 +6,32 @@ use crate::network::types::stop::RouteStop;
 use crate::network::types::stop::RouteStopData;
 use crate::network::types::stop::Stop;
 
+#[test]
+fn schedule_index_shares_equivalent_imported_templates() {
+    use crate::network::schedule::{ScheduledTrip, TripTemplate};
+    let template = TripTemplate {
+        trip_id: "trip".into(),
+        route_id: "route".into(),
+        headsign: "Terminal".into(),
+        direction_id: 0,
+        start_seconds: 90_000,
+        stop_times: vec![],
+    };
+    let expires_at = Utc::now() + chrono::Duration::hours(48);
+    let entries = [8, 9].map(|day| ScheduledTripEntry {
+        trip: ScheduledTrip {
+            template: Arc::new(template.clone()),
+            start_date: chrono::NaiveDate::from_ymd_opt(2026, 3, day).unwrap(),
+        },
+        expires_at,
+    });
+    let indexed = schedule_index(entries);
+    assert!(Arc::ptr_eq(
+        &indexed["trip"]["20260308"].trip.template,
+        &indexed["trip"]["20260309"].trip.template,
+    ));
+}
+
 fn subway_route() -> Route {
     Route {
         id: "1".into(),
@@ -70,11 +96,11 @@ fn persisted_bus_revision_keeps_route_shape_membership() {
             shape_ids: vec!["shape-a".into()],
         }),
     };
-    let revision = NetworkRevision::try_from_persisted(
+    let revision = NetworkRevision::try_from_sections(
         Source::MtaBus,
         vec![route],
         vec![stop],
-        Vec::new(),
+        crate::network::shape_index::ShapeIndex::from_prepared(HashMap::new()),
         HashMap::new(),
         HashMap::new(),
     )
@@ -92,11 +118,11 @@ fn persisted_bus_revision_keeps_route_shape_membership() {
 #[test]
 fn njt_revision_without_saved_patterns_is_not_reused() {
     assert!(
-        NetworkRevision::try_from_persisted(
+        NetworkRevision::try_from_sections(
             Source::NjtBus,
             vec![subway_route()],
             vec![njt_stop()],
-            Vec::new(),
+            crate::network::shape_index::ShapeIndex::from_prepared(HashMap::new()),
             HashMap::new(),
             HashMap::new(),
         )
@@ -117,11 +143,11 @@ fn njt_revision_keeps_saved_patterns_and_stop_remap() {
     );
     let mut remap = HashMap::new();
     remap.insert("child".into(), "100".into());
-    let revision = NetworkRevision::try_from_persisted(
+    let revision = NetworkRevision::try_from_sections(
         Source::NjtBus,
         vec![subway_route()],
         vec![njt_stop()],
-        Vec::new(),
+        crate::network::shape_index::ShapeIndex::from_prepared(HashMap::new()),
         patterns,
         remap,
     )
@@ -136,11 +162,11 @@ fn njt_revision_keeps_saved_patterns_and_stop_remap() {
 #[test]
 fn empty_tables_are_not_a_revision() {
     assert!(
-        NetworkRevision::try_from_persisted(
+        NetworkRevision::try_from_sections(
             Source::MtaSubway,
             Vec::new(),
             Vec::new(),
-            Vec::new(),
+            crate::network::shape_index::ShapeIndex::from_prepared(HashMap::new()),
             HashMap::new(),
             HashMap::new(),
         )

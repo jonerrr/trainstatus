@@ -1,10 +1,17 @@
+pub mod artifact;
+pub mod assets;
 pub mod catalog;
+pub mod chunks;
 pub mod controller;
 pub mod dataset;
 pub mod expansion;
 pub mod index;
-mod postgres;
+pub mod nearby;
+pub mod projection;
+pub mod publication;
+pub mod retired;
 pub mod schedule;
+pub mod shape_index;
 pub mod store;
 pub mod types;
 pub mod validation;

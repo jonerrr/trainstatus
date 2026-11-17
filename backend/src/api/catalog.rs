@@ -18,7 +18,7 @@ use http::{HeaderMap, StatusCode, header};
         (status = 200, description = "Source catalog", body = Catalog),
         (status = 304, description = "The supplied `If-None-Match` value matches the current catalog ETag"),
         (status = 400, description = "Invalid source path"),
-        (status = 500, description = "Database or internal service error")
+        (status = 500, description = "Storage or internal service error")
     )
 )]
 pub async fn catalog_handler(

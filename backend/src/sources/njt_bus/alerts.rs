@@ -8,13 +8,13 @@ use crate::alerts::{
 };
 use crate::feed::{Alert, FeedMessage};
 use crate::integrations::gtfs_realtime;
+use crate::operations::identity::AlertId;
 use crate::source::Source;
 use crate::sources::AlertsAdapter;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 #[cfg(feature = "fixture-capture")]
 use std::collections::BTreeMap;
-use uuid::Uuid;
 
 pub struct NjtBusAlerts;
 
@@ -59,7 +59,7 @@ impl GtfsAlertSource for NjtBusAlerts {
 
         let created_at = first_period_start?;
 
-        let alert_id = Uuid::now_v7();
+        let alert_id = AlertId::new(Source::NjtBus, &entity_id, created_at);
 
         let mut translations = Vec::new();
 

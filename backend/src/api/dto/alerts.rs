@@ -1,12 +1,12 @@
 use crate::alerts::types::{AlertData, AlertTranslation};
+use crate::operations::identity::AlertId;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 /// API response for alerts - flattened with all related data
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiAlert {
-    pub id: Uuid,
+    pub id: AlertId,
     pub original_id: String,
     pub data: AlertData,
     pub translations: Vec<AlertTranslation>,
@@ -14,9 +14,10 @@ pub struct ApiAlert {
     pub created_at: i64,
     /// Unix timestamp in seconds.
     pub updated_at: i64,
-    /// Unix timestamp in seconds of the earliest active period.
-    pub start_time: i64,
-    /// Unix timestamp in seconds. Absent while any active period has no end.
+    /// Unix timestamp of the earliest provider-declared active period; absent when none is declared.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<i64>,
+    /// Unix timestamp in seconds. Absent without declared periods or while any period has no end.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
     /// Entities affected by alert
@@ -37,6 +38,18 @@ pub struct ApiAlertEntity {
 
 impl From<&crate::alerts::types::Alert> for ApiAlert {
     fn from(alert: &crate::alerts::types::Alert) -> Self {
+        let mut entities: Vec<_> = alert
+            .entities
+            .iter()
+            .filter_map(|entity| {
+                Some(ApiAlertEntity {
+                    route_id: entity.route_id.clone()?,
+                    sort_order: entity.sort_order,
+                    stop_id: entity.stop_id.clone(),
+                })
+            })
+            .collect();
+        entities.sort_by_key(|entity| entity.sort_order);
         Self {
             id: alert.id,
             original_id: alert.original_id.clone(),
@@ -67,8 +80,7 @@ impl From<&crate::alerts::types::Alert> for ApiAlert {
                 .iter()
                 .map(|p| p.start_time)
                 .min()
-                .expect("selected alerts have an active period")
-                .timestamp(),
+                .map(|start| start.timestamp()),
             end_time: if alert.active_periods.iter().any(|p| p.end_time.is_none()) {
                 None
             } else {
@@ -79,17 +91,7 @@ impl From<&crate::alerts::types::Alert> for ApiAlert {
                     .max()
                     .map(|end| end.timestamp())
             },
-            entities: alert
-                .entities
-                .iter()
-                .filter_map(|entity| {
-                    Some(ApiAlertEntity {
-                        route_id: entity.route_id.clone()?,
-                        sort_order: entity.sort_order,
-                        stop_id: entity.stop_id.clone(),
-                    })
-                })
-                .collect(),
+            entities,
         }
     }
 }

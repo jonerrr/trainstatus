@@ -3,6 +3,7 @@
 export type {
 	AlertData,
 	AlertFormat,
+	AlertId,
 	AlertSection,
 	AlertsHandlerData,
 	AlertsHandlerErrors,
@@ -52,6 +53,7 @@ export type {
 	ReadinessHandlerResponses,
 	RenderUnit,
 	RouteService,
+	RunId,
 	Service,
 	ServiceCalls,
 	ServiceHandlerData,

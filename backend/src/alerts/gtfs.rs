@@ -4,6 +4,7 @@ use super::types::{
     AlertTranslation, MtaAlert, MtaAlertData,
 };
 use crate::feed::{Alert, FeedMessage};
+use crate::operations::identity::AlertId;
 use crate::source::Source;
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -68,7 +69,7 @@ pub fn mta_alert<T: GtfsAlertSource>(
             clone_id: mercury.clone_id.clone(),
         },
         details: AlertDetails {
-            id: uuid::Uuid::now_v7(),
+            id: AlertId::new(adapter.source(), &entity_id, created_at),
             original_id: entity_id,
             created_at,
             updated_at,

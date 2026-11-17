@@ -246,7 +246,6 @@ impl Metrics {
     }
     fn register_state(
         &self,
-        pool: sqlx::PgPool,
         live: crate::operations::live::LiveSnapshots,
         network: crate::network::index::NetworkIndex,
     ) {
@@ -340,37 +339,14 @@ impl Metrics {
                     }
                 })
                 .build();
-            let pool_attrs = [
-                KeyValue::new("db.system.name", "postgresql"),
-                KeyValue::new("db.client.connection.pool.name", "main"),
-            ];
-            self.meter
-                .i64_observable_up_down_counter("db.client.connection.count")
-                .with_unit("{connection}")
-                .with_callback(move |observer| {
-                    let size = pool.size() as usize;
-                    let idle = pool.num_idle();
-                    for (state, count) in [("idle", idle), ("used", size.saturating_sub(idle))] {
-                        observer.observe(
-                            count as i64,
-                            &[
-                                pool_attrs[0].clone(),
-                                pool_attrs[1].clone(),
-                                KeyValue::new("db.client.connection.state", state),
-                            ],
-                        );
-                    }
-                })
-                .build();
         });
     }
 }
 pub fn register_state(
-    pool: sqlx::PgPool,
     live: crate::operations::live::LiveSnapshots,
     network: crate::network::index::NetworkIndex,
 ) {
     if let Some(metrics) = metrics() {
-        metrics.register_state(pool, live, network);
+        metrics.register_state(live, network);
     }
 }

@@ -1,4 +1,5 @@
 use super::super::{
+    identity::RunId,
     ingestor::IngestionChanges,
     types::{
         position::{MtaBusPositionData, PositionData},
@@ -16,7 +17,7 @@ fn at(seconds: i64) -> DateTime<Utc> {
 
 fn trip(route_id: &str, vehicle_id: &str) -> TripRun {
     TripRun {
-        id: Uuid::now_v7(),
+        id: RunId::arbitrary(&format!("{route_id}-{vehicle_id}")),
         original_id: format!("{route_id}-{vehicle_id}"),
         vehicle_id: vehicle_id.into(),
         route_id: route_id.into(),
@@ -24,6 +25,7 @@ fn trip(route_id: &str, vehicle_id: &str) -> TripRun {
         direction: 1,
         created_at: at(0),
         updated_at: at(0),
+        partition_date: at(0).date_naive(),
         data: TripData::MtaBus(MtaBusData {
             deviation: Some(90),
         }),
@@ -41,7 +43,7 @@ fn call(trip: &TripRun, stop_sequence: i32, stop_id: &str, offset: i64) -> StopV
     }
 }
 
-fn position(trip_id: Option<Uuid>, vehicle_id: &str, stop_id: &str) -> VehicleObservation {
+fn position(trip_id: Option<RunId>, vehicle_id: &str, stop_id: &str) -> VehicleObservation {
     VehicleObservation {
         vehicle_id: vehicle_id.into(),
         trip_id,
@@ -76,7 +78,7 @@ fn revision(route_ids: &[&str]) -> Arc<NetworkRevision> {
             .collect::<HashMap<_, _>>()
             .into(),
         stops: Arc::new(HashMap::new()),
-        shapes: Arc::new(HashMap::new()),
+        shapes: crate::network::shape_index::ShapeIndex::from_prepared(HashMap::new()),
         route_stop_shapes: Arc::new(HashMap::new()),
         trip_patterns: Arc::new(HashMap::new()),
         stop_remap: Arc::new(HashMap::new()),

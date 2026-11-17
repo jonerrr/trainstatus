@@ -40,8 +40,8 @@ pub struct UnknownRoutes {
         (status = 200, description = "Service for the requested routes", body = Service),
         (status = 400, description = "Missing, empty or malformed `route_ids`, `route_ids` on `mta_subway`, or an invalid `at`"),
         (status = 404, description = "One or more requested routes do not exist", body = UnknownRoutes),
-        (status = 503, description = "The source is not ready or historical database reads are saturated"),
-        (status = 500, description = "Database or internal service error")
+        (status = 503, description = "The source is not ready or historical reads are saturated"),
+        (status = 500, description = "Storage or internal service error")
     )
 )]
 pub async fn service_handler(
@@ -61,35 +61,40 @@ pub async fn service_handler(
             None => return bad_request("route_ids must be a nonempty comma-separated list"),
         },
     };
-    let result = match time.at {
-        None => state
-            .operations
-            .live(source)
-            .and_then(|snapshot| snapshot.encode(&selection)),
-        Some(at) => state.operations.historical(source, at, &selection).await,
-    };
-    match result {
-        Ok(body) => (
-            [
-                (header::CONTENT_TYPE, "application/json"),
-                (header::CACHE_CONTROL, "no-store"),
-            ],
-            body,
-        )
-            .into_response(),
-        Err(ServiceError::UnknownRoutes(unknown_route_ids)) => (
-            StatusCode::NOT_FOUND,
-            Json(UnknownRoutes { unknown_route_ids }),
-        )
-            .into_response(),
-        Err(ServiceError::Unavailable) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            [(header::RETRY_AFTER, "30")],
-            "source has no realtime data yet",
-        )
-            .into_response(),
-        Err(ServiceError::Internal(error)) => AppError::from(error).into_response(),
-    }
+    state
+        .history_work(time.at.is_some(), move |state| async move {
+            let result = match time.at {
+                None => state
+                    .operations
+                    .live(source)
+                    .and_then(|snapshot| snapshot.encode(&selection)),
+                Some(at) => state.operations.historical(source, at, &selection).await,
+            };
+            match result {
+                Ok(body) => (
+                    [
+                        (header::CONTENT_TYPE, "application/json"),
+                        (header::CACHE_CONTROL, "no-store"),
+                    ],
+                    body,
+                )
+                    .into_response(),
+                Err(ServiceError::UnknownRoutes(unknown_route_ids)) => (
+                    StatusCode::NOT_FOUND,
+                    Json(UnknownRoutes { unknown_route_ids }),
+                )
+                    .into_response(),
+                Err(ServiceError::Unavailable) => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    [(header::RETRY_AFTER, "30")],
+                    "source has no realtime data yet",
+                )
+                    .into_response(),
+                Err(ServiceError::Internal(error)) => AppError::from(error).into_response(),
+            }
+        })
+        .await
+        .unwrap_or_else(|error| AppError::from(error).into_response())
 }
 
 fn bad_request(message: &'static str) -> Response {

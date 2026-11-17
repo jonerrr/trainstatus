@@ -23,11 +23,11 @@ pub struct TrajectoryService {
     deriver: TrajectoryDeriver,
 }
 impl TrajectoryService {
-    pub fn new(pool: sqlx::PgPool) -> Self {
+    pub fn new(history: History) -> Self {
         let cache = Arc::new(TrajectoryCache::new());
         let calculator = Arc::new(TrajectoryCalculator::new());
         Self {
-            history: History::new(pool),
+            history,
             deriver: TrajectoryDeriver::new(calculator.clone(), cache.clone()),
             cache,
             calculator,

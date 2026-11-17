@@ -8,7 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 
-use crate::support::{mta_bus_dataset, test_owners};
+use crate::support::{TestContext, mta_bus_dataset, njt_bus_dataset, test_owners};
 use backend::{
     network::{controller, dataset::NetworkDataset},
     source::Source,
@@ -35,22 +35,11 @@ impl StaticAdapter for CountingStaticAdapter {
     }
 }
 
-#[sqlx::test]
-async fn static_controller_initializes_empty_index_even_when_database_is_fresh(pool: sqlx::PgPool) {
-    sqlx::query(
-        r#"
-        INSERT INTO source (id, name, updated_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
-        "#,
-    )
-    .bind(Source::MtaBus)
-    .bind(Source::MtaBus.as_str())
-    .execute(&pool)
-    .await
-    .expect("fresh source timestamp should save");
-
-    let stores = test_owners(pool.clone());
+#[tokio::test]
+async fn static_controller_initializes_empty_index_from_storage() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
     let imports = Arc::new(AtomicUsize::new(0));
     let controller = controller::run(
         &stores.network,
@@ -74,14 +63,34 @@ async fn static_controller_initializes_empty_index_even_when_database_is_fresh(p
     assert!(revision.stops.contains_key("300226"));
     let route_stop_shapes = &revision.route_stop_shapes[&("B100".into(), "300226".into())];
     assert!(!route_stop_shapes.is_empty());
-    assert!(route_stop_shapes.iter().all(
-        |shape_id| route.shape_ids.contains(shape_id) && revision.shapes.contains_key(shape_id)
-    ));
+    assert!(
+        route_stop_shapes
+            .iter()
+            .all(|shape_id| route.shape_ids.contains(shape_id)
+                && revision.shapes.get(shape_id).unwrap().is_some())
+    );
     controller
         .ensure_updated(Source::MtaBus)
         .await
         .expect("fresh initialized revision should be reused");
     assert_eq!(imports.load(Ordering::SeqCst), 1);
+}
+
+fn restart_schedule() -> backend::network::schedule::ScheduledTrip {
+    let date = chrono::NaiveDate::from_ymd_opt(2026, 5, 28).unwrap();
+    let origin = backend::network::expansion::gtfs_datetime(date, 0).unwrap();
+    backend::network::schedule::ScheduledTrip {
+        template: Arc::new(backend::network::schedule::TripTemplate {
+            trip_id: "restart-trip".into(),
+            route_id: "87".into(),
+            headsign: "Recovered terminal".into(),
+            direction_id: 1,
+            start_seconds: u32::try_from((crate::support::fixed_time() - origin).num_seconds())
+                .unwrap(),
+            stop_times: vec![],
+        }),
+        start_date: date,
+    }
 }
 
 struct CountingNjtAdapter {
@@ -98,41 +107,23 @@ impl StaticAdapter for CountingNjtAdapter {
     }
     async fn collect(&self) -> anyhow::Result<NetworkDataset> {
         self.imports.fetch_add(1, Ordering::SeqCst);
-        let mut dataset = crate::support::njt_bus_dataset();
-        dataset
-            .scheduled_trips
-            .push(backend::network::schedule::ScheduledTrip {
-                trip_id: "restart-trip".into(),
-                route_id: "87".into(),
-                headsign: "Recovered terminal".into(),
-                direction_id: 1,
-                start_date: "20260528".into(),
-                start_time: crate::support::fixed_time(),
-                stop_times: vec![],
-            });
+        let mut dataset = njt_bus_dataset();
+        dataset.scheduled_trips.push(restart_schedule());
         Ok(dataset)
     }
 }
 
-#[sqlx::test]
-async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
-    let mut dataset = crate::support::njt_bus_dataset();
-    dataset
-        .scheduled_trips
-        .push(backend::network::schedule::ScheduledTrip {
-            trip_id: "restart-trip".into(),
-            route_id: "87".into(),
-            headsign: "Recovered terminal".into(),
-            direction_id: 1,
-            start_date: "20260528".into(),
-            start_time: crate::support::fixed_time(),
-            stop_times: vec![],
-        });
-    stores.network.persist(&dataset).await.unwrap();
+#[tokio::test]
+async fn njt_restart_restores_without_collection() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage.clone());
+    let mut dataset = njt_bus_dataset();
+    dataset.scheduled_trips.push(restart_schedule());
+    stores.network.persist(dataset).await.unwrap();
     let imports = Arc::new(AtomicUsize::new(0));
     for _ in 0..2 {
-        let restarted = test_owners(pool.clone());
+        let restarted = test_owners(storage.clone());
         let controller = controller::run(
             &restarted.network,
             vec![Arc::new(CountingNjtAdapter {
@@ -144,8 +135,9 @@ async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
         let revision = controller.network_index().get(Source::NjtBus).unwrap();
         assert_eq!(
             revision
-                .scheduled_trip("restart-trip", "20260528")
+                .scheduled_trip("restart-trip", "20260528", crate::support::fixed_time())
                 .unwrap()
+                .template
                 .headsign,
             "Recovered terminal"
         );
@@ -153,9 +145,11 @@ async fn njt_restart_restores_without_collection(pool: sqlx::PgPool) {
     }
 }
 
-#[sqlx::test]
-async fn fresh_and_restored_revisions_share_canonical_keys_and_colors(pool: sqlx::PgPool) {
-    let stores = test_owners(pool.clone());
+#[tokio::test]
+async fn fresh_and_restored_revisions_share_canonical_keys_and_colors() {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage.clone());
     let mut dataset = mta_bus_dataset();
     for route in &mut dataset.routes {
         route.id = route.id.to_lowercase();
@@ -168,9 +162,9 @@ async fn fresh_and_restored_revisions_share_canonical_keys_and_colors(pool: sqlx
         relation.route_id = relation.route_id.to_lowercase();
         relation.stop_id = relation.stop_id.to_lowercase();
     }
-    stores.network.persist(&dataset).await.unwrap();
+    stores.network.persist(dataset).await.unwrap();
     let fresh = stores.network.network_index().get(Source::MtaBus).unwrap();
-    let restarted = test_owners(pool);
+    let restarted = test_owners(storage);
     let restored = restarted
         .network
         .restore_revision(Source::MtaBus)

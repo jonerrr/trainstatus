@@ -6,7 +6,8 @@ use backend::{
     geometry::Geom,
     network::{dataset::NetworkDataset, types::shape::Shape},
     operations::{
-        source::{CollectedSnapshot, RunKey},
+        identity::RunId,
+        source::CollectedSnapshot,
         types::trip::{
             Consist, MtaBusData, MtaSubwayStopTimeData, MtaSubwayTripData, NjtBusData,
             StopTimeData, StopVisit, TripData, TripRun,
@@ -15,10 +16,10 @@ use backend::{
     source::Source,
 };
 
-pub async fn ingest_case(pool: sqlx::PgPool, source: Source) -> super::TestOwners {
-    let stores = super::test_owners(pool);
+pub async fn ingest_case(ctx: &super::TestContext, source: Source) -> super::TestOwners {
+    let stores = super::test_owners(ctx.storage());
     let (dataset, input) = input(source);
-    stores.network.persist(&dataset).await.unwrap();
+    stores.network.persist(dataset).await.unwrap();
     stores.ingestor.ingest(input).await.unwrap();
     stores
 }
@@ -72,11 +73,10 @@ fn input(source: Source) -> (NetworkDataset, CollectedSnapshot) {
             id: id.clone(),
             source,
             geom: Geom::from(geo::LineString::from(coords)),
-            data: serde_json::json!({}),
         });
     }
     let now = super::fixtures::fixed_time();
-    let id: RunKey = uuid::Uuid::now_v7().into();
+    let id = RunId::arbitrary(&format!("geometry-{source:?}"));
     let stop_ids = if source == Source::MtaSubway {
         vec!["101".to_owned(), "102".to_owned()]
     } else if source == Source::MtaBus {
@@ -118,6 +118,7 @@ fn input(source: Source) -> (NetworkDataset, CollectedSnapshot) {
         direction: 1,
         created_at: now,
         updated_at: now,
+        partition_date: super::fixtures::eastern_service_date(now),
         data: trip_data,
     };
     (

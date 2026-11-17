@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/state';
-
 	import type { FilterSpecification } from 'maplibre-gl';
-	import { CircleLayer, SymbolLayer, VectorTileSource } from 'svelte-maplibre-gl';
+	import { CircleLayer, GeoJSONSource, SymbolLayer } from 'svelte-maplibre-gl';
 
 	import {
 		BUS_SOURCE_FILTER,
@@ -18,8 +16,9 @@
 		STOP_HIT_RADIUS,
 		SUBWAY_SOURCE_FILTER
 	} from './map-theme';
+	import type { StopsGeoJSON } from './stops-geojson.js';
 
-	let { filter }: { filter: FilterSpecification } = $props();
+	let { data, filter }: { data: StopsGeoJSON; filter: FilterSpecification } = $props();
 	const subwayStopFilter: FilterSpecification = $derived([
 		'all',
 		filter,
@@ -32,10 +31,9 @@
 	] as FilterSpecification);
 </script>
 
-<VectorTileSource id="stop" promoteId="id" url={`${page.url.origin}/martin/stop`}>
+<GeoJSONSource id="stop" promoteId="id" {data}>
 	<CircleLayer
 		id="stop-subway-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stops}
 		filter={subwayStopFilter}
 		minzoom={12}
@@ -50,7 +48,6 @@
 	/>
 	<CircleLayer
 		id="stop-bus-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stops}
 		filter={busStopFilter}
 		minzoom={15}
@@ -65,7 +62,6 @@
 	/>
 	<CircleLayer
 		id="stop-subway-hit-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stops}
 		filter={subwayStopFilter}
 		minzoom={12}
@@ -74,7 +70,6 @@
 
 	<CircleLayer
 		id="stop-bus-hit-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stops}
 		filter={busStopFilter}
 		minzoom={15}
@@ -83,7 +78,6 @@
 
 	<SymbolLayer
 		id="stop-subway-label-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stopLabels}
 		filter={subwayStopFilter}
 		minzoom={14}
@@ -104,7 +98,6 @@
 
 	<SymbolLayer
 		id="stop-bus-label-layer"
-		sourceLayer="stop"
 		beforeId={SLOT.stopLabels}
 		filter={busStopFilter}
 		minzoom={17}
@@ -122,4 +115,4 @@
 			'text-opacity': ['interpolate', ['linear'], ['zoom'], 17, 0, 17.6, 0.9]
 		}}
 	/>
-</VectorTileSource>
+</GeoJSONSource>

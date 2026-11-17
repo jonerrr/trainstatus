@@ -47,8 +47,9 @@ impl TrajectoryDeriver {
         );
         let at = Utc::now();
         let previous = self.cache.get_hot(source).await;
-        let mut stops: HashMap<uuid::Uuid, Vec<StopVisit>> = HashMap::new();
-        let mut positions: HashMap<uuid::Uuid, Vec<VehicleObservation>> = HashMap::new();
+        let mut stops: HashMap<crate::operations::identity::RunId, Vec<StopVisit>> = HashMap::new();
+        let mut positions: HashMap<crate::operations::identity::RunId, Vec<VehicleObservation>> =
+            HashMap::new();
         for stop in &snapshot.stop_times {
             stops.entry(stop.trip_id).or_default().push(stop.clone());
         }

@@ -1,13 +1,18 @@
-use crate::source::Source;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
+
+use crate::operations::identity::AlertId;
+use crate::source::Source;
+
+pub fn resolve_alert_id(source: Source, original_id: &str, created_at: DateTime<Utc>) -> AlertId {
+    AlertId::new(source, original_id, created_at)
+}
 
 /// Provider-independent alert content, including every owned collection.
 #[derive(Debug, Clone)]
 pub struct AlertDetails {
-    pub id: Uuid,
+    pub id: AlertId,
     pub original_id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -134,6 +139,18 @@ pub enum AlertData {
 pub struct ActivePeriod {
     pub start_time: DateTime<Utc>,
     pub end_time: Option<DateTime<Utc>>,
+}
+
+/// Feed-presence history for alerts with no provider-declared `active_period` windows.
+///
+/// Each window is `[first_seen, ended_at)` where `first_seen` is the first successful collection
+/// `recorded_at` and `ended_at` (exclusive) is set only when the alert is missing from a later
+/// successful membership snapshot for its source. A reappearance after absence starts a new window.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InferredPresenceWindow {
+    pub first_seen: DateTime<Utc>,
+    pub last_seen: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

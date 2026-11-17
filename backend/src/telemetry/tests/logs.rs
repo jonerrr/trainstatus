@@ -35,6 +35,7 @@ fn with_log_bridge<R>(f: impl FnOnce(&SdkLoggerProvider, &InMemoryLogExporter) -
     let provider = SdkLoggerProvider::builder()
         .with_simple_exporter(exporter.clone())
         .build();
+    super::providers::retain_log_provider(&provider);
     let subscriber =
         Registry::default().with(log_layer(&provider, EnvFilter::new(TEST_ENV_FILTER)));
     let dispatch = Dispatch::new(subscriber);
@@ -183,12 +184,14 @@ fn error_logs_remain_trace_correlated_with_in_memory_tracer_only() {
     let log_provider = SdkLoggerProvider::builder()
         .with_simple_exporter(exporter.clone())
         .build();
+    super::providers::retain_log_provider(&log_provider);
     let trace_exporter = opentelemetry_sdk::trace::InMemorySpanExporterBuilder::new().build();
     let trace_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
         .with_span_processor(opentelemetry_sdk::trace::SimpleSpanProcessor::new(
             trace_exporter.clone(),
         ))
         .build();
+    super::providers::retain_trace_provider(&trace_provider);
     let env_filter = EnvFilter::new(TEST_ENV_FILTER);
     let otel_layer = OpenTelemetryLayer::new(trace_provider.tracer("trainstatus.backend"))
         .with_context_activation(true)

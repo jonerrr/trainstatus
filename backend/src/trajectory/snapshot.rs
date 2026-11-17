@@ -19,7 +19,7 @@ pub struct GeometryInputs<'a> {
     pub historical: bool,
     pub route_color: &'a str,
     pub stops: &'a std::collections::HashMap<String, crate::network::index::IndexedStop>,
-    pub shapes: &'a std::collections::HashMap<String, crate::geometry::Geom>,
+    pub shapes: &'a crate::network::shape_index::ShapeIndex,
 }
 
 fn connected(a: Coord<f64>, b: Coord<f64>) -> bool {
@@ -41,8 +41,7 @@ fn subway_leg_stations(id: &str) -> Option<(&str, &str)> {
 }
 
 fn append_segment(coords: &mut Vec<Coord<f64>>, segment: Vec<Coord<f64>>) {
-    // ST_MakeLine collapses an exactly repeated first LineString node. Distinct
-    // junction endpoints must both survive, including legitimate station gaps.
+    // One shared node is a junction; distinct endpoints preserve real station gaps.
     let shared = coords.last() == segment.first();
     coords.extend(segment.into_iter().skip(usize::from(shared)));
 }
@@ -63,9 +62,8 @@ fn trip_shape(trip: &TripRun, revision: &GeometryInputs<'_>) -> anyhow::Result<L
         .shape_ids
         .iter()
         .map(|id| {
-            let line =
-                geom_to_linestring(revision.shapes.get(id).context("Missing resolved shape")?)
-                    .context("Shape is not a LineString")?;
+            let shape = revision.shapes.get(id)?.context("Missing accepted shape")?;
+            let line = geom_to_linestring(&shape).context("Shape is not a LineString")?;
             ensure!(
                 line.0.len() >= 2 && line.0.iter().all(|c| c.x.is_finite() && c.y.is_finite()),
                 "Invalid shape coordinates"

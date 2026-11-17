@@ -40,9 +40,6 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 
 ## Self Hosting
 
-> [!NOTE]
-> You might need to restart the martin container on the first run so it picks up the tile functions installed by the baseline migrations.
-
 ### Requirements
 
 - Podman (Docker can be used, but mise tasks use podman)
@@ -64,14 +61,16 @@ A realtime transit map is available at [trainstat.us/map](https://trainstat.us/m
 2. Run `mise bootstrap --only tools,task` to install the tools and Git hooks.
 3. Copy `dev.pod.yml.example` to `dev.pod.yml`. It includes a Datadog Agent (commented out by default) for [optional telemetry](#optional-telemetry).
 4. Create `fnox.local.toml` in the repository root with your provider secrets as described in [Local secrets](#local-secrets).
-   - Non-sensitive variables like the DB URLs are already set in the root `mise.toml`. Put additional non-sensitive overrides from [backend configuration](backend/README.md#config) in `backend/mise.local.toml`.
+   - Non-sensitive variables like `TRAINSTATUS_DATA_DIR` are already set in the root `mise.toml`. Put additional non-sensitive overrides from [backend configuration](backend/README.md#config) in `backend/mise.local.toml`.
 5. Within the `backend/` directory, run `mise bootstrap packages` to install the required build dependencies for Valhalla and protobufs.
 6. You can pull the geo data and assets from ghcr or build them locally with `mise //geo:build` (it will take a while).
 7. Run `mise //geo:export` to export the Valhalla tile extract.
-8. Start Postgres and Martin with `mise containers:up`.
+8. Start the Martin/geo pod with `mise containers:up` (optional for map tiles; the backend stores data locally under `TRAINSTATUS_DATA_DIR`).
 9. Start the backend and frontend with `mise dev`. This starts the dev pod first when it is not already running.
 
 `mise containers:down` stops the dev pod and keeps its volumes. `mise reset` deletes that pod and its volumes, then creates them again. Both commands take an optional suffix, `dev` by default: `mise reset demo` targets the `trainstatus-demo` pod from `demo.pod.yml`.
+
+For an existing PostgreSQL-era development setup, replace the local `dev.pod.yml` from `dev.pod.yml.example` (reapply optional telemetry settings), then run `mise containers:down` followed by `mise containers:up`. Starting an existing pod alone does not apply the new database-free definition. The old database volume is not used by the backend; local data now lives under `TRAINSTATUS_DATA_DIR`.
 
 #### Local secrets
 
@@ -87,7 +86,7 @@ NJT_PASSWORD = { default = "your-njt-password" }
 
 These `default` values are stored in plaintext. You can instead configure an [fnox provider](https://fnox.jdx.dev/) in the same local file for encrypted values or password-manager references.
 
-Each task explicitly lists the secrets it needs. The backend dev tasks and fixture capture receive the provider credentials; tests, SQLx preparation/checks, OpenAPI export, and the container build need `MTA_API_URL` because Rust embeds it at compile time. Dispatcher tasks do not pass secrets to other tasks, and secrets do not appear in your activated shell. Run `mise secrets ls` to inspect the available keys and task grants without printing their values.
+Each task explicitly lists the secrets it needs. The backend dev tasks and fixture capture receive the provider credentials; tests, OpenAPI export, the container build, and the storage smoke command need `MTA_API_URL` because Rust embeds it at compile time (tests and smoke use `https://mta.invalid` without fnox). Dispatcher tasks do not pass secrets to other tasks, and secrets do not appear in your activated shell. Run `mise secrets ls` to inspect the available keys and task grants without printing their values.
 
 Podman kube deployments continue to use `demo.configmap.yml` and, when needed, `dev.configmap.yml`. Fill those in separately using their example files; the mise fnox integration does not populate the configmaps or inject secrets into containers automatically.
 
@@ -99,3 +98,11 @@ The backend exports telemetry over OTLP. Configure a collector in your local `de
 2. From `backend/`, run `mise run dev:telemetry` instead of the ordinary dev task.
 
 The `dev.pod.yml.example` file includes a commented Datadog Agent configuration as an example. If you use it, copy `dev.configmap.yml.example` to the gitignored `dev.configmap.yml` and set `DD_API_KEY` (stored in plaintext; keep it private). Filter Datadog by `service:trainstatus-backend env:development`. See the [backend telemetry architecture](docs/architecture/backend.md#optional-telemetry) for details.
+
+### Checks
+
+From the repository root:
+
+- `mise run check` — formatting, lint, and lock checks via hk
+- `mise run test:unit` — backend and frontend unit/behavior tests
+- `mise run smoke:storage` — backend filesystem storage smoke (capture replay, HTTP, restart)

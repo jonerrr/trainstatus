@@ -27,7 +27,7 @@ function checkItineraries(input: ChartInput[]) {
 		const points = chart.routeTrips[i].points;
 		// Preserve the actual itinerary, rather than sorting points into axis order
 		// or silently discarding visits to satisfy the monotonicity assertion.
-		const timedStops = [...input[i].calls].sort((a, b) => a.arrival - b.arrival);
+		const timedStops = [...input[i].calls].sort((a, b) => a.sequence - b.sequence);
 		expect(points.map((p) => p.stopId)).toEqual(timedStops.map((st) => st.stopId));
 		expect(points.map((p) => p.time)).toEqual(timedStops.map((st) => new Date(st.arrival)));
 		const rows = points.map((p) => chart.yDomain.indexOf(p.stopKey));
@@ -113,32 +113,34 @@ describe('chart stop ordering', () => {
 		expect(buildChartData([]).yDomain).toEqual([]);
 	});
 
-	it('accepts simultaneous arrivals without losing either stop', () => {
-		const input = inputs('mta_bus', [['a', 'b']]);
-		input[0].calls = input[0].calls.map((st) => ({
-			...st,
-			arrival: chartNow,
-			departure: chartNow
-		}));
-		const chart = buildChartData(input);
-		expect(chart.routeTrips[0].points.map((p) => p.stopId)).toEqual(['a', 'b']);
-		expect(chart.yDomain).toHaveLength(2);
-	});
+	it.each([
+		['reverse-alphabetical stops', ['b', 'a'], ['b', 'a']],
+		['repeated stops', ['b', 'a', 'b'], ['b', 'a', 'b (2)']]
+	] satisfies [string, string[], string[]][])(
+		'preserves sequence for equal-time %s regardless of input order',
+		(_, pattern, labels) => {
+			const input = inputs('mta_bus', [pattern]);
+			input[0].calls = input[0].calls.map((call) => ({
+				...call,
+				arrival: chartNow,
+				departure: chartNow
+			}));
+			const chart = checkItineraries(input);
+			const shuffled = checkItineraries([{ ...input[0], calls: [...input[0].calls].reverse() }]);
+			expect(chart.routeTrips[0].points.map((point) => point.stopId)).toEqual(pattern);
+			expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(labels);
+			expect(shuffled.yDomain).toEqual(chart.yDomain);
+		}
+	);
 
-	it('resolves simultaneous predictions using the travel order established by other trips', () => {
-		const input = inputs('mta_bus', [
-			['b', 'a', 'c'],
-			['b', 'a', 'c']
-		]);
-		input[1].calls = input[1].calls.map((st) =>
-			st.stopId === 'a' ? { ...st, arrival: chartNow + 60_000, departure: chartNow + 60_000 } : st
-		);
-		const chart = buildChartData(input);
-		expect(chart.yDomain.map((key) => chart.stopNames.get(key))).toEqual(['b', 'a', 'c']);
-		expect(chart.routeTrips.map((series) => series.points.map((point) => point.stopId))).toEqual([
-			['b', 'a', 'c'],
-			['b', 'a', 'c']
-		]);
+	it('preserves sequence when predictions run backwards', () => {
+		const input = inputs('mta_bus', [['b', 'a']]);
+		input[0].calls = input[0].calls.map((call) => ({
+			...call,
+			arrival: chartNow - call.sequence * 60_000
+		}));
+		const chart = checkItineraries(input);
+		expect(chart.routeTrips[0].points.map((point) => point.stopId)).toEqual(['b', 'a']);
 	});
 
 	it('preserves all 120 permutations of five stops, including incompatible patterns', () => {
@@ -152,24 +154,6 @@ describe('chart stop ordering', () => {
 		const patterns = permutations(['a', 'b', 'c', 'd', 'e']);
 		expect(patterns).toHaveLength(120);
 		checkItineraries(inputs('mta_subway', patterns));
-	});
-
-	it('does not let an unrelated loop reverse the resolved order of equal predictions', () => {
-		const input = inputs('mta_bus', [
-			['b', 'c', 'a'],
-			['b', 'c', 'a'],
-			['d', 'e', 'd']
-		]);
-		input[1].calls = input[1].calls.map((st) =>
-			st.stopId === 'a' ? { ...st, arrival: chartNow + 120_000, departure: chartNow + 120_000 } : st
-		);
-		const chart = buildChartData(input);
-		expect(
-			chart.routeTrips.slice(0, 2).map((series) => series.points.map((point) => point.stopId))
-		).toEqual([
-			['b', 'c', 'a'],
-			['b', 'c', 'a']
-		]);
 	});
 });
 

@@ -5,12 +5,13 @@ use arrow::array::{Array, FixedSizeListArray, Float64Array, Int16Array, ListArra
 use axum_test::TestServer;
 use backend::source::Source;
 
-async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: usize) {
-    let stores = ingest_case(pool.clone(), source).await;
+pub async fn assert_trajectory(source: Source, expected_units: usize) {
+    let ctx = crate::support::TestContext::new();
+    let stores = ingest_case(&ctx, source).await;
     let trip_id = stores.live_snapshots.get(source).unwrap().trips[0]
         .id
         .to_string();
-    let state = app_state_from_owners(pool, stores);
+    let state = app_state_from_owners(stores);
     let trajectories = state.trajectories.clone();
     let server = TestServer::new(backend::api::router(state).split_for_parts().0);
     let response = server
@@ -141,15 +142,15 @@ async fn assert_trajectory(pool: sqlx::PgPool, source: Source, expected_units: u
     assert_eq!(live_count, expected_units);
 }
 
-#[sqlx::test]
-async fn subway_segments_render_one_arrow_unit_per_car(pool: sqlx::PgPool) {
-    assert_trajectory(pool, Source::MtaSubway, 8).await;
+#[tokio::test]
+async fn subway_segments_render_one_arrow_unit_per_car() {
+    assert_trajectory(Source::MtaSubway, 8).await;
 }
-#[sqlx::test]
-async fn mta_bus_route_renders_one_moving_arrow_unit(pool: sqlx::PgPool) {
-    assert_trajectory(pool, Source::MtaBus, 1).await;
+#[tokio::test]
+async fn mta_bus_route_renders_one_moving_arrow_unit() {
+    assert_trajectory(Source::MtaBus, 1).await;
 }
-#[sqlx::test]
-async fn njt_bus_route_renders_one_moving_arrow_unit(pool: sqlx::PgPool) {
-    assert_trajectory(pool, Source::NjtBus, 1).await;
+#[tokio::test]
+async fn njt_bus_route_renders_one_moving_arrow_unit() {
+    assert_trajectory(Source::NjtBus, 1).await;
 }

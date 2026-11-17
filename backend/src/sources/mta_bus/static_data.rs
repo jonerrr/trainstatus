@@ -383,9 +383,9 @@ fn build_static_dataset(
         }
     }
 
-    // A route's two directions each start their own sequence at 0, and the
-    // primary key collapses them into one row per (route, stop), so take the
-    // earliest position across every shape serving the stop.
+    // A route's directions each start their own sequence at 0. The route/stop
+    // aggregate combines directions, so take the earliest position across
+    // every shape serving the stop.
     for ((_, stop_id), route_stop) in route_stop_map.iter_mut() {
         let RouteStopData::MtaBus { shape_ids, .. } = &route_stop.data else {
             continue;
@@ -407,7 +407,6 @@ fn build_static_dataset(
             id: shape_id,
             source: Source::MtaBus,
             geom: geom.into(),
-            data: serde_json::Value::Null,
         })
         .collect();
     shapes.sort_by(|a, b| a.id.cmp(&b.id));

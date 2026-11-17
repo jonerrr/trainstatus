@@ -7,15 +7,16 @@ pub mod geometry;
 pub mod integrations;
 pub mod network;
 pub mod operations;
-mod postgres;
 pub mod source;
 pub mod sources;
+pub mod storage;
 pub mod telemetry;
 pub mod trajectory;
 pub mod utils;
 
 use std::env::var;
 use std::sync::OnceLock;
+use tracing::Instrument;
 
 #[allow(clippy::all)]
 pub mod feed {
@@ -31,6 +32,41 @@ pub struct AppState {
     pub network: crate::network::catalog::CatalogReader,
     pub operations: crate::operations::service::Operations,
     pub trajectories: crate::trajectory::service::TrajectoryService,
+    pub history_budget: std::sync::Arc<tokio::sync::Semaphore>,
+    pub history_admission: std::sync::Arc<tokio::sync::Semaphore>,
+}
+
+impl AppState {
+    /// Keep admitted work alive through loading and encoding even if its HTTP caller leaves.
+    pub async fn history_work<T, F, Fut>(self, historical: bool, work: F) -> anyhow::Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(Self) -> Fut + Send + 'static,
+        Fut: Future<Output = T> + Send + 'static,
+    {
+        if !historical {
+            return Ok(work(self).await);
+        }
+        let admission = self
+            .history_admission
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| crate::operations::history::HistoryOverloaded)?;
+        let running = self
+            .history_budget
+            .clone()
+            .acquire_owned()
+            .await
+            .map_err(|_| crate::operations::history::HistoryOverloaded)?;
+        // A started blocking read cannot be aborted. Its owning task must retain
+        // capacity until that read and the rest of the response work have finished.
+        let task = async move {
+            let _permits = (running, admission);
+            work(self).await
+        }
+        .instrument(tracing::Span::current());
+        tokio::spawn(task).await.map_err(anyhow::Error::from)
+    }
 }
 
 pub fn mta_oba_api_key() -> &'static str {

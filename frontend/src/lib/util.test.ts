@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { chartFixture } from './charts/fixtures';
 import type { CatalogRoute, CatalogStopRoute, MtaBusDirection } from './client';
-import { busHeadsign, debounce, mainRouteStops, throttle } from './util.svelte';
+import {
+	busHeadsign,
+	calculateStopHeight,
+	debounce,
+	mainRouteStops,
+	throttle
+} from './util.svelte';
 
 it('throttles continuous input to the latest value each interval and cancels pending work', () => {
 	vi.useFakeTimers();
@@ -69,6 +76,15 @@ describe('mainRouteStops', () => {
 		active.clear();
 		expect(mainRouteStops(routes, active).map((r) => r.route_id)).toEqual(['6', '7']);
 	});
+});
+
+it('reserves subway row gaps once per displayed direction, excluding inactive express routes', () => {
+	const stop = chartFixture('mta_subway').catalog.stops[0];
+	const first = calculateStopHeight(stop);
+	stop.routes.push({ ...stop.routes[0], route_id: '5' });
+	expect(calculateStopHeight(stop) - first).toBe(28);
+	stop.routes.push({ ...stop.routes[0], route_id: '5X' });
+	expect(calculateStopHeight(stop) - first).toBe(28);
 });
 
 function busRoute(directions: MtaBusDirection[]): CatalogRoute {

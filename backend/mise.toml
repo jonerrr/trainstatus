@@ -1,29 +1,12 @@
 [env]
 VALHALLA_TILE_EXTRACT = "../geo/artifacts/valhalla_tiles.tar"
-SQLX_OFFLINE = "true"
-
-[tasks."sqlx:prepare"]
-description = "Refresh checked-query metadata against the configured migrated database"
-secrets = ["MTA_API_URL"]
-env = { SQLX_OFFLINE = "false" }
-run = "cargo sqlx prepare -- --all-targets --features fixture-capture,integration-tests"
-
-[tasks."sqlx:check"]
-description = "Check committed query metadata against the configured migrated database"
-secrets = ["MTA_API_URL"]
-env = { SQLX_OFFLINE = "false" }
-run = "cargo sqlx prepare --check -- --all-targets --features fixture-capture,integration-tests"
-
-[tasks.migrate]
-run = "sqlx migrate run"
+TRAINSTATUS_DATA_DIR = "data"
 
 [tasks.dev]
-depends = ["//backend:migrate"]
 secrets = ["MTA_API_URL", "MTA_OBA_API_KEY", "NJT_USERNAME", "NJT_PASSWORD"]
 run = "cargo run"
 
 [tasks."dev:telemetry"]
-depends = ["//backend:migrate"]
 secrets = ["MTA_API_URL", "MTA_OBA_API_KEY", "NJT_USERNAME", "NJT_PASSWORD"]
 description = "Run the backend with OTLP export to the local Datadog Agent"
 env = { OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318", OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf", OTEL_SERVICE_NAME = "trainstatus-backend", OTEL_RESOURCE_ATTRIBUTES = "deployment.environment.name=development", OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "Delta" }
@@ -40,7 +23,7 @@ raw_args = true
 run = "cargo run --features fixture-capture --bin fixtures -- $@"
 
 [tasks.test]
-description = "Run the ordinary backend suite using existing PostgreSQL"
+description = "Run the full backend test suites (behavior, integration, and doctests)"
 run = "mise run test:services full"
 
 [tasks."test:unit"]
@@ -49,16 +32,16 @@ env = { MTA_API_URL = "https://mta.invalid" }
 run = "cargo test --locked --features fixture-capture --lib --test behavior"
 
 [tasks."test:integration"]
-description = "Run database and private realtime engine integration tests"
+description = "Run filesystem-backed integration and engine tests"
 run = "mise run test:services integration"
 
 [tasks."test:performance"]
-description = "Run the opt-in ingestion benchmark on an idle PostgreSQL server"
+description = "Run opt-in ingestion benchmarks"
 run = "mise run test:services performance"
 
 [tasks."test:services"]
-description = "Run a suite on existing PostgreSQL; SQLx isolates test databases"
-env = { MTA_API_URL = "https://mta.invalid", SQLX_OFFLINE = "true", RUST_TEST_THREADS = "4" }
+description = "Run a suite using isolated local storage directories"
+env = { MTA_API_URL = "https://mta.invalid", RUST_TEST_THREADS = "4" }
 usage = """
 arg "<suite>" {
   choices "full" "integration" "performance"
@@ -68,8 +51,6 @@ arg "[filter]" default="" help="Optional Rust test name filter"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-# SQLx creates and migrates each test database; reuse the running dev server.
-export DATABASE_URL="${TEST_DATABASE_URL:-postgres://trains:trains@localhost:5432/postgres}"
 case "$usage_suite" in
   full)
     cargo test --features fixture-capture,integration-tests --lib --test behavior --test integration "$usage_filter"
@@ -85,9 +66,14 @@ case "$usage_suite" in
 esac
 '''
 
+[tasks."smoke:storage"]
+description = "Exercise local SSD storage, HTTP handlers, and restart recovery"
+env = { MTA_API_URL = "https://mta.invalid" }
+run = "cargo test --locked --features fixture-capture,integration-tests --test storage_smoke storage_cutover -- --exact --ignored --nocapture --test-threads=1"
+
 [tasks.openapi]
-description = "Export the current OpenAPI contract without starting workers or connecting to PostgreSQL"
-secrets = ["MTA_API_URL"]
+description = "Export the current OpenAPI contract without starting workers"
+env = { MTA_API_URL = "https://mta.invalid" }
 run = "cargo run --bin openapi"
 
 # Host deps for compiling the valhalla crate (vendored C++).

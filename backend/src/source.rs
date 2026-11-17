@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, str::FromStr};
 use utoipa::ToSchema;
 
-#[derive(sqlx::Type, Copy, Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize, ToSchema)]
-#[sqlx(type_name = "source_enum", rename_all = "snake_case")]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Source {
     MtaSubway,

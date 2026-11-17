@@ -87,6 +87,9 @@ importers:
       '@types/d3-time':
         specifier: 3.0.4
         version: 3.0.4
+      '@types/geojson':
+        specifier: 7946.0.16
+        version: 7946.0.16
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6

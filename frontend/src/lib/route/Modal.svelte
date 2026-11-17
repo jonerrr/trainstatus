@@ -153,8 +153,8 @@
 				{#snippet alert_time(time: number)}
 					{const dt = $derived(dayjs.unix(time))}
 					{#if timeFormat === 'countdown'}
-						{dt.fromNow()}
-					{:else if !dt.isSame(dayjs(), 'day')}
+						{dt.from(dayjs(currentTime.ms))}
+					{:else if !dt.isSame(dayjs(currentTime.ms), 'day')}
 						{dt.format('h:mm A M/D')}
 					{:else}
 						{dt.format('h:mm A')}

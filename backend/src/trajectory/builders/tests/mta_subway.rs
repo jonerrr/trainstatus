@@ -1,6 +1,6 @@
+use crate::operations::identity::RunId;
 use chrono::{DateTime, Utc};
 use geo::{Coord, LineString};
-use uuid::Uuid;
 
 use super::super::super::{
     geometry::{ShapeGeometry, build_shape_geometry, distance_to_coord},
@@ -198,7 +198,7 @@ fn trip_with_anchor(
     .unwrap();
     let anchor_position = VehicleObservation {
         vehicle_id: "train-1".into(),
-        trip_id: Some(Uuid::nil()),
+        trip_id: Some(RunId::ZERO),
         stop_id: None,
         updated_at: ts(100),
         data: PositionData::MtaSubway(MtaSubwayPositionData {
@@ -213,7 +213,7 @@ fn trip_with_anchor(
 
     let trip = TripSnapshot {
         started_at: ts(0),
-        trip_id: Uuid::nil(),
+        trip_id: RunId::ZERO,
         route_id: "A".into(),
         route_color: "#0039A6".into(),
         direction: 1,

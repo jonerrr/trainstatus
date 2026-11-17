@@ -451,7 +451,6 @@ fn build_static_dataset(
                 id: id.clone(),
                 source: Source::MtaSubway,
                 geom: LineString::new(points).into(),
-                data: serde_json::Value::Null,
             })
         })
         .collect();

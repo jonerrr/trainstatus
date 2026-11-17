@@ -1,5 +1,0 @@
-[macros.type-overrides]
-'geometry' = "crate::geometry::Geom"
-'geometry[]' = "Vec<crate::geometry::Geom>"
-'source_enum' = "crate::source::Source"
-'source_enum[]' = "Vec<crate::source::Source>"

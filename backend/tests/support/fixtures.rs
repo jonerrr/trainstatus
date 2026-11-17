@@ -68,3 +68,8 @@ pub fn fixture_root() -> std::path::PathBuf {
 pub fn fixed_time() -> chrono::DateTime<chrono::Utc> {
     chrono::DateTime::from_timestamp(1_780_000_000, 0).unwrap()
 }
+
+/// Eastern service calendar date for a fixture timestamp (not wall-clock `now`).
+pub fn eastern_service_date(at: chrono::DateTime<chrono::Utc>) -> chrono::NaiveDate {
+    backend::operations::identity::eastern_service_date(at)
+}

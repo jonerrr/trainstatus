@@ -48,7 +48,7 @@ describe('countActiveFilters', () => {
 
 	it('resets sources, layers, and property filters together', () => {
 		const filters = new MapFilters();
-		filters.sources = ['mta_bus'];
+		filters.toggleSource('mta_subway');
 		filters.layers.stop = false;
 		filters.stopFilters.mta_bus.direction = ['n'];
 
@@ -73,7 +73,6 @@ describe('countActiveFilters', () => {
 
 	it('keeps an unfiltered source when another source has a property filter', () => {
 		const filters = new MapFilters();
-		filters.sources = ['mta_subway', 'mta_bus'];
 		filters.stopFilters.mta_bus.direction = ['n'];
 
 		expect(filters.stop).toEqual([
@@ -97,6 +96,6 @@ describe('countActiveFilters', () => {
 
 		filters.toggleSource('mta_subway');
 		expect(filters.isSourceEnabled('mta_subway')).toBe(true);
-		expect(filters.sources).toEqual(['mta_bus', 'mta_subway']);
+		expect(filters.sources).toEqual(['mta_subway', 'mta_bus']);
 	});
 });

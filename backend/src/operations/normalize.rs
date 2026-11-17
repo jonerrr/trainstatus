@@ -1,19 +1,20 @@
 //! Shared provider identity rules. Missing or ambiguous identities are isolated.
-use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 
 /// GTFS permits hours beyond 24:00; preserve the service-date day offset.
 pub fn gtfs_start(date: NaiveDate, time: &str) -> Option<DateTime<Utc>> {
-    let parts = time
-        .split(':')
-        .map(str::parse::<u32>)
-        .collect::<Result<Vec<_>, _>>()
-        .ok()?;
-    if parts.len() != 3 || parts[1] >= 60 || parts[2] >= 60 {
+    let mut parts = time.split(':');
+    let hours = parts.next()?.parse::<u32>().ok()?;
+    let minutes = parts.next()?.parse::<u32>().ok()?;
+    let seconds = parts.next()?.parse::<u32>().ok()?;
+    if parts.next().is_some() || minutes >= 60 || seconds >= 60 {
         return None;
     }
-    let date = date.checked_add_signed(Duration::days(i64::from(parts[0] / 24)))?;
-    let time = NaiveTime::from_hms_opt(parts[0] % 24, parts[1], parts[2])?;
-    super::types::trip::TripRun::<uuid::Uuid>::created_at(date, time)
+    let elapsed = hours
+        .checked_mul(3600)?
+        .checked_add(minutes.checked_mul(60)?)?
+        .checked_add(seconds)?;
+    crate::network::expansion::gtfs_datetime(date, elapsed)
 }
 
 // NJT sometimes omits stop_sequence. Scheduled occurrence matching is required

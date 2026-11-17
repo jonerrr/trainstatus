@@ -61,14 +61,18 @@ fn realtime_fixture_maps_trips_and_merges_oba_positions() {
         PositionData::MtaBus(data) if data.passengers.is_some() && data.capacity.is_some()
             && data.status.is_some() && data.phase.is_some()))
     );
+    assert!(
+        snapshot
+            .positions
+            .iter()
+            .any(|position| position.trip_id.is_some()),
+        "fixture should link at least one position to a run"
+    );
     for position in &snapshot.positions {
         if let Some(trip_id) = position.trip_id {
-            assert!(
-                snapshot
-                    .trips
-                    .iter()
-                    .any(|(trip, _)| trip.id == trip_id && trip.vehicle_id == position.vehicle_id)
-            );
+            assert!(snapshot.trips.iter().any(|(trip, _)| trip.id == trip_id.id
+                && trip.partition_date == trip_id.partition_date
+                && trip.vehicle_id == position.vehicle_id));
         }
     }
 }

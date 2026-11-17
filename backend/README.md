@@ -4,19 +4,17 @@
 
 `sources/` decodes providers into owner domain types; `integrations/` wraps GTFS-RT/OBA and Valhalla. `network/` owns imports, restore, schedules, transfers and catalog revisions. `operations/` owns stable run identity, visits, observations, explicit GPS samples, atomic ingestion and shared retained-history materialization. `alerts/` owns notices and current/retained applicability. `trajectory/` owns geometry, interpolation, continuity and Arrow output.
 
-PostgreSQL is durable latest-record storage. Live reads use immutable committed source snapshots shared by `Arc`; only explicit historical reads access retained SQL rows. Network revisions pair routing inputs with exact catalog JSON/ETags and publish all affected catalogs together. Historical trajectories use retained shape assets and eligible recorded GPS anchors. No realtime generations, prediction versions or encoded API/map artifacts are persisted.
+Local SSD storage under `TRAINSTATUS_DATA_DIR` is the durable tier. Live reads use immutable committed source snapshots shared by `Arc`; historical reads load retained records from the filesystem store. Network revisions pair routing inputs with exact catalog JSON/ETags and publish all affected catalogs together. Historical trajectories use retained shape assets and eligible recorded GPS anchors. No realtime generations, prediction versions or encoded API/map artifacts are persisted.
 
 Vehicle observations with the same provider timestamp may update passenger/status metadata and run linkage. Coordinates retain the first accepted fix at that timestamp; only a newer report replaces them. Recorded GPS samples remain first-wins per run and timestamp.
 
-SQLx macros check describable persistence queries at compile time using the committed `.sqlx/` cache and `sqlx.toml` type overrides. Complex aggregate/spatial projections remain runtime queries. See [testing and metadata commands](TESTING.md).
-
-`api/dto/` defines wire representations and borrowed encoders; domain types and private SQL rows are separate. `app.rs` constructs owners, starts workers and stops them during shutdown. This architecture assumes one ingestion writer per source in one process.
+`api/dto/` defines wire representations and borrowed encoders; domain types and private persisted shapes are separate. `app.rs` constructs owners, starts workers and stops them during shutdown. This architecture assumes one ingestion writer per source in one process.
 
 ## Config
 
 | Environment Variable    | Usage                                                                                            | Required | Default                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------ | -------- | -------------------------- |
-| `DATABASE_URL`          | PostgreSQL connection URL used to create the sqlx pool and run migrations on startup.            | Yes      | None                       |
+| `TRAINSTATUS_DATA_DIR`  | Root directory for durable local storage (operations, network, alerts, and journals).            | No       | `data`                     |
 | `ADDRESS`               | Bind address for the Axum HTTP server listener.                                                  | No       | `127.0.0.1:3055`           |
 | `MTA_OBA_API_KEY`       | API key for MTA Bus Time OBA endpoints used by the MTA bus source.                               | Yes      | None                       |
 | `NJT_USERNAME`          | NJ Transit API username used to authenticate and fetch access tokens.                            | Yes      | None                       |

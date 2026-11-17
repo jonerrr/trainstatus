@@ -17,6 +17,11 @@ export type AlertData =
 
 export type AlertFormat = 'plain' | 'html';
 
+/**
+ * Stable identifier for one provider alert occurrence within a source.
+ */
+export type AlertId = string;
+
 export type AlertSection = 'header' | 'description';
 
 /**
@@ -39,19 +44,19 @@ export type ApiAlert = {
 	created_at: number;
 	data: AlertData;
 	/**
-	 * Unix timestamp in seconds. Absent while any active period has no end.
+	 * Unix timestamp in seconds. Absent without declared periods or while any period has no end.
 	 */
 	end_time?: number | null;
 	/**
 	 * Entities affected by alert
 	 */
 	entities: Array<ApiAlertEntity>;
-	id: string;
+	id: AlertId;
 	original_id: string;
 	/**
-	 * Unix timestamp in seconds of the earliest active period.
+	 * Unix timestamp of the earliest provider-declared active period; absent when none is declared.
 	 */
-	start_time: number;
+	start_time?: number | null;
 	translations: Array<AlertTranslation>;
 	/**
 	 * Unix timestamp in seconds.
@@ -385,6 +390,11 @@ export type RouteService = {
 };
 
 /**
+ * Stable identifier for one scheduled run occurrence within a source.
+ */
+export type RunId = string;
+
+/**
  * Passenger service for complete routes from one committed source snapshot, or from
  * retained history when `at` is present.
  */
@@ -447,7 +457,7 @@ export type ServiceTrip = {
 	 * route directions and stop routes.
 	 */
 	direction: number;
-	id: string;
+	id: RunId;
 	status?: VehicleStatus | null;
 	vehicle_id: string;
 };
@@ -589,9 +599,13 @@ export type AlertsHandlerErrors = {
 	 */
 	400: unknown;
 	/**
-	 * Database or internal service error
+	 * Storage or internal service error
 	 */
 	500: unknown;
+	/**
+	 * Historical reads are saturated
+	 */
+	503: unknown;
 };
 
 export type AlertsHandlerResponses = {
@@ -621,7 +635,7 @@ export type CatalogHandlerErrors = {
 	 */
 	400: unknown;
 	/**
-	 * Database or internal service error
+	 * Storage or internal service error
 	 */
 	500: unknown;
 };
@@ -702,11 +716,11 @@ export type ServiceHandlerErrors = {
 	 */
 	404: UnknownRoutes;
 	/**
-	 * Database or internal service error
+	 * Storage or internal service error
 	 */
 	500: unknown;
 	/**
-	 * The source is not ready or historical database reads are saturated
+	 * The source is not ready or historical reads are saturated
 	 */
 	503: unknown;
 };
@@ -745,11 +759,11 @@ export type TrajectoriesHandlerErrors = {
 	 */
 	400: unknown;
 	/**
-	 * Trajectory calculation, database, or internal service error
+	 * Trajectory calculation, storage, or internal service error
 	 */
 	500: unknown;
 	/**
-	 * Historical database reads are saturated
+	 * Historical reads are saturated
 	 */
 	503: unknown;
 };

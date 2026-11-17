@@ -30,7 +30,7 @@ fn trip() -> (TripSnapshot, ShapeGeometry) {
     (
         TripSnapshot {
             started_at: chrono::DateTime::from_timestamp(900, 0).unwrap(),
-            trip_id: uuid::Uuid::nil(),
+            trip_id: crate::operations::identity::RunId::ZERO,
             route_id: "87".into(),
             route_color: "1A2B57".into(),
             direction: 0,

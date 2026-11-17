@@ -1,12 +1,9 @@
-use crate::support;
+use crate::support::{TestContext, app_state};
 
 #[tokio::test]
-async fn trajectory_live_hot_miss_returns_empty_without_database() {
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .acquire_timeout(std::time::Duration::from_millis(100))
-        .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
-        .unwrap();
-    let state = support::app_state(pool.clone());
+async fn trajectory_live_hot_miss_returns_empty_without_ingested_data() {
+    let ctx = TestContext::new();
+    let state = app_state(ctx.storage());
     let (router, _) = utoipa_axum::router::OpenApiRouter::new()
         .nest("/api/v1", backend::api::router(state))
         .split_for_parts();
@@ -20,11 +17,6 @@ async fn trajectory_live_hot_miss_returns_empty_without_database() {
             .map(|batch| batch.unwrap().num_rows())
             .sum::<usize>();
     assert_eq!(rows, 0);
-    assert_eq!(
-        pool.size(),
-        0,
-        "live miss cannot acquire a PostgreSQL connection"
-    );
 }
 
 #[tokio::test]
@@ -34,10 +26,8 @@ async fn trajectory_responses_keep_the_source_commit_time_across_reads() {
     use backend::source::Source;
     use std::sync::Arc;
 
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
-        .unwrap();
-    let state = support::app_state(pool.clone());
+    let ctx = TestContext::new();
+    let state = app_state(ctx.storage());
     let committed_at = chrono::DateTime::from_timestamp(1_780_000_000, 0).unwrap();
     let hot = state
         .trajectories
@@ -64,5 +54,4 @@ async fn trajectory_responses_keep_the_source_commit_time_across_reads() {
         response.assert_status_ok();
         response.assert_header("x-source-updated-at", "1780000000");
     }
-    assert_eq!(pool.size(), 0);
 }

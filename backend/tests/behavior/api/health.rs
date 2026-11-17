@@ -1,15 +1,10 @@
-use crate::support::app_state;
+use crate::support::{TestContext, app_state, unavailable_app_state};
 use axum_test::TestServer;
-use sqlx::postgres::PgPoolOptions;
 
 #[tokio::test]
 async fn liveness_route_returns_ok() {
-    let pg_pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect_lazy("postgres://localhost/unused")
-        .expect("lazy pg pool");
-    let state = app_state(pg_pool);
-    let (router, _) = backend::api::router(state).split_for_parts();
+    let ctx = TestContext::new();
+    let (router, _) = backend::api::router(app_state(ctx.storage())).split_for_parts();
     let server = TestServer::new(router);
 
     let response = server.get("/health/live").await;
@@ -22,12 +17,8 @@ async fn liveness_route_returns_ok() {
 }
 
 #[tokio::test]
-async fn readiness_route_returns_unavailable_when_database_is_unavailable() {
-    let pg_pool = PgPoolOptions::new()
-        .max_connections(1)
-        .connect_lazy("postgres://localhost/unused")
-        .expect("lazy pg pool");
-    let state = app_state(pg_pool);
+async fn readiness_route_returns_unavailable_when_storage_is_unavailable() {
+    let (state, _ctx) = unavailable_app_state();
     let (router, _) = backend::api::router(state).split_for_parts();
     let server = TestServer::new(router);
 

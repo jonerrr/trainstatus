@@ -24,7 +24,7 @@ fn static_index_publishes_one_coherent_revision() {
         geo::Geometry::Point(_)
     ));
     assert!(matches!(
-        revision.shapes["B1000120"].0,
+        revision.shape("B1000120").unwrap().unwrap().0,
         geo::Geometry::LineString(_)
     ));
 }

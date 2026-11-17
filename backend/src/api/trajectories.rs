@@ -35,8 +35,8 @@ use crate::trajectory::types::RenderUnit;
             )
         ),
         (status = 400, description = "Invalid source path or query parameter"),
-        (status = 503, description = "Historical database reads are saturated"),
-        (status = 500, description = "Trajectory calculation, database, or internal service error")
+        (status = 503, description = "Historical reads are saturated"),
+        (status = 500, description = "Trajectory calculation, storage, or internal service error")
     )
 )]
 pub async fn trajectories_handler(
@@ -44,16 +44,19 @@ pub async fn trajectories_handler(
     SourcePath(source): SourcePath,
     Query(time): Query<TimeQuery>,
 ) -> Result<Response, AppError> {
-    let snapshot = state.trajectories.snapshot(source, time.at).await?;
-
-    let units: Vec<RenderUnit> = snapshot.render_units.values().cloned().collect();
-
-    let bytes = encode_render_units(&units)?;
-    let mut response = Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/vnd.apache.arrow.stream");
-    if let Some(committed_at) = snapshot.committed_at {
-        response = response.header("x-source-updated-at", committed_at.timestamp().to_string());
-    }
-    Ok(response.body(Body::from(bytes))?)
+    state
+        .history_work(time.at.is_some(), move |state| async move {
+            let snapshot = state.trajectories.snapshot(source, time.at).await?;
+            let units: Vec<RenderUnit> = snapshot.render_units.values().cloned().collect();
+            let bytes = encode_render_units(&units)?;
+            let mut response = Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/vnd.apache.arrow.stream");
+            if let Some(committed_at) = snapshot.committed_at {
+                response =
+                    response.header("x-source-updated-at", committed_at.timestamp().to_string());
+            }
+            Ok(response.body(Body::from(bytes))?)
+        })
+        .await?
 }

@@ -34,6 +34,8 @@ Local views have no unavailable-message variants. Failed refreshes retain loaded
 
 Live data older than 90 seconds since its last successful fetch or source commit triggers the shared warning. Passed calls are dropped and future predictions stay visible. Empty detail views say "No predictions to show"; list rows omit prediction labels when none remain. Successful historical data never becomes a live warning.
 
+Live requests use a 15-second network deadline; historical (`at`) service, alert and trajectory requests use 60 seconds. Failed historical trajectory requests do not retry automatically; they wait for the shared **Retry** control.
+
 ## Persistence and offline
 
 Persisted preferences use camelCase keys and cached `LocalStorage.current` snapshots: replace the value to mutate and persist, and let the wrapper handle cross-tab updates. Source selection uses `selectedSources` in both localStorage and its server-readable cookie; modal time formatting uses `timeFormat`. List tab keys derive from their camelCase titles, such as `pinnedTripsTab`. Old key spellings are not read or migrated.
@@ -45,6 +47,8 @@ The service worker caches the shell per deployment and catalogs in a stable `cat
 Each entity type has `Button.svelte` + `Modal.svelte` in `src/lib/{route,stop,trip}/`. Modal routing uses shallow URL params with the source: `?s=&src=`, `?r=&src=`, `?t=&r=&src=`. View transitions use `document.startViewTransition`.
 
 Pinned trip rows reserve 68px of content height in every state (loading, running and missing). With list padding and borders, their 86px border box matches `calculateTripHeight` and the list skeleton. `List.svelte.test.ts` measures real browser row heights, content bounds and scroll alignment for all three sources at narrow and wide widths; estimator drift fails the component suite without a live API.
+
+Stop-row height estimates include the list's 16px padding and two 1px borders. Subway estimates reserve the header-to-directions gap once and the 4px gaps between arrival rows; duplicate route memberships do not reserve duplicate rows. Skeletons use the same border/gap accounting.
 
 Trip-row status descriptions and countdowns share the same target call. An observed stop keeps its own countdown even when its prediction has passed (`Now` while stopped, otherwise `Due`); a missing matching call omits the countdown rather than borrowing another stop's prediction. Unassigned trains use their origin call. Otherwise, without an observed stop, the next upcoming call supplies both.
 
@@ -69,6 +73,14 @@ On initial load and client-side navigation into Stops, the search field receives
 
 Reactive state files use `.svelte.ts`. Current time is scoped per layout through `createCurrentTime`, `setCurrentTime` and `getCurrentTime`; retrieve the context during component initialization.
 
+Historical alert countdowns and same-day time labels use this selected clock, not the wall clock.
+
+Charts use each call's visit sequence for travel order, including repeated stops, equal predictions and predictions that move backward in time. Conflicting itineraries can occupy repeated axis rows; prediction times do not reorder visits. Enter selects a search result only when one exists.
+
 ## Map
 
 Trajectory rendering is described in [trajectories](trajectories.md).
+
+Stop layers are client GeoJSON from loaded current catalogs. Route layers use the selected sources' Arrow trajectory geometry and catalog route metadata, including historical `?at=` geometry. Route polling stays enabled with route lines even when vehicle markers are hidden. Filters, highlights and hit targets remain shared map interactions. Martin serves only the database-free MBTiles basemap, fonts, styles and sprites; neither transit layer requests SQL tiles.
+
+Map source filters derive from the layout's current selected sources, minus explicitly hidden sources. Newly available sources appear by default, removed sources leave every layer, and Reset restores the current layout selection rather than the initial page-load selection.

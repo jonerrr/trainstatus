@@ -132,10 +132,10 @@ function emptyPropertyFilters(): Record<Source, Record<string, FilterValue>> {
 }
 
 export class MapFilters {
-	readonly initialSources = [...page.data.selectedSources];
-
-	// Source selection state
-	sources = $state<Source[]>([...this.initialSources]);
+	hiddenSources = $state<Source[]>([]);
+	sources = $derived(
+		page.data.selectedSources.filter((source) => !this.hiddenSources.includes(source))
+	);
 
 	// Property filter state: Record<Source, Record<PropertyName, FilterValue>>
 	stopFilters = $state<Record<Source, Record<string, FilterValue>>>(emptyPropertyFilters());
@@ -226,7 +226,7 @@ export class MapFilters {
 
 	activeFilterCount = $derived(
 		countActiveFilters({
-			initialSources: this.initialSources,
+			initialSources: page.data.selectedSources,
 			sources: this.sources,
 			layers: this.layers,
 			propertyFilters: [
@@ -241,13 +241,13 @@ export class MapFilters {
 	}
 
 	toggleSource(source: Source) {
-		this.sources = this.isSourceEnabled(source)
-			? this.sources.filter((s) => s !== source)
-			: [...this.sources, source];
+		this.hiddenSources = this.isSourceEnabled(source)
+			? [...this.hiddenSources, source]
+			: this.hiddenSources.filter((s) => s !== source);
 	}
 
 	reset() {
-		this.sources = [...this.initialSources];
+		this.hiddenSources = [];
 		this.layers = { route: true, stop: true, trip: true };
 		this.stopFilters = emptyPropertyFilters();
 		this.routeFilters = emptyPropertyFilters();

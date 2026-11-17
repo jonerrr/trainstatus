@@ -10,7 +10,6 @@ config_roots = ["backend", "frontend", "geo", "science"]
 "aqua:pnpm/pnpm" = "latest"
 "aqua:jdx/hk" = "latest"
 "pipx:pyvalhalla" = { version = "latest", uvx = true }
-"cargo:sqlx-cli" = { version = "latest", features = "native-tls,postgres,sqlx-toml", default-features = "false" }
 fnox = "latest"
 # installing with mise caused the rust vscode extension not to work, and a
 # newer mise protoc breaks Valhalla's CMake (mismatched vs system libprotobuf)
@@ -23,7 +22,7 @@ experimental = true
 [secrets.fnox]
 
 [env]
-DATABASE_URL = "postgres://trains:trains@localhost:5432/trains"
+TRAINSTATUS_DATA_DIR = "data"
 HK_MISE = "1"
 _.path = ["frontend/node_modules/.bin"]
 
@@ -39,7 +38,7 @@ fi
 
 [tasks."containers:up"]
 extends = "containers"
-description = "Start the trainstatus-<suffix> pod if it is not running, then wait for Postgres."
+description = "Start the trainstatus-<suffix> pod if it is not running."
 run = '''
 #!/usr/bin/env bash
 {% raw %}
@@ -78,19 +77,7 @@ else
   podman "${args[@]}"
 fi
 
-container="${pod}-postgis"
-for attempt in $(seq 1 120); do
-  if podman exec "$container" pg_isready -U trains -d trains >/dev/null 2>&1; then
-    if ((attempt > 1)); then
-      echo "Postgres in ${pod} is accepting connections."
-    fi
-    exit 0
-  fi
-  sleep 1
-done
-
-echo "Timed out waiting for Postgres in ${pod}." >&2
-exit 1
+echo "${pod} is running."
 {% endraw %}
 '''
 
@@ -154,8 +141,6 @@ if ((${#collected[@]} > 0)); then
   mapfile -t volumes < <(printf '%s\n' "${collected[@]}" | sed '/^$/d' | sort -u)
 fi
 
-# kube down keeps volumes. --force only removes volumes named in the current
-# file, so also remove named volumes still mounted from an older spec.
 podman kube down "$file"
 echo "Removed ${pod}."
 if ((${#volumes[@]} > 0)); then
@@ -166,8 +151,6 @@ if ((${#volumes[@]} > 0)); then
     fi
   done
 fi
-
-echo "Run mise //backend:migrate if this database is empty."
 {% endraw %}
 '''
 
@@ -208,6 +191,10 @@ run = "hk fix"
 [tasks."test:unit"]
 description = "Run backend and frontend service-free unit/behavior suites"
 run = { tasks = ["//backend:test:unit", "//frontend:test:unit"] }
+
+[tasks."smoke:storage"]
+description = "Run the ignored all-source storage recovery and TCP integration smoke test"
+run = { tasks = ["//backend:smoke:storage"] }
 
 [tasks."test:hooks"]
 description = "Validate hk configuration and run its builtin utility tests"

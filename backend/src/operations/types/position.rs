@@ -1,16 +1,16 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::geometry::Geom;
+use crate::operations::identity::RunId;
 
-/// Collection links use `RunKey`; committed observations use the resolved UUID.
+/// Collection and committed observations share the same [`RunId`] links.
 /// A report can contain status without coordinates, so it is an observation rather
 /// than necessarily a geographic position.
 /// Latest accepted report for a vehicle, optionally linked to a run.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct VehicleObservation<I = Uuid> {
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct VehicleObservation<I = RunId> {
     pub vehicle_id: String,
     pub trip_id: Option<I>,
     pub stop_id: Option<String>,
@@ -19,13 +19,13 @@ pub struct VehicleObservation<I = Uuid> {
     pub geom: Option<Geom>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MtaSubwayPositionData {
     pub assigned: bool,
     pub status: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MtaBusPositionData {
     pub bearing: f32,
     pub passengers: Option<i32>,
@@ -34,12 +34,12 @@ pub struct MtaBusPositionData {
     pub phase: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NjtBusPositionData {
     pub occupancy_status: OccupancyStatus,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum PositionData {
     MtaSubway(MtaSubwayPositionData),
@@ -47,7 +47,7 @@ pub enum PositionData {
     NjtBus(NjtBusPositionData),
 }
 
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum OccupancyStatus {
     #[default]
     Empty,

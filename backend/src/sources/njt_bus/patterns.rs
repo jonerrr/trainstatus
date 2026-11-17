@@ -279,9 +279,6 @@ pub fn build_patterns(
                 id: id.clone(),
                 source: Source::NjtBus,
                 geom: geo::Geometry::LineString(line).into(),
-                // TODO: why are we this extra shape data? I don't think it is used anywhere else in the codebase.
-                data: serde_json::json!({"provenance": "njt_arcgis_operating_patterns", "bus_pattern": id,
-                    "line": f.attributes.line, "route_dir": f.attributes.route_dir, "upstream_id": f.attributes.id}),
             })
         })();
         match result {

@@ -18,7 +18,7 @@ fn fixture(source: Source) -> (TripSnapshot, ShapeGeometry) {
     let geometry = build_shape_geometry(&shape, 6538).unwrap();
     let trip = TripSnapshot {
         started_at: chrono::DateTime::from_timestamp(900, 0).unwrap(),
-        trip_id: uuid::Uuid::nil(),
+        trip_id: crate::operations::identity::RunId::ZERO,
         route_id: "bus".into(),
         route_color: "000000".into(),
         direction: 0,

@@ -2,10 +2,10 @@
 use std::collections::BTreeMap;
 
 use crate::operations::{
-    normalize::gtfs_start,
+    identity::{RunId, RunRef, eastern_service_date},
     source::{
         CollectedObservation, CollectedSnapshot, CollectedTrip, CollectedVisit, RealtimeSource,
-        RealtimeSourceConfig, RunKey,
+        RealtimeSourceConfig,
     },
     types::{
         position::{MtaSubwayPositionData, PositionData},
@@ -160,19 +160,23 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
             car_length_feet: c.car_length_feet,
         });
 
-        let trip_id = RunKey::new(
-            Source::MtaSubway,
-            &helium_trip.trip_id,
-            created_at,
-            direction,
-        );
+        let service_date = eastern_service_date(created_at);
+        let Some(run_id) = RunId::mta_subway(&helium_trip.trip_id, service_date) else {
+            warn!(
+                trainstatus.source = Source::MtaSubway.as_str(),
+                trainstatus.trip.id = %helium_trip.trip_id,
+                "Invalid subway run identity"
+            );
+            continue;
+        };
         let trip = CollectedTrip {
-            id: trip_id,
+            id: run_id,
             original_id: helium_trip.trip_id.clone(),
             route_id: helium_trip.route_id.clone(),
             shape_ids: helium_trip.shape_segment_ids.clone(),
             direction,
             created_at,
+            partition_date: service_date,
             vehicle_id: helium_trip.trip_id.clone(),
             updated_at,
             data: TripData::MtaSubway(MtaSubwayTripData {
@@ -197,7 +201,7 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
             .filter_map(|(index, stop)| {
                 let arrival = DateTime::from_timestamp(stop.est_arrive_at, 0)?;
                 Some(CollectedVisit {
-                    trip_id,
+                    trip_id: run_id,
                     stop_sequence: i32::try_from(index).ok()?,
                     stop_id: stop.station_id.to_string(),
                     arrival,
@@ -227,7 +231,10 @@ fn build_realtime_from_response(response: HeliumTripsResponse) -> CollectedSnaps
 
             positions.push(CollectedObservation {
                 vehicle_id: helium_trip.trip_id.clone(),
-                trip_id: Some(trip_id),
+                trip_id: Some(RunRef {
+                    id: run_id,
+                    partition_date: service_date,
+                }),
                 stop_id: Some(stop.station_id.to_string()),
                 updated_at,
                 geom: geom.map(|g| g.into()),
@@ -289,18 +296,6 @@ fn normalize_subway_direction(direction: &str) -> Option<i16> {
     }
 }
 
-/// Parses the MTA's origin time format into NaiveTime.
-pub fn parse_origin_time(origin_time: i32) -> Option<NaiveTime> {
-    let minutes = origin_time as f64 / 100.0;
-    let total_seconds = (minutes * 60.0) as i64;
-    let normalized = total_seconds.rem_euclid(24 * 60 * 60);
-    let h = (normalized / 3600) as u32;
-    let m = ((normalized % 3600) / 60) as u32;
-    let s = (normalized % 60) as u32;
-    NaiveTime::from_hms_opt(h, m, s)
-}
-
-// TODO: test this around midnight
 /// Try to parse a created_at timestamp from the Helium trip_id.
 ///
 /// TripRun ID format: `<prefix><route> <HHMM>[+] <origin>/<dest>`
@@ -336,24 +331,25 @@ fn parse_created_at_from_trip_id(trip_id: &str, now: DateTime<Utc>) -> Option<Da
     let has_plus = time_token.chars().nth(digits.len()) == Some('+');
     let ss: u32 = if has_plus { 30 } else { 0 };
 
-    let origin_time = format!("{hh}:{mm}:{ss}");
+    // Helium HHMM is provider wall time, not elapsed GTFS service time.
+    let origin_time = NaiveTime::from_hms_opt(hh, mm, ss)?;
 
     // Determine the service date in Eastern Time
     let now_et = now.with_timezone(&chrono_tz::America::New_York);
     let today_et = now_et.date_naive();
 
     // Try today first
-    let candidate = gtfs_start(today_et, &origin_time)?;
+    let candidate = CollectedTrip::created_at(today_et, origin_time)?;
     let diff_hours = (candidate - now).num_hours();
 
     if diff_hours > 6 {
         // Origin time is far in the future — this trip is from yesterday's service
         let yesterday = today_et - chrono::Duration::days(1);
-        gtfs_start(yesterday, &origin_time)
+        CollectedTrip::created_at(yesterday, origin_time)
     } else if diff_hours < -18 {
         // Origin time is far in the past — this trip is from tomorrow's service (just past midnight)
         let tomorrow = today_et + chrono::Duration::days(1);
-        gtfs_start(tomorrow, &origin_time)
+        CollectedTrip::created_at(tomorrow, origin_time)
     } else {
         Some(candidate)
     }

@@ -8,6 +8,7 @@ use crate::source::Source;
 use axum::{
     Json,
     extract::{Query, State},
+    response::{IntoResponse, Response},
 };
 
 #[utoipa::path(
@@ -23,14 +24,19 @@ use axum::{
     responses(
         (status = 200, description = "Alerts for the specified source", body = [ApiAlert]),
         (status = 400, description = "Invalid source path or query parameter"),
-        (status = 500, description = "Database or internal service error")
+        (status = 503, description = "Historical reads are saturated"),
+        (status = 500, description = "Storage or internal service error")
     )
 )]
 pub async fn alerts_handler(
     State(state): State<AppState>,
     SourcePath(source): SourcePath,
     Query(time): Query<TimeQuery>,
-) -> Result<Json<Vec<ApiAlert>>, AppError> {
-    let alerts = state.alerts.get_all(source, time.at).await?;
-    Ok(Json(alerts.iter().map(ApiAlert::from).collect()))
+) -> Result<Response, AppError> {
+    state
+        .history_work(time.at.is_some(), move |state| async move {
+            let alerts = state.alerts.get_all(source, time.at).await?;
+            Ok(Json(alerts.iter().map(ApiAlert::from).collect::<Vec<_>>()).into_response())
+        })
+        .await?
 }

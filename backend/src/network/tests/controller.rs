@@ -21,11 +21,10 @@ impl StaticAdapter for FailingAdapter {
 
 #[tokio::test]
 async fn import_panic_completes_waiters_and_allows_retry() {
-    // Forced updates reach collection before any SQL; no database is required.
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect_lazy("postgres://unused:unused@localhost/unused")
-        .unwrap();
-    let network = Network::new(pool, NetworkIndex::new());
+    let dir = std::env::temp_dir().join(format!("network-controller-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let storage = crate::storage::store::Storage::open(&dir).unwrap();
+    let network = Network::new(storage, NetworkIndex::new()).unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
     let controller = run(&network, vec![Arc::new(FailingAdapter(calls.clone()))]).await;
     let first = tokio::time::timeout(
@@ -46,4 +45,5 @@ async fn import_panic_completes_waiters_and_allows_retry() {
     assert!(retry.to_string().contains("next collection reached"));
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     controller.shutdown();
+    let _ = std::fs::remove_dir_all(&dir);
 }

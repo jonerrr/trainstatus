@@ -2,6 +2,8 @@
 target/
 debug_data/
 profile.json
+/data/
+/backend/data/
 
 
 # env
@@ -14,6 +16,7 @@ fnox.local.toml
 
 # frontend
 node_modules
+.pnpm-store/
 
 # Output
 .output

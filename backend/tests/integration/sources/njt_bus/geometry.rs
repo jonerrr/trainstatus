@@ -1,17 +1,15 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use uuid::Uuid;
 
-use crate::support;
+use crate::support::{TestContext, test_owners};
 use backend::{
     feed::{self, FeedMessage, TripUpdate},
     network::{
-        dataset::NetworkDataset,
         index::{NetworkRevision, TripPattern},
         store::Network,
     },
-    operations::{history::History, ingestor::OperationsIngestor},
+    operations::ingestor::OperationsIngestor,
     source::Source,
     sources::njt_bus::{
         patterns::PatternFeature, realtime::NjtBusRealtime,
@@ -21,20 +19,18 @@ use backend::{
 };
 
 struct Scenario {
-    stores: support::TestOwners,
-    dataset: NetworkDataset,
-    feed: FeedMessage,
-    update: TripUpdate,
-    patterns: HashMap<String, TripPattern>,
-    scheduled_id: String,
-    route_id: String,
-    now: chrono::DateTime<Utc>,
     ingestor: OperationsIngestor,
-    restarted: Network,
+    network: Network,
+    feed: FeedMessage,
+    dataset: backend::network::dataset::NetworkDataset,
+    now: chrono::DateTime<Utc>,
+    _context: TestContext,
 }
 
-async fn scenario(pool: sqlx::PgPool) -> Scenario {
-    let stores = support::test_owners(pool.clone());
+async fn scenario() -> Scenario {
+    let ctx = TestContext::new();
+    let storage = ctx.storage();
+    let stores = test_owners(storage);
     let gtfs = gtfs_structures::Gtfs::from_path(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/njt_bus/static/basic/raw/patterns_gtfs.zip"
@@ -46,31 +42,27 @@ async fn scenario(pool: sqlx::PgPool) -> Scenario {
     )))
     .unwrap();
     let mut built = build_static_dataset_from_patterns(&gtfs, features);
-    let patterns = built.revision.patterns.clone();
-    let mut gate_remap = built.revision.stop_remap.clone();
     let scheduled = gtfs
         .trips
         .values()
         .find(|t| t.shape_id.as_deref() == Some("87-3"))
         .unwrap();
-    let now = support::fixtures::fixed_time();
+    let now = Utc::now();
     let first = &scheduled.stop_times[0].stop;
-    let first_canonical = gate_remap
+    let canonical_first = built
+        .dataset
+        .stop_remap
         .get(&first.id)
-        .cloned()
-        .unwrap_or_else(|| first.id.clone());
-    gate_remap.insert("test-gate".into(), first_canonical.clone());
-    built.dataset.stop_remap = gate_remap.clone();
-    let dataset = &built.dataset;
-    assert_eq!(dataset.shapes.len(), 3);
-    stores.network.persist(dataset).await.unwrap();
-    let restarted = support::test_owners(pool.clone()).network;
-    restarted
-        .restore_revision(dataset.source)
-        .await
-        .unwrap()
-        .unwrap();
+        .unwrap_or(&first.id)
+        .clone();
+    built
+        .dataset
+        .stop_remap
+        .insert("test-gate".into(), canonical_first);
+    stores.network.persist(built.dataset.clone()).await.unwrap();
+    let network = stores.network;
     let update = TripUpdate {
+        timestamp: Some(now.timestamp() as u64),
         trip: feed::TripDescriptor {
             trip_id: Some(scheduled.id.clone()),
             route_id: Some(scheduled.route_id.clone()),
@@ -115,120 +107,87 @@ async fn scenario(pool: sqlx::PgPool) -> Scenario {
             .collect(),
         ..Default::default()
     };
-    let vehicle = feed::VehiclePosition {
-        vehicle: update.vehicle.clone(),
+    let position = feed::VehiclePosition {
         trip: Some(update.trip.clone()),
+        vehicle: update.vehicle.clone(),
+        timestamp: Some(now.timestamp() as u64),
+        stop_id: Some("test-gate".into()),
         position: Some(feed::Position {
             latitude: first.latitude.unwrap() as f32,
             longitude: first.longitude.unwrap() as f32,
             ..Default::default()
         }),
-        timestamp: Some(now.timestamp() as u64),
-        // No ceiling: allow the fixture to exercise motion over several stops.
         ..Default::default()
     };
     let feed = FeedMessage {
         header: feed::FeedHeader {
             gtfs_realtime_version: "2.0".into(),
+            timestamp: Some(now.timestamp() as u64),
             ..Default::default()
         },
         entity: vec![
             feed::FeedEntity {
                 id: "trip".into(),
-                trip_update: Some(update.clone()),
+                trip_update: Some(update),
                 ..Default::default()
             },
             feed::FeedEntity {
                 id: "vehicle".into(),
-                vehicle: Some(vehicle),
+                vehicle: Some(position),
                 ..Default::default()
             },
         ],
     };
-    let ingestor = OperationsIngestor::new(
-        pool.clone(),
-        stores.live_snapshots.clone(),
-        restarted.network_index(),
-    );
-
+    let ingestor = stores.ingestor;
     Scenario {
-        stores,
-        dataset: built.dataset,
         feed,
-        update,
-        patterns,
-        scheduled_id: scheduled.id.clone(),
-        route_id: scheduled.route_id.clone(),
+        dataset: built.dataset,
         now,
         ingestor,
-        restarted,
+        network,
+        _context: ctx,
     }
 }
 
-#[sqlx::test]
-async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPool) {
-    let scenario = scenario(pool.clone()).await;
-    scenario
+#[tokio::test]
+async fn exact_pattern_and_gate_remap_survive_ingestion_replay() {
+    let scenario = scenario().await;
+    let revision = scenario
+        .network
+        .network_index()
+        .get(Source::NjtBus)
+        .unwrap();
+    let expected_shape = revision.shape("87-3").unwrap().unwrap();
+    let snapshot =
+        |feed: FeedMessage| NjtBusRealtime::build_snapshot(vec![feed], revision.clone()).unwrap();
+    let first = scenario
         .ingestor
-        .ingest(
-            NjtBusRealtime::build_snapshot(
-                vec![scenario.feed.clone()],
-                scenario
-                    .restarted
-                    .network_index()
-                    .get(Source::NjtBus)
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
+        .ingest(snapshot(scenario.feed.clone()))
         .await
         .unwrap();
-    // Run again to verify vehicle linkage uses the existing database trip UUID.
-    scenario
+    let second = scenario
         .ingestor
-        .ingest(
-            NjtBusRealtime::build_snapshot(
-                vec![scenario.feed.clone()],
-                scenario
-                    .restarted
-                    .network_index()
-                    .get(Source::NjtBus)
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
+        .ingest(snapshot(scenario.feed.clone()))
         .await
         .unwrap();
-    let trips: Vec<(Uuid, Vec<String>)> =
-        sqlx::query_as("SELECT id, shape_ids FROM realtime.trip WHERE source = $1")
-            .bind(Source::NjtBus)
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-    assert_eq!(trips.len(), 1);
-    assert_eq!(trips[0].1, ["87-3"]);
-    let position_trips: Vec<Option<Uuid>> =
-        sqlx::query_scalar("SELECT trip_id FROM realtime.vehicle_position WHERE source = $1")
-            .bind(Source::NjtBus)
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-    assert_eq!(position_trips, [Some(trips[0].0)]);
-    let history = History::new(pool.clone());
-    let retained = history
+    assert_eq!(first.trips[0].id, second.trips[0].id);
+    assert_eq!(first.trips[0].shape_ids.len(), 1);
+    assert_eq!(
+        first
+            .network_revision
+            .shape(&first.trips[0].shape_ids[0])
+            .unwrap()
+            .unwrap(),
+        expected_shape
+    );
+    assert_eq!(second.positions[0].trip_id, Some(first.trips[0].id));
+    let retained = scenario
+        .ingestor
+        .history()
         .load_trajectories(Source::NjtBus, scenario.now)
         .await
         .unwrap();
     assert_eq!(retained.service.trips.len(), 1);
-    let network = retained.network.unwrap();
-    let expected = &scenario
-        .dataset
-        .shapes
-        .iter()
-        .find(|shape| shape.id == "87-3")
-        .unwrap()
-        .geom;
-    assert!(network.shapes.values().any(|geom| geom.0 == expected.0));
     assert!(
         retained
             .service
@@ -236,124 +195,84 @@ async fn exact_pattern_and_gate_remap_survive_ingestion_replay(pool: sqlx::PgPoo
             .iter()
             .all(|visit| visit.stop_id != "test-gate")
     );
-    let rendered = TrajectoryService::new(pool.clone())
+    let rendered = TrajectoryService::new(scenario.ingestor.history())
         .snapshot(Source::NjtBus, Some(scenario.now))
         .await
         .unwrap();
     assert!(!rendered.render_units.is_empty());
-    // Empty shape input after a metadata refresh preserves the previously
-    // resolved shape, consistently with every source's ingestion contract.
-    let mut empty_pattern_revision = NetworkRevision::from_dataset(&scenario.dataset);
-    std::sync::Arc::make_mut(&mut empty_pattern_revision.trip_patterns).clear();
+    let mut empty_patterns = NetworkRevision::from_dataset(&scenario.dataset);
+    std::sync::Arc::make_mut(&mut empty_patterns.trip_patterns).clear();
     scenario
-        .restarted
+        .network
         .network_index()
-        .publish_bundle(vec![empty_pattern_revision]);
-    assert!(
-        !scenario
-            .restarted
-            .network_index()
-            .get(Source::NjtBus)
-            .unwrap()
-            .trip_patterns
-            .contains_key(&scenario.scheduled_id)
-    );
-    scenario
+        .publish_bundle(vec![empty_patterns]);
+    let third = scenario
         .ingestor
-        .ingest(
-            NjtBusRealtime::build_snapshot(
-                vec![scenario.feed.clone()],
-                scenario
-                    .restarted
-                    .network_index()
-                    .get(Source::NjtBus)
-                    .unwrap(),
-            )
+        .ingest(snapshot(scenario.feed.clone()))
+        .await
+        .unwrap();
+    assert_eq!(third.trips[0].shape_ids.len(), 1);
+    assert_eq!(
+        third
+            .network_revision
+            .shape(&third.trips[0].shape_ids[0])
+            .unwrap()
             .unwrap(),
-        )
-        .await
-        .unwrap();
-    let rows = history
-        .load_trajectories(Source::NjtBus, scenario.now)
-        .await
-        .unwrap();
-    assert!(
-        !rows.service.trips.is_empty(),
-        "preserved stored shape remains usable historically"
+        expected_shape
     );
-    let shape_ids: (Vec<String>,) =
-        sqlx::query_as("SELECT shape_ids FROM realtime.trip WHERE source='njt_bus'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(shape_ids.0, ["87-3"]);
 }
 
-#[sqlx::test]
-async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction(pool: sqlx::PgPool) {
-    let scenario = scenario(pool).await;
-    // Even without geometry or a service-day cache entry, complete static trip
-    // metadata keeps a trip visible when GTFS-RT omits route/direction.
-    let mut unmatched_patterns = scenario.patterns.clone();
+#[tokio::test]
+async fn pattern_metadata_fills_missing_route_and_rejects_wrong_direction() {
+    let scenario = scenario().await;
+    let patterns: HashMap<String, TripPattern> = scenario
+        .network
+        .network_index()
+        .get(Source::NjtBus)
+        .unwrap()
+        .trip_patterns
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    let mut unmatched = NetworkRevision::from_dataset(&scenario.dataset);
+    let mut unmatched_patterns = patterns.clone();
     for pattern in unmatched_patterns.values_mut() {
         pattern.shape_id = None;
     }
-    let mut unmatched_revision = NetworkRevision::from_dataset(&scenario.dataset);
-    unmatched_revision.trip_patterns = std::sync::Arc::new(unmatched_patterns);
-    unmatched_revision.stop_remap = std::sync::Arc::new(HashMap::new());
+    unmatched.trip_patterns = std::sync::Arc::new(unmatched_patterns);
+    unmatched.stop_remap = std::sync::Arc::new(HashMap::new());
     scenario
-        .stores
         .network
         .network_index()
-        .publish_bundle(vec![unmatched_revision]);
-    let mut incomplete = scenario.update.clone();
-    incomplete.trip.route_id = None;
-    incomplete.trip.direction_id = None;
-    incomplete.trip.start_date = Some("19990101".into());
-    let mut incomplete_feed = scenario.feed.clone();
-    incomplete_feed.entity[0].trip_update = Some(incomplete);
-    let snapshot = NjtBusRealtime::build_snapshot(
-        vec![incomplete_feed],
-        scenario
-            .stores
-            .network
-            .network_index()
-            .get(Source::NjtBus)
-            .unwrap(),
-    )
-    .unwrap();
-    let trip = &snapshot
-        .trips
-        .first()
-        .expect("unmatched trip remains available for lists")
-        .0;
-    assert_eq!(trip.route_id, scenario.route_id);
+        .publish_bundle(vec![unmatched]);
+    let mut feed = scenario.feed.clone();
+    let update = feed.entity[0].trip_update.as_mut().unwrap();
+    update.trip.route_id = None;
+    update.trip.direction_id = None;
+    update.trip.start_date = Some("19990101".into());
+    let revision = scenario
+        .network
+        .network_index()
+        .get(Source::NjtBus)
+        .unwrap();
+    let snapshot = NjtBusRealtime::build_snapshot(vec![feed], revision.clone()).unwrap();
+    let trip = &snapshot.trips[0].0;
+    assert_eq!(trip.route_id, "87");
     assert!(trip.shape_ids.is_empty());
-
-    let mut mismatched = scenario.update;
-    mismatched.trip.direction_id = Some(1);
-    let mut mismatched_revision = NetworkRevision::from_dataset(&scenario.dataset);
-    mismatched_revision.trip_patterns = std::sync::Arc::new(scenario.patterns.clone());
-    mismatched_revision.stop_remap = std::sync::Arc::new(HashMap::new());
+    let mut mismatched = NetworkRevision::from_dataset(&scenario.dataset);
+    mismatched.trip_patterns = std::sync::Arc::new(patterns);
+    mismatched.stop_remap = std::sync::Arc::new(HashMap::new());
     scenario
-        .stores
         .network
         .network_index()
-        .publish_bundle(vec![mismatched_revision]);
-    let mut mismatched_feed = scenario.feed;
-    mismatched_feed.entity[0].trip_update = Some(mismatched);
-    let snapshot = NjtBusRealtime::build_snapshot(
-        vec![mismatched_feed],
-        scenario
-            .stores
-            .network
-            .network_index()
-            .get(Source::NjtBus)
-            .unwrap(),
-    )
-    .unwrap();
-    assert!(
-        snapshot.trips[0].0.shape_ids.is_empty(),
-        "direction mismatch is not assigned a pattern"
-    );
+        .publish_bundle(vec![mismatched]);
+    let mut feed = scenario.feed;
+    feed.entity[0]
+        .trip_update
+        .as_mut()
+        .unwrap()
+        .trip
+        .direction_id = Some(1);
+    let snapshot = NjtBusRealtime::build_snapshot(vec![feed], revision).unwrap();
+    assert!(snapshot.trips[0].0.shape_ids.is_empty());
 }
