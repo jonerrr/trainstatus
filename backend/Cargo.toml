@@ -24,7 +24,7 @@ geo = { version = "0.33.0", features = ["use-serde"] }
 geozero = { version = "0.15.1", features = ["with-wkb"] }
 gtfs-structures = "0.52.0"
 http = "1.2.0"
-jiff = "0.2"
+jiff = "1.0"
 moka = { version = "0.12.15", features = ["future", "sync"] }
 opentelemetry = { version = "0.33.1", features = ["trace", "metrics", "logs", "internal-logs"] }
 opentelemetry_sdk = { version = "0.33.1", features = ["trace", "metrics", "logs", "internal-logs"] }
