@@ -1,8 +1,8 @@
 # Declared before the first FROM so it can be used in later FROM lines.
 # Bump manually when upgrading; tile major version must match backend Valhalla.
-ARG VALHALLA_VERSION=3.9.1@sha256:4fd114eb1d26b8fc2f43bcb3df234c1b63a0bf13c277405e5943d5361dc575de
+ARG VALHALLA_VERSION=3.9.3@sha256:cf618ccafdead96829282acc81a70aa00947c2f28ddcf118f0194acf2fbc7e9d
 
-FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS osm-data
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS osm-data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -54,7 +54,7 @@ RUN valhalla_build_extract -c valhalla.json -v
 # (Optional) Delete the raw tiles directory to save space in the builder stage
 # RUN rm -rf /build/valhalla_tiles
 
-FROM ghcr.io/onthegomap/planetiler:latest@sha256:65250c408ad4ec576510284663a00d469cf69faf4ed91e08f0bf1450d60743f0 AS planetiler-builder
+FROM ghcr.io/onthegomap/planetiler:latest@sha256:b72e8593a95090619896c083db281cc647fd6e478344d504eb1704e42c712a92 AS planetiler-builder
 
 WORKDIR /data
 COPY --from=osm-data /build/merged.osm.pbf /data/merged.osm.pbf
